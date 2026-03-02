@@ -25,8 +25,8 @@ public class InternalEventPublisher implements EventPublisher {
     }
 
     @Override
-    public void publish(Event event, EventBus eventBus) {
-        if (eventBus != EventBus.INTERNAL) {
+    public void publish(Event event) {
+        if (!event.eventBusTypes().contains(EventBus.INTERNAL)) {
             throw new IllegalArgumentException("This publisher only supports INTERNAL event bus");
         }
         try {

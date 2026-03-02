@@ -24,24 +24,32 @@ public class CompositeEventPublisher implements EventPublisher {
     }
 
     @Override
-    public void publish(Event event, EventBus eventBus) {
-        EventPublisher publisher = eventPublishers.get(eventBus);
-        if (publisher == null) {
-            throw new IllegalArgumentException("No publisher found for bus: " + eventBus);
-        }
+    public void publish(Event event) {
+        event.eventBusTypes().forEach(eventBus -> {
+            EventPublisher publisher = eventPublishers.get(eventBus);
+            if (publisher == null) {
+                throw new IllegalArgumentException("No publisher found for bus: " + eventBus);
+            }
+            // Check if transaction is active
+            if (transactionalPublishingEnabled && TransactionSynchronizationManager.isActualTransactionActive()) {
+                // Register synchronization that will execute after commit
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        publisher.publish(event);
+                    }
+                });
+            } else {
+                // No transaction, publish immediately
+                publisher.publish(event);
+            }
+        });
 
-        // Check if transaction is active
-        if (transactionalPublishingEnabled && TransactionSynchronizationManager.isActualTransactionActive()) {
-            // Register synchronization that will execute after commit
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    publisher.publish(event, eventBus);
-                }
-            });
-        } else {
-            // No transaction, publish immediately
-            publisher.publish(event, eventBus);
-        }
+
+    }
+
+    @Override
+    public EventBus eventBus() {
+        throw new UnsupportedOperationException();
     }
 }

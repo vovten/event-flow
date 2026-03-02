@@ -1,5 +1,7 @@
-package com.github.vovten.eventflow.event;
+package com.github.vovten.eventflow.event.dispatcher;
 
+import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.event.EventDispatcher;
 import com.github.vovten.eventflow.event.collection.CompositeEventListenerCollection;
 import com.github.vovten.eventflow.event.collection.EventListenerCollection;
 import com.github.vovten.eventflow.event.collection.SpringEventListenerAnnotationCollection;

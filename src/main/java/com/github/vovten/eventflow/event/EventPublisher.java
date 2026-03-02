@@ -11,9 +11,8 @@ public interface EventPublisher {
      * Publish the event to the specified event bus
      *
      * @param event the event to publish
-     * @param eventBus the target event bus
      */
-    void publish(Event event, EventBus eventBus);
+    void publish(Event event);
 
     /**
      * @return  event bus

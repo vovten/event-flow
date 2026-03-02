@@ -1,11 +1,16 @@
 package com.github.vovten.eventflow.event;
 
+import com.github.vovten.eventflow.event.publisher.CompositeEventPublisher;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -13,20 +18,15 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.util.backoff.ExponentialBackOff;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -57,7 +57,8 @@ public class EventDispatcherConfig {
 
     private DefaultErrorHandler errorHandler() {
         return new DefaultErrorHandler(
-                (consumerRecord, e) -> log.error("Failed to process message from topic " + consumerRecord.topic(), e),
+                (consumerRecord, e) ->
+                        log.error("Failed to process message from topic: {} ", consumerRecord.topic(), e),
                 new ExponentialBackOff()
         );
     }
@@ -96,10 +97,10 @@ public class EventDispatcherConfig {
     }
 
     @Bean
-    public EventPublisher eventPublisher(List<EventListener> eventListeners,
+    public EventPublisher eventPublisher(List<EventPublisher> eventPublishers,
                                          @Value("${event.publishing.transactional:true}") boolean transactionalPublishingEnabled) {
         return new CompositeEventPublisher(
-                eventListeners.stream().collect(Collectors.toMap(EventListener::eventBus, Function.identity())),
+                eventPublishers.stream().collect(Collectors.toMap(EventPublisher::eventBus, Function.identity())),
                 transactionalPublishingEnabled
         );
     }

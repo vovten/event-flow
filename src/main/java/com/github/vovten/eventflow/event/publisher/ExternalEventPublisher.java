@@ -28,8 +28,8 @@ public class ExternalEventPublisher implements EventPublisher {
     }
 
     @Override
-    public void publish(Event event, EventBus eventBus) {
-        if (eventBus != EventBus.EXTERNAL) {
+    public void publish(Event event) {
+        if (!event.eventBusTypes().contains(EventBus.EXTERNAL)) {
             throw new IllegalArgumentException("This publisher only supports EXTERNAL event bus");
         }
         kafkaTemplate.send(topic, event.asJson());
