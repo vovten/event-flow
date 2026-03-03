@@ -11,6 +11,6 @@ public record TestEvent(String id) implements Event {
 
     @Override
     public List<EventBus> eventBusTypes() {
-        return List.of(EventBus.EXTERNAL);
+        return List.of(EventBus.INTERNAL, EventBus.EXTERNAL);
     }
 }

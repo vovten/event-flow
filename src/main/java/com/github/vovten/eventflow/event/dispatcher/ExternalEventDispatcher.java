@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -41,7 +42,7 @@ public class ExternalEventDispatcher extends AbstractEventDispatcher {
     public ExternalEventDispatcher(Consumer<String, String> kafkaConsumer,
                                    List<String> topics,
                                    ExecutorService executorService) {
-        this(kafkaConsumer, topics, executorService, executorService, "");
+        this(kafkaConsumer, topics, executorService, "");
     }
 
     /**
@@ -49,13 +50,12 @@ public class ExternalEventDispatcher extends AbstractEventDispatcher {
      */
     public ExternalEventDispatcher(Consumer<String, String> kafkaConsumer,
                                    List<String> topics,
-                                   ExecutorService loopExecutorService,
                                    ExecutorService executorService,
                                    String eventListenerScanPackage) {
         super(executorService, eventListenerScanPackage);
-        this.kafkaConsumer = kafkaConsumer;
         this.topics = topics;
-        this.executorService = loopExecutorService;
+        this.kafkaConsumer = kafkaConsumer;
+        this.executorService = Executors.newSingleThreadExecutor();
     }
 
     /**
@@ -69,7 +69,7 @@ public class ExternalEventDispatcher extends AbstractEventDispatcher {
         super(executorService, eventListenerScanPackage);
         this.kafkaConsumer = createConsumer(bootstrapServers, groupId);
         this.topics = parseTopics(topicsConfig);
-        this.executorService = executorService;
+        this.executorService = Executors.newSingleThreadExecutor();
     }
 
     /**
@@ -83,7 +83,7 @@ public class ExternalEventDispatcher extends AbstractEventDispatcher {
     }
 
     /**
-     * Stops the Kafka consumer gracefully
+     * Stops the Kafka consumer
      */
     public void stop() {
         if (running.compareAndSet(true, false)) {
@@ -92,8 +92,16 @@ public class ExternalEventDispatcher extends AbstractEventDispatcher {
                 consumerFuture.cancel(true);
             }
             if (kafkaConsumer != null) {
-                kafkaConsumer.wakeup();
-                kafkaConsumer.close();
+                try {
+                    kafkaConsumer.wakeup();
+                } catch (Exception e) {
+                    log.warn("Error waking up consumer", e);
+                }
+                try {
+                    kafkaConsumer.close();
+                } catch (Exception e) {
+                    log.warn("Error closing consumer", e);
+                }
             }
             log.info("ExternalEventDispatcher stopped");
         }

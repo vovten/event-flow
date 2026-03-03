@@ -7,7 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,11 +21,16 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for ExternalEventPublisher with Embedded Kafka
@@ -46,22 +51,38 @@ class ExternalPublisherDispatcherIntegrationTest {
     TestEventListener eventListener;
 
     private ExternalEventPublisher publisher;
+    private ExternalEventDispatcher dispatcher;
+    private ExecutorService dispatcherExecutor;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws InterruptedException {
+        eventListener.setLatch(new CountDownLatch(1));
+        eventListener.setAnnotationResult(null);
+        
         publisher = new ExternalEventPublisher(
                 createKafkaTemplate(),
                 "test-events"
         );
-        ExternalEventDispatcher dispatcher = new ExternalEventDispatcher(
+        dispatcherExecutor = Executors.newSingleThreadExecutor();
+        dispatcher = new ExternalEventDispatcher(
                 createDispatcherConsumer(),
                 List.of("test-events"),
-                Executors.newSingleThreadExecutor(),
-                executorService(),
-                "com.github.vovten.eventflow.event.publisher"
+                dispatcherExecutor,
+                "com.github.vovten.eventflow.event"
         );
         dispatcher.start();
         dispatcher.onApplicationEvent(new ContextRefreshedEvent(applicationContext));
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (dispatcher != null) {
+            dispatcher.stop();
+            dispatcher.stop();
+        }
+        if (dispatcherExecutor != null) {
+            dispatcherExecutor.shutdown();
+        }
     }
 
     @Test
@@ -69,13 +90,17 @@ class ExternalPublisherDispatcherIntegrationTest {
     void shouldPublishEventToKafkaTopic() throws InterruptedException {
         // arrange
         TestEvent testEvent = new TestEvent("test-id-123");
+        CountDownLatch latch = new CountDownLatch(1);
+        eventListener.setLatch(latch);
 
-        // arrange act
+        // act
         publisher.publish(testEvent);
+        boolean completed = latch.await(5, SECONDS);
 
         // assert
-        Thread.sleep(3000L);
-        Assertions.assertEquals("test-id-123", eventListener.getResult());
+        assertTrue(completed, "Event should be processed within timeout");
+        assertEquals("test-id-123", eventListener.getAnnotationResult());
+        assertEquals("test-id-123", eventListener.getInterfaceResult());
     }
 
     private KafkaTemplate<String, String> createKafkaTemplate() {
@@ -97,77 +122,5 @@ class ExternalPublisherDispatcherIntegrationTest {
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         DefaultKafkaConsumerFactory<String, String> factory = new DefaultKafkaConsumerFactory<>(properties);
         return factory.createConsumer();
-    }
-
-    private static ExecutorService executorService() {
-        return new ExecutorService() {
-            @Override
-            public void shutdown() {
-
-            }
-
-            @Override
-            public List<Runnable> shutdownNow() {
-                return List.of();
-            }
-
-            @Override
-            public boolean isShutdown() {
-                return false;
-            }
-
-            @Override
-            public boolean isTerminated() {
-                return false;
-            }
-
-            @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-                return false;
-            }
-
-            @Override
-            public <T> Future<T> submit(Callable<T> task) {
-                return null;
-            }
-
-            @Override
-            public <T> Future<T> submit(Runnable task, T result) {
-                return null;
-            }
-
-            @Override
-            public Future<?> submit(Runnable task) {
-                if (task == null) throw new NullPointerException();
-                RunnableFuture<Void> futureTask = new FutureTask(task, null);
-                execute(futureTask);
-                return futureTask;
-            }
-
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-                return List.of();
-            }
-
-            @Override
-            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException {
-                return List.of();
-            }
-
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-                return null;
-            }
-
-            @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-                return null;
-            }
-
-            @Override
-            public void execute(Runnable command) {
-                command.run();
-            }
-        };
     }
 }
