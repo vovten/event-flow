@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.github.vovten.eventflow.util.EventUtils;
 
 import java.util.List;
 
@@ -20,7 +21,7 @@ public interface Event {
     Class<? extends Event> type();
 
     /**
-     * Список шин, в которые будет происходить публикация данного события.
+     * Список шин в которые будет выполняться публикация данного события.
      * По умолчанию событие публикуется только во внутреннюю шину {@link EventBus#INTERNAL}.
      */
     default List<EventBus> eventBusTypes() {

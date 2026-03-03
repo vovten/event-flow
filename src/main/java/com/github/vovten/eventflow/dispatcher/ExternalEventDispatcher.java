@@ -2,7 +2,7 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventBus;
-import com.github.vovten.eventflow.EventUtils;
+import com.github.vovten.eventflow.util.EventUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;

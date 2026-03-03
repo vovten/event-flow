@@ -1,5 +1,5 @@
 // File: EventSerializationException.java
-package com.github.vovten.eventflow;
+package com.github.vovten.eventflow.util;
 
 /**
  * Event serialization error

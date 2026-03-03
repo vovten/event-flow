@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow;
 
+import com.github.vovten.eventflow.util.EventSerializationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

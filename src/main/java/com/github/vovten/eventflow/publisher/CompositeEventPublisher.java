@@ -25,7 +25,7 @@ public class CompositeEventPublisher implements EventPublisher {
 
     @Override
     public void publish(Event event) {
-        event.eventBusTypes().forEach(eventBus -> {
+        for (EventBus eventBus : event.eventBusTypes()) {
             EventPublisher publisher = eventPublishers.get(eventBus);
             if (publisher == null) {
                 throw new IllegalArgumentException("No publisher found for bus: " + eventBus);
@@ -43,7 +43,7 @@ public class CompositeEventPublisher implements EventPublisher {
                 // No transaction, publish immediately
                 publisher.publish(event);
             }
-        });
+        }
 
 
     }

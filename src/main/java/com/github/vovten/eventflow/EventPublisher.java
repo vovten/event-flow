@@ -15,6 +15,8 @@ public interface EventPublisher {
     void publish(Event event);
 
     /**
+     * The type of bus used when publishing events
+     *
      * @return  event bus
      */
     EventBus eventBus();
