@@ -25,6 +25,7 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -49,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         brokerProperties = {"listeners=PLAINTEXT://localhost:9092", "port=9092"},
         topics = {"test-events"}
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class CompositeEventPublisherIntegrationTest {
 
     @Value("${spring.embedded.kafka.brokers}")

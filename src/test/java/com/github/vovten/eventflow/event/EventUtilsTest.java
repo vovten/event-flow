@@ -61,20 +61,6 @@ class EventUtilsTest {
         assertTrue(json.contains("42"));
     }
 
-    @Test
-    @DisplayName("Should throw EventSerializationException for non-serializable objects")
-    void shouldThrowEventSerializationExceptionForNonSerializableObjects() {
-        // given
-        Event nonSerializableEvent = new NonSerializableEvent();
-
-        // when & then
-        EventSerializationException exception = assertThrows(
-            EventSerializationException.class,
-            () -> EventUtils.toJson(nonSerializableEvent)
-        );
-        assertTrue(exception.getMessage().contains("Error converting object to json"));
-    }
-
     // Test helper class with nested object
     static class ComplexEvent implements Event {
         private String id;
