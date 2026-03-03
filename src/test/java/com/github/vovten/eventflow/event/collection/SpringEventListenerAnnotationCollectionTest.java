@@ -100,6 +100,7 @@ class SpringEventListenerAnnotationCollectionTest {
     @DisplayName("Should throw exception for invalid method signature")
     void shouldThrowExceptionForInvalidMethodSignature() {
         // given
+        collection = new SpringEventListenerAnnotationCollection(executorService);
         InvalidEventListener listener = new InvalidEventListener();
 
         // when & then

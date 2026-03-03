@@ -65,17 +65,25 @@ public class SpringEventListenerAnnotationCollection implements EventListenerCol
             return false;
         }
         var listeners = eventListeners.get(event.getClass());
-        if (CollectionUtils.isEmpty(listeners)) {
-            return false;
-        } else {
-            if (eventListeners.containsKey(Event.class)) {
+        boolean hasListeners = !CollectionUtils.isEmpty(listeners);
+        
+        // Also check for generic Event.class listeners
+        if (eventListeners.containsKey(Event.class)) {
+            if (hasListeners) {
                 listeners = new ArrayList<>(listeners);
                 listeners.addAll(eventListeners.get(Event.class));
+            } else {
+                listeners = eventListeners.get(Event.class);
+                hasListeners = true;
             }
+        }
+        
+        if (hasListeners && listeners != null) {
             listeners.forEach(pair -> executorService.execute(() ->
                     invokeEventListener(pair.getLeft(), pair.getRight(), event)));
             return true;
         }
+        return false;
     }
 
     @Override

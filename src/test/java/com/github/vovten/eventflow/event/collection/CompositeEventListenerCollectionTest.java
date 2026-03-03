@@ -177,12 +177,17 @@ class CompositeEventListenerCollectionTest {
         // given
         SpringEventListenerInterfaceCollection collection1 =
                 new SpringEventListenerInterfaceCollection(executorService);
+        TestEventListener listener = new TestEventListener();
+        collection1.add(listener);
+        
         compositeCollection = new CompositeEventListenerCollection(
                 new ArrayList<>(List.of(collection1))
         );
 
         SpringEventListenerInterfaceCollection collection2 =
                 new SpringEventListenerInterfaceCollection(executorService);
+        TestEventListener listener2 = new TestEventListener();
+        collection2.add(listener2);
 
         // when
         compositeCollection.add(collection2);

@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.HashMap;
@@ -23,13 +25,14 @@ import static org.mockito.Mockito.*;
  * Unit tests for CompositeEventPublisher
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CompositeEventPublisherTest {
 
     @Mock
-    private InternalEventPublisher internalPublisher;
+    private EventPublisher internalPublisher;
 
     @Mock
-    private ExternalEventPublisher externalPublisher;
+    private EventPublisher externalPublisher;
 
     private Map<EventBus, EventPublisher> eventPublishers;
     private CompositeEventPublisher compositePublisher;

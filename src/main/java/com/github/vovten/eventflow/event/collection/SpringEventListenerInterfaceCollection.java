@@ -40,13 +40,23 @@ public class SpringEventListenerInterfaceCollection implements EventListenerColl
             return false;
         }
         var listeners = eventListeners.get(event.getClass());
-        if (CollectionUtils.isEmpty(listeners)) {
-            return false;
-        } else {
-            listeners.forEach(eventListener -> 
+        boolean hasListeners = !CollectionUtils.isEmpty(listeners);
+        
+        if (eventListeners.containsKey(Event.class)) {
+            if (hasListeners) {
+                listeners = new ArrayList<>(listeners);
+                listeners.addAll(eventListeners.get(Event.class));
+            } else {
+                listeners = eventListeners.get(Event.class);
+                hasListeners = true;
+            }
+        }
+        if (hasListeners && listeners != null) {
+            listeners.forEach(eventListener ->
                 executorService.execute(() -> eventListener.onEvent(event)));
             return true;
         }
+        return false;
     }
 
     @Override

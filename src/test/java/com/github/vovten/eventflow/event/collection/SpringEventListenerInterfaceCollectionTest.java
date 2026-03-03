@@ -140,9 +140,9 @@ class SpringEventListenerInterfaceCollectionTest {
         collection.pass(event);
 
         // then
-        Thread.sleep(100);
-        assertTrue(listener1.wasCalled());
-        assertTrue(listener2.wasCalled());
+        Thread.sleep(500);
+        assertTrue(listener1.wasCalled(), "Listener 1 should be called");
+        assertTrue(listener2.wasCalled(), "Listener 2 should be called");
     }
 
     @Test

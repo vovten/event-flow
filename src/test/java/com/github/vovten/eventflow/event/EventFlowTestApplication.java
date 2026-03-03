@@ -1,15 +1,12 @@
 package com.github.vovten.eventflow.event;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
-
 /**
  * Test application configuration for integration tests
+ * Removed eventQueue bean to avoid conflict with EventDispatcherConfig
  */
 @SpringBootApplication
 @ComponentScan(
@@ -20,9 +17,4 @@ import java.util.concurrent.LinkedBlockingDeque;
     )
 )
 public class EventFlowTestApplication {
-
-    @Bean
-    public BlockingDeque<Event> eventQueue() {
-        return new LinkedBlockingDeque<>();
-    }
 }

@@ -44,4 +44,30 @@ public final class EventUtils {
             throw new EventSerializationException("Error converting object to json", e);
         }
     }
+
+    /**
+     * Convert json string to event
+     *
+     * @param json the json string
+     * @param clazz the event class
+     * @param <T> the event type
+     * @return the event
+     * @throws EventSerializationException if error occurs during json to object conversion
+     */
+    public static <T extends Event> T fromJson(String json, Class<T> clazz) {
+        try {
+            return objectMapper.readValue(json, clazz);
+        } catch (JsonProcessingException e) {
+            throw new EventSerializationException("Error converting json to object", e);
+        }
+    }
+
+    /**
+     * Get ObjectMapper for custom serialization/deserialization
+     *
+     * @return the ObjectMapper
+     */
+    public static ObjectMapper getObjectMapper() {
+        return objectMapper;
+    }
 }

@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow.event;
 
+import com.github.vovten.eventflow.event.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.event.publisher.CompositeEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -7,6 +8,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -47,6 +49,21 @@ public class EventDispatcherConfig {
         this.bootstrapServers = bootstrapServers;
     }
 
+    /**
+     * Creates ExternalEventDispatcher bean that uses native Kafka consumer
+     */
+    @Bean(destroyMethod = "stop")
+    @ConditionalOnProperty(name = "event.external.dispatcher.enabled", havingValue = "true")
+    public ExternalEventDispatcher externalEventDispatcher(
+            @Value("${event.external.dispatcher.topics}") String topicsConfig,
+            @Value("${event.external.dispatcher.group.id:KafkaEventDispatcher}") String groupId,
+            @Value("${event.listener.scan.package:}") String eventListenerScanPackage,
+            ExecutorService executorService) {
+        ExternalEventDispatcher dispatcher = new ExternalEventDispatcher(bootstrapServers, topicsConfig, groupId, eventListenerScanPackage, executorService);
+        dispatcher.start();
+        return dispatcher;
+    }
+
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Event> kafkaEventDispatcherContainerFactory() {
         var factory = new ConcurrentKafkaListenerContainerFactory<String, Event>();
@@ -79,6 +96,15 @@ public class EventDispatcherConfig {
 
     @Bean
     public KafkaTemplate<String, Event> eventKafkaTemplate() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(config));
+    }
+
+    @Bean(destroyMethod = "destroy")
+    public KafkaTemplate<String, String> stringKafkaTemplate() {
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
