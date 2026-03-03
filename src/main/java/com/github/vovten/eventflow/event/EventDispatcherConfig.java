@@ -59,7 +59,8 @@ public class EventDispatcherConfig {
             @Value("${event.external.dispatcher.group.id:KafkaEventDispatcher}") String groupId,
             @Value("${event.listener.scan.package:}") String eventListenerScanPackage,
             ExecutorService executorService) {
-        ExternalEventDispatcher dispatcher = new ExternalEventDispatcher(bootstrapServers, topicsConfig, groupId, eventListenerScanPackage, executorService);
+        ExternalEventDispatcher dispatcher = new ExternalEventDispatcher(bootstrapServers, topicsConfig,
+                groupId, eventListenerScanPackage, executorService);
         dispatcher.start();
         return dispatcher;
     }

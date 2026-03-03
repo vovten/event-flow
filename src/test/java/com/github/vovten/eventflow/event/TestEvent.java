@@ -13,4 +13,8 @@ public record TestEvent(String id) implements Event {
     public List<EventBus> eventBusTypes() {
         return List.of(EventBus.INTERNAL, EventBus.EXTERNAL);
     }
+
+    public String getMessage() {
+        return id;
+    }
 }
