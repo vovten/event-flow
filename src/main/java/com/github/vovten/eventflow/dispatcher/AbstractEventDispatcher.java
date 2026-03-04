@@ -8,8 +8,6 @@ import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationListener;
-import org.springframework.context.event.ContextRefreshedEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,9 +21,8 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
  * @author Vladimir Aleshkov, 21.11.2024.
  */
 @Slf4j
-public abstract class AbstractEventDispatcher implements EventDispatcher, ApplicationListener<ContextRefreshedEvent> {
+public abstract class AbstractEventDispatcher implements EventDispatcher {
 
-    private final String eventListenerScanPackage;
     private final ExecutorService executorService;
     private final EventListenerRegistry listenerRegistry;
 
@@ -34,10 +31,19 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
     }
 
     protected AbstractEventDispatcher(ExecutorService executorService, String eventListenerScanPackage) {
+        this(executorService, eventListenerScanPackage, createDefaultRegistry(eventListenerScanPackage));
+    }
+
+    protected AbstractEventDispatcher(ExecutorService executorService,
+                                      String eventListenerScanPackage,
+                                      EventListenerRegistry listenerRegistry) {
         this.executorService = executorService;
-        this.eventListenerScanPackage = eventListenerScanPackage;
-        this.listenerRegistry = new CompositeEventListenerRegistry(new ArrayList<>(
-                List.of(new SpringAnnotationBasedEventListenerRegistry(),
+        this.listenerRegistry = listenerRegistry;
+    }
+
+    private static EventListenerRegistry createDefaultRegistry(String eventListenerScanPackage) {
+        return new CompositeEventListenerRegistry(new ArrayList<>(
+                List.of(new SpringAnnotationBasedEventListenerRegistry(eventListenerScanPackage, null),
                         new SpringInterfaceBasedEventListenerRegistry()
                 )
         ));
@@ -53,22 +59,6 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
         for (EventListener listener : listeners) {
             executorService.execute(() -> listener.onEvent(event));
         }
-    }
-
-    @Override
-    public void onApplicationEvent(ContextRefreshedEvent event) {
-        var applicationContext = event.getApplicationContext();
-        listenerRegistry.merge(
-                new SpringAnnotationBasedEventListenerRegistry(
-                        eventListenerScanPackage,
-                        applicationContext
-                )
-        );
-        listenerRegistry.merge(
-                new SpringInterfaceBasedEventListenerRegistry(
-                        applicationContext
-                )
-        );
     }
 
     @Override

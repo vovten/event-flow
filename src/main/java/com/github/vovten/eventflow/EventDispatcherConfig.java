@@ -2,6 +2,10 @@ package com.github.vovten.eventflow;
 
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.publisher.CompositeEventPublisher;
+import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
+import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -22,6 +26,7 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.util.backoff.ExponentialBackOff;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +44,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Configuration
-@ComponentScan("com.github.vovten.eventflow")
+@ComponentScan(basePackages = {"com.github.vovten.eventflow", "com.github.vovten.eventflow.registry"})
 @PropertySource(value = "classpath:event-flow.properties")
 public class EventDispatcherConfig {
 
@@ -58,11 +63,22 @@ public class EventDispatcherConfig {
             @Value("${event.external.dispatcher.topics}") String topicsConfig,
             @Value("${event.external.dispatcher.group.id:KafkaEventDispatcher}") String groupId,
             @Value("${event.listener.scan.package:}") String eventListenerScanPackage,
-            ExecutorService executorService) {
+            ExecutorService executorService,
+            SpringAnnotationBasedEventListenerRegistry annotationRegistry,
+            SpringInterfaceBasedEventListenerRegistry interfaceRegistry) {
         ExternalEventDispatcher dispatcher = new ExternalEventDispatcher(bootstrapServers, topicsConfig,
-                groupId, eventListenerScanPackage, executorService);
+                groupId, eventListenerScanPackage, executorService,
+                createCompositeRegistry(annotationRegistry, interfaceRegistry));
         dispatcher.start();
         return dispatcher;
+    }
+
+    private EventListenerRegistry createCompositeRegistry(
+            SpringAnnotationBasedEventListenerRegistry annotationRegistry,
+            SpringInterfaceBasedEventListenerRegistry interfaceRegistry) {
+        return new CompositeEventListenerRegistry(
+                new ArrayList<>(List.of(annotationRegistry, interfaceRegistry))
+        );
     }
 
     @Bean

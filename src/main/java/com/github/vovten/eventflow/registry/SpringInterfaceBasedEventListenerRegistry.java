@@ -1,6 +1,8 @@
 package com.github.vovten.eventflow.registry;
 
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
 import com.github.vovten.eventflow.EventListener;
 
 import java.util.concurrent.ExecutorService;
@@ -10,8 +12,10 @@ import java.util.concurrent.ExecutorService;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class SpringInterfaceBasedEventListenerRegistry extends InterfaceBasedEventListenerRegistry {
-    private final ApplicationContext applicationContext;
+public class SpringInterfaceBasedEventListenerRegistry extends InterfaceBasedEventListenerRegistry
+        implements ApplicationListener<ContextRefreshedEvent> {
+
+    private ApplicationContext applicationContext;
 
     /**
      * Constructor for event listener registry
@@ -30,6 +34,12 @@ public class SpringInterfaceBasedEventListenerRegistry extends InterfaceBasedEve
     public SpringInterfaceBasedEventListenerRegistry() {
         super();
         this.applicationContext = null;
+    }
+
+    @Override
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+        this.applicationContext = event.getApplicationContext();
+        this.init();
     }
 
     private void init() {

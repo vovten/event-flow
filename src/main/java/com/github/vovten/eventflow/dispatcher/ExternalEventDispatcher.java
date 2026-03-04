@@ -2,6 +2,10 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventBus;
+import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
+import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
 import com.github.vovten.eventflow.util.EventUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -11,6 +15,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -57,6 +62,19 @@ public class ExternalEventDispatcher extends AbstractEventDispatcher {
     }
 
     /**
+     * Constructor for tests - allows injecting a mock Consumer with custom listener registry
+     */
+    public ExternalEventDispatcher(Consumer<String, String> kafkaConsumer,
+                                   List<String> topics,
+                                   ExecutorService executorService,
+                                   EventListenerRegistry listenerRegistry) {
+        super(executorService, "", listenerRegistry);
+        this.topics = topics;
+        this.kafkaConsumer = kafkaConsumer;
+        this.executorService = Executors.newSingleThreadExecutor();
+    }
+
+    /**
      * Spring constructor - creates Kafka Consumer from configuration
      */
     public ExternalEventDispatcher(String bootstrapServers,
@@ -65,6 +83,21 @@ public class ExternalEventDispatcher extends AbstractEventDispatcher {
                                    String eventListenerScanPackage,
                                    ExecutorService executorService) {
         super(executorService, eventListenerScanPackage);
+        this.kafkaConsumer = createConsumer(bootstrapServers, groupId);
+        this.topics = parseTopics(topicsConfig);
+        this.executorService = Executors.newSingleThreadExecutor();
+    }
+
+    /**
+     * Spring constructor with custom listener registry
+     */
+    public ExternalEventDispatcher(String bootstrapServers,
+                                   String topicsConfig,
+                                   String groupId,
+                                   String eventListenerScanPackage,
+                                   ExecutorService executorService,
+                                   EventListenerRegistry listenerRegistry) {
+        super(executorService, eventListenerScanPackage, listenerRegistry);
         this.kafkaConsumer = createConsumer(bootstrapServers, groupId);
         this.topics = parseTopics(topicsConfig);
         this.executorService = Executors.newSingleThreadExecutor();

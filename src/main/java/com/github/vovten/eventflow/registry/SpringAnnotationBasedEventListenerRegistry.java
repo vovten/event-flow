@@ -2,6 +2,8 @@ package com.github.vovten.eventflow.registry;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.util.ClassUtils;
 
 import java.lang.reflect.Method;
@@ -15,9 +17,11 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedEventListenerRegistry {
+public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedEventListenerRegistry
+        implements ApplicationListener<ContextRefreshedEvent> {
+
     private final String scanPackage;
-    private final ApplicationContext applicationContext;
+    private ApplicationContext applicationContext;
 
     /**
      * Constructor for event listener registry
@@ -50,6 +54,12 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedE
                 registerListener(bean, method);
             }
         }
+    }
+
+    @Override
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+        this.applicationContext = event.getApplicationContext();
+        this.init();
     }
 
     private void init() {

@@ -2,6 +2,9 @@ package com.github.vovten.eventflow;
 
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.publisher.ExternalEventPublisher;
+import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -12,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -63,16 +65,22 @@ class ExternalPublisherDispatcherIntegrationTest {
                 "test-events"
         );
 
+        // Создаем реестры явно для тестов
+        var annotationRegistry = new SpringAnnotationBasedEventListenerRegistry(
+                TestEvent.class.getPackageName(), applicationContext);
+        var interfaceRegistry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
+        var listenerRegistry = new CompositeEventListenerRegistry(
+                java.util.List.of(annotationRegistry, interfaceRegistry));
+
         dispatcherExecutor = Executors.newSingleThreadExecutor();
         dispatcher = new ExternalEventDispatcher(
                 createDispatcherConsumer(),
                 List.of("test-events"),
                 dispatcherExecutor,
-                TestEvent.class.getPackageName()
+                listenerRegistry
         );
 
         dispatcher.start();
-        dispatcher.onApplicationEvent(new ContextRefreshedEvent(applicationContext));
 
         // Ждем инициализации
         Thread.sleep(1000);

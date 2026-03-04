@@ -7,6 +7,9 @@ import com.github.vovten.eventflow.TestEventListener;
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.test.CompositeTestEvent;
 import com.github.vovten.eventflow.TestEvent;
+import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -20,7 +23,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -96,14 +98,21 @@ class CompositeEventPublisherIntegrationTest {
 
         // Настраиваем и запускаем dispatcher для получения внешних событий
         dispatcherExecutor = Executors.newSingleThreadExecutor();
+        
+        // Создаем реестры явно для тестов
+        var annotationRegistry = new SpringAnnotationBasedEventListenerRegistry(
+                TestEvent.class.getPackageName(), applicationContext);
+        var interfaceRegistry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
+        var listenerRegistry = new CompositeEventListenerRegistry(
+                java.util.List.of(annotationRegistry, interfaceRegistry));
+        
         externalDispatcher = new ExternalEventDispatcher(
                 createDispatcherConsumer(),
                 java.util.List.of("test-events"),
                 dispatcherExecutor,
-                TestEvent.class.getPackageName()
+                listenerRegistry
         );
         externalDispatcher.start();
-        externalDispatcher.onApplicationEvent(new ContextRefreshedEvent(applicationContext));
     }
 
     @AfterEach
