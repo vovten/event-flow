@@ -33,8 +33,8 @@ class CompositeEventListenerRegistryTest {
         // given
         SpringInterfaceBasedEventListenerRegistry registry1 =
                 new SpringInterfaceBasedEventListenerRegistry(executorService);
-        SpringAnnotatedEventListenerRegistry registry2 =
-                new SpringAnnotatedEventListenerRegistry(executorService);
+        SpringAnnotationBasedEventListenerRegistry registry2 =
+                new SpringAnnotationBasedEventListenerRegistry(executorService);
         compositeRegistry = new CompositeEventListenerRegistry(
                 new ArrayList<>(List.of(registry1, registry2)));
 
@@ -52,8 +52,8 @@ class CompositeEventListenerRegistryTest {
         TestEventListener listener = new TestEventListener();
         interfaceRegistry.register(listener);
 
-        SpringAnnotatedEventListenerRegistry annotationRegistry =
-                new SpringAnnotatedEventListenerRegistry(executorService);
+        SpringAnnotationBasedEventListenerRegistry annotationRegistry =
+                new SpringAnnotationBasedEventListenerRegistry(executorService);
         AnnotatedEventListener annotatedListener = new AnnotatedEventListener();
         annotationRegistry.register(annotatedListener);
 
@@ -78,8 +78,8 @@ class CompositeEventListenerRegistryTest {
         // given
         SpringInterfaceBasedEventListenerRegistry registry1 =
                 new SpringInterfaceBasedEventListenerRegistry(executorService);
-        SpringAnnotatedEventListenerRegistry registry2 =
-                new SpringAnnotatedEventListenerRegistry(executorService);
+        SpringAnnotationBasedEventListenerRegistry registry2 =
+                new SpringAnnotationBasedEventListenerRegistry(executorService);
         compositeRegistry = new CompositeEventListenerRegistry(
                 new ArrayList<>(List.of(registry1, registry2)));
 

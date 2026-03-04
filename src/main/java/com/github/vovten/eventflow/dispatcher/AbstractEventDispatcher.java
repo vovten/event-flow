@@ -4,7 +4,7 @@ import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventDispatcher;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringAnnotatedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationListener;
@@ -37,7 +37,7 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
         this.eventListenerScanPackage = eventListenerScanPackage;
         this.eventListenerRegistry = new CompositeEventListenerRegistry(new ArrayList<>(
                 List.of(
-                        new SpringAnnotatedEventListenerRegistry(executorService),
+                        new SpringAnnotationBasedEventListenerRegistry(executorService),
                         new SpringInterfaceBasedEventListenerRegistry(executorService)
                 )
         ));
@@ -55,7 +55,7 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
     public void onApplicationEvent(ContextRefreshedEvent event) {
         var applicationContext = event.getApplicationContext();
         eventListenerRegistry.merge(
-                new SpringAnnotatedEventListenerRegistry(
+                new SpringAnnotationBasedEventListenerRegistry(
                         eventListenerScanPackage,
                         executorService,
                         applicationContext

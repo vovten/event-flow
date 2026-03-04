@@ -51,8 +51,8 @@ class EventListenerRegistryIntegrationTest {
     @DisplayName("Should dispatch event to annotation-based listener")
     void shouldDispatchEventToAnnotationBasedListener() throws InterruptedException {
         // given
-        SpringAnnotatedEventListenerRegistry registry =
-            new SpringAnnotatedEventListenerRegistry(
+        SpringAnnotationBasedEventListenerRegistry registry =
+            new SpringAnnotationBasedEventListenerRegistry(
                 Executors.newFixedThreadPool(2));
         AnnotationBasedListener listener = new AnnotationBasedListener();
         registry.register(listener);
@@ -76,8 +76,8 @@ class EventListenerRegistryIntegrationTest {
         SpringInterfaceBasedEventListenerRegistry interfaceRegistry =
             new SpringInterfaceBasedEventListenerRegistry(
                 Executors.newFixedThreadPool(2));
-        SpringAnnotatedEventListenerRegistry annotationRegistry =
-            new SpringAnnotatedEventListenerRegistry(
+        SpringAnnotationBasedEventListenerRegistry annotationRegistry =
+            new SpringAnnotationBasedEventListenerRegistry(
                 Executors.newFixedThreadPool(2));
 
         InterfaceBasedListener interfaceListener = new InterfaceBasedListener();
@@ -111,8 +111,8 @@ class EventListenerRegistryIntegrationTest {
                 Executors.newFixedThreadPool(2),
                 applicationContext);
 
-        SpringAnnotatedEventListenerRegistry annotationRegistry =
-            new SpringAnnotatedEventListenerRegistry(
+        SpringAnnotationBasedEventListenerRegistry annotationRegistry =
+            new SpringAnnotationBasedEventListenerRegistry(
                 "",
                 Executors.newFixedThreadPool(2),
                 applicationContext);

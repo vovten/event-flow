@@ -18,7 +18,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class AnnotatedEventListenerRegistry implements EventListenerRegistry {
+public class AnnotationBasedEventListenerRegistry implements EventListenerRegistry {
     private final ExecutorService executorService;
     private final Map<Class<? extends Event>, List<Pair<Object, Method>>> eventListeners;
 
@@ -27,7 +27,7 @@ public class AnnotatedEventListenerRegistry implements EventListenerRegistry {
      *
      * @param executorService service for background event processing
      */
-    public AnnotatedEventListenerRegistry(ExecutorService executorService) {
+    public AnnotationBasedEventListenerRegistry(ExecutorService executorService) {
         this.eventListeners = new HashMap<>();
         this.executorService = executorService;
     }

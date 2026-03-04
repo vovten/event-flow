@@ -17,11 +17,11 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for SpringAnnotatedEventListenerRegistry
  */
-class SpringAnnotatedEventListenerRegistryTest {
+class SpringAnnotationBasedEventListenerRegistryTest {
 
     private ExecutorService executorService;
     private ApplicationContext applicationContext;
-    private SpringAnnotatedEventListenerRegistry registry;
+    private SpringAnnotationBasedEventListenerRegistry registry;
 
     @BeforeEach
     void setUp() {
@@ -33,7 +33,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should register listener with @EventListener annotation")
     void shouldRegisterListenerWithEventListenerAnnotation() {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
         AnnotatedEventListener listener = new AnnotatedEventListener();
 
         // when
@@ -47,7 +47,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should dispatch event to registered listener method")
     void shouldDispatchEventToRegisteredListenerMethod() throws InterruptedException {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
         AnnotatedEventListener listener = new AnnotatedEventListener();
         registry.register(listener);
         TestEvent event = TestEvent.create("Test message");
@@ -72,7 +72,7 @@ class SpringAnnotatedEventListenerRegistryTest {
         when(applicationContext.getBean("annotatedEventListener")).thenReturn(listener);
 
         // when
-        registry = new SpringAnnotatedEventListenerRegistry(
+        registry = new SpringAnnotationBasedEventListenerRegistry(
             "", executorService, applicationContext);
 
         // then
@@ -89,7 +89,7 @@ class SpringAnnotatedEventListenerRegistryTest {
         when(applicationContext.getBean("annotatedEventListener")).thenReturn(listener);
 
         // when
-        registry = new SpringAnnotatedEventListenerRegistry(
+        registry = new SpringAnnotationBasedEventListenerRegistry(
             "com.github.vovten", executorService, applicationContext);
 
         // then
@@ -100,7 +100,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should throw exception for invalid method signature")
     void shouldThrowExceptionForInvalidMethodSignature() {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
         InvalidEventListener listener = new InvalidEventListener();
 
         // when & then
@@ -115,7 +115,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should return false when no listeners registered")
     void shouldReturnFalseWhenNoListenersRegistered() {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
         TestEvent event = TestEvent.create();
 
         // when
@@ -129,7 +129,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should handle Event.class as parameter type")
     void shouldHandleEventClassAsParameterType() throws InterruptedException {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
         GenericEventListener listener = new GenericEventListener();
         registry.register(listener);
         TestEvent event = TestEvent.create();
@@ -147,7 +147,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should not support merging registries")
     void shouldNotSupportMergingRegistries() {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
         EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
 
         // when & then
@@ -161,7 +161,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should return correct listener count")
     void shouldReturnCorrectListenerCount() {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
         AnnotatedEventListener listener1 = new AnnotatedEventListener();
         AnnotatedEventListener listener2 = new AnnotatedEventListener();
 
@@ -177,7 +177,7 @@ class SpringAnnotatedEventListenerRegistryTest {
     @DisplayName("Should return true for hasListeners when no listeners")
     void shouldReturnTrueForHasListenersWhenNoListeners() {
         // given
-        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        registry = new SpringAnnotationBasedEventListenerRegistry(executorService);
 
         // then
         assertFalse(registry.hasListeners());
