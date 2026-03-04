@@ -78,6 +78,19 @@ class EventListenerRegistryIntegrationTest {
         assertTrue(annotationRegistry.listenerCount() >= 0);
     }
 
+    @Test
+    @DisplayName("Should unregister listener")
+    void shouldUnregisterListener() {
+        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        InterfaceBasedListener listener = new InterfaceBasedListener();
+        registry.register(listener);
+        assertTrue(registry.isRegistered(listener));
+        
+        boolean result = registry.unregister(listener);
+        assertTrue(result);
+        assertFalse(registry.isRegistered(listener));
+    }
+
     // Interface-based listener
     public static class InterfaceBasedListener implements EventListener {
         @Override

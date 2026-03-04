@@ -35,13 +35,15 @@ public class CompositeEventListenerRegistry implements EventListenerRegistry {
     }
 
     @Override
-    public boolean isEmpty() {
-        return registries.stream().allMatch(EventListenerRegistry::isEmpty);
+    public void register(Object eventListener) {
+        registries.forEach(registry -> registry.register(eventListener));
     }
 
     @Override
-    public void register(Object eventListener) {
-        registries.forEach(registry -> registry.register(eventListener));
+    public boolean unregister(Object eventListener) {
+        return registries.stream()
+                .map(registry -> registry.unregister(eventListener))
+                .reduce(false, (a, b) -> a || b);
     }
 
     @Override

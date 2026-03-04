@@ -47,13 +47,18 @@ public class AnnotatedEventListenerRegistry implements EventListenerRegistry {
     }
 
     @Override
-    public boolean isEmpty() {
-        return eventListeners.isEmpty();
+    public void register(Object eventListener) {
+        registerIfAnnotationPresent(eventListener);
     }
 
     @Override
-    public void register(Object eventListener) {
-        registerIfAnnotationPresent(eventListener);
+    public boolean unregister(Object eventListener) {
+        for (List<Pair<Object, Method>> pairs : eventListeners.values()) {
+            if (pairs.removeIf(pair -> pair.getLeft().equals(eventListener))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

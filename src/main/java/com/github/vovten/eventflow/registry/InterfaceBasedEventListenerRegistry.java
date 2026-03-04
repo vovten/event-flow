@@ -40,15 +40,23 @@ public class InterfaceBasedEventListenerRegistry implements EventListenerRegistr
     }
 
     @Override
-    public boolean isEmpty() {
-        return eventListeners.isEmpty();
-    }
-
-    @Override
     public void register(Object eventListener) {
         if (eventListener instanceof EventListener listener) {
             registerListener(listener);
         }
+    }
+
+    @Override
+    public boolean unregister(Object eventListener) {
+        if (!(eventListener instanceof EventListener)) {
+            return false;
+        }
+        for (List<EventListener> listeners : eventListeners.values()) {
+            if (listeners.remove(eventListener)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

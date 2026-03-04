@@ -83,7 +83,20 @@ class SpringAnnotationBasedEventListenerRegistryTest {
     @DisplayName("Should return true for isEmpty when no listeners")
     void shouldReturnTrueForIsEmptyWhenNoListeners() {
         SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
-        assertTrue(registry.isEmpty());
+        assertEquals(0, registry.listenerCount());
+    }
+
+    @Test
+    @DisplayName("Should unregister listener")
+    void shouldUnregisterListener() {
+        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        AnnotatedEventListener listener = new AnnotatedEventListener();
+        registry.register(listener);
+        assertTrue(registry.isRegistered(listener));
+        
+        boolean result = registry.unregister(listener);
+        assertTrue(result);
+        assertFalse(registry.isRegistered(listener));
     }
 
     // Test helper class with @EventListener annotation

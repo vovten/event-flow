@@ -31,7 +31,6 @@ class CompositeEventListenerRegistryTest {
         compositeRegistry = new CompositeEventListenerRegistry(
                 new ArrayList<>(List.of(registry1, registry2)));
 
-        assertTrue(compositeRegistry.isEmpty());
         assertEquals(0, compositeRegistry.listenerCount());
     }
 
@@ -85,6 +84,23 @@ class CompositeEventListenerRegistryTest {
                 new ArrayList<>(List.of(registry1, registry2)));
 
         assertEquals(2, compositeRegistry.listenerCount());
+    }
+
+    @Test
+    @DisplayName("Should unregister listener from all registries")
+    void shouldUnregisterListenerFromAllRegistries() {
+        InterfaceBasedEventListenerRegistry registry1 = new InterfaceBasedEventListenerRegistry();
+        InterfaceBasedEventListenerRegistry registry2 = new InterfaceBasedEventListenerRegistry();
+        compositeRegistry = new CompositeEventListenerRegistry(
+                new ArrayList<>(List.of(registry1, registry2)));
+
+        TestEventListener listener = new TestEventListener();
+        compositeRegistry.register(listener);
+
+        boolean result = compositeRegistry.unregister(listener);
+        assertTrue(result);
+        assertFalse(registry1.isRegistered(listener));
+        assertFalse(registry2.isRegistered(listener));
     }
 
     @Test

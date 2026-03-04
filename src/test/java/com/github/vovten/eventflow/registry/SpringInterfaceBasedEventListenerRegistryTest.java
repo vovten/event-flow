@@ -22,7 +22,7 @@ class SpringInterfaceBasedEventListenerRegistryTest {
         ApplicationContext applicationContext = mock(ApplicationContext.class);
         SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
         assertNotNull(registry);
-        assertTrue(registry.isEmpty());
+        assertEquals(0, registry.listenerCount());
     }
 
     @Test
@@ -30,7 +30,7 @@ class SpringInterfaceBasedEventListenerRegistryTest {
         SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
-        assertFalse(registry.isEmpty());
+        assertEquals(1, registry.listenerCount());
     }
 
     @Test
@@ -59,7 +59,27 @@ class SpringInterfaceBasedEventListenerRegistryTest {
         when(applicationContext.getBeansOfType(EventListener.class))
                 .thenReturn(java.util.Collections.singletonMap("testListener", listener));
         SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
-        assertFalse(registry.isEmpty());
+        assertEquals(1, registry.listenerCount());
+    }
+
+    @Test
+    void testUnregisterEventListener() {
+        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        TestEventListener listener = new TestEventListener();
+        registry.register(listener);
+        assertTrue(registry.isRegistered(listener));
+        
+        boolean result = registry.unregister(listener);
+        assertTrue(result);
+        assertFalse(registry.isRegistered(listener));
+    }
+
+    @Test
+    void testUnregisterNonExistentListener() {
+        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        TestEventListener listener = new TestEventListener();
+        boolean result = registry.unregister(listener);
+        assertFalse(result);
     }
 
     @Test

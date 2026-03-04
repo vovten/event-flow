@@ -27,19 +27,20 @@ public interface EventListenerRegistry {
     int listenerCount();
 
     /**
-     * Check if the registry has any listeners
-     *
-     * @return true if the registry has listeners, false otherwise
-     */
-    boolean isEmpty();
-
-    /**
      * Register a listener in the registry
      *
      * @param eventListener listener that implements the EventListener interface
      *                     or has methods annotated with @EventListener
      */
     void register(Object eventListener);
+
+    /**
+     * Unregister a listener from the registry
+     *
+     * @param eventListener the listener to unregister
+     * @return true if the listener was successfully unregistered, false otherwise
+     */
+    boolean unregister(Object eventListener);
 
     /**
      * Check if a listener is registered in the registry
