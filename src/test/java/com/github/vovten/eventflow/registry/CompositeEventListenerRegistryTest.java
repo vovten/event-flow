@@ -1,4 +1,4 @@
-package com.github.vovten.eventflow.collection;
+package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.annotation.EventListener;
 import com.github.vovten.eventflow.Event;

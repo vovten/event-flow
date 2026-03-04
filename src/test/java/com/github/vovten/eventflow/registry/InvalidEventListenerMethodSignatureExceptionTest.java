@@ -1,4 +1,4 @@
-package com.github.vovten.eventflow.collection;
+package com.github.vovten.eventflow.registry;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

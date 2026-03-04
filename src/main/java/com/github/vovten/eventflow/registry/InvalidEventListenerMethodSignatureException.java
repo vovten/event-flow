@@ -1,4 +1,4 @@
-package com.github.vovten.eventflow.collection;
+package com.github.vovten.eventflow.registry;
 
 /**
  * Exception thrown when the signature of a method responsible for handling

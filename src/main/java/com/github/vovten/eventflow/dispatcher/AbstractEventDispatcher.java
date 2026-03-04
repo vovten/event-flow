@@ -2,10 +2,10 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventDispatcher;
-import com.github.vovten.eventflow.collection.CompositeEventListenerRegistry;
-import com.github.vovten.eventflow.collection.EventListenerRegistry;
-import com.github.vovten.eventflow.collection.SpringAnnotatedEventListenerRegistry;
-import com.github.vovten.eventflow.collection.SpringInterfaceBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
+import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotatedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;

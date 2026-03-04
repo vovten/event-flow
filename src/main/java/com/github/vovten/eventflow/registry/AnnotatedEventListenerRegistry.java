@@ -1,4 +1,4 @@
-package com.github.vovten.eventflow.collection;
+package com.github.vovten.eventflow.registry;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;

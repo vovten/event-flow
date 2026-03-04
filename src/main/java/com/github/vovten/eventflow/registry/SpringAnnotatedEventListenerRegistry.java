@@ -1,4 +1,4 @@
-package com.github.vovten.eventflow.collection;
+package com.github.vovten.eventflow.registry;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
