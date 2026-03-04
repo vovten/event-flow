@@ -27,7 +27,7 @@ class CompositeEventListenerRegistryTest {
     @DisplayName("Should compose multiple listener registries")
     void shouldComposeMultipleListenerRegistries() {
         InterfaceBasedEventListenerRegistry registry1 = new InterfaceBasedEventListenerRegistry();
-        AnnotatedEventListenerRegistry registry2 = new AnnotatedEventListenerRegistry();
+        AnnotationBasedEventListenerRegistry registry2 = new AnnotationBasedEventListenerRegistry();
         compositeRegistry = new CompositeEventListenerRegistry(
                 new ArrayList<>(List.of(registry1, registry2)));
 
@@ -41,7 +41,7 @@ class CompositeEventListenerRegistryTest {
         TestEventListener listener = new TestEventListener();
         interfaceRegistry.register(listener);
 
-        AnnotatedEventListenerRegistry annotationRegistry = new AnnotatedEventListenerRegistry();
+        AnnotationBasedEventListenerRegistry annotationRegistry = new AnnotationBasedEventListenerRegistry();
         AnnotatedEventListener annotatedListener = new AnnotatedEventListener();
         annotationRegistry.register(annotatedListener);
 

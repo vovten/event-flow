@@ -20,13 +20,6 @@ public interface EventListenerRegistry {
     List<EventListener> getListeners(Event event);
 
     /**
-     * Number of listeners in the registry
-     *
-     * @return number of listeners
-     */
-    int listenerCount();
-
-    /**
      * Register a listener in the registry
      *
      * @param eventListener listener that implements the EventListener interface
@@ -56,4 +49,11 @@ public interface EventListenerRegistry {
      * @param registry the registry to merge
      */
     void merge(EventListenerRegistry registry);
+
+    /**
+     * Number of listeners in the registry
+     *
+     * @return number of listeners
+     */
+    int listenerCount();
 }

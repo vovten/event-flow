@@ -52,7 +52,7 @@ class EventListenerRegistryIntegrationTest {
     @DisplayName("Should get listeners through composite registry")
     void shouldGetListenersThroughCompositeRegistry() {
         InterfaceBasedEventListenerRegistry interfaceRegistry = new InterfaceBasedEventListenerRegistry();
-        AnnotatedEventListenerRegistry annotationRegistry = new AnnotatedEventListenerRegistry();
+        AnnotationBasedEventListenerRegistry annotationRegistry = new AnnotationBasedEventListenerRegistry();
 
         InterfaceBasedListener interfaceListener = new InterfaceBasedListener();
         AnnotationBasedListener annotationListener = new AnnotationBasedListener();

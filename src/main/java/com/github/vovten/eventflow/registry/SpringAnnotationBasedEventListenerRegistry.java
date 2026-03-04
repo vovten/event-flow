@@ -15,7 +15,7 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class SpringAnnotationBasedEventListenerRegistry extends AnnotatedEventListenerRegistry {
+public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedEventListenerRegistry {
     private final String scanPackage;
     private final ApplicationContext applicationContext;
 
