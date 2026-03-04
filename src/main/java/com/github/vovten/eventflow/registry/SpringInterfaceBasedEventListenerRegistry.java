@@ -32,17 +32,10 @@ public class SpringInterfaceBasedEventListenerRegistry extends InterfaceBasedEve
         this.applicationContext = null;
     }
 
-    @Override
-    public void register(Object eventListener) {
-        if (eventListener instanceof EventListener listener) {
-            registerListener(listener);
-        }
-    }
-
     private void init() {
         if (applicationContext != null) {
             for (EventListener listener : applicationContext.getBeansOfType(EventListener.class).values()) {
-                registerListener(listener);
+                register(listener);
             }
         }
     }

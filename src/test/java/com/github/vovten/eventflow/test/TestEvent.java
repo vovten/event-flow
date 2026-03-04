@@ -39,6 +39,10 @@ public class TestEvent implements Event {
         return new TestEvent(id, message, LocalDateTime.now());
     }
 
+    public static TestEvent create(String id, String message, LocalDateTime dateTime) {
+        return new TestEvent(id, message, dateTime);
+    }
+
     public String getId() {
         return id;
     }

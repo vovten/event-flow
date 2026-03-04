@@ -4,6 +4,8 @@ import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -19,7 +21,7 @@ class EventIntegrationTest {
 
         // when
         String json = originalEvent.asJson();
-        
+
         // then
         assertNotNull(json);
         assertTrue(json.contains("Serialization test"));
@@ -57,9 +59,10 @@ class EventIntegrationTest {
     @Test
     @DisplayName("Should produce consistent JSON output")
     void shouldProduceConsistentJsonOutput() {
+        LocalDateTime dateTime = LocalDateTime.of(2026, 3, 4, 12, 0, 0);
         // given
-        TestEvent event1 = TestEvent.create("same-id", "same-message");
-        TestEvent event2 = TestEvent.create("same-id", "same-message");
+        TestEvent event1 = TestEvent.create("same-id", "same-message", dateTime);
+        TestEvent event2 = TestEvent.create("same-id", "same-message", dateTime);
 
         // when
         String json1 = event1.asJson();

@@ -42,7 +42,7 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotatedEventLi
     }
 
     @Override
-    public void registerIfAnnotationPresent(Object bean) {
+    protected void registerIfAnnotationPresent(Object bean) {
         Method[] methods = ClassUtils.getUserClass(bean.getClass()).getMethods();
         for (Method method : methods) {
             if (method.isAnnotationPresent(com.github.vovten.eventflow.annotation.EventListener.class)) {
@@ -54,13 +54,13 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotatedEventLi
 
     private void init() {
         if (applicationContext != null) {
-            allBeans().forEach(this::registerIfAnnotationPresent);
+            allBeans().forEach(this::register);
         }
     }
 
     private List<Object> allBeans() {
         return Arrays.stream(applicationContext.getBeanDefinitionNames())
-                .map(name -> applicationContext.getBean(name))
+                .map(applicationContext::getBean)
                 .filter(this::beanInScanPackage)
                 .toList();
     }
@@ -70,15 +70,6 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotatedEventLi
             return true;
         } else {
             return StringUtils.startsWithIgnoreCase(bean.getClass().getName(), scanPackage);
-        }
-    }
-
-    @Override
-    protected void checkMethodSignature(Method method) {
-        var types = method.getParameterTypes();
-        if (types.length != 1 || !com.github.vovten.eventflow.Event.class.isAssignableFrom(types[0])) {
-            throw new InvalidEventListenerMethodSignatureException(
-                    method.getDeclaringClass().getName(), method.getName());
         }
     }
 }

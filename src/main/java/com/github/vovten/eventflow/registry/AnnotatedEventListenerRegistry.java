@@ -73,7 +73,7 @@ public class AnnotatedEventListenerRegistry implements EventListenerRegistry {
      *
      * @param bean the listener object
      */
-    public void registerIfAnnotationPresent(Object bean) {
+    protected void registerIfAnnotationPresent(Object bean) {
         Method[] methods = bean.getClass().getMethods();
         for (Method method : methods) {
             if (method.isAnnotationPresent(com.github.vovten.eventflow.annotation.EventListener.class)) {
@@ -110,21 +110,15 @@ public class AnnotatedEventListenerRegistry implements EventListenerRegistry {
 
     private List<EventListener> createEventListeners(List<Pair<Object, Method>> pairs) {
         return pairs.stream()
-                .<EventListener>map(pair -> new MethodInvokingEventListener(pair.getLeft(), pair.getRight()))
+                .<EventListener>map(pair ->
+                        new MethodInvokingEventListener(pair.getLeft(), pair.getRight()))
                 .toList();
     }
 
     /**
      * Wrapper that invokes a method on an object when an event is received
      */
-    private static class MethodInvokingEventListener implements EventListener {
-        private final Object bean;
-        private final Method method;
-
-        MethodInvokingEventListener(Object bean, Method method) {
-            this.bean = bean;
-            this.method = method;
-        }
+    private record MethodInvokingEventListener(Object object, Method method) implements EventListener {
 
         @Override
         public List<Class<? extends Event>> events() {
@@ -134,9 +128,9 @@ public class AnnotatedEventListenerRegistry implements EventListenerRegistry {
         @Override
         public void onEvent(Event event) {
             try {
-                method.invoke(bean, event);
+                method.invoke(object, event);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new EventListenerInvocationException(bean, event, e);
+                throw new EventListenerInvocationException(object, event, e);
             }
         }
     }

@@ -31,7 +31,6 @@ public class InterfaceBasedEventListenerRegistry implements EventListenerRegistr
         if (eventListeners.containsKey(Event.class)) {
             listeners.addAll(eventListeners.get(Event.class));
         }
-
         return listeners;
     }
 
