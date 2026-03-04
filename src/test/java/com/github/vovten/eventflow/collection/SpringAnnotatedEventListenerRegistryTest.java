@@ -15,13 +15,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for SpringEventListenerAnnotationCollection
+ * Unit tests for SpringAnnotatedEventListenerRegistry
  */
-class SpringEventListenerAnnotationCollectionTest {
+class SpringAnnotatedEventListenerRegistryTest {
 
     private ExecutorService executorService;
     private ApplicationContext applicationContext;
-    private SpringEventListenerAnnotationCollection collection;
+    private SpringAnnotatedEventListenerRegistry registry;
 
     @BeforeEach
     void setUp() {
@@ -30,30 +30,30 @@ class SpringEventListenerAnnotationCollectionTest {
     }
 
     @Test
-    @DisplayName("Should add listener with @EventListener annotation")
-    void shouldAddListenerWithEventListenerAnnotation() {
+    @DisplayName("Should register listener with @EventListener annotation")
+    void shouldRegisterListenerWithEventListenerAnnotation() {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
         AnnotatedEventListener listener = new AnnotatedEventListener();
 
         // when
-        collection.add(listener);
+        registry.register(listener);
 
         // then
-        assertTrue(collection.contains(listener));
+        assertTrue(registry.isRegistered(listener));
     }
 
     @Test
-    @DisplayName("Should pass event to annotated listener method")
-    void shouldPassEventToAnnotatedListenerMethod() throws InterruptedException {
+    @DisplayName("Should dispatch event to registered listener method")
+    void shouldDispatchEventToRegisteredListenerMethod() throws InterruptedException {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
         AnnotatedEventListener listener = new AnnotatedEventListener();
-        collection.add(listener);
+        registry.register(listener);
         TestEvent event = TestEvent.create("Test message");
 
         // when
-        boolean result = collection.pass(event);
+        boolean result = registry.dispatch(event);
 
         // then
         Thread.sleep(100);
@@ -72,11 +72,11 @@ class SpringEventListenerAnnotationCollectionTest {
         when(applicationContext.getBean("annotatedEventListener")).thenReturn(listener);
 
         // when
-        collection = new SpringEventListenerAnnotationCollection(
+        registry = new SpringAnnotatedEventListenerRegistry(
             "", executorService, applicationContext);
 
         // then
-        assertTrue(collection.contains(listener));
+        assertTrue(registry.isRegistered(listener));
     }
 
     @Test
@@ -89,24 +89,24 @@ class SpringEventListenerAnnotationCollectionTest {
         when(applicationContext.getBean("annotatedEventListener")).thenReturn(listener);
 
         // when
-        collection = new SpringEventListenerAnnotationCollection(
+        registry = new SpringAnnotatedEventListenerRegistry(
             "com.github.vovten", executorService, applicationContext);
 
         // then
-        assertTrue(collection.contains(listener));
+        assertTrue(registry.isRegistered(listener));
     }
 
     @Test
     @DisplayName("Should throw exception for invalid method signature")
     void shouldThrowExceptionForInvalidMethodSignature() {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
         InvalidEventListener listener = new InvalidEventListener();
 
         // when & then
-        IllegalEventListenerMethodSignatureException exception = assertThrows(
-            IllegalEventListenerMethodSignatureException.class,
-            () -> collection.add(listener)
+        InvalidEventListenerMethodSignatureException exception = assertThrows(
+            InvalidEventListenerMethodSignatureException.class,
+            () -> registry.register(listener)
         );
         assertTrue(exception.getMessage().contains("Method signature"));
     }
@@ -115,11 +115,11 @@ class SpringEventListenerAnnotationCollectionTest {
     @DisplayName("Should return false when no listeners registered")
     void shouldReturnFalseWhenNoListenersRegistered() {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
         TestEvent event = TestEvent.create();
 
         // when
-        boolean result = collection.pass(event);
+        boolean result = registry.dispatch(event);
 
         // then
         assertFalse(result);
@@ -129,13 +129,13 @@ class SpringEventListenerAnnotationCollectionTest {
     @DisplayName("Should handle Event.class as parameter type")
     void shouldHandleEventClassAsParameterType() throws InterruptedException {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
         GenericEventListener listener = new GenericEventListener();
-        collection.add(listener);
+        registry.register(listener);
         TestEvent event = TestEvent.create();
 
         // when
-        boolean result = collection.pass(event);
+        boolean result = registry.dispatch(event);
 
         // then
         Thread.sleep(100);
@@ -144,43 +144,43 @@ class SpringEventListenerAnnotationCollectionTest {
     }
 
     @Test
-    @DisplayName("Should not support adding listener collection")
-    void shouldNotSupportAddingListenerCollection() {
+    @DisplayName("Should not support merging registries")
+    void shouldNotSupportMergingRegistries() {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
-        EventListenerCollection otherCollection = mock(EventListenerCollection.class);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
+        EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
 
         // when & then
         assertThrows(
             UnsupportedOperationException.class,
-            () -> collection.add(otherCollection)
+            () -> registry.merge(otherRegistry)
         );
     }
 
     @Test
-    @DisplayName("Should return correct size")
-    void shouldReturnCorrectSize() {
+    @DisplayName("Should return correct listener count")
+    void shouldReturnCorrectListenerCount() {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
         AnnotatedEventListener listener1 = new AnnotatedEventListener();
         AnnotatedEventListener listener2 = new AnnotatedEventListener();
 
         // when
-        collection.add(listener1);
-        collection.add(listener2);
+        registry.register(listener1);
+        registry.register(listener2);
 
         // then
-        assertEquals(1, collection.size());
+        assertEquals(1, registry.listenerCount());
     }
 
     @Test
-    @DisplayName("Should return true for isEmpty when no listeners")
-    void shouldReturnTrueForIsEmptyWhenNoListeners() {
+    @DisplayName("Should return true for hasListeners when no listeners")
+    void shouldReturnTrueForHasListenersWhenNoListeners() {
         // given
-        collection = new SpringEventListenerAnnotationCollection(executorService);
+        registry = new SpringAnnotatedEventListenerRegistry(executorService);
 
         // then
-        assertTrue(collection.isEmpty());
+        assertFalse(registry.hasListeners());
     }
 
     // Test helper class with @EventListener annotation

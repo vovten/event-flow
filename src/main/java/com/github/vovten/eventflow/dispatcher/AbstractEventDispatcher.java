@@ -2,10 +2,10 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventDispatcher;
-import com.github.vovten.eventflow.collection.CompositeEventListenerCollection;
-import com.github.vovten.eventflow.collection.EventListenerCollection;
-import com.github.vovten.eventflow.collection.SpringEventListenerAnnotationCollection;
-import com.github.vovten.eventflow.collection.SpringEventListenerInterfaceCollection;
+import com.github.vovten.eventflow.collection.CompositeEventListenerRegistry;
+import com.github.vovten.eventflow.collection.EventListenerRegistry;
+import com.github.vovten.eventflow.collection.SpringAnnotatedEventListenerRegistry;
+import com.github.vovten.eventflow.collection.SpringInterfaceBasedEventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -26,7 +26,7 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
 
     private final String eventListenerScanPackage;
     private final ExecutorService executorService;
-    private final EventListenerCollection eventListenerCollection;
+    private final EventListenerRegistry eventListenerRegistry;
 
     protected AbstractEventDispatcher(ExecutorService executorService) {
         this(executorService, EMPTY);
@@ -35,18 +35,18 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
     protected AbstractEventDispatcher(ExecutorService executorService, String eventListenerScanPackage) {
         this.executorService = executorService;
         this.eventListenerScanPackage = eventListenerScanPackage;
-        this.eventListenerCollection = new CompositeEventListenerCollection(new ArrayList<>(
+        this.eventListenerRegistry = new CompositeEventListenerRegistry(new ArrayList<>(
                 List.of(
-                        new SpringEventListenerAnnotationCollection(executorService),
-                        new SpringEventListenerInterfaceCollection(executorService)
+                        new SpringAnnotatedEventListenerRegistry(executorService),
+                        new SpringInterfaceBasedEventListenerRegistry(executorService)
                 )
         ));
     }
 
     @Override
     public void dispatch(Event event) {
-        boolean passed = eventListenerCollection.pass(event);
-        if (!passed) {
+        boolean dispatched = eventListenerRegistry.dispatch(event);
+        if (!dispatched) {
             log.debug("No listeners found for event: {}", event);
         }
     }
@@ -54,21 +54,30 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         var applicationContext = event.getApplicationContext();
-        eventListenerCollection.add(new SpringEventListenerAnnotationCollection(
-                eventListenerScanPackage, executorService, applicationContext));
-        eventListenerCollection.add(new SpringEventListenerInterfaceCollection(
-                executorService, applicationContext));
+        eventListenerRegistry.merge(
+                new SpringAnnotatedEventListenerRegistry(
+                        eventListenerScanPackage,
+                        executorService,
+                        applicationContext
+                )
+        );
+        eventListenerRegistry.merge(
+                new SpringInterfaceBasedEventListenerRegistry(
+                        executorService,
+                        applicationContext
+                )
+        );
     }
 
     @Override
     public void register(Object listener) {
         if (!isRegistered(listener)) {
-            eventListenerCollection.add(listener);
+            eventListenerRegistry.register(listener);
         }
     }
 
     @Override
     public boolean isRegistered(Object listener) {
-        return eventListenerCollection.contains(listener);
+        return eventListenerRegistry.isRegistered(listener);
     }
 }

@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for IllegalEventListenerMethodSignatureException
+ * Unit tests for InvalidEventListenerMethodSignatureException
  */
-class IllegalEventListenerMethodSignatureExceptionTest {
+class InvalidEventListenerMethodSignatureExceptionTest {
 
     @Test
     @DisplayName("Should create exception with class and method name")
@@ -18,8 +18,8 @@ class IllegalEventListenerMethodSignatureExceptionTest {
         String methodName = "handleEvent";
 
         // when
-        IllegalEventListenerMethodSignatureException exception = 
-            new IllegalEventListenerMethodSignatureException(className, methodName);
+        InvalidEventListenerMethodSignatureException exception =
+            new InvalidEventListenerMethodSignatureException(className, methodName);
 
         // then
         assertNotNull(exception.getMessage());
@@ -36,8 +36,8 @@ class IllegalEventListenerMethodSignatureExceptionTest {
         String methodName = "onTestEvent";
 
         // when
-        IllegalEventListenerMethodSignatureException exception = 
-            new IllegalEventListenerMethodSignatureException(className, methodName);
+        InvalidEventListenerMethodSignatureException exception =
+            new InvalidEventListenerMethodSignatureException(className, methodName);
 
         // then
         String expectedMessage = String.format(

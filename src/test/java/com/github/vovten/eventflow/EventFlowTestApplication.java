@@ -13,7 +13,7 @@ import org.springframework.context.annotation.FilterType;
     basePackages = "com.github.vovten.eventflow",
     excludeFilters = @ComponentScan.Filter(
         type = FilterType.REGEX,
-        pattern = ".*EventListenerCollectionIntegrationTest.*"
+        pattern = ".*EventListenerRegistryIntegrationTest.*"
     )
 )
 public class EventFlowTestApplication {

@@ -12,36 +12,36 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Collection of event listeners based on interface, extracted from the Spring context
+ * Registry of event listeners based on interface, extracted from the Spring context
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class SpringEventListenerInterfaceCollection implements EventListenerCollection {
+public class SpringInterfaceBasedEventListenerRegistry implements EventListenerRegistry {
     private final ExecutorService executorService;
     private final Map<Class<? extends Event>, List<EventListener>> eventListeners;
     private final ApplicationContext applicationContext;
 
-    public SpringEventListenerInterfaceCollection(ExecutorService executorService, ApplicationContext applicationContext) {
+    public SpringInterfaceBasedEventListenerRegistry(ExecutorService executorService, ApplicationContext applicationContext) {
         this.eventListeners = new HashMap<>();
         this.executorService = executorService;
         this.applicationContext = applicationContext;
         this.init();
     }
 
-    public SpringEventListenerInterfaceCollection(ExecutorService executorService) {
+    public SpringInterfaceBasedEventListenerRegistry(ExecutorService executorService) {
         this.eventListeners = new HashMap<>();
         this.executorService = executorService;
         this.applicationContext = null;
     }
 
     @Override
-    public boolean pass(Event event) {
+    public boolean dispatch(Event event) {
         if (eventListeners.isEmpty()) {
             return false;
         }
         var listeners = eventListeners.get(event.getClass());
         boolean hasListeners = !CollectionUtils.isEmpty(listeners);
-        
+
         if (eventListeners.containsKey(Event.class)) {
             if (hasListeners) {
                 listeners = new ArrayList<>(listeners);
@@ -60,17 +60,17 @@ public class SpringEventListenerInterfaceCollection implements EventListenerColl
     }
 
     @Override
-    public int size() {
+    public int listenerCount() {
         return eventListeners.size();
     }
 
     @Override
-    public boolean isEmpty() {
-        return size() == 0;
+    public boolean hasListeners() {
+        return listenerCount() > 0;
     }
 
     @Override
-    public void add(Object eventListener) {
+    public void register(Object eventListener) {
         if (eventListener instanceof EventListener listener) {
             for (Class<? extends Event> event : listener.events()) {
                 var listeners = eventListeners.getOrDefault(event, new ArrayList<>());
@@ -81,7 +81,7 @@ public class SpringEventListenerInterfaceCollection implements EventListenerColl
     }
 
     @Override
-    public boolean contains(Object eventListener) {
+    public boolean isRegistered(Object eventListener) {
         if (!(eventListener instanceof EventListener)) {
             return false;
         } else {
@@ -91,8 +91,8 @@ public class SpringEventListenerInterfaceCollection implements EventListenerColl
     }
 
     @Override
-    public void add(EventListenerCollection eventListenerCollection) {
-        throw new UnsupportedOperationException("Adding listener collection is not supported");
+    public void merge(EventListenerRegistry registry) {
+        throw new UnsupportedOperationException("Merging registries is not supported");
     }
 
     private void init() {

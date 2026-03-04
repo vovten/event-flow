@@ -6,9 +6,9 @@ package com.github.vovten.eventflow.collection;
  *
  * @author Vladimir Aleshkov, 06.12.2024.
  */
-public class IllegalEventListenerMethodSignatureException extends RuntimeException {
+public class InvalidEventListenerMethodSignatureException extends RuntimeException {
 
-    public IllegalEventListenerMethodSignatureException(String className, String methodName) {
+    public InvalidEventListenerMethodSignatureException(String className, String methodName) {
         super(String.format("Method signature does not meet the EventListener annotation requirements. " +
                 "Class: %s, method: %s", className, methodName));
     }

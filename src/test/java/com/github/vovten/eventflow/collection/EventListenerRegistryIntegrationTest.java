@@ -17,27 +17,27 @@ import java.util.concurrent.Executors;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for EventListenerCollection implementations
+ * Integration tests for EventListenerRegistry implementations
  */
 @SpringBootTest(classes = EventFlowTestApplication.class)
-class EventListenerCollectionIntegrationTest {
+class EventListenerRegistryIntegrationTest {
 
     @Autowired
     private ApplicationContext applicationContext;
 
     @Test
-    @DisplayName("Should pass event to interface-based listener")
-    void shouldPassEventToInterfaceBasedListener() throws InterruptedException {
+    @DisplayName("Should dispatch event to interface-based listener")
+    void shouldDispatchEventToInterfaceBasedListener() throws InterruptedException {
         // given
-        SpringEventListenerInterfaceCollection collection = 
-            new SpringEventListenerInterfaceCollection(
+        SpringInterfaceBasedEventListenerRegistry registry =
+            new SpringInterfaceBasedEventListenerRegistry(
                 Executors.newFixedThreadPool(2));
         InterfaceBasedListener listener = new InterfaceBasedListener();
-        collection.add(listener);
+        registry.register(listener);
         TestEvent event = TestEvent.create("Interface listener test");
 
         // when
-        boolean result = collection.pass(event);
+        boolean result = registry.dispatch(event);
         Thread.sleep(100);
 
         // then
@@ -48,18 +48,18 @@ class EventListenerCollectionIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should pass event to annotation-based listener")
-    void shouldPassEventToAnnotationBasedListener() throws InterruptedException {
+    @DisplayName("Should dispatch event to annotation-based listener")
+    void shouldDispatchEventToAnnotationBasedListener() throws InterruptedException {
         // given
-        SpringEventListenerAnnotationCollection collection = 
-            new SpringEventListenerAnnotationCollection(
+        SpringAnnotatedEventListenerRegistry registry =
+            new SpringAnnotatedEventListenerRegistry(
                 Executors.newFixedThreadPool(2));
         AnnotationBasedListener listener = new AnnotationBasedListener();
-        collection.add(listener);
+        registry.register(listener);
         TestEvent event = TestEvent.create("Annotation listener test");
 
         // when
-        boolean result = collection.pass(event);
+        boolean result = registry.dispatch(event);
         Thread.sleep(100);
 
         // then
@@ -70,30 +70,30 @@ class EventListenerCollectionIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should pass event through composite collection")
-    void shouldPassEventThroughCompositeCollection() throws InterruptedException {
+    @DisplayName("Should dispatch event through composite registry")
+    void shouldDispatchEventThroughCompositeRegistry() throws InterruptedException {
         // given
-        SpringEventListenerInterfaceCollection interfaceCollection = 
-            new SpringEventListenerInterfaceCollection(
+        SpringInterfaceBasedEventListenerRegistry interfaceRegistry =
+            new SpringInterfaceBasedEventListenerRegistry(
                 Executors.newFixedThreadPool(2));
-        SpringEventListenerAnnotationCollection annotationCollection = 
-            new SpringEventListenerAnnotationCollection(
+        SpringAnnotatedEventListenerRegistry annotationRegistry =
+            new SpringAnnotatedEventListenerRegistry(
                 Executors.newFixedThreadPool(2));
-        
+
         InterfaceBasedListener interfaceListener = new InterfaceBasedListener();
         AnnotationBasedListener annotationListener = new AnnotationBasedListener();
-        
-        interfaceCollection.add(interfaceListener);
-        annotationCollection.add(annotationListener);
-        
-        CompositeEventListenerCollection compositeCollection = 
-            new CompositeEventListenerCollection(
-                new java.util.ArrayList<>(List.of(interfaceCollection, annotationCollection)));
-        
+
+        interfaceRegistry.register(interfaceListener);
+        annotationRegistry.register(annotationListener);
+
+        CompositeEventListenerRegistry compositeRegistry =
+            new CompositeEventListenerRegistry(
+                new java.util.ArrayList<>(List.of(interfaceRegistry, annotationRegistry)));
+
         TestEvent event = TestEvent.create("Composite listener test");
 
         // when
-        boolean result = compositeCollection.pass(event);
+        boolean result = compositeRegistry.dispatch(event);
         Thread.sleep(100);
 
         // then
@@ -106,13 +106,13 @@ class EventListenerCollectionIntegrationTest {
     @DisplayName("Should initialize listeners from Spring context")
     void shouldInitializeListenersFromSpringContext() throws InterruptedException {
         // given
-        SpringEventListenerInterfaceCollection collection = 
-            new SpringEventListenerInterfaceCollection(
+        SpringInterfaceBasedEventListenerRegistry registry =
+            new SpringInterfaceBasedEventListenerRegistry(
                 Executors.newFixedThreadPool(2),
                 applicationContext);
-        
-        SpringEventListenerAnnotationCollection annotationCollection = 
-            new SpringEventListenerAnnotationCollection(
+
+        SpringAnnotatedEventListenerRegistry annotationRegistry =
+            new SpringAnnotatedEventListenerRegistry(
                 "",
                 Executors.newFixedThreadPool(2),
                 applicationContext);
@@ -120,12 +120,12 @@ class EventListenerCollectionIntegrationTest {
         TestEvent event = TestEvent.create("Spring context test");
 
         // when
-        boolean result1 = collection.pass(event);
-        boolean result2 = annotationCollection.pass(event);
+        boolean result1 = registry.dispatch(event);
+        boolean result2 = annotationRegistry.dispatch(event);
         Thread.sleep(100);
 
         // then
-        // Collections should be initialized with beans from context
+        // Registries should be initialized with beans from context
         assertTrue(result1 || result2);
     }
 
