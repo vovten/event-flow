@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.EventListener;
 
 import java.util.List;
 
@@ -20,26 +21,22 @@ public class CompositeEventListenerRegistry implements EventListenerRegistry {
     }
 
     @Override
-    public boolean dispatch(Event event) {
-        long count = registries.stream()
-                .map(registry -> registry.dispatch(event))
-                .filter(b -> b)
-                .count();
-        return count > 0;
+    public List<EventListener> getListeners(Event event) {
+        return registries.stream()
+                .flatMap(registry -> registry.getListeners(event).stream())
+                .toList();
     }
 
     @Override
     public int listenerCount() {
-        int count = 0;
-        for (var registry : registries) {
-            count += registry.listenerCount();
-        }
-        return count;
+        return registries.stream()
+                .mapToInt(EventListenerRegistry::listenerCount)
+                .sum();
     }
 
     @Override
-    public boolean hasListeners() {
-        return listenerCount() > 0;
+    public boolean isEmpty() {
+        return registries.stream().allMatch(EventListenerRegistry::isEmpty);
     }
 
     @Override
@@ -52,6 +49,7 @@ public class CompositeEventListenerRegistry implements EventListenerRegistry {
         return registries.stream().anyMatch(registry -> registry.isRegistered(eventListener));
     }
 
+    @Override
     public void merge(EventListenerRegistry registry) {
         if (registry instanceof CompositeEventListenerRegistry composite) {
             this.registries.addAll(composite.registries);

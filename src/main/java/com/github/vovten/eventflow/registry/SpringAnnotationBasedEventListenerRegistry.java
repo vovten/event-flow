@@ -7,7 +7,6 @@ import org.springframework.util.ClassUtils;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 
@@ -16,7 +15,7 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedEventListenerRegistry {
+public class SpringAnnotationBasedEventListenerRegistry extends AnnotatedEventListenerRegistry {
     private final String scanPackage;
     private final ApplicationContext applicationContext;
 
@@ -24,12 +23,10 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedE
      * Constructor for event listener registry
      *
      * @param scanPackage        package to scan for event listeners
-     * @param executorService    service for background event processing
      * @param applicationContext application context
      */
-    public SpringAnnotationBasedEventListenerRegistry(String scanPackage, ExecutorService executorService,
-                                                      ApplicationContext applicationContext) {
-        super(executorService);
+    public SpringAnnotationBasedEventListenerRegistry(String scanPackage, ApplicationContext applicationContext) {
+        super();
         this.scanPackage = scanPackage;
         this.applicationContext = applicationContext;
         this.init();
@@ -37,11 +34,9 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedE
 
     /**
      * Constructor for event listener registry
-     *
-     * @param executorService service for background event processing
      */
-    public SpringAnnotationBasedEventListenerRegistry(ExecutorService executorService) {
-        super(executorService);
+    public SpringAnnotationBasedEventListenerRegistry() {
+        super();
         this.scanPackage = EMPTY;
         this.applicationContext = null;
     }

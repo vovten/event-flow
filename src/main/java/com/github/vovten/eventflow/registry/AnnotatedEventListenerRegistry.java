@@ -1,9 +1,9 @@
 package com.github.vovten.eventflow.registry;
 
+import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.EventListener;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.annotation.EventListener;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -11,52 +11,34 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Registry of event listeners based on annotations
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class AnnotationBasedEventListenerRegistry implements EventListenerRegistry {
-    private final ExecutorService executorService;
+public class AnnotatedEventListenerRegistry implements EventListenerRegistry {
     private final Map<Class<? extends Event>, List<Pair<Object, Method>>> eventListeners;
 
     /**
      * Constructor for event listener registry
-     *
-     * @param executorService service for background event processing
      */
-    public AnnotationBasedEventListenerRegistry(ExecutorService executorService) {
+    public AnnotatedEventListenerRegistry() {
         this.eventListeners = new HashMap<>();
-        this.executorService = executorService;
     }
 
     @Override
-    public boolean dispatch(Event event) {
-        if (eventListeners.isEmpty()) {
-            return false;
-        }
-        var listeners = eventListeners.get(event.getClass());
-        boolean hasListeners = listeners != null && !listeners.isEmpty();
+    public List<EventListener> getListeners(Event event) {
+        List<EventListener> listeners = new ArrayList<>();
+        List<Pair<Object, Method>> methods = eventListeners.getOrDefault(event.getClass(), List.of());
 
-        // Also check for generic Event.class listeners
+        // Also add listeners for generic Event.class
         if (eventListeners.containsKey(Event.class)) {
-            if (hasListeners) {
-                listeners = new ArrayList<>(listeners);
-                listeners.addAll(eventListeners.get(Event.class));
-            } else {
-                listeners = eventListeners.get(Event.class);
-                hasListeners = true;
-            }
+            listeners.addAll(createEventListeners(eventListeners.get(Event.class)));
         }
 
-        if (hasListeners && listeners != null) {
-            listeners.forEach(pair -> executorService.execute(() ->
-                    invokeEventListener(pair.getLeft(), pair.getRight(), event)));
-            return true;
-        }
-        return false;
+        listeners.addAll(createEventListeners(methods));
+        return listeners;
     }
 
     @Override
@@ -65,8 +47,8 @@ public class AnnotationBasedEventListenerRegistry implements EventListenerRegist
     }
 
     @Override
-    public boolean hasListeners() {
-        return listenerCount() > 0;
+    public boolean isEmpty() {
+        return eventListeners.isEmpty();
     }
 
     @Override
@@ -94,7 +76,7 @@ public class AnnotationBasedEventListenerRegistry implements EventListenerRegist
     public void registerIfAnnotationPresent(Object bean) {
         Method[] methods = bean.getClass().getMethods();
         for (Method method : methods) {
-            if (method.isAnnotationPresent(EventListener.class)) {
+            if (method.isAnnotationPresent(com.github.vovten.eventflow.annotation.EventListener.class)) {
                 checkMethodSignature(method);
                 registerListener(bean, method);
             }
@@ -126,11 +108,36 @@ public class AnnotationBasedEventListenerRegistry implements EventListenerRegist
         }
     }
 
-    private void invokeEventListener(Object bean, Method method, Event event) {
-        try {
-            method.invoke(bean, event);
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new EventListenerInvocationException(bean, event, e);
+    private List<EventListener> createEventListeners(List<Pair<Object, Method>> pairs) {
+        return pairs.stream()
+                .<EventListener>map(pair -> new MethodInvokingEventListener(pair.getLeft(), pair.getRight()))
+                .toList();
+    }
+
+    /**
+     * Wrapper that invokes a method on an object when an event is received
+     */
+    private static class MethodInvokingEventListener implements EventListener {
+        private final Object bean;
+        private final Method method;
+
+        MethodInvokingEventListener(Object bean, Method method) {
+            this.bean = bean;
+            this.method = method;
+        }
+
+        @Override
+        public List<Class<? extends Event>> events() {
+            return List.of((Class<? extends Event>) method.getParameterTypes()[0]);
+        }
+
+        @Override
+        public void onEvent(Event event) {
+            try {
+                method.invoke(bean, event);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new EventListenerInvocationException(bean, event, e);
+            }
         }
     }
 }

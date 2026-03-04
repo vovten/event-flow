@@ -1,6 +1,9 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.EventListener;
+
+import java.util.List;
 
 /**
  * Registry of event listeners
@@ -9,12 +12,12 @@ import com.github.vovten.eventflow.Event;
  */
 public interface EventListenerRegistry {
     /**
-     * Dispatch the event to listeners
+     * Get listeners for the specified event type
      *
      * @param event the event
-     * @return true if the event was dispatched to at least one listener, false otherwise
+     * @return list of listeners that handle this event type
      */
-    boolean dispatch(Event event);
+    List<EventListener> getListeners(Event event);
 
     /**
      * Number of listeners in the registry
@@ -28,12 +31,12 @@ public interface EventListenerRegistry {
      *
      * @return true if the registry has listeners, false otherwise
      */
-    boolean hasListeners();
+    boolean isEmpty();
 
     /**
      * Register a listener in the registry
      *
-     * @param eventListener listener that either implements the EventListener interface
+     * @param eventListener listener that implements the EventListener interface
      *                     or has methods annotated with @EventListener
      */
     void register(Object eventListener);

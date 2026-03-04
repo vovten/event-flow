@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventDispatcher;
+import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
@@ -37,18 +38,22 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
         this.eventListenerScanPackage = eventListenerScanPackage;
         this.eventListenerRegistry = new CompositeEventListenerRegistry(new ArrayList<>(
                 List.of(
-                        new SpringAnnotationBasedEventListenerRegistry(executorService),
-                        new SpringInterfaceBasedEventListenerRegistry(executorService)
+                        new SpringAnnotationBasedEventListenerRegistry(),
+                        new SpringInterfaceBasedEventListenerRegistry()
                 )
         ));
     }
 
     @Override
     public void dispatch(Event event) {
-        boolean dispatched = eventListenerRegistry.dispatch(event);
-        if (!dispatched) {
+        List<EventListener> listeners = eventListenerRegistry.getListeners(event);
+        if (listeners.isEmpty()) {
             log.debug("No listeners found for event: {}", event);
+            return;
         }
+        listeners.forEach(listener -> 
+            executorService.execute(() -> listener.onEvent(event))
+        );
     }
 
     @Override
@@ -57,13 +62,11 @@ public abstract class AbstractEventDispatcher implements EventDispatcher, Applic
         eventListenerRegistry.merge(
                 new SpringAnnotationBasedEventListenerRegistry(
                         eventListenerScanPackage,
-                        executorService,
                         applicationContext
                 )
         );
         eventListenerRegistry.merge(
                 new SpringInterfaceBasedEventListenerRegistry(
-                        executorService,
                         applicationContext
                 )
         );
