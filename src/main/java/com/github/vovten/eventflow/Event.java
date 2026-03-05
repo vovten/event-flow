@@ -6,30 +6,30 @@ import com.github.vovten.eventflow.util.EventUtils;
 import java.util.List;
 
 /**
- * Событие, которое возникает в приложении и может быть передано всем заинтересованным
- * (компоненты внутри приложения, компоненты сторонних приложений (микросервисы)).
+ * An event that occurs in the application and can be delivered to all interested parties
+ * (components within the application, components of third-party applications (microservices)).
  *
- * @author Vladimir Aleshkov, 20.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 2026-03-02
  */
-
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 public interface Event {
 
     /**
-     * @return тип события
+     * @return the event type
      */
     Class<? extends Event> type();
 
     /**
-     * Список шин в которые будет выполняться публикация данного события.
-     * По умолчанию событие публикуется только во внутреннюю шину {@link EventBus#INTERNAL}.
+     * List of event buses where this event will be published.
+     * By default, the event is published only to the internal bus {@link EventBus#INTERNAL}.
      */
     default List<EventBus> eventBusTypes() {
         return List.of(EventBus.INTERNAL);
     }
 
     /**
-     * @return событие в формате JSON
+     * @return the event as JSON
      */
     default String asJson() {
         return EventUtils.toJson(this);
