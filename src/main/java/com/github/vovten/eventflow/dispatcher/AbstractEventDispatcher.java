@@ -5,8 +5,8 @@ import com.github.vovten.eventflow.EventDispatcher;
 import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -43,8 +43,8 @@ public abstract class AbstractEventDispatcher implements EventDispatcher {
 
     private static EventListenerRegistry createDefaultRegistry(String eventListenerScanPackage) {
         return new CompositeEventListenerRegistry(new ArrayList<>(
-                List.of(new SpringAnnotationBasedEventListenerRegistry(eventListenerScanPackage, null),
-                        new SpringInterfaceBasedEventListenerRegistry()
+                List.of(new SpringAnnotationEventListenerRegistry(eventListenerScanPackage, null),
+                        new SpringInterfaceEventListenerRegistry()
                 )
         ));
     }

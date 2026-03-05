@@ -3,8 +3,8 @@ package com.github.vovten.eventflow;
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.publisher.ExternalEventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -66,9 +66,9 @@ class ExternalPublisherDispatcherIntegrationTest {
         );
 
         // Создаем реестры явно для тестов
-        var annotationRegistry = new SpringAnnotationBasedEventListenerRegistry(
+        var annotationRegistry = new SpringAnnotationEventListenerRegistry(
                 TestEvent.class.getPackageName(), applicationContext);
-        var interfaceRegistry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
+        var interfaceRegistry = new SpringInterfaceEventListenerRegistry(applicationContext);
         var listenerRegistry = new CompositeEventListenerRegistry(
                 java.util.List.of(annotationRegistry, interfaceRegistry));
 

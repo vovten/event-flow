@@ -17,13 +17,13 @@ import java.util.Map;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class AnnotationBasedEventListenerRegistry implements EventListenerRegistry {
+public class AnnotationEventListenerRegistry implements EventListenerRegistry {
     private final Map<Class<? extends Event>, List<Pair<Object, Method>>> eventListeners;
 
     /**
      * Constructor for event listener registry
      */
-    public AnnotationBasedEventListenerRegistry() {
+    public AnnotationEventListenerRegistry() {
         this.eventListeners = new HashMap<>();
     }
 

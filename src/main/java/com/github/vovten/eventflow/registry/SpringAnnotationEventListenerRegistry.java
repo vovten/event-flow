@@ -17,7 +17,7 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedEventListenerRegistry
+public class SpringAnnotationEventListenerRegistry extends AnnotationEventListenerRegistry
         implements ApplicationListener<ContextRefreshedEvent> {
 
     private final String scanPackage;
@@ -29,7 +29,7 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedE
      * @param scanPackage        package to scan for event listeners
      * @param applicationContext application context
      */
-    public SpringAnnotationBasedEventListenerRegistry(String scanPackage, ApplicationContext applicationContext) {
+    public SpringAnnotationEventListenerRegistry(String scanPackage, ApplicationContext applicationContext) {
         super();
         this.scanPackage = scanPackage;
         this.applicationContext = applicationContext;
@@ -39,7 +39,7 @@ public class SpringAnnotationBasedEventListenerRegistry extends AnnotationBasedE
     /**
      * Constructor for event listener registry
      */
-    public SpringAnnotationBasedEventListenerRegistry() {
+    public SpringAnnotationEventListenerRegistry() {
         super();
         this.scanPackage = EMPTY;
         this.applicationContext = null;

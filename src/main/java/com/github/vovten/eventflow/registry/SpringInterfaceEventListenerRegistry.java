@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class SpringInterfaceBasedEventListenerRegistry extends InterfaceBasedEventListenerRegistry
+public class SpringInterfaceEventListenerRegistry extends InterfaceEventListenerRegistry
         implements ApplicationListener<ContextRefreshedEvent> {
 
     private ApplicationContext applicationContext;
@@ -22,7 +22,7 @@ public class SpringInterfaceBasedEventListenerRegistry extends InterfaceBasedEve
      *
      * @param applicationContext application context
      */
-    public SpringInterfaceBasedEventListenerRegistry(ApplicationContext applicationContext) {
+    public SpringInterfaceEventListenerRegistry(ApplicationContext applicationContext) {
         super();
         this.applicationContext = applicationContext;
         this.init();
@@ -31,7 +31,7 @@ public class SpringInterfaceBasedEventListenerRegistry extends InterfaceBasedEve
     /**
      * Constructor for event listener registry
      */
-    public SpringInterfaceBasedEventListenerRegistry() {
+    public SpringInterfaceEventListenerRegistry() {
         super();
         this.applicationContext = null;
     }

@@ -13,13 +13,13 @@ import java.util.Map;
  *
  * @author Vladimir Aleshkov, 07.12.2024.
  */
-public class InterfaceBasedEventListenerRegistry implements EventListenerRegistry {
+public class InterfaceEventListenerRegistry implements EventListenerRegistry {
     private final Map<Class<? extends Event>, List<EventListener>> eventListeners;
 
     /**
      * Constructor for event listener registry
      */
-    public InterfaceBasedEventListenerRegistry() {
+    public InterfaceEventListenerRegistry() {
         this.eventListeners = new HashMap<>();
     }
 

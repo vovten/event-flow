@@ -11,14 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for SpringAnnotationBasedEventListenerRegistry
+ * Unit tests for SpringAnnotationEventListenerRegistry
  */
-class SpringAnnotationBasedEventListenerRegistryTest {
+class SpringAnnotationEventListenerRegistryTest {
 
     @Test
     @DisplayName("Should register listener with @EventListener annotation")
     void shouldRegisterListenerWithEventListenerAnnotation() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         AnnotatedEventListener listener = new AnnotatedEventListener();
         registry.register(listener);
         assertTrue(registry.isRegistered(listener));
@@ -27,7 +27,7 @@ class SpringAnnotationBasedEventListenerRegistryTest {
     @Test
     @DisplayName("Should return listeners for annotated listener method")
     void shouldReturnListenersForAnnotatedListenerMethod() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         AnnotatedEventListener listener = new AnnotatedEventListener();
         registry.register(listener);
         TestEvent event = TestEvent.create("Test message");
@@ -44,7 +44,7 @@ class SpringAnnotationBasedEventListenerRegistryTest {
             .thenReturn(new String[]{"annotatedEventListener"});
         when(applicationContext.getBean("annotatedEventListener")).thenReturn(listener);
 
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry(
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(
             "", applicationContext);
 
         assertTrue(registry.isRegistered(listener));
@@ -53,7 +53,7 @@ class SpringAnnotationBasedEventListenerRegistryTest {
     @Test
     @DisplayName("Should throw exception for invalid method signature")
     void shouldThrowExceptionForInvalidMethodSignature() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         InvalidEventListener listener = new InvalidEventListener();
         InvalidEventListenerMethodSignatureException exception = assertThrows(
             InvalidEventListenerMethodSignatureException.class,
@@ -65,7 +65,7 @@ class SpringAnnotationBasedEventListenerRegistryTest {
     @Test
     @DisplayName("Should return empty list when no listeners registered")
     void shouldReturnEmptyListWhenNoListenersRegistered() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         TestEvent event = TestEvent.create();
         var listeners = registry.getListeners(event);
         assertTrue(listeners.isEmpty());
@@ -74,7 +74,7 @@ class SpringAnnotationBasedEventListenerRegistryTest {
     @Test
     @DisplayName("Should not support merging registries")
     void shouldNotSupportMergingRegistries() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
         assertThrows(UnsupportedOperationException.class, () -> registry.merge(otherRegistry));
     }
@@ -82,18 +82,18 @@ class SpringAnnotationBasedEventListenerRegistryTest {
     @Test
     @DisplayName("Should return true for isEmpty when no listeners")
     void shouldReturnTrueForIsEmptyWhenNoListeners() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         assertEquals(0, registry.listenerCount());
     }
 
     @Test
     @DisplayName("Should unregister listener")
     void shouldUnregisterListener() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         AnnotatedEventListener listener = new AnnotatedEventListener();
         registry.register(listener);
         assertTrue(registry.isRegistered(listener));
-        
+
         boolean result = registry.unregister(listener);
         assertTrue(result);
         assertFalse(registry.isRegistered(listener));

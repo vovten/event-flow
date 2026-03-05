@@ -27,7 +27,7 @@ class EventListenerRegistryIntegrationTest {
     @Test
     @DisplayName("Should get interface-based listeners")
     void shouldGetInterfaceBasedListeners() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         InterfaceBasedListener listener = new InterfaceBasedListener();
         registry.register(listener);
         TestEvent event = TestEvent.create("Interface listener test");
@@ -39,7 +39,7 @@ class EventListenerRegistryIntegrationTest {
     @Test
     @DisplayName("Should get annotation-based listeners")
     void shouldGetAnnotationBasedListeners() {
-        SpringAnnotationBasedEventListenerRegistry registry = new SpringAnnotationBasedEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
         AnnotationBasedListener listener = new AnnotationBasedListener();
         registry.register(listener);
         TestEvent event = TestEvent.create("Annotation listener test");
@@ -51,8 +51,8 @@ class EventListenerRegistryIntegrationTest {
     @Test
     @DisplayName("Should get listeners through composite registry")
     void shouldGetListenersThroughCompositeRegistry() {
-        InterfaceBasedEventListenerRegistry interfaceRegistry = new InterfaceBasedEventListenerRegistry();
-        AnnotationBasedEventListenerRegistry annotationRegistry = new AnnotationBasedEventListenerRegistry();
+        InterfaceEventListenerRegistry interfaceRegistry = new InterfaceEventListenerRegistry();
+        AnnotationEventListenerRegistry annotationRegistry = new AnnotationEventListenerRegistry();
 
         InterfaceBasedListener interfaceListener = new InterfaceBasedListener();
         AnnotationBasedListener annotationListener = new AnnotationBasedListener();
@@ -71,8 +71,8 @@ class EventListenerRegistryIntegrationTest {
     @Test
     @DisplayName("Should initialize listeners from Spring context")
     void shouldInitializeListenersFromSpringContext() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
-        SpringAnnotationBasedEventListenerRegistry annotationRegistry = new SpringAnnotationBasedEventListenerRegistry("", applicationContext);
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
+        SpringAnnotationEventListenerRegistry annotationRegistry = new SpringAnnotationEventListenerRegistry("", applicationContext);
 
         assertTrue(registry.listenerCount() >= 0);
         assertTrue(annotationRegistry.listenerCount() >= 0);
@@ -81,11 +81,11 @@ class EventListenerRegistryIntegrationTest {
     @Test
     @DisplayName("Should unregister listener")
     void shouldUnregisterListener() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         InterfaceBasedListener listener = new InterfaceBasedListener();
         registry.register(listener);
         assertTrue(registry.isRegistered(listener));
-        
+
         boolean result = registry.unregister(listener);
         assertTrue(result);
         assertFalse(registry.isRegistered(listener));

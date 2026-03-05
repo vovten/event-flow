@@ -4,8 +4,8 @@ import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.publisher.CompositeEventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringAnnotationBasedEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringInterfaceBasedEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -64,8 +64,8 @@ public class EventDispatcherConfig {
             @Value("${event.external.dispatcher.group.id:KafkaEventDispatcher}") String groupId,
             @Value("${event.listener.scan.package:}") String eventListenerScanPackage,
             ExecutorService executorService,
-            SpringAnnotationBasedEventListenerRegistry annotationRegistry,
-            SpringInterfaceBasedEventListenerRegistry interfaceRegistry) {
+            SpringAnnotationEventListenerRegistry annotationRegistry,
+            SpringInterfaceEventListenerRegistry interfaceRegistry) {
         ExternalEventDispatcher dispatcher = new ExternalEventDispatcher(bootstrapServers, topicsConfig,
                 groupId, eventListenerScanPackage, executorService,
                 createCompositeRegistry(annotationRegistry, interfaceRegistry));
@@ -74,8 +74,8 @@ public class EventDispatcherConfig {
     }
 
     private EventListenerRegistry createCompositeRegistry(
-            SpringAnnotationBasedEventListenerRegistry annotationRegistry,
-            SpringInterfaceBasedEventListenerRegistry interfaceRegistry) {
+            SpringAnnotationEventListenerRegistry annotationRegistry,
+            SpringInterfaceEventListenerRegistry interfaceRegistry) {
         return new CompositeEventListenerRegistry(
                 new ArrayList<>(List.of(annotationRegistry, interfaceRegistry))
         );

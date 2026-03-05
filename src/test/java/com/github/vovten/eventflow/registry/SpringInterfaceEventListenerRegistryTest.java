@@ -13,21 +13,21 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for SpringInterfaceBasedEventListenerRegistry
+ * Unit tests for SpringInterfaceEventListenerRegistry
  */
-class SpringInterfaceBasedEventListenerRegistryTest {
+class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testConstructorWithApplicationContext() {
         ApplicationContext applicationContext = mock(ApplicationContext.class);
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         assertNotNull(registry);
         assertEquals(0, registry.listenerCount());
     }
 
     @Test
     void testRegisterEventListener() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
         assertEquals(1, registry.listenerCount());
@@ -35,7 +35,7 @@ class SpringInterfaceBasedEventListenerRegistryTest {
 
     @Test
     void testGetListeners() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
         TestEvent event = new TestEvent();
@@ -45,7 +45,7 @@ class SpringInterfaceBasedEventListenerRegistryTest {
 
     @Test
     void testIsRegistered() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         TestEventListener listener = new TestEventListener();
         assertFalse(registry.isRegistered(listener));
         registry.register(listener);
@@ -58,17 +58,17 @@ class SpringInterfaceBasedEventListenerRegistryTest {
         TestEventListener listener = new TestEventListener();
         when(applicationContext.getBeansOfType(EventListener.class))
                 .thenReturn(java.util.Collections.singletonMap("testListener", listener));
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry(applicationContext);
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         assertEquals(1, registry.listenerCount());
     }
 
     @Test
     void testUnregisterEventListener() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
         assertTrue(registry.isRegistered(listener));
-        
+
         boolean result = registry.unregister(listener);
         assertTrue(result);
         assertFalse(registry.isRegistered(listener));
@@ -76,7 +76,7 @@ class SpringInterfaceBasedEventListenerRegistryTest {
 
     @Test
     void testUnregisterNonExistentListener() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         TestEventListener listener = new TestEventListener();
         boolean result = registry.unregister(listener);
         assertFalse(result);
@@ -84,14 +84,14 @@ class SpringInterfaceBasedEventListenerRegistryTest {
 
     @Test
     void testMergeUnsupported() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
         assertThrows(UnsupportedOperationException.class, () -> registry.merge(otherRegistry));
     }
 
     @Test
     void testListenerCount() {
-        SpringInterfaceBasedEventListenerRegistry registry = new SpringInterfaceBasedEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
         assertEquals(0, registry.listenerCount());
         registry.register(new TestEventListener());
         assertEquals(1, registry.listenerCount());
@@ -102,7 +102,7 @@ class SpringInterfaceBasedEventListenerRegistryTest {
         public Class<? extends Event> type() {
             return TestEvent.class;
         }
-        
+
         public static TestEvent create() {
             return new TestEvent();
         }
