@@ -1,12 +1,17 @@
 package com.github.vovten.eventflow;
 
+import com.github.vovten.eventflow.channel.EventChannel;
+import com.github.vovten.eventflow.channel.ExternalEventChannel;
+import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
-import com.github.vovten.eventflow.publisher.CompositeEventPublisher;
+import com.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
+import com.github.vovten.eventflow.transport.InMemoryEventTransport;
+import com.github.vovten.eventflow.transport.KafkaEventTransport;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -31,21 +36,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Configuration for the event dispatching system
+ * Configuration for the event dispatching system with channels and transports.
  *
- * @author Vladimir Aleshkov, 21.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 21.11.2024
  */
 @Slf4j
 @Configuration
-@ComponentScan(basePackages = {"com.github.vovten.eventflow", "com.github.vovten.eventflow.registry"})
+@ComponentScan(basePackages = {"com.github.vovten.eventflow", "com.github.vovten.eventflow.registry", "com.github.vovten.eventflow.channel", "com.github.vovten.eventflow.transport"})
 @PropertySource(value = "classpath:event-flow.properties")
 public class EventDispatcherConfig {
 
@@ -140,12 +146,33 @@ public class EventDispatcherConfig {
         return new LinkedBlockingDeque<>();
     }
 
+    // ==================== Channel Configuration ====================
+
     @Bean
-    public EventPublisher eventPublisher(List<EventPublisher> eventPublishers,
-                                         @Value("${event.publishing.transactional:true}") boolean transactionalPublishingEnabled) {
-        return new CompositeEventPublisher(
-                eventPublishers.stream().collect(Collectors.toMap(EventPublisher::eventBus, Function.identity())),
-                transactionalPublishingEnabled
+    @ConditionalOnProperty(name = "event.internal.enabled", havingValue = "true", matchIfMissing = true)
+    public EventChannel internalChannel(
+            @Value("${event.internal.queue.size:1000}") int queueSize) {
+        return new InternalEventChannel(
+                List.of(new InMemoryEventTransport(queueSize))
         );
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "event.external.enabled", havingValue = "true")
+    public EventChannel externalChannel(@Value("${event.external.topic:events}") String topic) {
+        return new ExternalEventChannel(List.of(new KafkaEventTransport(createKafkaProperties(), topic)));
+    }
+
+    private Properties createKafkaProperties() {
+        Properties props = new Properties();
+        props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        return props;
+    }
+
+    @Bean
+    public EventPublisher channelEventPublisher(
+            List<EventChannel> channels,
+            @Value("${event.publishing.transactional:true}") boolean transactionalPublishingEnabled) {
+        return new ChannelEventPublisher(channels, transactionalPublishingEnabled);
     }
 }

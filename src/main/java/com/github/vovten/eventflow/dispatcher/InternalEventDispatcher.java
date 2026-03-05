@@ -1,7 +1,6 @@
 package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventBus;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,9 +12,10 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Event dispatcher that listens to events within a single application (see {@link EventBus#INTERNAL})
+ * Event dispatcher that listens to events within a single application (internal channel).
  *
- * @author Vladimir Aleshkov, 21.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 21.11.2024
  */
 @Slf4j
 @Component

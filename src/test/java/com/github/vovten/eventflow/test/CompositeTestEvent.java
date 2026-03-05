@@ -1,7 +1,9 @@
 package com.github.vovten.eventflow.test;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventBus;
+import com.github.vovten.eventflow.channel.EventChannel;
+import com.github.vovten.eventflow.channel.ExternalEventChannel;
+import com.github.vovten.eventflow.channel.InternalEventChannel;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -72,8 +74,8 @@ public class CompositeTestEvent implements Event {
     }
 
     @Override
-    public List<EventBus> eventBusTypes() {
-        return List.of(EventBus.INTERNAL, EventBus.EXTERNAL);
+    public List<Class<? extends EventChannel>> channels() {
+        return List.of(InternalEventChannel.class, ExternalEventChannel.class);
     }
 
     @Override

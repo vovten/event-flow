@@ -1,10 +1,13 @@
 package com.github.vovten.eventflow;
 
+import com.github.vovten.eventflow.channel.EventChannel;
+import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,18 +32,18 @@ class EventIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return correct event bus types")
-    void shouldReturnCorrectEventBusTypes() {
+    @DisplayName("Should return correct channel types")
+    void shouldReturnCorrectChannelTypes() {
         // given
         TestEvent event = TestEvent.create();
 
         // when
-        var eventBusTypes = event.eventBusTypes();
+        var channels = event.channels();
 
         // then
-        assertNotNull(eventBusTypes);
-        assertEquals(1, eventBusTypes.size());
-        assertEquals(EventBus.INTERNAL, eventBusTypes.get(0));
+        assertNotNull(channels);
+        assertEquals(1, channels.size());
+        assertEquals(InternalEventChannel.class, channels.get(0));
     }
 
     @Test

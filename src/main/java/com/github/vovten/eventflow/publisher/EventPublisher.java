@@ -1,26 +1,19 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventBus;
 
 /**
- * Event publisher interface
+ * Event publisher interface.
  *
- * @author Vladimir Aleshkov, 20.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 20.11.2024
  */
 public interface EventPublisher {
 
     /**
-     * Publish the event to the specified event bus
+     * Publish the event.
      *
      * @param event the event to publish
      */
     void publish(Event event);
-
-    /**
-     * The type of bus used when publishing events
-     *
-     * @return  event bus
-     */
-    EventBus eventBus();
 }

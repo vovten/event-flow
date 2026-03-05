@@ -1,6 +1,8 @@
 package com.github.vovten.eventflow;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.github.vovten.eventflow.channel.EventChannel;
+import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.util.EventUtils;
 
 import java.util.List;
@@ -21,11 +23,14 @@ public interface Event {
     Class<? extends Event> type();
 
     /**
-     * List of event buses where this event will be published.
-     * By default, the event is published only to the internal bus {@link EventBus#INTERNAL}.
+     * List of channel classes this event should be published to.
+     * Uses class types for compile-time safety.
+     * By default, the event is published to the internal channel.
+     *
+     * @return list of channel classes
      */
-    default List<EventBus> eventBusTypes() {
-        return List.of(EventBus.INTERNAL);
+    default List<Class<? extends EventChannel>> channels() {
+        return List.of(InternalEventChannel.class);
     }
 
     /**

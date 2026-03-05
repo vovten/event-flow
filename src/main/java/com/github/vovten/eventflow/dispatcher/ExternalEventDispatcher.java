@@ -1,7 +1,6 @@
 package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventBus;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
@@ -24,9 +23,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Event dispatcher that listens to events from the external bus (see {@link EventBus#EXTERNAL})
+ * Event dispatcher that listens to events from the external bus (external channel).
  *
- * @author Vladimir Aleshkov, 21.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 21.11.2024
  */
 @Slf4j
 public class ExternalEventDispatcher extends AbstractEventDispatcher {

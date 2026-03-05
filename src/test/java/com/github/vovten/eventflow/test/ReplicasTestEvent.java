@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.test;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventBus;
+import com.github.vovten.eventflow.channel.EventChannel;
+import com.github.vovten.eventflow.channel.ExternalEventChannel;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -65,8 +66,8 @@ public class ReplicasTestEvent implements Event {
     }
 
     @Override
-    public List<EventBus> eventBusTypes() {
-        return List.of(EventBus.EXTERNAL);
+    public List<Class<? extends EventChannel>> channels() {
+        return List.of(ExternalEventChannel.class);
     }
 
     @Override
