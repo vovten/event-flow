@@ -1,4 +1,7 @@
-package com.github.vovten.eventflow;
+package com.github.vovten.eventflow.publisher;
+
+import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.EventBus;
 
 /**
  * Event publisher interface

@@ -3,7 +3,6 @@ package com.github.vovten.eventflow.publisher;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventPublisher;
 import com.github.vovten.eventflow.EventBus;
 
 import java.util.Map;

@@ -1,7 +1,6 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.EventBus;
-import com.github.vovten.eventflow.EventPublisher;
 import com.github.vovten.eventflow.test.CompositeTestEvent;
 import com.github.vovten.eventflow.test.ExternalTestEvent;
 import com.github.vovten.eventflow.test.TestEvent;

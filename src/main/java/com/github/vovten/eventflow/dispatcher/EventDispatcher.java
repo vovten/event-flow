@@ -1,4 +1,6 @@
-package com.github.vovten.eventflow;
+package com.github.vovten.eventflow.dispatcher;
+
+import com.github.vovten.eventflow.Event;
 
 /**
  * <p>Event dispatcher.

@@ -2,6 +2,7 @@ package com.github.vovten.eventflow;
 
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.publisher.CompositeEventPublisher;
+import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;

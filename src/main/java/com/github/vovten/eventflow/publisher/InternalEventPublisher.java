@@ -3,7 +3,6 @@ package com.github.vovten.eventflow.publisher;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventPublisher;
 import com.github.vovten.eventflow.EventBus;
 
 import java.util.concurrent.BlockingDeque;

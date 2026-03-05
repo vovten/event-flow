@@ -7,7 +7,6 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventBus;
-import com.github.vovten.eventflow.EventPublisher;
 
 /**
  * Publishes events to the external bus

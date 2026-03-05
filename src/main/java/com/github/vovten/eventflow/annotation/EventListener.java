@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.annotation;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventDispatcher;
+import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
