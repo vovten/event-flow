@@ -79,10 +79,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class ChannelEventPublisher implements EventPublisher {
 
-    private static final String ERROR_MSG = """
-            Channel '%s' required for event %s but not configured in the system.
-            Check that the channel bean is created and registered.""";
-    
     private final Map<Class<? extends EventChannel>, EventChannel> channels;
 
     /**
@@ -115,7 +111,7 @@ public class ChannelEventPublisher implements EventPublisher {
      * the exception propagates to the caller and remaining channels are not processed.
      *
      * @param event the event to publish
-     * @throws EventPublisherException if required channel is not configured
+     * @throws EventPublisherConfigException if required channel is not configured
      * @throws EventPublisherException if channel send fails
      */
     @Override
@@ -129,11 +125,11 @@ public class ChannelEventPublisher implements EventPublisher {
 
     private void checkChannel(Event event, Class<? extends EventChannel> channelType, EventChannel channel) {
         if (channel == null) {
-            throw new EventPublisherException(String.format(
-                    ERROR_MSG,
-                    channelType.getSimpleName(),
-                    event.type().getSimpleName()
-            ));
+            String text = """
+                    Channel '%s' required for event %s but not configured in the system.
+                    Check that the channel bean is created and registered.""";
+            String msg = String.format(text, channelType.getSimpleName(), event.type().getSimpleName());
+            throw new EventPublisherConfigException(msg);
         }
     }
 
@@ -141,7 +137,8 @@ public class ChannelEventPublisher implements EventPublisher {
         try {
             channel.send(event);
         } catch (Exception e) {
-            throw new EventPublisherException(" ", e);
+            String msg = "Failed to send event '%s' to channel '%s'";
+            throw new EventPublisherException(String.format(msg, event.type().getSimpleName(), channel.name()), e);
         }
     }
 }

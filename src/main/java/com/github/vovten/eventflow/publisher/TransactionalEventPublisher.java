@@ -36,7 +36,7 @@ public class TransactionalEventPublisher implements EventPublisher {
     private final EventPublisher origin;
 
     /**
-     * Create transactional decorator.
+     * Create transactional decorator
      *
      * @param origin the delegate publisher to wrap
      */
