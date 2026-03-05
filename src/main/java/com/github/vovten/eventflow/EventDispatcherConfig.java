@@ -6,6 +6,7 @@ import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import com.github.vovten.eventflow.publisher.EventPublisher;
+import com.github.vovten.eventflow.publisher.TransactionalEventPublisherDecorator;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
@@ -170,9 +171,8 @@ public class EventDispatcherConfig {
     }
 
     @Bean
-    public EventPublisher channelEventPublisher(
-            List<EventChannel> channels,
-            @Value("${event.publishing.transactional:true}") boolean transactionalPublishingEnabled) {
-        return new ChannelEventPublisher(channels, transactionalPublishingEnabled);
+    public EventPublisher channelEventPublisher(List<EventChannel> channels) {
+        EventPublisher publisher = new ChannelEventPublisher(channels);
+        return new TransactionalEventPublisherDecorator(publisher);
     }
 }

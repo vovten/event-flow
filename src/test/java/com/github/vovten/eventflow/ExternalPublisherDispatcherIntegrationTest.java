@@ -66,8 +66,8 @@ class ExternalPublisherDispatcherIntegrationTest {
         kafkaProps.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         var kafkaTransport = new KafkaEventTransport(kafkaProps, "test-events");
         var externalChannel = new ExternalEventChannel(List.of(kafkaTransport));
-        
-        publisher = new ChannelEventPublisher(List.of(externalChannel), false);
+
+        publisher = new ChannelEventPublisher(List.of(externalChannel));
 
         // Создаем реестры явно для тестов
         var annotationRegistry = new SpringAnnotationEventListenerRegistry(
