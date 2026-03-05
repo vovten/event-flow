@@ -14,8 +14,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <b>Usage example:</b>
  * <pre>{@code
  * EventPublisher basePublisher = new ChannelEventPublisher(channels);
- * EventPublisher transactionalPublisher = new TransactionalEventPublisher(basePublisher);
- * transactionalPublisher.publish(event);  // Will be deferred until after commit
+ * EventPublisher retryPublisher = new RetryEventPublisherDecorator(basePublisher);
+ * EventPublisher transactionalPublisher = new TransactionalEventPublisher(retryPublisher);
+ * transactionalPublisher.publish(event);  // Retry + deferred until after commit
  * }</pre>
  * <p>
  * <b>How it works:</b>

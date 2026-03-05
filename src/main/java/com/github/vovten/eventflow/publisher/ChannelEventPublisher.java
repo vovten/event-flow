@@ -57,7 +57,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *     @Bean
  *     public EventPublisher eventPublisher(List<EventChannel> channels) {
  *         EventPublisher basePublisher = new ChannelEventPublisher(channels);
- *         return new TransactionalEventPublisher(basePublisher);
+ *         EventPublisher retryPublisher = new RetryEventPublisherDecorator(basePublisher);
+ *         return new TransactionalEventPublisher(retryPublisher);
  *     }
  * }
  * }</pre>
@@ -65,6 +66,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * <b>Transaction support:</b>
  * For transactional event publishing (defer until after commit), wrap this publisher
  * with {@link TransactionalEventPublisher}.
+ * <p>
+ * <b>Retry support:</b>
+ * For automatic retry on transient failures, wrap this publisher with
+ * {@link RetryEventPublisherDecorator}. Can be combined with transactional support.
  * <p>
  * <b>Error handling:</b>
  * If an event specifies a channel that is not configured in the system,
