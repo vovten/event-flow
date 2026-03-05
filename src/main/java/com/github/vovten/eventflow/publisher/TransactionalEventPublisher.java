@@ -21,26 +21,26 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * @since 2026-03-05
  */
 @Slf4j
-public class TransactionalEventPublisherDecorator implements EventPublisher {
+public class TransactionalEventPublisher implements EventPublisher {
 
-    private final EventPublisher delegate;
+    private final EventPublisher origin;
 
     /**
      * Create transactional decorator.
      *
-     * @param delegate the delegate publisher to wrap
+     * @param origin the delegate publisher to wrap
      */
-    public TransactionalEventPublisherDecorator(EventPublisher delegate) {
-        this.delegate = delegate;
+    public TransactionalEventPublisher(EventPublisher origin) {
+        this.origin = origin;
     }
 
     @Override
     public void publish(Event event) {
         if (isTransactionActive()) {
-            registerTransactionSynchronization(() -> delegate.publish(event));
+            registerTransactionSynchronization(() -> origin.publish(event));
             log.debug("Transaction active, deferred publishing for event {}", event.type());
         } else {
-            delegate.publish(event);
+            origin.publish(event);
         }
     }
 

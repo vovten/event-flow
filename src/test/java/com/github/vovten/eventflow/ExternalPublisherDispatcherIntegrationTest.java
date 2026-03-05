@@ -1,12 +1,14 @@
 package com.github.vovten.eventflow;
 
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
+import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
 import com.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
+import com.github.vovten.eventflow.transport.InMemoryEventTransport;
 import com.github.vovten.eventflow.transport.KafkaEventTransport;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -66,8 +68,9 @@ class ExternalPublisherDispatcherIntegrationTest {
         kafkaProps.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         var kafkaTransport = new KafkaEventTransport(kafkaProps, "test-events");
         var externalChannel = new ExternalEventChannel(List.of(kafkaTransport));
+        var internalChannel = new InternalEventChannel(List.of(new InMemoryEventTransport(1000)));
 
-        publisher = new ChannelEventPublisher(List.of(externalChannel));
+        publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
 
         // Создаем реестры явно для тестов
         var annotationRegistry = new SpringAnnotationEventListenerRegistry(
