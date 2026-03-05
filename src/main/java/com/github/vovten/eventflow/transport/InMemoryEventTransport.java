@@ -49,7 +49,7 @@ public class InMemoryEventTransport implements EventTransport {
     @Override
     public void send(Event event) {
         if (!eventQueue.offer(event)) {
-            throw new RuntimeException("Queue is full, event rejected: " + event);
+            throw new EventTransportException("Queue is full, event rejected: " + event);
         }
     }
     

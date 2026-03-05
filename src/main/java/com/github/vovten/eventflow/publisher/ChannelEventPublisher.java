@@ -57,24 +57,24 @@ import java.util.concurrent.ConcurrentHashMap;
  *     @Bean
  *     public EventPublisher eventPublisher(List<EventChannel> channels) {
  *         EventPublisher basePublisher = new ChannelEventPublisher(channels);
- *         return new TransactionalEventPublisherDecorator(basePublisher);
+ *         return new TransactionalEventPublisher(basePublisher);
  *     }
  * }
  * }</pre>
  * <p>
  * <b>Transaction support:</b>
  * For transactional event publishing (defer until after commit), wrap this publisher
- * with {@link TransactionalEventPublisherDecorator}.
+ * with {@link TransactionalEventPublisher}.
  * <p>
  * <b>Error handling:</b>
  * If an event specifies a channel that is not configured in the system,
- * {@code IllegalStateException} is thrown with a detailed error message.
+ * {@code EventTransportException} is thrown with a detailed error message.
  * This ensures that misconfigurations are detected early.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  * @see EventChannel
- * @see TransactionalEventPublisherDecorator
+ * @see TransactionalEventPublisher
  */
 @Slf4j
 public class ChannelEventPublisher implements EventPublisher {
@@ -107,7 +107,7 @@ public class ChannelEventPublisher implements EventPublisher {
      * For each channel class returned by {@code event.channels()}, this method:
      * <ol>
      *   <li>Looks up the configured channel from the registry</li>
-     *   <li>Throws {@code IllegalStateException} if channel is not found</li>
+     *   <li>Throws {@code EventPublisherException} if channel is not found</li>
      *   <li>Delegates to {@code channel.send(event)} for delivery</li>
      * </ol>
      * <p>
@@ -115,21 +115,33 @@ public class ChannelEventPublisher implements EventPublisher {
      * the exception propagates to the caller and remaining channels are not processed.
      *
      * @param event the event to publish
-     * @throws IllegalStateException if required channel is not configured
-     * @throws RuntimeException if channel send fails
+     * @throws EventPublisherException if required channel is not configured
+     * @throws EventPublisherException if channel send fails
      */
     @Override
     public void publish(Event event) {
         for (Class<? extends EventChannel> channelType : event.channels()) {
             EventChannel channel = channels.get(channelType);
-            if (channel == null) {
-                throw new IllegalStateException(String.format(
-                        ERROR_MSG,
-                        channelType.getSimpleName(),
-                        event.type().getSimpleName()
-                ));
-            }
+            checkChannel(event, channelType, channel);
+            trySend(event, channel);
+        }
+    }
+
+    private void checkChannel(Event event, Class<? extends EventChannel> channelType, EventChannel channel) {
+        if (channel == null) {
+            throw new EventPublisherException(String.format(
+                    ERROR_MSG,
+                    channelType.getSimpleName(),
+                    event.type().getSimpleName()
+            ));
+        }
+    }
+
+    private void trySend(Event event, EventChannel channel) {
+        try {
             channel.send(event);
+        } catch (Exception e) {
+            throw new EventPublisherException(" ", e);
         }
     }
 }

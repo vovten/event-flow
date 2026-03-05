@@ -11,14 +11,24 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * When a transaction is active, event publishing is deferred until after the transaction commits.
  * This ensures that events are only published if the transaction succeeds.
  * <p>
- * Usage example:
+ * <b>Usage example:</b>
  * <pre>{@code
  * EventPublisher basePublisher = new ChannelEventPublisher(channels);
- * EventPublisher transactionalPublisher = new TransactionalEventPublisherDecorator(basePublisher);
+ * EventPublisher transactionalPublisher = new TransactionalEventPublisher(basePublisher);
+ * transactionalPublisher.publish(event);  // Will be deferred until after commit
  * }</pre>
+ * <p>
+ * <b>How it works:</b>
+ * <ol>
+ *   <li>Checks if Spring transaction is active via {@code TransactionSynchronizationManager}</li>
+ *   <li>If active, registers {@code TransactionSynchronization} to publish after commit</li>
+ *   <li>If not active, publishes immediately</li>
+ * </ol>
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
+ * @see ChannelEventPublisher
+ * @see TransactionSynchronizationManager
  */
 @Slf4j
 public class TransactionalEventPublisher implements EventPublisher {
