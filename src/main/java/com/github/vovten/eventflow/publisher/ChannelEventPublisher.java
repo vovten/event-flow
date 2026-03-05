@@ -69,7 +69,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * <b>Retry support:</b>
  * For automatic retry on transient failures, wrap this publisher with
- * {@link RetryEventPublisher}. Can be combined with transactional support.
+ * {@link RetryEventPublisherDecorator}. Can be combined with transactional support.
+ * <p>
+ * <b>Silent publishing:</b>
+ * For "fire-and-forget" scenarios where errors should be logged but not propagated,
+ * wrap this publisher with {@link SilentEventPublisher}.
  * <p>
  * <b>Error handling:</b>
  * If an event specifies a channel that is not configured in the system,
@@ -80,6 +84,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2026-03-05
  * @see EventChannel
  * @see TransactionalEventPublisher
+ * @see RetryEventPublisherDecorator
+ * @see SilentEventPublisher
  */
 @Slf4j
 public class ChannelEventPublisher implements EventPublisher {

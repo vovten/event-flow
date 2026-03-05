@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.transport;
 
 import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.publisher.RetryEventPublisher;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -47,7 +48,7 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * <b>Retry integration:</b>
  * For additional reliability, wrap with {@code RetryEventPublisherDecorator}:
  * <pre>{@code
- * EventPublisher publisher = new RetryEventPublisherDecorator(
+ * EventPublisher publisher = new RetryEventPublisher(
  *     new ChannelEventPublisher(channels),
  *     3,                              // 3 retries
  *     Duration.ofMillis(100),         // exponential backoff
@@ -57,7 +58,7 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
- * @see RetryEventPublisherDecorator
+ * @see RetryEventPublisher
  */
 public class KafkaEventTransport implements EventTransport {
     
@@ -127,13 +128,15 @@ public class KafkaEventTransport implements EventTransport {
     public void send(Event event) {
         String key = event.type().getName();
         String value = event.asJson();
-        var record = new ProducerRecord<>(topic, key, value);
-        
+        trySend(event, new ProducerRecord<>(topic, key, value));
+    }
+
+    private void trySend(Event event, ProducerRecord<String, String> record) {
         try {
             // Synchronous send with 10 second timeout
             RecordMetadata metadata = producer.send(record).get(10, TimeUnit.SECONDS);
-            
-            if (metadata == null || metadata.hasOffset() == false) {
+
+            if (metadata == null || !metadata.hasOffset()) {
                 throw new EventTransportException(
                     String.format("Kafka returned null metadata for event %s", event.type().getSimpleName())
                 );
@@ -141,19 +144,19 @@ public class KafkaEventTransport implements EventTransport {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new EventTransportException(
-                String.format("Kafka send interrupted for event %s", event.type().getSimpleName()), 
+                String.format("Kafka send interrupted for event %s", event.type().getSimpleName()),
                 e
             );
         } catch (ExecutionException e) {
             throw new EventTransportException(
-                String.format("Failed to send event %s to Kafka topic %s: %s", 
-                    event.type().getSimpleName(), topic, e.getCause().getMessage()), 
+                String.format("Failed to send event %s to Kafka topic %s: %s",
+                    event.type().getSimpleName(), topic, e.getCause().getMessage()),
                 e.getCause()
             );
         } catch (TimeoutException e) {
             throw new EventTransportException(
-                String.format("Timeout sending event %s to Kafka topic %s (timeout: 10s)", 
-                    event.type().getSimpleName(), topic), 
+                String.format("Timeout sending event %s to Kafka topic %s (timeout: 10s)",
+                    event.type().getSimpleName(), topic),
                 e
             );
         }

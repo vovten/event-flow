@@ -33,6 +33,18 @@ public class InMemoryEventTransport implements EventTransport {
     private final BlockingDeque<Event> eventQueue;
     
     /**
+     * Default queue size when not specified.
+     */
+    private static final int DEFAULT_QUEUE_SIZE = 5000;
+
+    /**
+     * Create in-memory transport with default queue size (5000).
+     */
+    public InMemoryEventTransport() {
+        this.eventQueue = new LinkedBlockingDeque<>(DEFAULT_QUEUE_SIZE);
+    }
+
+    /**
      * Create in-memory transport with custom queue size.
      *
      * @param maxQueueSize maximum queue size for backpressure

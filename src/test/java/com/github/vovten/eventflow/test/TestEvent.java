@@ -27,6 +27,12 @@ public class TestEvent implements Event {
         this.message = message;
         this.timestamp = timestamp;
     }
+
+    public TestEvent(String id, String message) {
+        this.id = id;
+        this.message = message;
+        this.timestamp = timestamp;
+    }
     
     public static TestEvent create() {
         return new TestEvent();

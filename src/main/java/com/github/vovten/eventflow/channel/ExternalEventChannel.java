@@ -41,6 +41,15 @@ public class ExternalEventChannel implements EventChannel {
     public ExternalEventChannel(List<EventTransport> transports) {
         this.transports = transports;
     }
+
+    /**
+     * Create external channel with a single transport.
+     *
+     * @param transport the transport for this channel
+     */
+    public ExternalEventChannel(EventTransport transport) {
+        this.transports = List.of(transport);
+    }
     
     @Override
     public String name() {

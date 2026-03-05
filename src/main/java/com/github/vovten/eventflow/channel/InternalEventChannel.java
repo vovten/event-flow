@@ -40,6 +40,15 @@ public class InternalEventChannel implements EventChannel {
     public InternalEventChannel(List<EventTransport> transports) {
         this.transports = transports;
     }
+
+    /**
+     * Create internal channel with a single transport.
+     *
+     * @param transport the transport for this channel
+     */
+    public InternalEventChannel(EventTransport transport) {
+        this.transports = List.of(transport);
+    }
     
     @Override
     public String name() {
