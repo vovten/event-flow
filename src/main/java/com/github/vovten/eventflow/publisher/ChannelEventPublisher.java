@@ -69,7 +69,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * <b>Retry support:</b>
  * For automatic retry on transient failures, wrap this publisher with
- * {@link RetryEventPublisherDecorator}. Can be combined with transactional support.
+ * {@link RetryEventPublisher}. Can be combined with transactional support.
  * <p>
  * <b>Error handling:</b>
  * If an event specifies a channel that is not configured in the system,
