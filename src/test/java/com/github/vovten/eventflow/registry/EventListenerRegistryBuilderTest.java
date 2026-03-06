@@ -1,9 +1,12 @@
 package com.github.vovten.eventflow.registry;
 
+import com.github.vovten.eventflow.annotation.EventListener;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,9 +18,7 @@ class EventListenerRegistryBuilderIntegrationTest {
     @Test
     @DisplayName("Should build registry with Spring context")
     void shouldBuildRegistryWithSpringContext() {
-        try (AnnotationConfigApplicationContext context =
-                     new AnnotationConfigApplicationContext()) {
-
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.register(TestConfiguration.class);
             context.refresh();
 
@@ -34,9 +35,7 @@ class EventListenerRegistryBuilderIntegrationTest {
     @Test
     @DisplayName("Should discover real listeners from Spring context")
     void shouldDiscoverRealListenersFromSpringContext() {
-        try (AnnotationConfigApplicationContext context =
-                     new AnnotationConfigApplicationContext()) {
-
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.register(RealListener.class);
             context.refresh();
 
@@ -64,15 +63,15 @@ class EventListenerRegistryBuilderIntegrationTest {
         assertThat(composite).isInstanceOf(CompositeEventListenerRegistry.class);
     }
 
-    @org.springframework.stereotype.Component
+    @Component
     static class RealListener {
-        @com.github.vovten.eventflow.annotation.EventListener
+        @EventListener
         public void handle(TestEvent event) {
             // real implementation
         }
     }
 
-    @org.springframework.context.annotation.Configuration
+    @Configuration
     static class TestConfiguration {
         // empty config
     }

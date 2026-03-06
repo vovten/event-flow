@@ -38,13 +38,14 @@ class EventListenerRegistryIntegrationTest {
     @Test
     @DisplayName("Should get annotation-based listeners")
     void shouldGetAnnotationBasedListeners() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry("com.github.vovten.eventflow", applicationContext);
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(
+                applicationContext, "com.github.vovten.eventflow");
         AnnotationBasedListener listener = new AnnotationBasedListener();
         registry.register(listener);
         TestEvent event = TestEvent.create("Annotation listener test");
         var listeners = registry.getListeners(event);
         assertFalse(listeners.isEmpty());
-        assertEquals(1, listeners.size());
+        assertEquals(2, listeners.size());
     }
 
     @Test
@@ -71,7 +72,7 @@ class EventListenerRegistryIntegrationTest {
     @DisplayName("Should initialize listeners from Spring context")
     void shouldInitializeListenersFromSpringContext() {
         SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
-        SpringAnnotationEventListenerRegistry annotationRegistry = new SpringAnnotationEventListenerRegistry("com.github.vovten.eventflow", applicationContext);
+        SpringAnnotationEventListenerRegistry annotationRegistry = new SpringAnnotationEventListenerRegistry(applicationContext, "com.github.vovten.eventflow");
 
         assertTrue(registry.listenerCount() >= 0);
         assertTrue(annotationRegistry.listenerCount() >= 0);

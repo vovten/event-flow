@@ -99,11 +99,11 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
      * Immediately scans and registers beans from the application context.
      * Also registers itself as an ApplicationListener to receive ContextRefreshedEvent.
      *
-     * @param scanPackage        package prefix for filtering beans (required)
      * @param applicationContext Spring application context (required)
+     * @param scanPackage        package prefix for filtering beans (required)
      * @throws IllegalArgumentException if applicationContext is null
      */
-    public SpringAnnotationEventListenerRegistry(String scanPackage, ApplicationContext applicationContext) {
+    public SpringAnnotationEventListenerRegistry(ApplicationContext applicationContext, String scanPackage) {
         super();
         if (applicationContext == null) {
             throw new IllegalArgumentException("ApplicationContext is required");

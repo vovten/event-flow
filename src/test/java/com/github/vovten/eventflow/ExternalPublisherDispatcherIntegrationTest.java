@@ -84,7 +84,7 @@ class ExternalPublisherDispatcherIntegrationTest {
 
     private CompositeEventListenerRegistry createEventListenerRegistry() {
         var scanPackage = TestEvent.class.getPackageName();
-        var annotationRegistry = new SpringAnnotationEventListenerRegistry(scanPackage, applicationContext);
+        var annotationRegistry = new SpringAnnotationEventListenerRegistry(applicationContext, scanPackage);
         var interfaceRegistry = new SpringInterfaceEventListenerRegistry(applicationContext);
         return new CompositeEventListenerRegistry(List.of(annotationRegistry, interfaceRegistry));
     }
