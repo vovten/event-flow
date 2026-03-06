@@ -207,6 +207,7 @@ public class AnnotationEventListenerRegistry implements EventListenerRegistry {
      * Register a specific method as an event listener.
      * <p>
      * The method's first parameter determines the event type it will handle.
+     * Duplicate registrations (same bean and method) are ignored.
      *
      * @param bean the listener object
      * @param method the method to register
@@ -214,7 +215,13 @@ public class AnnotationEventListenerRegistry implements EventListenerRegistry {
     protected void registerListener(Object bean, Method method) {
         var eventType = (Class<? extends Event>) method.getParameterTypes()[0];
         var listeners = eventListeners.computeIfAbsent(eventType, k -> new ArrayList<>());
-        listeners.add(new ImmutablePair<>(bean, method));
+        var newPair = new ImmutablePair<>(bean, method);
+        // Check for duplicate (same bean and method)
+        boolean exists = listeners.stream()
+                .anyMatch(pair -> pair.getLeft().equals(bean) && pair.getRight().equals(method));
+        if (!exists) {
+            listeners.add(newPair);
+        }
     }
 
     /**

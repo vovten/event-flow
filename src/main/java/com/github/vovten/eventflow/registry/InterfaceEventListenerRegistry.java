@@ -198,14 +198,16 @@ public class InterfaceEventListenerRegistry implements EventListenerRegistry {
      * Register an EventListener for all its declared event types.
      * <p>
      * The listener is added to the list for each event type it declares interest in.
+     * Duplicate registrations are ignored.
      *
      * @param listener the listener to register
      */
     protected void registerListener(EventListener listener) {
         for (Class<? extends Event> event : listener.events()) {
-            var listeners = eventListeners.getOrDefault(event, new ArrayList<>());
-            listeners.add(listener);
-            eventListeners.put(event, listeners);
+            var listeners = eventListeners.computeIfAbsent(event, k -> new ArrayList<>());
+            if (!listeners.contains(listener)) {
+                listeners.add(listener);
+            }
         }
     }
 }

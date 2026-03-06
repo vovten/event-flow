@@ -1,10 +1,8 @@
 package com.github.vovten.eventflow.registry;
 
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.util.ClassUtils;
 
 import java.lang.reflect.Method;
@@ -106,11 +104,6 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
         super();
         this.scanPackage = scanPackage != null ? scanPackage : EMPTY;
         this.applicationContext = applicationContext;
-        if (applicationContext instanceof AbstractApplicationContext) {
-            ((AbstractApplicationContext) applicationContext).getBeanFactory()
-                    .registerSingleton("springAnnotationEventListenerRegistry", this);
-            applicationContext.addApplicationListener(this);
-        }
         this.init();
     }
 
@@ -191,7 +184,8 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
         if (scanPackage.isEmpty()) {
             return true;
         } else {
-            return StringUtils.startsWithIgnoreCase(bean.getClass().getName(), scanPackage);
+            String beanClassName = ClassUtils.getUserClass(bean.getClass()).getPackageName();
+            return beanClassName.equals(scanPackage) || beanClassName.startsWith(scanPackage + ".");
         }
     }
 }
