@@ -22,9 +22,9 @@ class EventListenerRegistryBuilderIntegrationTest {
             context.register(TestConfiguration.class);
             context.refresh();
 
-            EventListenerRegistry registry = EventListenerRegistryBuilder.spring()
-                    .scanPackage("com.github.vovten.eventflow.registry")
-                    .withSpringContext(context)
+            EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+                    .withSpring(context, "com.github.vovten.eventflow.registry")
+                    .withAnnotationListeners()
                     .build();
 
             assertThat(registry).isNotNull();
@@ -39,9 +39,10 @@ class EventListenerRegistryBuilderIntegrationTest {
             context.register(RealListener.class);
             context.refresh();
 
-            EventListenerRegistry registry = EventListenerRegistryBuilder.spring()
-                    .scanPackage("com.github.vovten.eventflow.registry")
-                    .withSpringContext(context)
+            EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+                    .withSpring(context, "com.github.vovten.eventflow.registry")
+                    .withAnnotationListeners()
+                    .withInterfaceListeners()
                     .build();
 
             TestEvent event = new TestEvent();
@@ -55,9 +56,9 @@ class EventListenerRegistryBuilderIntegrationTest {
         EventListenerRegistry annRegistry = new AnnotationEventListenerRegistry();
         EventListenerRegistry intRegistry = new InterfaceEventListenerRegistry();
 
-        EventListenerRegistry composite = EventListenerRegistryBuilder.composite()
-                .withRegistry(annRegistry)
-                .withRegistry(intRegistry)
+        EventListenerRegistry composite = EventListenerRegistryBuilder.create()
+                .withCustomRegistry(annRegistry)
+                .withCustomRegistry(intRegistry)
                 .build();
 
         assertThat(composite).isInstanceOf(CompositeEventListenerRegistry.class);

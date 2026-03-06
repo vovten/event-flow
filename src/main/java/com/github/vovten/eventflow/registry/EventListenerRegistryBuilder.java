@@ -10,6 +10,7 @@ import java.util.List;
 
 /**
  * Fluent builder for creating configured {@link EventListenerRegistry} instances.
+ *
  * <p>
  * <b>Important rules:</b>
  * <ul>
@@ -17,117 +18,107 @@ import java.util.List;
  *   <li>scanPackage is only used with Spring-based registries</li>
  *   <li>Without Spring, scanPackage is ignored</li>
  * </ul>
+ *
+ * <p>
+ * <b>Usage examples:</b>
+ * <pre>
+ * // Simple annotation-based registry (non-Spring)
+ * EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+ *     .withAnnotationListeners()
+ *     .build();
+ *
+ * // Spring-based registry with package scan
+ * EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+ *     .withSpring(applicationContext, "com.example.listeners")  // package is REQUIRED
+ *     .withAnnotationListeners()
+ *     .withInterfaceListeners()
+ *     .build();
+ *
+ * // Composite registry with custom registries and decorators
+ * EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+ *     .withAnnotationListeners()
+ *     .withInterfaceListeners()
+ *     .withRegistry(customRegistry)
+ *     .withDecorator(loggingDecorator)
+ *     .build();
+ * </pre>
  */
 @Slf4j
 public class EventListenerRegistryBuilder {
 
+    private String scanPackage;
     private ApplicationContext springContext;
-    private String scanPackage = "";
-    private RegistryType registryType = RegistryType.COMPOSITE;
-
-    private boolean includeAnnotationListeners = false;
-    private boolean includeInterfaceListeners = false;
+    private boolean useInterfaceListeners = false;
+    private boolean useAnnotationListeners = false;
 
     private final List<DecoratorFunction> decorators = new ArrayList<>();
     private final List<EventListenerRegistry> additionalRegistries = new ArrayList<>();
 
-    private EventListenerRegistryBuilder() {}
-
-    private EventListenerRegistryBuilder(RegistryType registryType) {
-        this.registryType = registryType;
+    private EventListenerRegistryBuilder() {
     }
-
-    // ==================== Static factories ====================
-
-    public static EventListenerRegistryBuilder annotationBased() {
-        return new EventListenerRegistryBuilder(RegistryType.ANNOTATION);
-    }
-
-    public static EventListenerRegistryBuilder interfaceBased() {
-        return new EventListenerRegistryBuilder(RegistryType.INTERFACE);
-    }
-
-    public static EventListenerRegistryBuilder composite() {
-        return new EventListenerRegistryBuilder(RegistryType.COMPOSITE)
-                .includeAnnotationListeners()
-                .includeInterfaceListeners();
-    }
-
-    public static EventListenerRegistryBuilder spring() {
-        return new EventListenerRegistryBuilder(RegistryType.COMPOSITE)
-                .includeAnnotationListeners()
-                .includeInterfaceListeners();
-    }
-
-    public static EventListenerRegistryBuilder springAnnotationBased() {
-        return new EventListenerRegistryBuilder(RegistryType.SPRING_ANNOTATION);
-    }
-
-    public static EventListenerRegistryBuilder springInterfaceBased() {
-        return new EventListenerRegistryBuilder(RegistryType.SPRING_INTERFACE);
-    }
-
-    // ==================== Configuration ====================
 
     /**
-     * Set Spring application context.
-     * <p>
-     * <b>IMPORTANT:</b> When using Spring, you MUST also call {@link #scanPackage(String)}
-     * to specify which package to scan for listeners.
+     * Start building a new EventListenerRegistry.
      */
-    public EventListenerRegistryBuilder withSpringContext(ApplicationContext context) {
-        this.springContext = context;
-        return this;
+    public static EventListenerRegistryBuilder create() {
+        return new EventListenerRegistryBuilder();
     }
 
     /**
-     * Set the package to scan for listeners.
+     * Enable Spring integration with application context and package scan.
      * <p>
-     * <b>REQUIRED when using Spring integration.</b>
-     * Without Spring, this parameter is ignored.
+     * <b>IMPORTANT:</b> Package scan is REQUIRED when using Spring.
      *
-     * @param scanPackage base package to scan (e.g., "com.example.listeners")
+     * @param context       Spring application context
+     * @param packageToScan base package to scan for listeners (e.g., "com.example.listeners")
      * @return this builder
-     * @throws IllegalArgumentException if package is null or empty when Spring is configured
+     * @throws IllegalArgumentException if context is null or package is empty
      */
-    public EventListenerRegistryBuilder scanPackage(String scanPackage) {
-        if (springContext != null && (scanPackage == null || scanPackage.isEmpty())) {
+    public EventListenerRegistryBuilder withSpring(ApplicationContext context, String packageToScan) {
+        if (context == null) {
+            throw new IllegalArgumentException("Spring context cannot be null");
+        }
+        if (packageToScan == null || packageToScan.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Scan package is REQUIRED when using Spring context. " +
+                    "Scan package is REQUIRED when using Spring. " +
                             "Please provide a valid package name (e.g., 'com.example.listeners')"
             );
         }
-        this.scanPackage = scanPackage != null ? scanPackage : "";
+
+        this.springContext = context;
+        this.scanPackage = packageToScan;
         return this;
     }
 
-    public EventListenerRegistryBuilder includeAnnotationListeners() {
-        this.includeAnnotationListeners = true;
+    /**
+     * Include listeners based on annotations (e.g., @EventListener).
+     */
+    public EventListenerRegistryBuilder withAnnotationListeners() {
+        this.useAnnotationListeners = true;
         return this;
     }
 
-    public EventListenerRegistryBuilder includeAnnotationListeners(boolean include) {
-        this.includeAnnotationListeners = include;
+    /**
+     * Include listeners based on interface implementation (e.g., EventListener interface).
+     */
+    public EventListenerRegistryBuilder withInterfaceListeners() {
+        this.useInterfaceListeners = true;
         return this;
     }
 
-    public EventListenerRegistryBuilder includeInterfaceListeners() {
-        this.includeInterfaceListeners = true;
-        return this;
-    }
-
-    public EventListenerRegistryBuilder includeInterfaceListeners(boolean include) {
-        this.includeInterfaceListeners = include;
-        return this;
-    }
-
-    public EventListenerRegistryBuilder withRegistry(EventListenerRegistry registry) {
+    /**
+     * Add a custom registry to the composite.
+     */
+    public EventListenerRegistryBuilder withCustomRegistry(EventListenerRegistry registry) {
         if (registry != null) {
             this.additionalRegistries.add(registry);
         }
         return this;
     }
 
+    /**
+     * Add a decorator to wrap the registry.
+     */
     public EventListenerRegistryBuilder withDecorator(DecoratorFunction decorator) {
         if (decorator != null) {
             this.decorators.add(decorator);
@@ -135,12 +126,12 @@ public class EventListenerRegistryBuilder {
         return this;
     }
 
-    // ==================== Build methods ====================
-
+    /**
+     * Build the registry without logging.
+     */
     public EventListenerRegistry build() {
         validateConfiguration();
-
-        EventListenerRegistry registry = createBaseRegistry();
+        EventListenerRegistry registry = createRegistry();
 
         for (DecoratorFunction decorator : decorators) {
             registry = decorator.apply(registry);
@@ -149,16 +140,18 @@ public class EventListenerRegistryBuilder {
         return registry;
     }
 
+    /**
+     * Build the registry and log the configuration.
+     */
     public EventListenerRegistry buildAndLog() {
         EventListenerRegistry registry = build();
 
-        log.info("Built EventListenerRegistry: type={}, springContext={}, scanPackage='{}', " +
-                        "includeAnnotation={}, includeInterface={}, customRegistries={}, decorators={}",
-                registryType,
+        log.info("Built EventListenerRegistry: springContext={}, scanPackage='{}', " +
+                        "annotationListeners={}, interfaceListeners={}, customRegistries={}, decorators={}",
                 springContext != null ? "yes" : "no",
-                springContext != null ? scanPackage : "N/A (no Spring)",
-                includeAnnotationListeners,
-                includeInterfaceListeners,
+                scanPackage != null ? scanPackage : "N/A",
+                useAnnotationListeners,
+                useInterfaceListeners,
                 additionalRegistries.size(),
                 decorators.size()
         );
@@ -166,116 +159,73 @@ public class EventListenerRegistryBuilder {
         return registry;
     }
 
-    // ==================== Private validation ====================
+    // ==================== Private methods ====================
 
     private void validateConfiguration() {
-        // Rule 1: If Spring context is provided, scanPackage must be specified
-        if (springContext != null && scanPackage.isEmpty()) {
+        // Must have at least one listener source
+        if (!useAnnotationListeners && !useInterfaceListeners && additionalRegistries.isEmpty()) {
             throw new IllegalStateException(
-                    "Scan package is REQUIRED when using Spring context.\n" +
-                            "Please add .scanPackage(\"com.your.base.package\") to the builder chain.\n" +
-                            "Example: EventListenerRegistryBuilder.spring()\n" +
-                            "    .scanPackage(\"com.example.listeners\")\n" +
-                            "    .withSpringContext(applicationContext)\n" +
-                            "    .build();"
+                    """
+                            At least one listener source must be configured.
+                            Use withAnnotationListeners(), withInterfaceListeners(), or withRegistry()."""
             );
         }
 
-        // Rule 2: Spring annotation registry requires scanPackage (redundant but explicit)
-        if (registryType == RegistryType.SPRING_ANNOTATION && scanPackage.isEmpty()) {
+        // If Spring is used, scan package must be provided
+        if (springContext != null && scanPackage == null) {
             throw new IllegalStateException(
-                    "Spring annotation registry requires a scan package. " +
-                            "Use .scanPackage(\"com.example.package\") to specify it."
-            );
-        }
-
-        // Rule 3: Spring context required for Spring-based registries
-        if (isSpringBased() && springContext == null) {
-            throw new IllegalStateException(
-                    "Spring context is REQUIRED for Spring-based registries. " +
-                            "Use .withSpringContext(applicationContext) to provide it."
-            );
-        }
-
-        // Rule 4: Composite must have at least one registry
-        if (registryType == RegistryType.COMPOSITE &&
-                !includeAnnotationListeners &&
-                !includeInterfaceListeners &&
-                additionalRegistries.isEmpty()) {
-            throw new IllegalStateException(
-                    "Composite registry must contain at least one registry. " +
-                            "Use includeAnnotationListeners(), includeInterfaceListeners(), or withRegistry()."
+                    """
+                            Scan package is REQUIRED when using Spring context.
+                            Please use: .withSpring(context, "your.base.package")
+                            Example: .withSpring(applicationContext, "com.example.listeners")"""
             );
         }
     }
 
-    private boolean isSpringBased() {
-        return registryType == RegistryType.SPRING_ANNOTATION ||
-                registryType == RegistryType.SPRING_INTERFACE ||
-                (registryType == RegistryType.COMPOSITE && springContext != null);
-    }
+    private EventListenerRegistry createRegistry() {
+        List<EventListenerRegistry> registries = new ArrayList<>();
 
-    // ==================== Registry creation ====================
+        // Add annotation-based registry if requested
+        if (useAnnotationListeners) {
+            registries.add(createAnnotationRegistry());
+        }
 
-    private EventListenerRegistry createBaseRegistry() {
-        return switch (registryType) {
-            case ANNOTATION -> createAnnotationRegistry();
-            case INTERFACE -> createInterfaceRegistry();
-            case SPRING_ANNOTATION -> createSpringAnnotationRegistry();
-            case SPRING_INTERFACE -> createSpringInterfaceRegistry();
-            case COMPOSITE -> createCompositeRegistry();
-        };
+        // Add interface-based registry if requested
+        if (useInterfaceListeners) {
+            registries.add(createInterfaceRegistry());
+        }
+
+        // Add custom registries
+        registries.addAll(additionalRegistries);
+
+        // Return single registry or composite
+        if (registries.size() == 1) {
+            return registries.getFirst();
+        }
+
+        return new CompositeEventListenerRegistry(registries);
     }
 
     private EventListenerRegistry createAnnotationRegistry() {
         if (springContext != null) {
-            validateSpringAnnotationConfig();
-            return createSpringAnnotationRegistry();
+            SpringAnnotationEventListenerRegistry registry =
+                    new SpringAnnotationEventListenerRegistry(springContext, scanPackage);
+            registerInSpring(registry, "springAnnotationEventListenerRegistry");
+            return registry;
         }
+
         return new AnnotationEventListenerRegistry();
     }
 
     private EventListenerRegistry createInterfaceRegistry() {
         if (springContext != null) {
-            return createSpringInterfaceRegistry();
+            SpringInterfaceEventListenerRegistry registry =
+                    new SpringInterfaceEventListenerRegistry(springContext);
+            registerInSpring(registry, "springInterfaceEventListenerRegistry");
+            return registry;
         }
+
         return new InterfaceEventListenerRegistry();
-    }
-
-    private SpringAnnotationEventListenerRegistry createSpringAnnotationRegistry() {
-        validateSpringAnnotationConfig();
-        SpringAnnotationEventListenerRegistry registry =
-                new SpringAnnotationEventListenerRegistry(springContext, scanPackage);
-        registerInSpring(registry, "springAnnotationEventListenerRegistry");
-        return registry;
-    }
-
-    private SpringInterfaceEventListenerRegistry createSpringInterfaceRegistry() {
-        SpringInterfaceEventListenerRegistry registry =
-                new SpringInterfaceEventListenerRegistry(springContext);
-        registerInSpring(registry, "springInterfaceEventListenerRegistry");
-        return registry;
-    }
-
-    private void validateSpringAnnotationConfig() {
-        if (scanPackage.isEmpty()) {
-            throw new IllegalStateException(
-                    "Scan package is REQUIRED for Spring annotation registry. " +
-                            "Please specify it with .scanPackage(\"com.example.package\")"
-            );
-        }
-    }
-
-    private EventListenerRegistry createCompositeRegistry() {
-        List<EventListenerRegistry> registries = new ArrayList<>();
-        if (includeAnnotationListeners) {
-            registries.add(createAnnotationRegistry());
-        }
-        if (includeInterfaceListeners) {
-            registries.add(createInterfaceRegistry());
-        }
-        registries.addAll(additionalRegistries);
-        return new CompositeEventListenerRegistry(registries);
     }
 
     private void registerInSpring(Object registry, String beanName) {
@@ -292,14 +242,6 @@ public class EventListenerRegistryBuilder {
     }
 
     // ==================== Inner types ====================
-
-    private enum RegistryType {
-        ANNOTATION,
-        INTERFACE,
-        SPRING_ANNOTATION,
-        SPRING_INTERFACE,
-        COMPOSITE
-    }
 
     @FunctionalInterface
     public interface DecoratorFunction {
