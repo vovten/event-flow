@@ -106,7 +106,7 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdown();
         }
-        log.debug("InMemoryIncomingEventTransport stopped");
+        log.info("InMemoryIncomingEventTransport stopped");
     }
 
     private void consumeLoop(Consumer<Event> eventConsumer) {

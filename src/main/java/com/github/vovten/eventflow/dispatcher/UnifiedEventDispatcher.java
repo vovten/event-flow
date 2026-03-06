@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.stream.Collectors.joining;
+
 /**
  * Unified event dispatcher that listens to events from multiple transport sources.
  * <p>
@@ -92,7 +94,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
             for (IncomingEventTransport transport : transports) {
                 transport.start(this::dispatch);
             }
-            log.info("UnifiedEventDispatcher started with {} transport(s)", transports.size());
+            log.info(buildDispatcherStartedMsg());
         } else {
             log.warn("UnifiedEventDispatcher is already started");
         }
@@ -143,5 +145,11 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         } catch (Exception e) {
             log.warn("Error stopping transport {}", transport.name(), e);
         }
+    }
+
+    private String buildDispatcherStartedMsg() {
+        String msg = "UnifiedEventDispatcher started with %s transport(s): %s";
+        String names = transports.stream().map(IncomingEventTransport::name).collect(joining(","));
+        return String.format(msg, transports.size(), names);
     }
 }
