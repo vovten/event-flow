@@ -12,7 +12,8 @@ import com.github.vovten.eventflow.Event;
 /**
  * Utilities for working with events
  *
- * @author Vladimir Aleshkov, 21.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 2024-11-21
  */
 public final class EventUtils {
 

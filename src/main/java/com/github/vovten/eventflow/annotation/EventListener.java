@@ -14,7 +14,8 @@ import java.lang.annotation.Target;
  * <p>Methods with this annotation must accept exactly one parameter of type
  * {@link Event}.
  *
- * @author Vladimir Aleshkov, 06.12.2024.
+ * @author Vladimir Aleshkov
+ * @since 2024-12-06
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)

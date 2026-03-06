@@ -5,7 +5,8 @@ import com.github.vovten.eventflow.Event;
 /**
  * Error when the dispatcher invokes a method to handle an event
  *
- * @author Vladimir Aleshkov, 07.12.2024.
+ * @author Vladimir Aleshkov
+ * @since 2024-12-07
  */
 public class EventListenerInvocationException extends RuntimeException {
 

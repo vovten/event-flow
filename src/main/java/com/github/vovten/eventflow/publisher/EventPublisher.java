@@ -6,7 +6,7 @@ import com.github.vovten.eventflow.Event;
  * Event publisher interface.
  *
  * @author Vladimir Aleshkov
- * @since 20.11.2024
+ * @since 2024-11-20
  */
 public interface EventPublisher {
 

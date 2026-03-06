@@ -3,7 +3,8 @@ package com.github.vovten.eventflow.publisher;
 /**
  * Error in event publisher operation
  *
- * @author Vladimir Aleshkov, 20.12.2024.
+ * @author Vladimir Aleshkov
+ * @since 2024-12-20
  */
 public class EventPublisherException extends RuntimeException {
     public EventPublisherException(String message) {

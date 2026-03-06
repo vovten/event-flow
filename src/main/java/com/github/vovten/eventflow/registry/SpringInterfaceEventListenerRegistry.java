@@ -80,7 +80,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 07.12.2024
+ * @since 2024-12-07
  * @see InterfaceEventListenerRegistry
  * @see SpringAnnotationEventListenerRegistry
  * @see EventListener

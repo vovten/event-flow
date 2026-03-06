@@ -64,7 +64,7 @@ import java.util.List;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 07.12.2024
+ * @since 2024-12-07
  * @see EventListener
  * @see Event
  * @see AnnotationEventListenerRegistry

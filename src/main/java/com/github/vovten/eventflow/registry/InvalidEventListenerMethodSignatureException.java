@@ -4,7 +4,8 @@ package com.github.vovten.eventflow.registry;
  * Exception thrown when the signature of a method responsible for handling
  * an event does not meet the requirements
  *
- * @author Vladimir Aleshkov, 06.12.2024.
+ * @author Vladimir Aleshkov
+ * @since 2024-12-06
  */
 public class InvalidEventListenerMethodSignatureException extends RuntimeException {
 

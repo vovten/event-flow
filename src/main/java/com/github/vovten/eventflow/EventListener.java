@@ -5,7 +5,8 @@ import java.util.List;
 /**
  * Listener for events occurring in the application
  *
- * @author Vladimir Aleshkov, 21.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 2024-11-21
  */
 public interface EventListener {
 

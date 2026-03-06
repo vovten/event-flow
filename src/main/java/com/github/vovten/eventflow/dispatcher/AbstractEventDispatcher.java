@@ -12,7 +12,8 @@ import java.util.concurrent.ExecutorService;
 /**
  * Abstract event dispatcher
  *
- * @author Vladimir Aleshkov, 21.11.2024.
+ * @author Vladimir Aleshkov
+ * @since 2024-11-21
  */
 @Slf4j
 public abstract class AbstractEventDispatcher implements EventDispatcher {

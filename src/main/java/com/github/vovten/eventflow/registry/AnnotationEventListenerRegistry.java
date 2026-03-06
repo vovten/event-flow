@@ -71,7 +71,7 @@ import java.util.Map;
  * {@link EventListenerInvocationException} wraps the underlying exception.
  *
  * @author Vladimir Aleshkov
- * @since 07.12.2024
+ * @since 2024-12-07
  * @see com.github.vovten.eventflow.annotation.EventListener
  * @see Event
  * @see InvalidEventListenerMethodSignatureException

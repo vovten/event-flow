@@ -71,7 +71,7 @@ import java.util.regex.Pattern;
  * ensuring annotated methods are discovered even on proxied beans.
  *
  * @author Vladimir Aleshkov
- * @since 07.12.2024
+ * @since 2024-12-07
  * @see AnnotationEventListenerRegistry
  * @see SpringInterfaceEventListenerRegistry
  * @see EventListener
