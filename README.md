@@ -187,7 +187,51 @@ implementation 'com.github.vovten:event-flow:1.0.0-SNAPSHOT'
 
 ## 🚀 Quick Start
 
-### 1. Create an Event
+### 1. Configure Event Flow Infrastructure
+
+First, set up the channels, transports, publisher, dispatcher, and listener registry:
+
+```java
+@Configuration
+public class EventFlowConfig {
+
+    @Bean
+    public EventChannel internalChannel() {
+        return new InternalEventChannel(
+            List.of(new InMemoryOutgoingEventTransport(1000))
+        );
+    }
+
+    @Bean
+    public EventPublisher eventPublisher(List<EventChannel> channels) {
+        return EventPublisherBuilder.channels(channels)
+            .build();
+    }
+
+    @Bean
+    public EventListenerRegistry listenerRegistry(ApplicationContext context) {
+        return EventListenerRegistryBuilder.create()
+            .withSpring(context, "com.example")
+            .withAnnotationListeners()
+            .build();
+    }
+
+    @Bean
+    public EventDispatcher eventDispatcher(
+            EventListenerRegistry registry,
+            List<IncomingEventTransport> transports) {
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        return new UnifiedEventDispatcher(executor, registry, transports);
+    }
+
+    @Bean
+    public IncomingEventTransport incomingTransport() {
+        return new InMemoryIncomingEventTransport(1000);
+    }
+}
+```
+
+### 2. Create an Event
 
 ```java
 public record OrderCreatedEvent(String orderId, String customerId) implements Event {
@@ -199,7 +243,7 @@ public record OrderCreatedEvent(String orderId, String customerId) implements Ev
 }
 ```
 
-### 2. Create a Listener (Annotation-Based)
+### 3. Create a Listener (Annotation-Based)
 
 ```java
 @Component
@@ -212,7 +256,7 @@ public class OrderEventListener {
 }
 ```
 
-### 3. Publish an Event
+### 4. Publish an Event
 
 ```java
 @Service
