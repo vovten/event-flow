@@ -17,9 +17,10 @@ import static org.mockito.Mockito.when;
  */
 class SpringInterfaceEventListenerRegistryTest {
 
+    private final ApplicationContext applicationContext = mock(ApplicationContext.class);
+
     @Test
     void testConstructorWithApplicationContext() {
-        ApplicationContext applicationContext = mock(ApplicationContext.class);
         SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         assertNotNull(registry);
         assertEquals(0, registry.listenerCount());
@@ -27,7 +28,7 @@ class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testRegisterEventListener() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
         assertEquals(1, registry.listenerCount());
@@ -35,7 +36,7 @@ class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testGetListeners() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
         TestEvent event = new TestEvent();
@@ -45,7 +46,7 @@ class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testIsRegistered() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         TestEventListener listener = new TestEventListener();
         assertFalse(registry.isRegistered(listener));
         registry.register(listener);
@@ -54,7 +55,6 @@ class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testInitWithApplicationContext() {
-        ApplicationContext applicationContext = mock(ApplicationContext.class);
         TestEventListener listener = new TestEventListener();
         when(applicationContext.getBeansOfType(EventListener.class))
                 .thenReturn(java.util.Collections.singletonMap("testListener", listener));
@@ -64,7 +64,7 @@ class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testUnregisterEventListener() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
         assertTrue(registry.isRegistered(listener));
@@ -76,7 +76,7 @@ class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testUnregisterNonExistentListener() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         TestEventListener listener = new TestEventListener();
         boolean result = registry.unregister(listener);
         assertFalse(result);
@@ -84,17 +84,26 @@ class SpringInterfaceEventListenerRegistryTest {
 
     @Test
     void testMergeUnsupported() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
         assertThrows(UnsupportedOperationException.class, () -> registry.merge(otherRegistry));
     }
 
     @Test
     void testListenerCount() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
         assertEquals(0, registry.listenerCount());
         registry.register(new TestEventListener());
         assertEquals(1, registry.listenerCount());
+    }
+
+    @Test
+    void testConstructorWithNullApplicationContext() {
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> new SpringInterfaceEventListenerRegistry(null)
+        );
+        assertEquals("ApplicationContext is required", exception.getMessage());
     }
 
     static class TestEvent implements Event {

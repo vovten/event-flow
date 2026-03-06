@@ -15,10 +15,17 @@ import static org.mockito.Mockito.*;
  */
 class SpringAnnotationEventListenerRegistryTest {
 
+    private final ApplicationContext applicationContext = mock(ApplicationContext.class);
+    private static final String SCAN_PACKAGE = "com.github.vovten.eventflow";
+
+    SpringAnnotationEventListenerRegistryTest() {
+        when(applicationContext.getBeanDefinitionNames()).thenReturn(new String[]{});
+    }
+
     @Test
     @DisplayName("Should register listener with @EventListener annotation")
     void shouldRegisterListenerWithEventListenerAnnotation() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, applicationContext);
         AnnotatedEventListener listener = new AnnotatedEventListener();
         registry.register(listener);
         assertTrue(registry.isRegistered(listener));
@@ -27,7 +34,7 @@ class SpringAnnotationEventListenerRegistryTest {
     @Test
     @DisplayName("Should return listeners for annotated listener method")
     void shouldReturnListenersForAnnotatedListenerMethod() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, applicationContext);
         AnnotatedEventListener listener = new AnnotatedEventListener();
         registry.register(listener);
         TestEvent event = TestEvent.create("Test message");
@@ -39,13 +46,12 @@ class SpringAnnotationEventListenerRegistryTest {
     @DisplayName("Should initialize listeners from application context")
     void shouldInitializeListenersFromApplicationContext() {
         AnnotatedEventListener listener = new AnnotatedEventListener();
-        ApplicationContext applicationContext = mock(ApplicationContext.class);
         when(applicationContext.getBeanDefinitionNames())
             .thenReturn(new String[]{"annotatedEventListener"});
         when(applicationContext.getBean("annotatedEventListener")).thenReturn(listener);
 
         SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(
-            "", applicationContext);
+            SCAN_PACKAGE, applicationContext);
 
         assertTrue(registry.isRegistered(listener));
     }
@@ -53,7 +59,7 @@ class SpringAnnotationEventListenerRegistryTest {
     @Test
     @DisplayName("Should throw exception for invalid method signature")
     void shouldThrowExceptionForInvalidMethodSignature() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, applicationContext);
         InvalidEventListener listener = new InvalidEventListener();
         InvalidEventListenerMethodSignatureException exception = assertThrows(
             InvalidEventListenerMethodSignatureException.class,
@@ -65,7 +71,7 @@ class SpringAnnotationEventListenerRegistryTest {
     @Test
     @DisplayName("Should return empty list when no listeners registered")
     void shouldReturnEmptyListWhenNoListenersRegistered() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, applicationContext);
         TestEvent event = TestEvent.create();
         var listeners = registry.getListeners(event);
         assertTrue(listeners.isEmpty());
@@ -74,7 +80,7 @@ class SpringAnnotationEventListenerRegistryTest {
     @Test
     @DisplayName("Should not support merging registries")
     void shouldNotSupportMergingRegistries() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, applicationContext);
         EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
         assertThrows(UnsupportedOperationException.class, () -> registry.merge(otherRegistry));
     }
@@ -82,14 +88,14 @@ class SpringAnnotationEventListenerRegistryTest {
     @Test
     @DisplayName("Should return true for isEmpty when no listeners")
     void shouldReturnTrueForIsEmptyWhenNoListeners() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, applicationContext);
         assertEquals(0, registry.listenerCount());
     }
 
     @Test
     @DisplayName("Should unregister listener")
     void shouldUnregisterListener() {
-        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry();
+        SpringAnnotationEventListenerRegistry registry = new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, applicationContext);
         AnnotatedEventListener listener = new AnnotatedEventListener();
         registry.register(listener);
         assertTrue(registry.isRegistered(listener));
@@ -97,6 +103,16 @@ class SpringAnnotationEventListenerRegistryTest {
         boolean result = registry.unregister(listener);
         assertTrue(result);
         assertFalse(registry.isRegistered(listener));
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when applicationContext is null")
+    void shouldThrowIllegalArgumentExceptionWhenApplicationContextIsNull() {
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> new SpringAnnotationEventListenerRegistry(SCAN_PACKAGE, null)
+        );
+        assertEquals("ApplicationContext is required", exception.getMessage());
     }
 
     // Test helper class with @EventListener annotation
