@@ -2,7 +2,7 @@ package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.test.TestEvent;
-import com.github.vovten.eventflow.transport.EventTransportException;
+import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -69,7 +69,7 @@ class SilentEventPublisherTest {
     void shouldCatchEventTransportExceptionAndLog() {
         // given
         EventPublisher mockDelegate = mock(EventPublisher.class);
-        doThrow(new EventTransportException("Transport error"))
+        doThrow(new OutgoingEventTransportException("Transport error"))
                 .when(mockDelegate).publish(any(Event.class));
         
         SilentEventPublisher silentPublisher = new SilentEventPublisher(mockDelegate);

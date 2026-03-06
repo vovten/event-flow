@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * <b>Architecture:</b>
  * <pre>{@code
- * Event → ChannelEventPublisher → EventChannel → EventTransport(s)
+ * Event → ChannelEventPublisher → EventChannel → OutgoingEventTransport(s)
  *                                      ↓
  *                              KafkaTransport, InMemoryTransport, etc.
  * }</pre>
@@ -34,10 +34,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * <pre>{@code
  * // Create channels with their transports
  * EventChannel internalChannel = new InternalEventChannel(
- *     List.of(new InMemoryEventTransport(1000))
+ *     List.of(new InMemoryOutgoingEventTransport(1000))
  * );
  * EventChannel externalChannel = new ExternalEventChannel(
- *     List.of(new KafkaEventTransport(bootstrapServers, "events"))
+ *     List.of(new KafkaOutgoingEventTransport(bootstrapServers, "events"))
  * );
  *
  * // Create publisher with configured channels

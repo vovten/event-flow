@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.EventTransport;
+import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 
 import java.util.List;
 
@@ -21,7 +21,7 @@ import java.util.List;
  * <b>Configuration example:</b>
  * <pre>{@code
  * EventChannel internalChannel = new InternalEventChannel(
- *     List.of(new InMemoryEventTransport(1000))
+ *     List.of(new InMemoryOutgoingEventTransport(1000))
  * );
  * }</pre>
  *
@@ -29,15 +29,15 @@ import java.util.List;
  * @since 2026-03-05
  */
 public class InternalEventChannel implements EventChannel {
-    
-    private final List<EventTransport> transports;
-    
+
+    private final List<OutgoingEventTransport> transports;
+
     /**
      * Create internal channel with custom transports.
      *
      * @param transports list of transports for this channel
      */
-    public InternalEventChannel(List<EventTransport> transports) {
+    public InternalEventChannel(List<OutgoingEventTransport> transports) {
         this.transports = transports;
     }
 
@@ -46,17 +46,17 @@ public class InternalEventChannel implements EventChannel {
      *
      * @param transport the transport for this channel
      */
-    public InternalEventChannel(EventTransport transport) {
+    public InternalEventChannel(OutgoingEventTransport transport) {
         this.transports = List.of(transport);
     }
-    
+
     @Override
     public String name() {
         return "internal";
     }
-    
+
     @Override
-    public List<EventTransport> transports() {
+    public List<OutgoingEventTransport> transports() {
         return transports;
     }
 }

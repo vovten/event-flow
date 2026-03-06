@@ -3,33 +3,33 @@ package com.github.vovten.eventflow.transport;
 import com.github.vovten.eventflow.Event;
 
 /**
- * Event transport — a mechanism for physical event delivery.
+ * Outgoing event transport — a mechanism for sending events to external destinations.
  * <p>
  * A transport is responsible for the actual delivery of events to their destination.
  * Transports are configured within channels and are transparent to event publishers.
  * <p>
  * <b>Implementations:</b>
  * <ul>
- *   <li>InMemoryEventTransport — in-memory queue for local delivery</li>
- *   <li>KafkaEventTransport — Apache Kafka for distributed delivery</li>
+ *   <li>InMemoryOutgoingEventTransport — in-memory queue for local delivery</li>
+ *   <li>KafkaOutgoingEventTransport — Apache Kafka for distributed delivery</li>
  * </ul>
  * <p>
  * <b>Usage example:</b>
  * <pre>{@code
- * EventTransport transport = new KafkaEventTransport(bootstrapServers, "events");
+ * OutgoingEventTransport transport = new KafkaOutgoingEventTransport(bootstrapServers, "events");
  * transport.send(event);
  * }</pre>
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
-public interface EventTransport {
-    
+public interface OutgoingEventTransport {
+
     /**
      * @return unique transport name (e.g., "kafka", "in-memory")
      */
     String name();
-    
+
     /**
      * Send an event.
      * <p>

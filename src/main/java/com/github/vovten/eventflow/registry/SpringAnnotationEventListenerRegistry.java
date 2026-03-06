@@ -13,31 +13,104 @@ import java.util.List;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 
 /**
- * Registry of event listeners based on annotations, extracted from the Spring context
+ * Spring-aware registry that discovers event listeners from the application context
+ * based on the {@code @EventListener} annotation.
+ * <p>
+ * This registry extends {@link AnnotationEventListenerRegistry} with Spring integration:
+ * <ul>
+ *   <li>Automatically scans Spring beans for annotated methods</li>
+ *   <li>Supports package-based filtering of beans</li>
+ *   <li>Integrates with Spring's application lifecycle</li>
+ *   <li>Handles proxy classes correctly</li>
+ * </ul>
+ * <p>
+ * <b>Key features:</b>
+ * <ul>
+ *   <li>Automatic bean discovery from Spring context</li>
+ *   <li>Package scan filtering — register only beans from specific packages</li>
+ *   <li>Support for Spring proxy classes (AOP, transactions, etc.)</li>
+ *   <li>Lifecycle integration via ContextRefreshedEvent</li>
+ * </ul>
+ * <p>
+ * <b>Usage with Spring Boot:</b>
+ * <pre>{@code
+ * @Configuration
+ * public class EventConfig {
  *
- * @author Vladimir Aleshkov, 07.12.2024.
+ *     @Bean
+ *     public EventListenerRegistry listenerRegistry(ApplicationContext context) {
+ *         return new SpringAnnotationEventListenerRegistry("com.example", context);
+ *     }
+ * }
+ *
+ * // Listener bean — automatically discovered
+ * @Component
+ * public class OrderEventListener {
+ *
+ *     @EventListener
+ *     public void handleOrderCreated(OrderCreatedEvent event) {
+ *         // Handle event
+ *     }
+ * }
+ * }</pre>
+ * <p>
+ * <b>Package filtering:</b>
+ * The {@code scanPackage} parameter controls which beans are scanned:
+ * <ul>
+ *   <li>Empty string — all beans in the context</li>
+ *   <li>"com.example" — beans in com.example and subpackages</li>
+ *   <li>"com.example.service" — beans in com.example.service only</li>
+ * </ul>
+ * <p>
+ * <b>Spring lifecycle:</b>
+ * This registry implements {@link ApplicationListener<ContextRefreshedEvent>}.
+ * When the Spring context is refreshed, it automatically scans and registers
+ * all eligible beans.
+ * <p>
+ * <b>Proxy support:</b>
+ * Uses {@link ClassUtils#getUserClass()} to handle Spring proxies correctly,
+ * ensuring annotated methods are discovered even on proxied beans.
+ *
+ * @author Vladimir Aleshkov
+ * @since 07.12.2024
+ * @see AnnotationEventListenerRegistry
+ * @see SpringInterfaceEventListenerRegistry
+ * @see com.github.vovten.eventflow.annotation.EventListener
  */
 public class SpringAnnotationEventListenerRegistry extends AnnotationEventListenerRegistry
         implements ApplicationListener<ContextRefreshedEvent> {
 
+    /**
+     * Package name to scan for listener beans.
+     * Empty string means all beans.
+     */
     private final String scanPackage;
+
+    /**
+     * Spring application context.
+     */
     private ApplicationContext applicationContext;
 
     /**
-     * Constructor for event listener registry
+     * Creates a Spring-aware annotation-based registry with package filtering.
+     * <p>
+     * Immediately scans and registers beans if the context is provided.
      *
-     * @param scanPackage        package to scan for event listeners
-     * @param applicationContext application context
+     * @param scanPackage        package prefix for filtering beans (empty = all)
+     * @param applicationContext Spring application context
      */
     public SpringAnnotationEventListenerRegistry(String scanPackage, ApplicationContext applicationContext) {
         super();
-        this.scanPackage = scanPackage;
+        this.scanPackage = scanPackage != null ? scanPackage : EMPTY;
         this.applicationContext = applicationContext;
         this.init();
     }
 
     /**
-     * Constructor for event listener registry
+     * Creates a Spring-aware annotation-based registry without context.
+     * <p>
+     * Use this constructor when the context will be provided later
+     * via {@link #onApplicationEvent(ContextRefreshedEvent)}.
      */
     public SpringAnnotationEventListenerRegistry() {
         super();
@@ -45,6 +118,13 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
         this.applicationContext = null;
     }
 
+    /**
+     * Register a Spring bean if its methods have @EventListener annotation.
+     * <p>
+     * Uses {@link ClassUtils#getUserClass()} to handle Spring proxies correctly.
+     *
+     * @param bean the Spring bean to scan
+     */
     @Override
     protected void registerIfAnnotationPresent(Object bean) {
         Method[] methods = ClassUtils.getUserClass(bean.getClass()).getMethods();
@@ -56,18 +136,36 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
         }
     }
 
+    /**
+     * Handle Spring context refresh event.
+     * <p>
+     * When the context is refreshed, updates the application context reference
+     * and re-initializes bean scanning.
+     *
+     * @param event the context refreshed event
+     */
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         this.applicationContext = event.getApplicationContext();
         this.init();
     }
 
+    /**
+     * Initialize by scanning and registering beans from the context.
+     */
     private void init() {
         if (applicationContext != null) {
             allBeans().forEach(this::register);
         }
     }
 
+    /**
+     * Get all eligible beans from the application context.
+     * <p>
+     * Beans are filtered by the configured scan package.
+     *
+     * @return list of beans to register as listeners
+     */
     private List<Object> allBeans() {
         return Arrays.stream(applicationContext.getBeanDefinitionNames())
                 .map(applicationContext::getBean)
@@ -75,6 +173,12 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
                 .toList();
     }
 
+    /**
+     * Check if a bean is in the configured scan package.
+     *
+     * @param bean the bean to check
+     * @return true if the bean should be scanned
+     */
     private boolean beanInScanPackage(Object bean) {
         if (scanPackage.isEmpty()) {
             return true;

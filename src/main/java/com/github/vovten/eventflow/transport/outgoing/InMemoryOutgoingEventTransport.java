@@ -1,12 +1,14 @@
-package com.github.vovten.eventflow.transport;
+package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 
 /**
- * In-memory transport for internal event delivery.
+ * In-memory outgoing transport for internal event delivery.
  * <p>
  * This transport uses a bounded {@link BlockingDeque} to queue events
  * for consumption by local event dispatchers. It provides backpressure support
@@ -21,17 +23,17 @@ import java.util.concurrent.LinkedBlockingDeque;
  * <p>
  * <b>Configuration example:</b>
  * <pre>{@code
- * EventTransport transport = new InMemoryEventTransport(1000);
+ * OutgoingEventTransport transport = new InMemoryOutgoingEventTransport(1000);
  * EventChannel channel = new InternalEventChannel(List.of(transport));
  * }</pre>
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
-public class InMemoryEventTransport implements EventTransport {
-    
+public class InMemoryOutgoingEventTransport implements OutgoingEventTransport {
+
     private final BlockingDeque<Event> eventQueue;
-    
+
     /**
      * Default queue size when not specified.
      */
@@ -40,7 +42,7 @@ public class InMemoryEventTransport implements EventTransport {
     /**
      * Create in-memory transport with default queue size (5000).
      */
-    public InMemoryEventTransport() {
+    public InMemoryOutgoingEventTransport() {
         this.eventQueue = new LinkedBlockingDeque<>(DEFAULT_QUEUE_SIZE);
     }
 
@@ -49,22 +51,22 @@ public class InMemoryEventTransport implements EventTransport {
      *
      * @param maxQueueSize maximum queue size for backpressure
      */
-    public InMemoryEventTransport(int maxQueueSize) {
+    public InMemoryOutgoingEventTransport(int maxQueueSize) {
         this.eventQueue = new LinkedBlockingDeque<>(maxQueueSize);
     }
-    
+
     @Override
     public String name() {
         return "in-memory";
     }
-    
+
     @Override
     public void send(Event event) {
         if (!eventQueue.offer(event)) {
-            throw new EventTransportException("Queue is full, event rejected: " + event);
+            throw new OutgoingEventTransportException("Queue is full, event rejected: " + event);
         }
     }
-    
+
     /**
      * @return the event queue for consumption by dispatchers
      */

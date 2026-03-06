@@ -27,9 +27,8 @@ class EventListenerRegistryIntegrationTest {
     @Test
     @DisplayName("Should get interface-based listeners")
     void shouldGetInterfaceBasedListeners() {
-        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry();
-        InterfaceBasedListener listener = new InterfaceBasedListener();
-        registry.register(listener);
+        SpringInterfaceEventListenerRegistry registry = new SpringInterfaceEventListenerRegistry(applicationContext);
+        registry.register(new InterfaceBasedListener());
         TestEvent event = TestEvent.create("Interface listener test");
         var listeners = registry.getListeners(event);
         assertFalse(listeners.isEmpty());

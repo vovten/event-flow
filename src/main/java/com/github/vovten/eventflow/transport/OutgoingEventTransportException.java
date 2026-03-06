@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.transport;
 
 /**
- * Error in event transport operation.
+ * Error in outgoing event transport operation.
  * <p>
  * Thrown when a transport fails to send an event due to network issues,
  * broker unavailability, serialization errors, or timeouts.
@@ -9,14 +9,14 @@ package com.github.vovten.eventflow.transport;
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
-public class EventTransportException extends RuntimeException {
+public class OutgoingEventTransportException extends RuntimeException {
     
     /**
      * Create transport exception with message.
      *
      * @param message the error message
      */
-    public EventTransportException(String message) {
+    public OutgoingEventTransportException(String message) {
         super(message);
     }
     
@@ -26,7 +26,7 @@ public class EventTransportException extends RuntimeException {
      * @param message the error message
      * @param cause the underlying cause
      */
-    public EventTransportException(String message, Throwable cause) {
+    public OutgoingEventTransportException(String message, Throwable cause) {
         super(message, cause);
     }
 }

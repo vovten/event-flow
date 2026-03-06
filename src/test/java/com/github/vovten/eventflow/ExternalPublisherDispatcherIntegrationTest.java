@@ -2,16 +2,17 @@ package com.github.vovten.eventflow;
 
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
-import com.github.vovten.eventflow.dispatcher.ExternalEventDispatcher;
+import com.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
 import com.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
-import com.github.vovten.eventflow.transport.InMemoryEventTransport;
-import com.github.vovten.eventflow.transport.KafkaEventTransport;
-import org.apache.kafka.clients.consumer.Consumer;
+import com.github.vovten.eventflow.transport.incoming.KafkaIncomingEventTransport;
+import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
+import com.github.vovten.eventflow.transport.outgoing.KafkaOutgoingEventTransport;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.*;
@@ -23,11 +24,7 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -55,7 +52,7 @@ class ExternalPublisherDispatcherIntegrationTest {
     TestEventListener eventListener;
 
     private EventPublisher publisher;
-    private ExternalEventDispatcher dispatcher;
+    private UnifiedEventDispatcher dispatcher;
     private ExecutorService dispatcherExecutor;
     private String uniqueGroupId;
 
@@ -63,34 +60,33 @@ class ExternalPublisherDispatcherIntegrationTest {
     void setUp() throws InterruptedException {
         uniqueGroupId = "test-dispatcher-group-" + UUID.randomUUID();
 
-        // Создаём каналы и publisher для тестов
         Properties kafkaProps = new Properties();
         kafkaProps.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
-        var kafkaTransport = new KafkaEventTransport(kafkaProps, "test-events");
+        var kafkaTransport = new KafkaOutgoingEventTransport(kafkaProps, "test-events");
         var externalChannel = new ExternalEventChannel(List.of(kafkaTransport));
-        var internalChannel = new InternalEventChannel(List.of(new InMemoryEventTransport(1000)));
+        var internalChannel = new InternalEventChannel(List.of(new InMemoryOutgoingEventTransport(1000)));
 
         publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
-
-        // Создаем реестры явно для тестов
-        var annotationRegistry = new SpringAnnotationEventListenerRegistry(
-                TestEvent.class.getPackageName(), applicationContext);
-        var interfaceRegistry = new SpringInterfaceEventListenerRegistry(applicationContext);
-        var listenerRegistry = new CompositeEventListenerRegistry(
-                java.util.List.of(annotationRegistry, interfaceRegistry));
-
-        dispatcherExecutor = Executors.newSingleThreadExecutor();
-        dispatcher = new ExternalEventDispatcher(
+        dispatcherExecutor = Executors.newFixedThreadPool(2);
+        KafkaIncomingEventTransport kafkaInTransport = new KafkaIncomingEventTransport(
                 createDispatcherConsumer(),
                 List.of("test-events"),
-                dispatcherExecutor,
-                listenerRegistry
+                dispatcherExecutor
         );
-
+        dispatcher = new UnifiedEventDispatcher(
+                dispatcherExecutor,
+                List.of(kafkaInTransport),
+                createCompositeEventListenerRegistry()
+        );
         dispatcher.start();
-
-        // Ждем инициализации
         Thread.sleep(1000);
+    }
+
+    private CompositeEventListenerRegistry createCompositeEventListenerRegistry() {
+        var scanPackage = TestEvent.class.getPackageName();
+        var annotationRegistry = new SpringAnnotationEventListenerRegistry(scanPackage, applicationContext);
+        var interfaceRegistry = new SpringInterfaceEventListenerRegistry(applicationContext);
+        return new CompositeEventListenerRegistry(List.of(annotationRegistry, interfaceRegistry));
     }
 
     @AfterEach
@@ -127,7 +123,7 @@ class ExternalPublisherDispatcherIntegrationTest {
         });
     }
 
-    private Consumer<String, String> createDispatcherConsumer() {
+    private KafkaConsumer<String, String> createDispatcherConsumer() {
         Map<String, Object> properties = new HashMap<>();
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, uniqueGroupId);
@@ -137,6 +133,6 @@ class ExternalPublisherDispatcherIntegrationTest {
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         properties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 15000);
         DefaultKafkaConsumerFactory<String, String> factory = new DefaultKafkaConsumerFactory<>(properties);
-        return factory.createConsumer();
+        return (KafkaConsumer<String, String>) factory.createConsumer();
     }
 }

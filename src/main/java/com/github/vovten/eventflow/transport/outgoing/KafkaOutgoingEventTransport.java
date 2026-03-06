@@ -1,9 +1,10 @@
-package com.github.vovten.eventflow.transport;
+package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.publisher.RetryEventPublisher;
+import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
@@ -15,7 +16,7 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.kafka.clients.producer.ProducerConfig.*;
 
 /**
- * Kafka transport for external event delivery.
+ * Kafka outgoing transport for external event delivery.
  * <p>
  * This transport sends events to an Apache Kafka topic using <b>synchronous</b> delivery.
  * Each event is sent and the transport waits for acknowledgment from Kafka brokers.
@@ -41,7 +42,7 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * <pre>{@code
  * Properties props = new Properties();
  * props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
- * EventTransport transport = new KafkaEventTransport(props, "events");
+ * OutgoingEventTransport transport = new KafkaOutgoingEventTransport(props, "events");
  * EventChannel channel = new ExternalEventChannel(List.of(transport));
  * }</pre>
  * <p>
@@ -60,18 +61,18 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * @since 2026-03-05
  * @see RetryEventPublisher
  */
-public class KafkaEventTransport implements EventTransport {
-    
+public class KafkaOutgoingEventTransport implements OutgoingEventTransport {
+
     private final KafkaProducer<String, String> producer;
     private final String topic;
-    
+
     /**
      * Create Kafka transport with custom configuration.
      *
      * @param properties Kafka producer configuration
      * @param topic Kafka topic name
      */
-    public KafkaEventTransport(Properties properties, String topic) {
+    public KafkaOutgoingEventTransport(Properties properties, String topic) {
         Properties props = new Properties();
         props.putAll(properties);
         props.putIfAbsent(KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
@@ -79,17 +80,17 @@ public class KafkaEventTransport implements EventTransport {
         this.producer = new KafkaProducer<>(props);
         this.topic = topic;
     }
-    
+
     /**
      * Create Kafka transport with bootstrap servers and topic.
      *
      * @param bootstrapServers Kafka bootstrap servers (e.g., "localhost:9092")
      * @param topic Kafka topic name
      */
-    public KafkaEventTransport(String bootstrapServers, String topic) {
+    public KafkaOutgoingEventTransport(String bootstrapServers, String topic) {
         this(createDefaultProperties(bootstrapServers), topic);
     }
-    
+
     private static Properties createDefaultProperties(String bootstrapServers) {
         Properties props = new Properties();
         props.setProperty(BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -101,7 +102,7 @@ public class KafkaEventTransport implements EventTransport {
         props.setProperty(DELIVERY_TIMEOUT_MS_CONFIG, "30000");
         return props;
     }
-    
+
     @Override
     public String name() {
         return "kafka";
@@ -112,7 +113,7 @@ public class KafkaEventTransport implements EventTransport {
      * <p>
      * This method sends the event and waits for acknowledgment from Kafka brokers.
      * The send operation has a timeout of 10 seconds. If the send fails, an
-     * {@link EventTransportException} is thrown.
+     * {@link OutgoingEventTransportException} is thrown.
      * <p>
      * <b>Reliability guarantees:</b>
      * <ul>
@@ -122,7 +123,7 @@ public class KafkaEventTransport implements EventTransport {
      * </ul>
      *
      * @param event the event to send
-     * @throws EventTransportException if send fails (network error, timeout, etc.)
+     * @throws OutgoingEventTransportException if send fails (network error, timeout, etc.)
      */
     @Override
     public void send(Event event) {
@@ -137,24 +138,24 @@ public class KafkaEventTransport implements EventTransport {
             RecordMetadata metadata = producer.send(record).get(10, TimeUnit.SECONDS);
 
             if (metadata == null || !metadata.hasOffset()) {
-                throw new EventTransportException(
+                throw new OutgoingEventTransportException(
                     String.format("Kafka returned null metadata for event %s", event.type().getSimpleName())
                 );
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new EventTransportException(
+            throw new OutgoingEventTransportException(
                 String.format("Kafka send interrupted for event %s", event.type().getSimpleName()),
                 e
             );
         } catch (ExecutionException e) {
-            throw new EventTransportException(
+            throw new OutgoingEventTransportException(
                 String.format("Failed to send event %s to Kafka topic %s: %s",
                     event.type().getSimpleName(), topic, e.getCause().getMessage()),
                 e.getCause()
             );
         } catch (TimeoutException e) {
-            throw new EventTransportException(
+            throw new OutgoingEventTransportException(
                 String.format("Timeout sending event %s to Kafka topic %s (timeout: 10s)",
                     event.type().getSimpleName(), topic),
                 e
