@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.util.ClassUtils;
 
 import java.lang.reflect.Method;
@@ -95,8 +96,8 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
      * Creates a Spring-aware annotation-based registry with package filtering.
      * <p>
      * Immediately scans and registers beans if the context is provided.
-     * Also registers itself as an ApplicationListener in the context to receive
-     * ContextRefreshedEvent for re-scanning beans on context refresh.
+     * Also registers itself as a singleton bean in the application context
+     * and as an ApplicationListener to receive ContextRefreshedEvent.
      *
      * @param scanPackage        package prefix for filtering beans (empty = all)
      * @param applicationContext Spring application context
@@ -105,7 +106,9 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
         super();
         this.scanPackage = scanPackage != null ? scanPackage : EMPTY;
         this.applicationContext = applicationContext;
-        if (applicationContext != null) {
+        if (applicationContext instanceof AbstractApplicationContext) {
+            ((AbstractApplicationContext) applicationContext).getBeanFactory()
+                    .registerSingleton("springAnnotationEventListenerRegistry", this);
             applicationContext.addApplicationListener(this);
         }
         this.init();

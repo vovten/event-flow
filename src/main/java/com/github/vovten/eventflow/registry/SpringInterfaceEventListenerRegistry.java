@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.registry;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.support.AbstractApplicationContext;
 import com.github.vovten.eventflow.EventListener;
 
 import java.util.concurrent.ExecutorService;
@@ -99,15 +100,17 @@ public class SpringInterfaceEventListenerRegistry extends InterfaceEventListener
      * Creates a Spring-aware interface-based registry.
      * <p>
      * Immediately scans and registers EventListener beans if the context is provided.
-     * Also registers itself as an ApplicationListener in the context to receive
-     * ContextRefreshedEvent for re-scanning beans on context refresh.
+     * Also registers itself as a singleton bean in the application context
+     * and as an ApplicationListener to receive ContextRefreshedEvent.
      *
      * @param applicationContext Spring application context
      */
     public SpringInterfaceEventListenerRegistry(ApplicationContext applicationContext) {
         super();
         this.applicationContext = applicationContext;
-        if (applicationContext != null) {
+        if (applicationContext instanceof AbstractApplicationContext) {
+            ((AbstractApplicationContext) applicationContext).getBeanFactory()
+                    .registerSingleton("springInterfaceEventListenerRegistry", this);
             applicationContext.addApplicationListener(this);
         }
         this.init();
