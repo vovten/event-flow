@@ -99,12 +99,17 @@ public class SpringInterfaceEventListenerRegistry extends InterfaceEventListener
      * Creates a Spring-aware interface-based registry.
      * <p>
      * Immediately scans and registers EventListener beans if the context is provided.
+     * Also registers itself as an ApplicationListener in the context to receive
+     * ContextRefreshedEvent for re-scanning beans on context refresh.
      *
      * @param applicationContext Spring application context
      */
     public SpringInterfaceEventListenerRegistry(ApplicationContext applicationContext) {
         super();
         this.applicationContext = applicationContext;
+        if (applicationContext != null) {
+            applicationContext.addApplicationListener(this);
+        }
         this.init();
     }
 

@@ -95,6 +95,8 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
      * Creates a Spring-aware annotation-based registry with package filtering.
      * <p>
      * Immediately scans and registers beans if the context is provided.
+     * Also registers itself as an ApplicationListener in the context to receive
+     * ContextRefreshedEvent for re-scanning beans on context refresh.
      *
      * @param scanPackage        package prefix for filtering beans (empty = all)
      * @param applicationContext Spring application context
@@ -103,6 +105,9 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
         super();
         this.scanPackage = scanPackage != null ? scanPackage : EMPTY;
         this.applicationContext = applicationContext;
+        if (applicationContext != null) {
+            applicationContext.addApplicationListener(this);
+        }
         this.init();
     }
 
