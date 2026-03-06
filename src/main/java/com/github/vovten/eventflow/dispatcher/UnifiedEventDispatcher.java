@@ -2,25 +2,18 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventListener;
-import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.apache.commons.lang3.StringUtils.EMPTY;
-
 /**
  * Unified event dispatcher that listens to events from multiple transport sources.
  * <p>
- * This dispatcher consolidates the functionality of both internal and external
- * dispatchers into a single implementation. It can listen to multiple
+ * This dispatcher can listen to multiple
  * {@link IncomingEventTransport} instances simultaneously, delivering events from all
  * sources to the registered listeners.
  * <p>
@@ -29,7 +22,7 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
  *   <li>Single dispatcher implementation for all transport types</li>
  *   <li>Support for multiple transports (in-memory, Kafka, etc.)</li>
  *   <li>Thread-safe event delivery to listeners</li>
- *   <li>Configurable listener registry</li>
+ *   <li>External listener registry injection</li>
  * </ul>
  * <p>
  * <b>Architecture:</b>
@@ -48,10 +41,16 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
  *     "localhost:9092", "events", "my-group"
  * );
  *
+ * // Create listener registry
+ * EventListenerRegistry registry = new CompositeEventListenerRegistry(
+ *     List.of(annotationRegistry, interfaceRegistry)
+ * );
+ *
  * // Create dispatcher with multiple transports
  * UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
  *     executorService,
- *     List.of(memoryTransport, kafkaTransport)
+ *     List.of(memoryTransport, kafkaTransport),
+ *     registry
  * );
  * dispatcher.start();
  * }</pre>
@@ -68,68 +67,18 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
-     * Create unified dispatcher with multiple transports.
-     *
-     * @param executorService executor service for async listener execution
-     * @param transports      list of transports to listen to
-     */
-    public UnifiedEventDispatcher(ExecutorService executorService, List<IncomingEventTransport> transports) {
-        this(executorService, transports, EMPTY);
-    }
-
-    /**
-     * Create unified dispatcher with multiple transports and event listener scan package.
-     *
-     * @param executorService           executor service for async listener execution
-     * @param transports                list of transports to listen to
-     * @param eventListenerScanPackage  package to scan for event listeners
-     */
-    public UnifiedEventDispatcher(ExecutorService executorService,
-                                   List<IncomingEventTransport> transports,
-                                   String eventListenerScanPackage) {
-        this(executorService, transports, eventListenerScanPackage,
-                createDefaultRegistry(eventListenerScanPackage));
-    }
-
-    /**
      * Create unified dispatcher with custom listener registry.
      *
-     * @param executorService   executor service for async listener execution
-     * @param transports        list of transports to listen to
-     * @param listenerRegistry  custom listener registry
+     * @param executorService  executor service for async listener execution
+     * @param listenerRegistry custom listener registry
+     * @param transports       list of transports to listen to
      */
     public UnifiedEventDispatcher(ExecutorService executorService,
-                                   List<IncomingEventTransport> transports,
-                                   EventListenerRegistry listenerRegistry) {
-        this(executorService, transports, EMPTY, listenerRegistry);
-    }
-
-    /**
-     * Create unified dispatcher with full configuration.
-     *
-     * @param executorService           executor service for async listener execution
-     * @param transports                list of transports to listen to
-     * @param eventListenerScanPackage  package to scan for event listeners
-     * @param listenerRegistry          custom listener registry
-     */
-    public UnifiedEventDispatcher(ExecutorService executorService,
-                                  List<IncomingEventTransport> transports,
-                                  String eventListenerScanPackage,
-                                  EventListenerRegistry listenerRegistry) {
-        this.executorService = executorService;
+                                  EventListenerRegistry listenerRegistry,
+                                  List<IncomingEventTransport> transports) {
         this.transports = transports;
-        this.listenerRegistry = listenerRegistry != null
-                ? listenerRegistry
-                : createDefaultRegistry(eventListenerScanPackage);
-    }
-
-    private static EventListenerRegistry createDefaultRegistry(String eventListenerScanPackage) {
-        return new CompositeEventListenerRegistry(new ArrayList<>(
-                List.of(
-                        new SpringAnnotationEventListenerRegistry(eventListenerScanPackage, null),
-                        new SpringInterfaceEventListenerRegistry()
-                )
-        ));
+        this.executorService = executorService;
+        this.listenerRegistry = listenerRegistry;
     }
 
     /**

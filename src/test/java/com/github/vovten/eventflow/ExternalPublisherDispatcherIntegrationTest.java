@@ -75,14 +75,14 @@ class ExternalPublisherDispatcherIntegrationTest {
         );
         dispatcher = new UnifiedEventDispatcher(
                 dispatcherExecutor,
-                List.of(kafkaInTransport),
-                createCompositeEventListenerRegistry()
+                createEventListenerRegistry(),
+                List.of(kafkaInTransport)
         );
         dispatcher.start();
         Thread.sleep(1000);
     }
 
-    private CompositeEventListenerRegistry createCompositeEventListenerRegistry() {
+    private CompositeEventListenerRegistry createEventListenerRegistry() {
         var scanPackage = TestEvent.class.getPackageName();
         var annotationRegistry = new SpringAnnotationEventListenerRegistry(scanPackage, applicationContext);
         var interfaceRegistry = new SpringInterfaceEventListenerRegistry(applicationContext);
