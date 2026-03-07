@@ -4,6 +4,7 @@ import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for CompositeEventListenerRegistry.
  */
+@DisplayName("CompositeEventListenerRegistry Tests")
 class CompositeEventListenerRegistryTest {
 
     private EventListenerRegistry registry1;
@@ -28,22 +30,26 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testConstructor_EmptyList() {
+    @DisplayName("Should throw exception for empty registries list")
+    void shouldThrowExceptionForEmptyRegistriesList() {
         assertThrows(IllegalArgumentException.class, () -> new CompositeEventListenerRegistry(List.of()));
     }
 
     @Test
-    void testConstructor_NullList() {
+    @DisplayName("Should throw exception for null registries list")
+    void shouldThrowExceptionForNullRegistriesList() {
         assertThrows(IllegalArgumentException.class, () -> new CompositeEventListenerRegistry(null));
     }
 
     @Test
-    void testConstructor_WithRegistries() {
+    @DisplayName("Should create registry with registries")
+    void shouldCreateRegistryWithRegistries() {
         assertDoesNotThrow(() -> new CompositeEventListenerRegistry(List.of(registry1)));
     }
 
     @Test
-    void testGetListeners_CombinesFromAllRegistries() {
+    @DisplayName("Should combine listeners from all registries")
+    void shouldCombineListenersFromAllRegistries() {
         TestEventListener listener1 = new TestEventListener();
         TestEventListener listener2 = new TestEventListener();
 
@@ -59,7 +65,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testGetListeners_EmptyRegistries() {
+    @DisplayName("Should return empty list when all registries are empty")
+    void shouldReturnEmptyListWhenAllRegistriesAreEmpty() {
         when(registry1.getListeners(any())).thenReturn(List.of());
         when(registry2.getListeners(any())).thenReturn(List.of());
 
@@ -70,7 +77,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testListenerCount_SumsAllRegistries() {
+    @DisplayName("Should sum listener counts from all registries")
+    void shouldSumListenerCountsFromAllRegistries() {
         when(registry1.listenerCount()).thenReturn(5);
         when(registry2.listenerCount()).thenReturn(3);
 
@@ -80,7 +88,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testRegister_DelegatesToAllRegistries() {
+    @DisplayName("Should delegate register to all registries")
+    void shouldDelegateRegisterToAllRegistries() {
         Object listener = new Object();
 
         compositeRegistry.register(listener);
@@ -90,7 +99,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testUnregister_AnyRegistryReturnsTrue() {
+    @DisplayName("Should return true when any registry returns true on unregister")
+    void shouldReturnTrueWhenAnyRegistryReturnsTrueOnUnregister() {
         Object listener = new Object();
         when(registry1.unregister(listener)).thenReturn(true);
         when(registry2.unregister(listener)).thenReturn(false);
@@ -103,7 +113,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testUnregister_AllRegistriesReturnFalse() {
+    @DisplayName("Should return false when all registries return false on unregister")
+    void shouldReturnFalseWhenAllRegistriesReturnFalseOnUnregister() {
         Object listener = new Object();
         when(registry1.unregister(listener)).thenReturn(false);
         when(registry2.unregister(listener)).thenReturn(false);
@@ -114,7 +125,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testIsRegistered_AnyRegistryReturnsTrue() {
+    @DisplayName("Should return true when any registry returns true on isRegistered")
+    void shouldReturnTrueWhenAnyRegistryReturnsTrueOnIsRegistered() {
         Object listener = new Object();
         when(registry1.isRegistered(listener)).thenReturn(false);
         when(registry2.isRegistered(listener)).thenReturn(true);
@@ -125,7 +137,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testIsRegistered_AllRegistriesReturnFalse() {
+    @DisplayName("Should return false when all registries return false on isRegistered")
+    void shouldReturnFalseWhenAllRegistriesReturnFalseOnIsRegistered() {
         Object listener = new Object();
         when(registry1.isRegistered(listener)).thenReturn(false);
         when(registry2.isRegistered(listener)).thenReturn(false);
@@ -136,7 +149,8 @@ class CompositeEventListenerRegistryTest {
     }
 
     @Test
-    void testMerge_DelegatesToAllRegistries() {
+    @DisplayName("Should throw exception on merge")
+    void shouldThrowExceptionOnMerge() {
         EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
         doThrow(new UnsupportedOperationException("Merge not supported")).when(registry1).merge(otherRegistry);
 

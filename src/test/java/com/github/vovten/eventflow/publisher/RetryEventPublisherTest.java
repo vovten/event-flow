@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for RetryEventPublisher.
  */
+@DisplayName("RetryEventPublisher Tests")
 class RetryEventPublisherTest {
 
     private EventPublisher delegate;
@@ -24,33 +26,38 @@ class RetryEventPublisherTest {
     }
 
     @Test
-    void testConstructor_DefaultValues() {
+    @DisplayName("Should create publisher with default values")
+    void shouldCreatePublisherWithDefaultValues() {
         RetryEventPublisher publisher = new RetryEventPublisher(delegate);
 
         assertNotNull(publisher);
     }
 
     @Test
-    void testConstructor_CustomValues() {
+    @DisplayName("Should create publisher with custom values")
+    void shouldCreatePublisherWithCustomValues() {
         RetryEventPublisher publisher = new RetryEventPublisher(delegate, 5, Duration.ofMillis(50), 1.5);
 
         assertNotNull(publisher);
     }
 
     @Test
-    void testConstructor_InvalidMaxRetries() {
+    @DisplayName("Should throw exception for invalid maxRetries")
+    void shouldThrowExceptionForInvalidMaxRetries() {
         assertThrows(IllegalArgumentException.class, () ->
                 new RetryEventPublisher(delegate, -1, Duration.ofMillis(100), 2.0));
     }
 
     @Test
-    void testConstructor_InvalidMultiplier() {
+    @DisplayName("Should throw exception for invalid multiplier")
+    void shouldThrowExceptionForInvalidMultiplier() {
         assertThrows(IllegalArgumentException.class, () ->
                 new RetryEventPublisher(delegate, 3, Duration.ofMillis(100), 0.5));
     }
 
     @Test
-    void testPublish_Success_NoRetries() {
+    @DisplayName("Should publish without retries on success")
+    void shouldPublishWithoutRetriesOnSuccess() {
         RetryEventPublisher retryPublisher = new RetryEventPublisher(delegate);
         TestEvent event = new TestEvent();
 
@@ -60,7 +67,8 @@ class RetryEventPublisherTest {
     }
 
     @Test
-    void testPublish_FailureWithRetries() {
+    @DisplayName("Should retry on failure and succeed")
+    void shouldRetryOnFailureAndSucceed() {
         doThrow(new EventPublisherException("Failed"))
                 .doThrow(new EventPublisherException("Failed"))
                 .doNothing()
@@ -75,7 +83,8 @@ class RetryEventPublisherTest {
     }
 
     @Test
-    void testPublish_AllRetriesFail_ThrowsException() {
+    @DisplayName("Should throw exception after all retries fail")
+    void shouldThrowExceptionAfterAllRetriesFail() {
         doThrow(new EventPublisherException("Failed"))
                 .when(delegate).publish(any());
 
@@ -87,7 +96,8 @@ class RetryEventPublisherTest {
     }
 
     @Test
-    void testPublish_RetryCount() {
+    @DisplayName("Should retry correct number of times")
+    void shouldRetryCorrectNumberOfTimes() {
         AtomicInteger callCount = new AtomicInteger(0);
         EventPublisher failingDelegate = e -> {
             callCount.incrementAndGet();
@@ -102,7 +112,8 @@ class RetryEventPublisherTest {
     }
 
     @Test
-    void testPublish_ConfigException_NoRetry() {
+    @DisplayName("Should not retry EventPublisherConfigException")
+    void shouldNotRetryEventPublisherConfigException() {
         doThrow(new EventPublisherConfigException("Config error"))
                 .when(delegate).publish(any());
 
@@ -114,7 +125,8 @@ class RetryEventPublisherTest {
     }
 
     @Test
-    void testPublish_IllegalArgumentException_NoRetry() {
+    @DisplayName("Should not retry IllegalArgumentException")
+    void shouldNotRetryIllegalArgumentException() {
         doThrow(new IllegalArgumentException("Invalid argument"))
                 .when(delegate).publish(any());
 

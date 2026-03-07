@@ -4,6 +4,7 @@ import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for AbstractEventDispatcher.
  */
+@DisplayName("AbstractEventDispatcher Tests")
 class AbstractEventDispatcherTest {
 
     private ExecutorService executorService;
@@ -34,7 +36,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testDispatch_NoListeners_NoAction() {
+    @DisplayName("Should do nothing when no listeners")
+    void shouldDoNothingWhenNoListeners() {
         when(listenerRegistry.getListeners(any())).thenReturn(List.of());
 
         TestEvent event = new TestEvent();
@@ -44,7 +47,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testDispatch_WithListeners_ExecutesAsync() throws InterruptedException {
+    @DisplayName("Should execute listener asynchronously")
+    void shouldExecuteListenerAsynchronously() throws InterruptedException {
         TestEventListener listener = new TestEventListener();
         when(listenerRegistry.getListeners(any())).thenReturn(List.of(listener));
 
@@ -56,7 +60,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testDispatch_MultipleListeners_AllExecuted() throws InterruptedException {
+    @DisplayName("Should execute all listeners")
+    void shouldExecuteAllListeners() throws InterruptedException {
         TestEventListener listener1 = new TestEventListener();
         TestEventListener listener2 = new TestEventListener();
         when(listenerRegistry.getListeners(any())).thenReturn(List.of(listener1, listener2));
@@ -70,7 +75,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testRegister_DelegatesToRegistry() {
+    @DisplayName("Should delegate register to registry")
+    void shouldDelegateRegisterToRegistry() {
         Object listener = new Object();
         when(listenerRegistry.isRegistered(listener)).thenReturn(false);
 
@@ -80,7 +86,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testRegister_AlreadyRegistered_DoesNotRegisterAgain() {
+    @DisplayName("Should not register already registered listener")
+    void shouldNotRegisterAlreadyRegisteredListener() {
         Object listener = new Object();
         when(listenerRegistry.isRegistered(listener)).thenReturn(true);
 
@@ -90,7 +97,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testIsRegistered_DelegatesToRegistry() {
+    @DisplayName("Should delegate isRegistered to registry")
+    void shouldDelegateIsRegisteredToRegistry() {
         Object listener = new Object();
         when(listenerRegistry.isRegistered(listener)).thenReturn(true);
 
@@ -101,7 +109,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testIsRegistered_NotRegistered() {
+    @DisplayName("Should return false for unregistered listener")
+    void shouldReturnFalseForUnregisteredListener() {
         Object listener = new Object();
         when(listenerRegistry.isRegistered(listener)).thenReturn(false);
 
@@ -111,7 +120,8 @@ class AbstractEventDispatcherTest {
     }
 
     @Test
-    void testDispatch_ListenerThrowsException_DoesNotAffectOtherListeners() throws InterruptedException {
+    @DisplayName("Should not affect other listeners when one throws exception")
+    void shouldNotAffectOtherListenersWhenOneThrowsException() throws InterruptedException {
         FailingEventListener failingListener = new FailingEventListener();
         TestEventListener successListener = new TestEventListener();
         when(listenerRegistry.getListeners(any())).thenReturn(List.of(failingListener, successListener));

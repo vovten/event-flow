@@ -5,7 +5,7 @@ import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.test.TestEvent;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -16,22 +16,24 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for ChannelEventPublisher.
  */
+@DisplayName("ChannelEventPublisher Tests")
 class ChannelEventPublisherTest {
 
-    private ChannelEventPublisher publisher;
-
     @Test
-    void testConstructor_EmptyChannelsList() {
+    @DisplayName("Should throw exception for empty channels list")
+    void shouldThrowExceptionForEmptyChannelsList() {
         assertThrows(IllegalArgumentException.class, () -> new ChannelEventPublisher(List.of()));
     }
 
     @Test
-    void testConstructor_NullChannelsList() {
+    @DisplayName("Should throw exception for null channels list")
+    void shouldThrowExceptionForNullChannelsList() {
         assertThrows(IllegalArgumentException.class, () -> new ChannelEventPublisher(null));
     }
 
     @Test
-    void testConstructor_ValidChannels() {
+    @DisplayName("Should create publisher with valid channels")
+    void shouldCreatePublisherWithValidChannels() {
         EventChannel channel = mock(EventChannel.class);
         when(channel.name()).thenReturn("test");
         when(channel.transports()).thenReturn(List.of());
@@ -40,11 +42,12 @@ class ChannelEventPublisherTest {
     }
 
     @Test
-    void testPublish_SendsToConfiguredChannels() {
+    @DisplayName("Should send event to configured channel")
+    void shouldSendEventToConfiguredChannel() {
         OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
 
-        publisher = new ChannelEventPublisher(List.of(channel));
+        ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
         publisher.publish(event);
@@ -53,11 +56,12 @@ class ChannelEventPublisherTest {
     }
 
     @Test
-    void testPublish_ChannelNotConfigured_ThrowsException() {
+    @DisplayName("Should throw exception when channel not configured")
+    void shouldThrowExceptionWhenChannelNotConfigured() {
         OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
         EventChannel internalChannel = new InternalEventChannel(transport);
 
-        publisher = new ChannelEventPublisher(List.of(internalChannel));
+        ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(internalChannel));
 
         TestEventWithExternalChannel event = new TestEventWithExternalChannel();
 
@@ -69,12 +73,13 @@ class ChannelEventPublisherTest {
     }
 
     @Test
-    void testPublish_SendThrowsException_WrappedInEventPublisherException() {
+    @DisplayName("Should wrap send exception in EventPublisherException")
+    void shouldWrapSendExceptionInEventPublisherException() {
         OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
         doThrow(new RuntimeException("Send failed")).when(transport).send(any());
         EventChannel channel = new InternalEventChannel(transport);
 
-        publisher = new ChannelEventPublisher(List.of(channel));
+        ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
         EventPublisherException exception = assertThrows(

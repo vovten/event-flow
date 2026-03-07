@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.channel;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for EventChannel interface default methods.
  */
+@DisplayName("EventChannel Tests")
 class EventChannelTest {
 
     private OutgoingEventTransport transport1;
@@ -30,7 +32,8 @@ class EventChannelTest {
     }
 
     @Test
-    void testSend_SendsToAllTransports() {
+    @DisplayName("Should send event to all transports")
+    void shouldSendEventToAllTransports() {
         channel.send(testEvent);
 
         verify(transport1).send(testEvent);
@@ -38,7 +41,8 @@ class EventChannelTest {
     }
 
     @Test
-    void testSend_PropagatesExceptionFromTransport() {
+    @DisplayName("Should propagate exception from transport")
+    void shouldPropagateExceptionFromTransport() {
         doThrow(new RuntimeException("Transport failed")).when(transport1).send(testEvent);
 
         assertThrows(RuntimeException.class, () -> channel.send(testEvent));
@@ -46,12 +50,14 @@ class EventChannelTest {
     }
 
     @Test
-    void testName_ReturnsChannelName() {
+    @DisplayName("Should return channel name")
+    void shouldReturnChannelName() {
         assertEquals("test-channel", channel.name());
     }
 
     @Test
-    void testTransports_ReturnsConfiguredTransports() {
+    @DisplayName("Should return configured transports")
+    void shouldReturnConfiguredTransports() {
         List<OutgoingEventTransport> transports = channel.transports();
 
         assertEquals(2, transports.size());

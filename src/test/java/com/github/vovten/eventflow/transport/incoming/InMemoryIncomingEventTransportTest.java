@@ -4,6 +4,7 @@ import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.BlockingDeque;
@@ -12,13 +13,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for InMemoryIncomingEventTransport.
  */
+@DisplayName("InMemoryIncomingEventTransport Tests")
 class InMemoryIncomingEventTransportTest {
 
     private ExecutorService testExecutor;
@@ -36,21 +37,24 @@ class InMemoryIncomingEventTransportTest {
     }
 
     @Test
-    void testDefaultConstructor() {
+    @DisplayName("Should create transport with default constructor")
+    void shouldCreateTransportWithDefaultConstructor() {
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport();
 
         assertEquals("in-memory", transport.name());
     }
 
     @Test
-    void testConstructorWithQueueSize() {
+    @DisplayName("Should create transport with custom queue size")
+    void shouldCreateTransportWithCustomQueueSize() {
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(500);
 
         assertEquals("in-memory", transport.name());
     }
 
     @Test
-    void testConstructorWithExistingQueue() {
+    @DisplayName("Should create transport with existing queue")
+    void shouldCreateTransportWithExistingQueue() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue);
 
@@ -58,7 +62,8 @@ class InMemoryIncomingEventTransportTest {
     }
 
     @Test
-    void testConstructorWithQueueAndExecutor() {
+    @DisplayName("Should create transport with queue and executor")
+    void shouldCreateTransportWithQueueAndExecutor() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
         ExecutorService executor = Executors.newSingleThreadExecutor();
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, executor);
@@ -67,40 +72,43 @@ class InMemoryIncomingEventTransportTest {
     }
 
     @Test
-    void testStart_DeliversEvents() throws InterruptedException {
+    @DisplayName("Should deliver events when started")
+    void shouldDeliverEventsWhenStarted() throws InterruptedException {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
         AtomicInteger deliveredCount = new AtomicInteger(0);
-        AtomicBoolean delivered = new AtomicBoolean(false);
+        AtomicInteger receivedValue = new AtomicInteger(0);
 
-        TestEvent event = new TestEvent();
+        TestEvent event = new TestEvent(42);
         transport.start(e -> {
-            delivered.set(e.equals(event));
+            receivedValue.set(((TestEvent) e).getValue());
             deliveredCount.incrementAndGet();
         });
 
         queue.offer(event);
         Thread.sleep(100);
 
-        assertTrue(delivered.get(), "Event should be delivered");
+        assertEquals(42, receivedValue.get(), "Event value should be delivered");
         assertEquals(1, deliveredCount.get());
 
         transport.stop();
     }
 
     @Test
-    void testStart_AlreadyRunning_LogsWarning() {
+    @DisplayName("Should log warning when starting already running transport")
+    void shouldLogWarningWhenStartingAlreadyRunningTransport() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
 
         transport.start(e -> {});
-        transport.start(e -> {});
+        assertDoesNotThrow(() -> transport.start(e -> {}));
 
         transport.stop();
     }
 
     @Test
-    void testStop_StopsProcessing() throws InterruptedException {
+    @DisplayName("Should stop processing after stop is called")
+    void shouldStopProcessingAfterStopIsCalled() throws InterruptedException {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
         AtomicInteger deliveredCount = new AtomicInteger(0);
@@ -108,18 +116,20 @@ class InMemoryIncomingEventTransportTest {
         transport.start(e -> deliveredCount.incrementAndGet());
         Thread.sleep(50);
 
-        queue.offer(new TestEvent());
+        queue.offer(new TestEvent(1));
         Thread.sleep(100);
 
         transport.stop();
-        queue.offer(new TestEvent());
+        Thread.sleep(50);
+        queue.offer(new TestEvent(2));
         Thread.sleep(100);
 
         assertEquals(1, deliveredCount.get(), "Only first event should be delivered");
     }
 
     @Test
-    void testStop_MultipleTimes_DoesNotThrow() {
+    @DisplayName("Should not throw when stop is called multiple times")
+    void shouldNotThrowWhenStopIsCalledMultipleTimes() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
 
@@ -131,7 +141,8 @@ class InMemoryIncomingEventTransportTest {
     }
 
     @Test
-    void testStop_NotRunning_DoesNothing() {
+    @DisplayName("Should do nothing when stop is called on non-running transport")
+    void shouldDoNothingWhenStopIsCalledOnNonRunningTransport() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
 
@@ -139,58 +150,42 @@ class InMemoryIncomingEventTransportTest {
     }
 
     @Test
-    void testMultipleEvents_DeliveredInOrder() throws InterruptedException {
+    @DisplayName("Should deliver multiple events in order")
+    void shouldDeliverMultipleEventsInOrder() throws InterruptedException {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
-        java.util.List<Event> deliveredEvents = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.List<Integer> deliveredValues = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-        transport.start(deliveredEvents::add);
+        transport.start(e -> deliveredValues.add(((TestEvent) e).getValue()));
 
-        TestEvent event1 = new TestEvent("event1");
-        TestEvent event2 = new TestEvent("event2");
-        TestEvent event3 = new TestEvent("event3");
-
-        queue.offer(event1);
-        queue.offer(event2);
-        queue.offer(event3);
+        queue.offer(new TestEvent(1));
+        queue.offer(new TestEvent(2));
+        queue.offer(new TestEvent(3));
 
         Thread.sleep(200);
 
-        assertEquals(3, deliveredEvents.size());
-        assertEquals(event1, deliveredEvents.get(0));
-        assertEquals(event2, deliveredEvents.get(1));
-        assertEquals(event3, deliveredEvents.get(2));
+        assertEquals(3, deliveredValues.size());
+        assertEquals(1, deliveredValues.get(0));
+        assertEquals(2, deliveredValues.get(1));
+        assertEquals(3, deliveredValues.get(2));
 
         transport.stop();
     }
 
     static class TestEvent implements Event {
-        private final String id;
+        private final int value;
 
-        TestEvent(String id) {
-            this.id = id;
+        TestEvent(int value) {
+            this.value = value;
         }
 
-        TestEvent() {
-            this("default");
+        int getValue() {
+            return value;
         }
 
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) return true;
-            if (!(obj instanceof TestEvent)) return false;
-            TestEvent other = (TestEvent) obj;
-            return id.equals(other.id);
-        }
-
-        @Override
-        public int hashCode() {
-            return id.hashCode();
         }
     }
 }

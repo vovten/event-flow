@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -14,17 +15,20 @@ import static org.mockito.Mockito.mock;
 /**
  * Unit tests for EventPublisherBuilder.
  */
+@DisplayName("EventPublisherBuilder Tests")
 class EventPublisherBuilderTest {
 
     @Test
-    void testBuild_WithoutChannels_ThrowsException() {
+    @DisplayName("Should throw exception when building without channels")
+    void shouldThrowExceptionWhenBuildingWithoutChannels() {
         assertThrows(IllegalStateException.class, () ->
                 EventPublisherBuilder.channels()
                         .build());
     }
 
     @Test
-    void testBuild_WithChannels() {
+    @DisplayName("Should build publisher with single channel")
+    void shouldBuildPublisherWithSingleChannel() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -34,7 +38,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithMultipleChannels() {
+    @DisplayName("Should build publisher with multiple channels")
+    void shouldBuildPublisherWithMultipleChannels() {
         EventChannel channel1 = mock(EventChannel.class);
         EventChannel channel2 = mock(EventChannel.class);
 
@@ -45,7 +50,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithRetry() {
+    @DisplayName("Should build publisher with retry")
+    void shouldBuildPublisherWithRetry() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -56,7 +62,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithRetry_DefaultValues() {
+    @DisplayName("Should build publisher with default retry")
+    void shouldBuildPublisherWithDefaultRetry() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -67,7 +74,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithSilent() {
+    @DisplayName("Should build publisher with silent mode")
+    void shouldBuildPublisherWithSilentMode() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -78,7 +86,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithTransactional() {
+    @DisplayName("Should build publisher with transactional mode")
+    void shouldBuildPublisherWithTransactionalMode() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -89,7 +98,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithRetryAndSilent() {
+    @DisplayName("Should build publisher with retry and silent")
+    void shouldBuildPublisherWithRetryAndSilent() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -101,7 +111,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithRetryAndTransactional() {
+    @DisplayName("Should build publisher with retry and transactional")
+    void shouldBuildPublisherWithRetryAndTransactional() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -113,7 +124,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_WithAllOptions() {
+    @DisplayName("Should build publisher with all options")
+    void shouldBuildPublisherWithAllOptions() {
         EventChannel channel = mock(EventChannel.class);
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -126,14 +138,16 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testBuild_NullChannel_ThrowsException() {
+    @DisplayName("Should throw exception for null channel")
+    void shouldThrowExceptionForNullChannel() {
         assertThrows(NullPointerException.class, () ->
                 EventPublisherBuilder.channels((EventChannel) null)
                         .build());
     }
 
     @Test
-    void testBuild_WithInternalEventChannel() {
+    @DisplayName("Should build publisher with InternalEventChannel")
+    void shouldBuildPublisherWithInternalEventChannel() {
         EventChannel channel = new InternalEventChannel(new InMemoryOutgoingEventTransport(100));
 
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -143,7 +157,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testAddChannels_Varargs() {
+    @DisplayName("Should add channels with varargs")
+    void shouldAddChannelsWithVarargs() {
         EventChannel channel1 = mock(EventChannel.class);
         EventChannel channel2 = mock(EventChannel.class);
 
@@ -155,7 +170,8 @@ class EventPublisherBuilderTest {
     }
 
     @Test
-    void testAddChannels_List() {
+    @DisplayName("Should add channels with list")
+    void shouldAddChannelsWithList() {
         EventChannel channel1 = mock(EventChannel.class);
         EventChannel channel2 = mock(EventChannel.class);
 

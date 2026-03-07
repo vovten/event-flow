@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow.transport;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -7,10 +8,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for OutgoingEventTransportException.
  */
+@DisplayName("OutgoingEventTransportException Tests")
 class OutgoingEventTransportExceptionTest {
 
     @Test
-    void testConstructorWithMessage() {
+    @DisplayName("Should create exception with message")
+    void shouldCreateExceptionWithMessage() {
         String message = "Transport failed";
         OutgoingEventTransportException exception = new OutgoingEventTransportException(message);
 
@@ -19,7 +22,8 @@ class OutgoingEventTransportExceptionTest {
     }
 
     @Test
-    void testConstructorWithMessageAndCause() {
+    @DisplayName("Should create exception with message and cause")
+    void shouldCreateExceptionWithMessageAndCause() {
         String message = "Transport failed";
         Throwable cause = new RuntimeException("Underlying cause");
         OutgoingEventTransportException exception = new OutgoingEventTransportException(message, cause);
@@ -30,7 +34,8 @@ class OutgoingEventTransportExceptionTest {
     }
 
     @Test
-    void testIsRuntimeException() {
+    @DisplayName("Should be RuntimeException")
+    void shouldBeRuntimeException() {
         OutgoingEventTransportException exception = new OutgoingEventTransportException("Error");
         assertTrue(exception instanceof RuntimeException);
     }

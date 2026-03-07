@@ -5,6 +5,7 @@ import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for UnifiedEventDispatcher.
  */
+@DisplayName("UnifiedEventDispatcher Tests")
 class UnifiedEventDispatcherTest {
 
     private ExecutorService executorService;
@@ -39,14 +41,16 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testConstructor() {
+    @DisplayName("Should create dispatcher")
+    void shouldCreateDispatcher() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
 
         assertNotNull(dispatcher);
     }
 
     @Test
-    void testStart_StartsAllTransports() {
+    @DisplayName("Should start all transports")
+    void shouldStartAllTransports() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1, transport2));
 
         dispatcher.start();
@@ -56,7 +60,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testStart_AlreadyStarted_LogsWarning() {
+    @DisplayName("Should log warning when starting already started dispatcher")
+    void shouldLogWarningWhenStartingAlreadyStartedDispatcher() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
         dispatcher.start();
 
@@ -64,7 +69,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testStop_StopsAllTransports() {
+    @DisplayName("Should stop all transports")
+    void shouldStopAllTransports() {
         doAnswer(invocation -> {
             Consumer<Event> consumer = invocation.getArgument(0);
             return null;
@@ -83,7 +89,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testStop_NotStarted_DoesNothing() {
+    @DisplayName("Should do nothing when stopping non-started dispatcher")
+    void shouldDoNothingWhenStoppingNonStartedDispatcher() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
 
         assertDoesNotThrow(() -> dispatcher.stop());
@@ -91,7 +98,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testStop_TransportThrowsException_LogsWarning() {
+    @DisplayName("Should log warning when transport throws on stop")
+    void shouldLogWarningWhenTransportThrowsOnStop() {
         doAnswer(invocation -> {
             Consumer<Event> consumer = invocation.getArgument(0);
             return null;
@@ -105,7 +113,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testDispatch_NoListeners_NoAction() {
+    @DisplayName("Should do nothing when no listeners")
+    void shouldDoNothingWhenNoListeners() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
         when(listenerRegistry.getListeners(any())).thenReturn(List.of());
 
@@ -116,7 +125,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testDispatch_WithListeners_ExecutesAsync() throws InterruptedException {
+    @DisplayName("Should execute listener asynchronously")
+    void shouldExecuteListenerAsynchronously() throws InterruptedException {
         TestEventListener listener = new TestEventListener();
         when(listenerRegistry.getListeners(any())).thenReturn(List.of(listener));
 
@@ -129,7 +139,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testRegister_DelegatesToRegistry() {
+    @DisplayName("Should delegate register to registry")
+    void shouldDelegateRegisterToRegistry() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
         Object listener = new Object();
         when(listenerRegistry.isRegistered(listener)).thenReturn(false);
@@ -140,7 +151,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testRegister_AlreadyRegistered_DoesNotRegisterAgain() {
+    @DisplayName("Should not register already registered listener")
+    void shouldNotRegisterAlreadyRegisteredListener() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
         Object listener = new Object();
         when(listenerRegistry.isRegistered(listener)).thenReturn(true);
@@ -151,7 +163,8 @@ class UnifiedEventDispatcherTest {
     }
 
     @Test
-    void testIsRegistered_DelegatesToRegistry() {
+    @DisplayName("Should delegate isRegistered to registry")
+    void shouldDelegateIsRegisteredToRegistry() {
         dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
         Object listener = new Object();
         when(listenerRegistry.isRegistered(listener)).thenReturn(true);

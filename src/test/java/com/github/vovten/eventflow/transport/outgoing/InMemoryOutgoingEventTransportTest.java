@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.transport.outgoing;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.test.TestEvent;
 import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.BlockingDeque;
@@ -13,10 +14,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for InMemoryOutgoingEventTransport.
  */
+@DisplayName("InMemoryOutgoingEventTransport Tests")
 class InMemoryOutgoingEventTransportTest {
 
     @Test
-    void testDefaultConstructor() {
+    @DisplayName("Should create transport with default constructor")
+    void shouldCreateTransportWithDefaultConstructor() {
         InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport();
 
         assertEquals("in-memory", transport.name());
@@ -25,7 +28,8 @@ class InMemoryOutgoingEventTransportTest {
     }
 
     @Test
-    void testConstructorWithCustomQueueSize() {
+    @DisplayName("Should create transport with custom queue size")
+    void shouldCreateTransportWithCustomQueueSize() {
         int maxQueueSize = 100;
         InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(maxQueueSize);
 
@@ -34,7 +38,8 @@ class InMemoryOutgoingEventTransportTest {
     }
 
     @Test
-    void testSend_AddsEventToQueue() throws InterruptedException {
+    @DisplayName("Should add event to queue on send")
+    void shouldAddEventToQueueOnSend() throws InterruptedException {
         InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(10);
         TestEvent event = new TestEvent();
 
@@ -45,7 +50,8 @@ class InMemoryOutgoingEventTransportTest {
     }
 
     @Test
-    void testSend_ThrowsExceptionWhenQueueFull() {
+    @DisplayName("Should throw exception when queue is full")
+    void shouldThrowExceptionWhenQueueIsFull() {
         int maxQueueSize = 2;
         InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(maxQueueSize);
         TestEvent event1 = new TestEvent();
@@ -63,7 +69,8 @@ class InMemoryOutgoingEventTransportTest {
     }
 
     @Test
-    void testGetEventQueue_ReturnsInternalQueue() {
+    @DisplayName("Should return internal queue")
+    void shouldReturnInternalQueue() {
         InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(10);
         BlockingDeque<Event> queue = transport.getEventQueue();
 
@@ -75,7 +82,8 @@ class InMemoryOutgoingEventTransportTest {
     }
 
     @Test
-    void testMultipleSends_OrderPreserved() throws InterruptedException {
+    @DisplayName("Should preserve order on multiple sends")
+    void shouldPreserveOrderOnMultipleSends() throws InterruptedException {
         InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(10);
         TestEvent event1 = new TestEvent("event1");
         TestEvent event2 = new TestEvent("event2");

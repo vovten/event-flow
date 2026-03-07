@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow.publisher;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -7,10 +8,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for EventPublisherConfigException.
  */
+@DisplayName("EventPublisherConfigException Tests")
 class EventPublisherConfigExceptionTest {
 
     @Test
-    void testConstructorWithMessage() {
+    @DisplayName("Should create exception with message")
+    void shouldCreateExceptionWithMessage() {
         String message = "Configuration error";
         EventPublisherConfigException exception = new EventPublisherConfigException(message);
 
@@ -19,7 +22,8 @@ class EventPublisherConfigExceptionTest {
     }
 
     @Test
-    void testConstructorWithMessageAndCause() {
+    @DisplayName("Should create exception with message and cause")
+    void shouldCreateExceptionWithMessageAndCause() {
         String message = "Configuration error";
         Throwable cause = new IllegalArgumentException("Invalid config");
         EventPublisherConfigException exception = new EventPublisherConfigException(message, cause);
@@ -30,13 +34,15 @@ class EventPublisherConfigExceptionTest {
     }
 
     @Test
-    void testIsEventPublisherException() {
+    @DisplayName("Should be EventPublisherException")
+    void shouldBeEventPublisherException() {
         EventPublisherConfigException exception = new EventPublisherConfigException("Error");
         assertTrue(exception instanceof EventPublisherException);
     }
 
     @Test
-    void testIsRuntimeException() {
+    @DisplayName("Should be RuntimeException")
+    void shouldBeRuntimeException() {
         EventPublisherConfigException exception = new EventPublisherConfigException("Error");
         assertTrue(exception instanceof RuntimeException);
     }

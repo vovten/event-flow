@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,10 +12,12 @@ import static org.mockito.Mockito.mock;
 /**
  * Unit tests for InternalEventChannel.
  */
+@DisplayName("InternalEventChannel Tests")
 class InternalEventChannelTest {
 
     @Test
-    void testConstructorWithSingleTransport() {
+    @DisplayName("Should create channel with single transport")
+    void shouldCreateChannelWithSingleTransport() {
         OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
         InternalEventChannel channel = new InternalEventChannel(transport);
 
@@ -23,7 +26,8 @@ class InternalEventChannelTest {
     }
 
     @Test
-    void testConstructorWithMultipleTransports() {
+    @DisplayName("Should create channel with multiple transports")
+    void shouldCreateChannelWithMultipleTransports() {
         OutgoingEventTransport transport1 = mock(OutgoingEventTransport.class);
         OutgoingEventTransport transport2 = mock(OutgoingEventTransport.class);
         List<OutgoingEventTransport> transports = List.of(transport1, transport2);
@@ -37,7 +41,8 @@ class InternalEventChannelTest {
     }
 
     @Test
-    void testTransportsReturnsImmutableList() {
+    @DisplayName("Should return immutable transports list")
+    void shouldReturnImmutableTransportsList() {
         OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
         InternalEventChannel channel = new InternalEventChannel(transport);
 

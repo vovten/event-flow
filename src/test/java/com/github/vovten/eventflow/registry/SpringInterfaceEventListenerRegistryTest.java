@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.registry;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventListener;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 
@@ -15,6 +16,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for SpringInterfaceEventListenerRegistry.
  */
+@DisplayName("SpringInterfaceEventListenerRegistry Tests")
 class SpringInterfaceEventListenerRegistryTest {
 
     private ApplicationContext applicationContext;
@@ -28,19 +30,22 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testConstructor_NullContext_ThrowsException() {
+    @DisplayName("Should throw exception for null context")
+    void shouldThrowExceptionForNullContext() {
         assertThrows(IllegalArgumentException.class, () ->
                 new SpringInterfaceEventListenerRegistry(null));
     }
 
     @Test
-    void testConstructor_Valid() {
+    @DisplayName("Should create registry with valid context")
+    void shouldCreateRegistryWithValidContext() {
         assertDoesNotThrow(() ->
                 new SpringInterfaceEventListenerRegistry(applicationContext));
     }
 
     @Test
-    void testRegister_InterfaceListener() {
+    @DisplayName("Should register interface listener")
+    void shouldRegisterInterfaceListener() {
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
 
@@ -49,7 +54,8 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testRegister_NonInterfaceListener_Ignored() {
+    @DisplayName("Should ignore non-interface listener")
+    void shouldIgnoreNonInterfaceListener() {
         Object nonListener = new Object();
         registry.register(nonListener);
 
@@ -58,7 +64,8 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testGetListeners_ReturnsListenersForEventType() {
+    @DisplayName("Should return listeners for event type")
+    void shouldReturnListenersForEventType() {
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
 
@@ -70,7 +77,8 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testGetListeners_IncludesGenericListeners() {
+    @DisplayName("Should include generic listeners")
+    void shouldIncludeGenericListeners() {
         SpecificEventListener specificListener = new SpecificEventListener();
         GenericEventListener genericListener = new GenericEventListener();
 
@@ -86,7 +94,8 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testGetListeners_NoListeners_ReturnsEmptyList() {
+    @DisplayName("Should return empty list when no listeners")
+    void shouldReturnEmptyListWhenNoListeners() {
         TestEvent event = new TestEvent();
         List<EventListener> listeners = registry.getListeners(event);
 
@@ -94,7 +103,8 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testUnregister_ExistingListener() {
+    @DisplayName("Should unregister existing listener")
+    void shouldUnregisterExistingListener() {
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
 
@@ -105,7 +115,8 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testUnregister_NonInterfaceListener() {
+    @DisplayName("Should return false when unregistering non-interface listener")
+    void shouldReturnFalseWhenUnregisteringNonInterfaceListener() {
         Object nonListener = new Object();
         boolean result = registry.unregister(nonListener);
 
@@ -113,7 +124,8 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testIsRegistered_InterfaceListener() {
+    @DisplayName("Should return true for registered interface listener")
+    void shouldReturnTrueForRegisteredInterfaceListener() {
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
 
@@ -121,20 +133,23 @@ class SpringInterfaceEventListenerRegistryTest {
     }
 
     @Test
-    void testIsRegistered_NonInterfaceListener() {
+    @DisplayName("Should return false for non-interface listener")
+    void shouldReturnFalseForNonInterfaceListener() {
         Object nonListener = new Object();
         assertFalse(registry.isRegistered(nonListener));
     }
 
     @Test
-    void testMerge_ThrowsUnsupportedOperationException() {
+    @DisplayName("Should throw exception on merge")
+    void shouldThrowExceptionOnMerge() {
         SpringInterfaceEventListenerRegistry otherRegistry = mock(SpringInterfaceEventListenerRegistry.class);
 
         assertThrows(UnsupportedOperationException.class, () -> registry.merge(otherRegistry));
     }
 
     @Test
-    void testRegister_MultipleEventTypes() {
+    @DisplayName("Should register listener for multiple event types")
+    void shouldRegisterListenerForMultipleEventTypes() {
         MultiEventListener listener = new MultiEventListener();
         registry.register(listener);
 

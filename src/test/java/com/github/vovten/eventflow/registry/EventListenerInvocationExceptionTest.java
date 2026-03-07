@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.test.TestEvent;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -9,10 +10,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for EventListenerInvocationException.
  */
+@DisplayName("EventListenerInvocationException Tests")
 class EventListenerInvocationExceptionTest {
 
     @Test
-    void testConstructorWithListenerEventAndCause() {
+    @DisplayName("Should create exception with listener, event and cause")
+    void shouldCreateExceptionWithListenerEventAndCause() {
         Object listener = new TestListener();
         Event event = new TestEvent();
         Throwable cause = new RuntimeException("Invocation failed");
@@ -25,7 +28,8 @@ class EventListenerInvocationExceptionTest {
     }
 
     @Test
-    void testIsRuntimeException() {
+    @DisplayName("Should be RuntimeException")
+    void shouldBeRuntimeException() {
         Object listener = new TestListener();
         Event event = new TestEvent();
         EventListenerInvocationException exception = new EventListenerInvocationException(listener, event, new RuntimeException());

@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for SilentEventPublisher.
  */
+@DisplayName("SilentEventPublisher Tests")
 class SilentEventPublisherTest {
 
     private EventPublisher delegate;
@@ -23,7 +25,8 @@ class SilentEventPublisherTest {
     }
 
     @Test
-    void testPublish_Success() {
+    @DisplayName("Should publish event successfully")
+    void shouldPublishEventSuccessfully() {
         TestEvent event = new TestEvent();
 
         silentPublisher.publish(event);
@@ -32,7 +35,8 @@ class SilentEventPublisherTest {
     }
 
     @Test
-    void testPublish_DelegateThrowsException_Swallowed() {
+    @DisplayName("Should swallow EventPublisherException")
+    void shouldSwallowEventPublisherException() {
         TestEvent event = new TestEvent();
         doThrow(new EventPublisherException("Failed")).when(delegate).publish(event);
 
@@ -41,7 +45,8 @@ class SilentEventPublisherTest {
     }
 
     @Test
-    void testPublish_RuntimeException_Swallowed() {
+    @DisplayName("Should swallow RuntimeException")
+    void shouldSwallowRuntimeException() {
         TestEvent event = new TestEvent();
         doThrow(new RuntimeException("Unexpected error")).when(delegate).publish(event);
 
@@ -49,7 +54,8 @@ class SilentEventPublisherTest {
     }
 
     @Test
-    void testPublish_Error_NotSwallowed() {
+    @DisplayName("Should not swallow Error")
+    void shouldNotSwallowError() {
         TestEvent event = new TestEvent();
         doThrow(new OutOfMemoryError("OOM")).when(delegate).publish(event);
 

@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow.util;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -7,10 +8,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for EventSerializationException.
  */
+@DisplayName("EventSerializationException Tests")
 class EventSerializationExceptionTest {
 
     @Test
-    void testConstructorWithMessageAndCause() {
+    @DisplayName("Should create exception with message and cause")
+    void shouldCreateExceptionWithMessageAndCause() {
         String message = "Serialization failed";
         Throwable cause = new RuntimeException("JSON parsing error");
         EventSerializationException exception = new EventSerializationException(message, cause);
@@ -21,7 +24,8 @@ class EventSerializationExceptionTest {
     }
 
     @Test
-    void testIsRuntimeException() {
+    @DisplayName("Should be RuntimeException")
+    void shouldBeRuntimeException() {
         EventSerializationException exception = new EventSerializationException("Error", new RuntimeException());
         assertTrue(exception instanceof RuntimeException);
     }
