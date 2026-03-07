@@ -3,3 +3,4 @@
 /.mvn/wrapper/maven-wrapper.properties
 /.idea/modules.xml
 /src/test/resources/logback-test.xml
+/.idea/
