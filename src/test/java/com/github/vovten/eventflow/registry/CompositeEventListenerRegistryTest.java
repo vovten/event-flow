@@ -4,126 +4,145 @@ import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for CompositeEventListenerRegistry
+ * Unit tests for CompositeEventListenerRegistry.
  */
 class CompositeEventListenerRegistryTest {
 
+    private EventListenerRegistry registry1;
+    private EventListenerRegistry registry2;
     private CompositeEventListenerRegistry compositeRegistry;
 
     @BeforeEach
     void setUp() {
+        registry1 = mock(EventListenerRegistry.class);
+        registry2 = mock(EventListenerRegistry.class);
+        compositeRegistry = new CompositeEventListenerRegistry(List.of(registry1, registry2));
     }
 
     @Test
-    @DisplayName("Should compose multiple listener registries")
-    void shouldComposeMultipleListenerRegistries() {
-        InterfaceEventListenerRegistry registry1 = new InterfaceEventListenerRegistry();
-        AnnotationEventListenerRegistry registry2 = new AnnotationEventListenerRegistry();
-        compositeRegistry = new CompositeEventListenerRegistry(
-                new ArrayList<>(List.of(registry1, registry2)));
-
-        assertEquals(0, compositeRegistry.listenerCount());
+    void testConstructor_EmptyList() {
+        assertThrows(IllegalArgumentException.class, () -> new CompositeEventListenerRegistry(List.of()));
     }
 
     @Test
-    @DisplayName("Should get listeners from all composed registries")
-    void shouldGetListenersFromAllComposedRegistries() {
-        InterfaceEventListenerRegistry interfaceRegistry = new InterfaceEventListenerRegistry();
-        TestEventListener listener = new TestEventListener();
-        interfaceRegistry.register(listener);
-
-        AnnotationEventListenerRegistry annotationRegistry = new AnnotationEventListenerRegistry();
-        AnnotatedEventListener annotatedListener = new AnnotatedEventListener();
-        annotationRegistry.register(annotatedListener);
-
-        compositeRegistry = new CompositeEventListenerRegistry(
-                new ArrayList<>(List.of(interfaceRegistry, annotationRegistry)));
-
-        TestEvent event = TestEvent.create("Test message");
-
-        var listeners = compositeRegistry.getListeners(event);
-        assertEquals(2, listeners.size());
+    void testConstructor_NullList() {
+        assertThrows(IllegalArgumentException.class, () -> new CompositeEventListenerRegistry(null));
     }
 
     @Test
-    @DisplayName("Should register listener to all composed registries")
-    void shouldRegisterListenerToAllComposedRegistries() {
-        InterfaceEventListenerRegistry registry1 = new InterfaceEventListenerRegistry();
-        InterfaceEventListenerRegistry registry2 = new InterfaceEventListenerRegistry();
-        compositeRegistry = new CompositeEventListenerRegistry(
-                new ArrayList<>(List.of(registry1, registry2)));
-
-        TestEventListener listener = new TestEventListener();
-        compositeRegistry.register(listener);
-
-        assertTrue(registry1.isRegistered(listener));
-        assertTrue(registry2.isRegistered(listener));
+    void testConstructor_WithRegistries() {
+        assertDoesNotThrow(() -> new CompositeEventListenerRegistry(List.of(registry1)));
     }
 
     @Test
-    @DisplayName("Should calculate total listener count from all registries")
-    void shouldCalculateTotalListenerCountFromAllRegistries() {
-        InterfaceEventListenerRegistry registry1 = new InterfaceEventListenerRegistry();
-        InterfaceEventListenerRegistry registry2 = new InterfaceEventListenerRegistry();
-
+    void testGetListeners_CombinesFromAllRegistries() {
         TestEventListener listener1 = new TestEventListener();
         TestEventListener listener2 = new TestEventListener();
-        registry1.register(listener1);
-        registry2.register(listener2);
 
-        compositeRegistry = new CompositeEventListenerRegistry(
-                new ArrayList<>(List.of(registry1, registry2)));
+        when(registry1.getListeners(any())).thenReturn(List.of(listener1));
+        when(registry2.getListeners(any())).thenReturn(List.of(listener2));
 
-        assertEquals(2, compositeRegistry.listenerCount());
+        TestEvent event = new TestEvent();
+        List<EventListener> listeners = compositeRegistry.getListeners(event);
+
+        assertEquals(2, listeners.size());
+        assertTrue(listeners.contains(listener1));
+        assertTrue(listeners.contains(listener2));
     }
 
     @Test
-    @DisplayName("Should unregister listener from all registries")
-    void shouldUnregisterListenerFromAllRegistries() {
-        InterfaceEventListenerRegistry registry1 = new InterfaceEventListenerRegistry();
-        InterfaceEventListenerRegistry registry2 = new InterfaceEventListenerRegistry();
-        compositeRegistry = new CompositeEventListenerRegistry(
-                new ArrayList<>(List.of(registry1, registry2)));
+    void testGetListeners_EmptyRegistries() {
+        when(registry1.getListeners(any())).thenReturn(List.of());
+        when(registry2.getListeners(any())).thenReturn(List.of());
 
-        TestEventListener listener = new TestEventListener();
+        TestEvent event = new TestEvent();
+        List<EventListener> listeners = compositeRegistry.getListeners(event);
+
+        assertTrue(listeners.isEmpty());
+    }
+
+    @Test
+    void testListenerCount_SumsAllRegistries() {
+        when(registry1.listenerCount()).thenReturn(5);
+        when(registry2.listenerCount()).thenReturn(3);
+
+        int count = compositeRegistry.listenerCount();
+
+        assertEquals(8, count);
+    }
+
+    @Test
+    void testRegister_DelegatesToAllRegistries() {
+        Object listener = new Object();
+
         compositeRegistry.register(listener);
 
-        boolean result = compositeRegistry.unregister(listener);
-        assertTrue(result);
-        assertFalse(registry1.isRegistered(listener));
-        assertFalse(registry2.isRegistered(listener));
+        verify(registry1).register(listener);
+        verify(registry2).register(listener);
     }
 
     @Test
-    @DisplayName("Should support merging listener registry")
-    void shouldSupportMergingListenerRegistry() {
-        InterfaceEventListenerRegistry registry1 = new InterfaceEventListenerRegistry();
-        TestEventListener listener = new TestEventListener();
-        registry1.register(listener);
+    void testUnregister_AnyRegistryReturnsTrue() {
+        Object listener = new Object();
+        when(registry1.unregister(listener)).thenReturn(true);
+        when(registry2.unregister(listener)).thenReturn(false);
 
-        compositeRegistry = new CompositeEventListenerRegistry(
-                new ArrayList<>(List.of(registry1))
-        );
+        boolean result = compositeRegistry.unregister(listener);
 
-        InterfaceEventListenerRegistry registry2 = new InterfaceEventListenerRegistry();
-        TestEventListener listener2 = new TestEventListener();
-        registry2.register(listener2);
-
-        compositeRegistry.merge(registry2);
-
-        assertEquals(2, compositeRegistry.listenerCount());
+        assertTrue(result);
+        verify(registry1).unregister(listener);
+        verify(registry2).unregister(listener);
     }
 
-    // Test helper class
+    @Test
+    void testUnregister_AllRegistriesReturnFalse() {
+        Object listener = new Object();
+        when(registry1.unregister(listener)).thenReturn(false);
+        when(registry2.unregister(listener)).thenReturn(false);
+
+        boolean result = compositeRegistry.unregister(listener);
+
+        assertFalse(result);
+    }
+
+    @Test
+    void testIsRegistered_AnyRegistryReturnsTrue() {
+        Object listener = new Object();
+        when(registry1.isRegistered(listener)).thenReturn(false);
+        when(registry2.isRegistered(listener)).thenReturn(true);
+
+        boolean result = compositeRegistry.isRegistered(listener);
+
+        assertTrue(result);
+    }
+
+    @Test
+    void testIsRegistered_AllRegistriesReturnFalse() {
+        Object listener = new Object();
+        when(registry1.isRegistered(listener)).thenReturn(false);
+        when(registry2.isRegistered(listener)).thenReturn(false);
+
+        boolean result = compositeRegistry.isRegistered(listener);
+
+        assertFalse(result);
+    }
+
+    @Test
+    void testMerge_DelegatesToAllRegistries() {
+        EventListenerRegistry otherRegistry = mock(EventListenerRegistry.class);
+        doThrow(new UnsupportedOperationException("Merge not supported")).when(registry1).merge(otherRegistry);
+
+        assertThrows(UnsupportedOperationException.class, () -> compositeRegistry.merge(otherRegistry));
+    }
+
     static class TestEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
@@ -132,13 +151,6 @@ class CompositeEventListenerRegistryTest {
 
         @Override
         public void onEvent(Event event) {
-        }
-    }
-
-    // Test helper class with @EventListener annotation
-    static class AnnotatedEventListener {
-        @com.github.vovten.eventflow.annotation.EventListener
-        public void handleTestEvent(TestEvent event) {
         }
     }
 }

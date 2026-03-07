@@ -1,18 +1,18 @@
-package com.github.vovten.eventflow.publisher;
+package com.github.vovten.eventflow.transport;
 
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for EventPublisherException.
+ * Unit tests for OutgoingEventTransportException.
  */
-class EventPublisherExceptionTest {
+class OutgoingEventTransportExceptionTest {
 
     @Test
     void testConstructorWithMessage() {
-        String message = "Publisher error";
-        EventPublisherException exception = new EventPublisherException(message);
+        String message = "Transport failed";
+        OutgoingEventTransportException exception = new OutgoingEventTransportException(message);
 
         assertEquals(message, exception.getMessage());
         assertNull(exception.getCause());
@@ -20,9 +20,9 @@ class EventPublisherExceptionTest {
 
     @Test
     void testConstructorWithMessageAndCause() {
-        String message = "Publisher error";
+        String message = "Transport failed";
         Throwable cause = new RuntimeException("Underlying cause");
-        EventPublisherException exception = new EventPublisherException(message, cause);
+        OutgoingEventTransportException exception = new OutgoingEventTransportException(message, cause);
 
         assertEquals(message, exception.getMessage());
         assertEquals(cause, exception.getCause());
@@ -31,7 +31,7 @@ class EventPublisherExceptionTest {
 
     @Test
     void testIsRuntimeException() {
-        EventPublisherException exception = new EventPublisherException("Error");
+        OutgoingEventTransportException exception = new OutgoingEventTransportException("Error");
         assertTrue(exception instanceof RuntimeException);
     }
 }
