@@ -1,4 +1,4 @@
-package com.github.vovten.eventflow.publisher;
+package com.github.vovten.eventflow.transport;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -6,16 +6,16 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for EventPublisherException.
+ * Unit tests for OutgoingEventTransportException.
  */
-@DisplayName("EventPublisherException Tests")
-class EventPublisherExceptionTest {
+@DisplayName("OutgoingEventTransportException Tests")
+class OutgoingEventTransportExceptionTest {
 
     @Test
     @DisplayName("Should create exception with message")
     void shouldCreateExceptionWithMessage() {
-        String message = "Publisher error";
-        EventPublisherException exception = new EventPublisherException(message);
+        String message = "Transport failed";
+        OutgoingEventTransportException exception = new OutgoingEventTransportException(message);
 
         assertEquals(message, exception.getMessage());
         assertNull(exception.getCause());
@@ -24,9 +24,9 @@ class EventPublisherExceptionTest {
     @Test
     @DisplayName("Should create exception with message and cause")
     void shouldCreateExceptionWithMessageAndCause() {
-        String message = "Publisher error";
+        String message = "Transport failed";
         Throwable cause = new RuntimeException("Underlying cause");
-        EventPublisherException exception = new EventPublisherException(message, cause);
+        OutgoingEventTransportException exception = new OutgoingEventTransportException(message, cause);
 
         assertEquals(message, exception.getMessage());
         assertEquals(cause, exception.getCause());
@@ -36,7 +36,7 @@ class EventPublisherExceptionTest {
     @Test
     @DisplayName("Should be RuntimeException")
     void shouldBeRuntimeException() {
-        EventPublisherException exception = new EventPublisherException("Error");
+        OutgoingEventTransportException exception = new OutgoingEventTransportException("Error");
         assertTrue(exception instanceof RuntimeException);
     }
 }

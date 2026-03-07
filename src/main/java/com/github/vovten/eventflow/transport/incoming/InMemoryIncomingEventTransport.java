@@ -8,6 +8,7 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -38,7 +39,7 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
 
     private final BlockingDeque<Event> eventQueue;
     private final ExecutorService executorService;
-    private volatile boolean running = false;
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
     /**
      * Default queue size when not specified.
@@ -88,30 +89,27 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
 
     @Override
     public void start(Consumer<Event> eventConsumer) {
-        if (running) {
+        if (running.compareAndSet(false, true)) {
+            executorService.execute(() -> consumeLoop(eventConsumer));
+            log.debug("InMemoryIncomingEventTransport started");
+        } else {
             log.warn("InMemoryIncomingEventTransport is already running");
-            return;
         }
-        running = true;
-        executorService.execute(() -> consumeLoop(eventConsumer));
-        log.debug("InMemoryIncomingEventTransport started");
     }
 
     @Override
     public void stop() {
-        if (!running) {
-            return;
+        if (running.compareAndSet(true, false)) {
+            log.info("InMemoryIncomingEventTransport stopped");
+            if (executorService != null && !executorService.isShutdown()) {
+                executorService.shutdownNow();
+            }
         }
-        running = false;
-        if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdown();
-        }
-        log.info("InMemoryIncomingEventTransport stopped");
     }
 
     private void consumeLoop(Consumer<Event> eventConsumer) {
         try {
-            while (running && !Thread.currentThread().isInterrupted()) {
+            while (running.get() && !Thread.currentThread().isInterrupted()) {
                 try {
                     Event event = eventQueue.take();
                     tryDeliver(event, eventConsumer);
@@ -120,13 +118,13 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
                     log.debug("InMemoryIncomingEventTransport consumer loop interrupted");
                     break;
                 } catch (Exception e) {
-                    if (running) {
+                    if (running.get()) {
                         log.error("Error consuming event from queue", e);
                     }
                 }
             }
         } catch (Exception e) {
-            if (running) {
+            if (running.get()) {
                 log.error("InMemoryIncomingEventTransport loop error", e);
             }
         }
