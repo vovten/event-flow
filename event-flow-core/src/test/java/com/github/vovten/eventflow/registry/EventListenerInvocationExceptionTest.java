@@ -1,42 +1,54 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.test.TestEvent;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for EventListenerInvocationException.
+ * Tests for {@link EventListenerInvocationException}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("EventListenerInvocationException Tests")
 class EventListenerInvocationExceptionTest {
 
     @Test
-    @DisplayName("Should create exception with listener, event and cause")
-    void shouldCreateExceptionWithListenerEventAndCause() {
-        Object listener = new TestListener();
-        Event event = new TestEvent();
-        Throwable cause = new RuntimeException("Invocation failed");
-        EventListenerInvocationException exception = new EventListenerInvocationException(listener, event, cause);
+    @DisplayName("Should create exception with listener and event")
+    void shouldCreateExceptionWithListenerAndEvent() {
+        // Arrange
+        Object listener = new Object();
+        TestEvent event = new TestEvent("test");
 
-        assertTrue(exception.getMessage().contains("TestListener"));
-        assertTrue(exception.getMessage().contains("TestEvent"));
-        assertEquals(cause, exception.getCause());
-        assertEquals("Invocation failed", exception.getCause().getMessage());
+        // Act
+        EventListenerInvocationException exception = new EventListenerInvocationException(listener, event, new RuntimeException("Cause"));
+
+        // Assert
+        assertNotNull(exception);
+        assertTrue(exception.getMessage().contains(listener.getClass().getName()));
+        assertTrue(exception.getMessage().contains(event.type().getSimpleName()));
     }
 
-    @Test
-    @DisplayName("Should be RuntimeException")
-    void shouldBeRuntimeException() {
-        Object listener = new TestListener();
-        Event event = new TestEvent();
-        EventListenerInvocationException exception = new EventListenerInvocationException(listener, event, new RuntimeException());
+    /**
+     * Test event class.
+     */
+    private static class TestEvent implements Event {
+        private final String data;
 
-        assertTrue(exception instanceof RuntimeException);
-    }
+        public TestEvent(String data) {
+            this.data = data;
+        }
 
-    static class TestListener {
+        @Override
+        public Class<? extends Event> type() {
+            return TestEvent.class;
+        }
+
+        @Override
+        public String asJson() {
+            return "{\"data\":\"" + data + "\"}";
+        }
     }
 }

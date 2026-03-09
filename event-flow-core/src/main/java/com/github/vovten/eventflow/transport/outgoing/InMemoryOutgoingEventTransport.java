@@ -55,6 +55,18 @@ public class InMemoryOutgoingEventTransport implements OutgoingEventTransport {
         this.eventQueue = new LinkedBlockingDeque<>(maxQueueSize);
     }
 
+    /**
+     * Create in-memory transport with existing queue.
+     * <p>
+     * This constructor allows sharing the same queue with other transports,
+     * such as {@link InMemoryIncomingEventTransport}.
+     *
+     * @param eventQueue the event queue to use
+     */
+    public InMemoryOutgoingEventTransport(BlockingDeque<Event> eventQueue) {
+        this.eventQueue = eventQueue;
+    }
+
     @Override
     public String name() {
         return "in-memory";

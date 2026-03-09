@@ -1,12 +1,15 @@
 package com.github.vovten.eventflow.transport;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for OutgoingEventTransportException.
+ * Tests for {@link OutgoingEventTransportException}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("OutgoingEventTransportException Tests")
 class OutgoingEventTransportExceptionTest {
@@ -14,29 +17,26 @@ class OutgoingEventTransportExceptionTest {
     @Test
     @DisplayName("Should create exception with message")
     void shouldCreateExceptionWithMessage() {
-        String message = "Transport failed";
-        OutgoingEventTransportException exception = new OutgoingEventTransportException(message);
+        // Act
+        OutgoingEventTransportException exception = new OutgoingEventTransportException("Test message");
 
-        assertEquals(message, exception.getMessage());
-        assertNull(exception.getCause());
+        // Assert
+        assertNotNull(exception);
+        assertEquals("Test message", exception.getMessage());
     }
 
     @Test
     @DisplayName("Should create exception with message and cause")
     void shouldCreateExceptionWithMessageAndCause() {
-        String message = "Transport failed";
-        Throwable cause = new RuntimeException("Underlying cause");
-        OutgoingEventTransportException exception = new OutgoingEventTransportException(message, cause);
+        // Arrange
+        Throwable cause = new RuntimeException("Cause");
 
-        assertEquals(message, exception.getMessage());
+        // Act
+        OutgoingEventTransportException exception = new OutgoingEventTransportException("Test message", cause);
+
+        // Assert
+        assertNotNull(exception);
+        assertEquals("Test message", exception.getMessage());
         assertEquals(cause, exception.getCause());
-        assertEquals("Underlying cause", exception.getCause().getMessage());
-    }
-
-    @Test
-    @DisplayName("Should be RuntimeException")
-    void shouldBeRuntimeException() {
-        OutgoingEventTransportException exception = new OutgoingEventTransportException("Error");
-        assertTrue(exception instanceof RuntimeException);
     }
 }

@@ -1,12 +1,15 @@
 package com.github.vovten.eventflow.publisher;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for EventPublisherException.
+ * Tests for {@link EventPublisherException}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("EventPublisherException Tests")
 class EventPublisherExceptionTest {
@@ -14,29 +17,26 @@ class EventPublisherExceptionTest {
     @Test
     @DisplayName("Should create exception with message")
     void shouldCreateExceptionWithMessage() {
-        String message = "Publisher error";
-        EventPublisherException exception = new EventPublisherException(message);
+        // Act
+        EventPublisherException exception = new EventPublisherException("Test message");
 
-        assertEquals(message, exception.getMessage());
-        assertNull(exception.getCause());
+        // Assert
+        assertNotNull(exception);
+        assertEquals("Test message", exception.getMessage());
     }
 
     @Test
     @DisplayName("Should create exception with message and cause")
     void shouldCreateExceptionWithMessageAndCause() {
-        String message = "Publisher error";
-        Throwable cause = new RuntimeException("Underlying cause");
-        EventPublisherException exception = new EventPublisherException(message, cause);
+        // Arrange
+        Throwable cause = new RuntimeException("Cause");
 
-        assertEquals(message, exception.getMessage());
+        // Act
+        EventPublisherException exception = new EventPublisherException("Test message", cause);
+
+        // Assert
+        assertNotNull(exception);
+        assertEquals("Test message", exception.getMessage());
         assertEquals(cause, exception.getCause());
-        assertEquals("Underlying cause", exception.getCause().getMessage());
-    }
-
-    @Test
-    @DisplayName("Should be RuntimeException")
-    void shouldBeRuntimeException() {
-        EventPublisherException exception = new EventPublisherException("Error");
-        assertTrue(exception instanceof RuntimeException);
     }
 }

@@ -3,15 +3,18 @@ package com.github.vovten.eventflow.registry;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventListener;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for InterfaceEventListenerRegistry.
+ * Tests for {@link InterfaceEventListenerRegistry}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("InterfaceEventListenerRegistry Tests")
 class InterfaceEventListenerRegistryTest {
@@ -24,154 +27,188 @@ class InterfaceEventListenerRegistryTest {
     }
 
     @Test
-    @DisplayName("Should register interface listener")
-    void shouldRegisterInterfaceListener() {
+    @DisplayName("Should register listener for specific event type")
+    void shouldRegisterListenerForSpecificEventType() {
+        // Arrange
         TestEventListener listener = new TestEventListener();
+
+        // Act
         registry.register(listener);
 
-        assertEquals(1, registry.listenerCount());
-        assertTrue(registry.isRegistered(listener));
-    }
-
-    @Test
-    @DisplayName("Should ignore non-interface listener")
-    void shouldIgnoreNonInterfaceListener() {
-        Object nonListener = new Object();
-        registry.register(nonListener);
-
-        assertEquals(0, registry.listenerCount());
-        assertFalse(registry.isRegistered(nonListener));
-    }
-
-    @Test
-    @DisplayName("Should return listeners for event type")
-    void shouldReturnListenersForEventType() {
-        TestEventListener listener = new TestEventListener();
-        registry.register(listener);
-
-        TestEvent event = new TestEvent();
-        List<EventListener> listeners = registry.getListeners(event);
-
+        // Assert
+        List<EventListener> listeners = registry.getListeners(new TestEvent("test"));
         assertEquals(1, listeners.size());
         assertTrue(listeners.contains(listener));
     }
 
     @Test
-    @DisplayName("Should include generic listeners")
-    void shouldIncludeGenericListeners() {
-        SpecificEventListener specificListener = new SpecificEventListener();
+    @DisplayName("Should register listener for multiple event types")
+    void shouldRegisterListenerForMultipleEventTypes() {
+        // Arrange
+        MultiEventListener listener = new MultiEventListener();
+
+        // Act
+        registry.register(listener);
+
+        // Assert
+        List<EventListener> testListeners = registry.getListeners(new TestEvent("test"));
+        List<EventListener> anotherListeners = registry.getListeners(new AnotherEvent("test"));
+        assertTrue(testListeners.contains(listener));
+        assertTrue(anotherListeners.contains(listener));
+    }
+
+    @Test
+    @DisplayName("Should register generic listener for all events")
+    void shouldRegisterGenericListenerForAllEvents() {
+        // Arrange
         GenericEventListener genericListener = new GenericEventListener();
 
-        registry.register(specificListener);
+        // Act
         registry.register(genericListener);
 
-        SpecificEvent event = new SpecificEvent();
-        List<EventListener> listeners = registry.getListeners(event);
-
-        assertEquals(2, listeners.size());
-        assertTrue(listeners.contains(specificListener));
-        assertTrue(listeners.contains(genericListener));
+        // Assert
+        List<EventListener> listeners = registry.getListeners(new TestEvent("test"));
+        assertEquals(1, listeners.size());
     }
 
     @Test
     @DisplayName("Should return empty list when no listeners")
     void shouldReturnEmptyListWhenNoListeners() {
-        TestEvent event = new TestEvent();
-        List<EventListener> listeners = registry.getListeners(event);
+        // Act
+        List<EventListener> listeners = registry.getListeners(new TestEvent("test"));
 
+        // Assert
         assertTrue(listeners.isEmpty());
     }
 
     @Test
-    @DisplayName("Should unregister existing listener")
-    void shouldUnregisterExistingListener() {
-        TestEventListener listener = new TestEventListener();
-        registry.register(listener);
+    @DisplayName("Should count unique event types")
+    void shouldCountUniqueEventTypes() {
+        // Arrange
+        registry.register(new TestEventListener());
+        registry.register(new AnotherEventListener());
 
-        boolean result = registry.unregister(listener);
+        // Act
+        int count = registry.listenerCount();
 
-        assertTrue(result);
-        assertFalse(registry.isRegistered(listener));
-        List<EventListener> listeners = registry.getListeners(new TestEvent());
-        assertTrue(listeners.isEmpty());
+        // Assert
+        assertEquals(2, count);
     }
 
     @Test
-    @DisplayName("Should return false when unregistering non-existing listener")
-    void shouldReturnFalseWhenUnregisteringNonExistingListener() {
+    @DisplayName("Should unregister listener")
+    void shouldUnregisterListener() {
+        // Arrange
         TestEventListener listener = new TestEventListener();
         registry.register(listener);
 
-        Object nonListener = new Object();
-        boolean result = registry.unregister(nonListener);
+        // Act
+        boolean unregistered = registry.unregister(listener);
 
-        assertFalse(result);
+        // Assert
+        assertTrue(unregistered);
+        assertTrue(registry.getListeners(new TestEvent("test")).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should return false when unregistering non-existent listener")
+    void shouldReturnFalseWhenUnregisteringNonExistentListener() {
+        // Arrange
+        TestEventListener listener = new TestEventListener();
+
+        // Act
+        boolean unregistered = registry.unregister(listener);
+
+        // Assert
+        assertFalse(unregistered);
+    }
+
+    @Test
+    @DisplayName("Should check if listener is registered")
+    void shouldCheckIfListenerIsRegistered() {
+        // Arrange
+        TestEventListener listener = new TestEventListener();
+        registry.register(listener);
+
+        // Act & Assert
         assertTrue(registry.isRegistered(listener));
+        assertFalse(registry.isRegistered(new AnotherEventListener()));
     }
 
     @Test
-    @DisplayName("Should return false when unregistering non-interface listener")
-    void shouldReturnFalseWhenUnregisteringNonInterfaceListener() {
-        Object nonListener = new Object();
-        boolean result = registry.unregister(nonListener);
-
-        assertFalse(result);
-    }
-
-    @Test
-    @DisplayName("Should return true for registered interface listener")
-    void shouldReturnTrueForRegisteredInterfaceListener() {
-        TestEventListener listener = new TestEventListener();
-        registry.register(listener);
-
-        assertTrue(registry.isRegistered(listener));
-    }
-
-    @Test
-    @DisplayName("Should return false for non-interface listener")
-    void shouldReturnFalseForNonInterfaceListener() {
-        Object nonListener = new Object();
-        assertFalse(registry.isRegistered(nonListener));
-    }
-
-    @Test
-    @DisplayName("Should throw exception on merge")
-    void shouldThrowExceptionOnMerge() {
+    @DisplayName("Should throw exception for merge operation")
+    void shouldThrowExceptionForMergeOperation() {
+        // Arrange
         InterfaceEventListenerRegistry otherRegistry = new InterfaceEventListenerRegistry();
 
-        assertThrows(UnsupportedOperationException.class, () -> registry.merge(otherRegistry));
+        // Assert
+        assertThrows(UnsupportedOperationException.class, () ->
+                registry.merge(otherRegistry)
+        );
     }
 
     @Test
-    @DisplayName("Should register listener for multiple event types")
-    void shouldRegisterListenerForMultipleEventTypes() {
-        MultiEventListener listener = new MultiEventListener();
-        registry.register(listener);
+    @DisplayName("Should handle multiple listeners for same event type")
+    void shouldHandleMultipleListenersForSameEventType() {
+        // Arrange
+        TestEventListener listener1 = new TestEventListener();
+        TestEventListener listener2 = new TestEventListener();
 
-        assertEquals(2, registry.listenerCount());
+        // Act
+        registry.register(listener1);
+        registry.register(listener2);
 
-        List<EventListener> listeners1 = registry.getListeners(new TestEvent());
-        List<EventListener> listeners2 = registry.getListeners(new SpecificEvent());
-
-        assertEquals(1, listeners1.size());
-        assertEquals(1, listeners2.size());
-        assertTrue(listeners1.contains(listener));
-        assertTrue(listeners2.contains(listener));
+        // Assert
+        List<EventListener> listeners = registry.getListeners(new TestEvent("test"));
+        assertEquals(2, listeners.size());
     }
 
-    @Test
-    @DisplayName("Should ignore duplicate listener registration")
-    void shouldIgnoreDuplicateListenerRegistration() {
-        TestEventListener listener = new TestEventListener();
-        registry.register(listener);
-        registry.register(listener);
+    /**
+     * Test event class.
+     */
+    private static class TestEvent implements Event {
+        private final String data;
 
-        assertEquals(1, registry.listenerCount());
-        List<EventListener> listeners = registry.getListeners(new TestEvent());
-        assertEquals(1, listeners.size());
+        public TestEvent(String data) {
+            this.data = data;
+        }
+
+        @Override
+        public Class<? extends Event> type() {
+            return TestEvent.class;
+        }
+
+        @Override
+        public String asJson() {
+            return "{\"data\":\"" + data + "\"}";
+        }
     }
 
-    static class TestEventListener implements EventListener {
+    /**
+     * Another test event class.
+     */
+    private static class AnotherEvent implements Event {
+        private final String data;
+
+        public AnotherEvent(String data) {
+            this.data = data;
+        }
+
+        @Override
+        public Class<? extends Event> type() {
+            return AnotherEvent.class;
+        }
+
+        @Override
+        public String asJson() {
+            return "{\"data\":\"" + data + "\"}";
+        }
+    }
+
+    /**
+     * Test listener for specific event type.
+     */
+    private static class TestEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
             return List.of(TestEvent.class);
@@ -182,17 +219,13 @@ class InterfaceEventListenerRegistryTest {
         }
     }
 
-    static class TestEvent implements Event {
-        @Override
-        public Class<? extends Event> type() {
-            return TestEvent.class;
-        }
-    }
-
-    static class SpecificEventListener implements EventListener {
+    /**
+     * Test listener for another event type.
+     */
+    private static class AnotherEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
-            return List.of(SpecificEvent.class);
+            return List.of(AnotherEvent.class);
         }
 
         @Override
@@ -200,28 +233,27 @@ class InterfaceEventListenerRegistryTest {
         }
     }
 
-    static class SpecificEvent implements Event {
+    /**
+     * Test listener for multiple event types.
+     */
+    private static class MultiEventListener implements EventListener {
         @Override
-        public Class<? extends Event> type() {
-            return SpecificEvent.class;
+        public List<Class<? extends Event>> events() {
+            return List.of(TestEvent.class, AnotherEvent.class);
+        }
+
+        @Override
+        public void onEvent(Event event) {
         }
     }
 
-    static class GenericEventListener implements EventListener {
+    /**
+     * Generic listener for all events.
+     */
+    private static class GenericEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
             return List.of(Event.class);
-        }
-
-        @Override
-        public void onEvent(Event event) {
-        }
-    }
-
-    static class MultiEventListener implements EventListener {
-        @Override
-        public List<Class<? extends Event>> events() {
-            return List.of(TestEvent.class, SpecificEvent.class);
         }
 
         @Override

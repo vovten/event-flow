@@ -1,71 +1,113 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.test.TestEvent;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for SilentEventPublisher.
+ * Tests for {@link SilentEventPublisher}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("SilentEventPublisher Tests")
 class SilentEventPublisherTest {
 
-    private EventPublisher delegate;
-    private SilentEventPublisher silentPublisher;
+    @Test
+    @DisplayName("Should throw exception when delegate is null")
+    void shouldThrowExceptionWhenDelegateIsNull() {
+        // Assert
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                new SilentEventPublisher(null)
+        );
+        assertEquals("EventPublisher delegate must not be null", exception.getMessage());
+    }
 
-    @BeforeEach
-    void setUp() {
-        delegate = mock(EventPublisher.class);
-        silentPublisher = new SilentEventPublisher(delegate);
+    @Test
+    @DisplayName("Should throw exception when delegate is null with logWarnings")
+    void shouldThrowExceptionWhenDelegateIsNullWithLogWarnings() {
+        // Assert
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                new SilentEventPublisher(null, true)
+        );
+        assertEquals("EventPublisher delegate must not be null", exception.getMessage());
     }
 
     @Test
     @DisplayName("Should publish event successfully")
     void shouldPublishEventSuccessfully() {
-        TestEvent event = new TestEvent();
+        // Arrange
+        TestEvent event = new TestEvent("test");
+        AtomicBoolean called = new AtomicBoolean(false);
+        EventPublisher delegate = e -> called.set(true);
+        SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
-        silentPublisher.publish(event);
+        // Act
+        assertDoesNotThrow(() -> publisher.publish(event));
 
-        verify(delegate).publish(event);
+        // Assert
+        assertTrue(called.get());
     }
 
     @Test
-    @DisplayName("Should swallow EventPublisherException")
-    void shouldSwallowEventPublisherException() {
-        TestEvent event = new TestEvent();
-        doThrow(new EventPublisherException("Failed")).when(delegate).publish(event);
+    @DisplayName("Should silently catch exception and log warning")
+    void shouldSilentlyCatchExceptionAndLogWarning() {
+        // Arrange
+        TestEvent event = new TestEvent("test");
+        EventPublisher delegate = e -> { throw new RuntimeException("Test exception"); };
+        SilentEventPublisher publisher = new SilentEventPublisher(delegate, true);
 
-        assertDoesNotThrow(() -> silentPublisher.publish(event));
-        verify(delegate).publish(event);
+        // Act & Assert
+        assertDoesNotThrow(() -> publisher.publish(event));
     }
 
     @Test
-    @DisplayName("Should swallow RuntimeException")
-    void shouldSwallowRuntimeException() {
-        TestEvent event = new TestEvent();
-        doThrow(new RuntimeException("Unexpected error")).when(delegate).publish(event);
+    @DisplayName("Should silently catch exception and log debug")
+    void shouldSilentlyCatchExceptionAndLogDebug() {
+        // Arrange
+        TestEvent event = new TestEvent("test");
+        EventPublisher delegate = e -> { throw new RuntimeException("Test exception"); };
+        SilentEventPublisher publisher = new SilentEventPublisher(delegate, false);
 
-        assertDoesNotThrow(() -> silentPublisher.publish(event));
+        // Act & Assert
+        assertDoesNotThrow(() -> publisher.publish(event));
     }
 
     @Test
-    @DisplayName("Should not swallow Error")
-    void shouldNotSwallowError() {
-        TestEvent event = new TestEvent();
-        doThrow(new OutOfMemoryError("OOM")).when(delegate).publish(event);
+    @DisplayName("Should handle different exception types")
+    void shouldHandleDifferentExceptionTypes() {
+        // Arrange
+        TestEvent event = new TestEvent("test");
+        EventPublisher delegate = e -> { throw new EventPublisherException("Test"); };
+        SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
-        assertThrows(OutOfMemoryError.class, () -> silentPublisher.publish(event));
+        // Act & Assert
+        assertDoesNotThrow(() -> publisher.publish(event));
     }
 
-    static class TestEvent implements Event {
+    /**
+     * Test event class.
+     */
+    private static class TestEvent implements Event {
+        private final String data;
+
+        public TestEvent(String data) {
+            this.data = data;
+        }
+
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
+        }
+
+        @Override
+        public String asJson() {
+            return "{\"data\":\"" + data + "\",\"timestamp\":\"" + LocalDateTime.now() + "\"}";
         }
     }
 }

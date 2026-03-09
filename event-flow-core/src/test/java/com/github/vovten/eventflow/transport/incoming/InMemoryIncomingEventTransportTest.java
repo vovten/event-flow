@@ -1,7 +1,6 @@
 package com.github.vovten.eventflow.transport.incoming;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,10 +10,10 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for InMemoryIncomingEventTransport.
@@ -39,7 +38,9 @@ class InMemoryIncomingEventTransportTest {
     @Test
     @DisplayName("Should create transport with default constructor")
     void shouldCreateTransportWithDefaultConstructor() {
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport();
+        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(
+                new LinkedBlockingDeque<>(100)
+        );
 
         assertEquals("in-memory", transport.name());
     }
@@ -47,7 +48,9 @@ class InMemoryIncomingEventTransportTest {
     @Test
     @DisplayName("Should create transport with custom queue size")
     void shouldCreateTransportWithCustomQueueSize() {
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(500);
+        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(
+                new LinkedBlockingDeque<>(100)
+        );
 
         assertEquals("in-memory", transport.name());
     }

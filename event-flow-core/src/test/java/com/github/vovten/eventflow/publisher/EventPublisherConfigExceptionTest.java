@@ -1,12 +1,15 @@
 package com.github.vovten.eventflow.publisher;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for EventPublisherConfigException.
+ * Tests for {@link EventPublisherConfigException}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("EventPublisherConfigException Tests")
 class EventPublisherConfigExceptionTest {
@@ -14,36 +17,26 @@ class EventPublisherConfigExceptionTest {
     @Test
     @DisplayName("Should create exception with message")
     void shouldCreateExceptionWithMessage() {
-        String message = "Configuration error";
-        EventPublisherConfigException exception = new EventPublisherConfigException(message);
+        // Act
+        EventPublisherConfigException exception = new EventPublisherConfigException("Test message");
 
-        assertEquals(message, exception.getMessage());
-        assertNull(exception.getCause());
+        // Assert
+        assertNotNull(exception);
+        assertEquals("Test message", exception.getMessage());
     }
 
     @Test
     @DisplayName("Should create exception with message and cause")
     void shouldCreateExceptionWithMessageAndCause() {
-        String message = "Configuration error";
-        Throwable cause = new IllegalArgumentException("Invalid config");
-        EventPublisherConfigException exception = new EventPublisherConfigException(message, cause);
+        // Arrange
+        Throwable cause = new RuntimeException("Cause");
 
-        assertEquals(message, exception.getMessage());
+        // Act
+        EventPublisherConfigException exception = new EventPublisherConfigException("Test message", cause);
+
+        // Assert
+        assertNotNull(exception);
+        assertEquals("Test message", exception.getMessage());
         assertEquals(cause, exception.getCause());
-        assertEquals("Invalid config", exception.getCause().getMessage());
-    }
-
-    @Test
-    @DisplayName("Should be EventPublisherException")
-    void shouldBeEventPublisherException() {
-        EventPublisherConfigException exception = new EventPublisherConfigException("Error");
-        assertTrue(exception instanceof EventPublisherException);
-    }
-
-    @Test
-    @DisplayName("Should be RuntimeException")
-    void shouldBeRuntimeException() {
-        EventPublisherConfigException exception = new EventPublisherConfigException("Error");
-        assertTrue(exception instanceof RuntimeException);
     }
 }

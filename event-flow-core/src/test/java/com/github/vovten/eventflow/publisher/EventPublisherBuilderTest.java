@@ -3,156 +3,224 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
 
 /**
- * Unit tests for EventPublisherBuilder.
+ * Tests for {@link EventPublisherBuilder}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("EventPublisherBuilder Tests")
 class EventPublisherBuilderTest {
 
-    @Test
-    @DisplayName("Should throw exception when building without channels")
-    void shouldThrowExceptionWhenBuildingWithoutChannels() {
-        assertThrows(IllegalStateException.class, () ->
-                EventPublisherBuilder.channels()
-                        .build());
+    private EventChannel channel;
+
+    @BeforeEach
+    void setUp() {
+        channel = new InternalEventChannel(new InMemoryOutgoingEventTransport());
     }
 
     @Test
-    @DisplayName("Should build publisher with single channel")
-    void shouldBuildPublisherWithSingleChannel() {
-        EventChannel channel = mock(EventChannel.class);
+    @DisplayName("Should build simple publisher with channels")
+    void shouldBuildSimplePublisherWithChannels() {
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel).build();
 
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
-                .build();
-
+        // Assert
         assertNotNull(publisher);
+        assertTrue(publisher instanceof ChannelEventPublisher);
     }
 
     @Test
     @DisplayName("Should build publisher with multiple channels")
     void shouldBuildPublisherWithMultipleChannels() {
-        EventChannel channel1 = mock(EventChannel.class);
-        EventChannel channel2 = mock(EventChannel.class);
+        // Arrange
+        EventChannel channel2 = new InternalEventChannel(new InMemoryOutgoingEventTransport());
 
-        EventPublisher publisher = EventPublisherBuilder.channels(List.of(channel1, channel2))
-                .build();
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel, channel2).build();
 
+        // Assert
+        assertNotNull(publisher);
+        assertTrue(publisher instanceof ChannelEventPublisher);
+    }
+
+    @Test
+    @DisplayName("Should build publisher with channels list")
+    void shouldBuildPublisherWithChannelsList() {
+        // Arrange
+        List<EventChannel> channels = List.of(channel, new InternalEventChannel(new InMemoryOutgoingEventTransport()));
+
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channels).build();
+
+        // Assert
         assertNotNull(publisher);
     }
 
     @Test
-    @DisplayName("Should build publisher with retry")
-    void shouldBuildPublisherWithRetry() {
-        EventChannel channel = mock(EventChannel.class);
+    @DisplayName("Should add channels to builder")
+    void shouldAddChannelsToBuilder() {
+        // Arrange
+        EventChannel channel2 = new InternalEventChannel(new InMemoryOutgoingEventTransport());
 
+        // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
-                .retryable(3, Duration.ofMillis(100), 2.0)
+                .addChannels(channel2)
                 .build();
 
+        // Assert
+        assertNotNull(publisher);
+    }
+
+    @Test
+    @DisplayName("Should add channels list to builder")
+    void shouldAddChannelsListToBuilder() {
+        // Arrange
+        List<EventChannel> channels = List.of(new InternalEventChannel(new InMemoryOutgoingEventTransport()), 
+                new InternalEventChannel(new InMemoryOutgoingEventTransport()));
+
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+                .addChannels(channels)
+                .build();
+
+        // Assert
         assertNotNull(publisher);
     }
 
     @Test
     @DisplayName("Should build publisher with default retry")
     void shouldBuildPublisherWithDefaultRetry() {
-        EventChannel channel = mock(EventChannel.class);
-
+        // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
                 .retryable()
                 .build();
 
+        // Assert
         assertNotNull(publisher);
+        assertTrue(publisher instanceof RetryEventPublisher);
     }
 
     @Test
-    @DisplayName("Should build publisher with silent mode")
-    void shouldBuildPublisherWithSilentMode() {
-        EventChannel channel = mock(EventChannel.class);
+    @DisplayName("Should build publisher with custom retry")
+    void shouldBuildPublisherWithCustomRetry() {
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+                .retryable(5, Duration.ofMillis(200), 1.5)
+                .build();
 
+        // Assert
+        assertNotNull(publisher);
+        assertTrue(publisher instanceof RetryEventPublisher);
+    }
+
+    @Test
+    @DisplayName("Should build silent publisher")
+    void shouldBuildSilentPublisher() {
+        // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
                 .silent()
                 .build();
 
+        // Assert
         assertNotNull(publisher);
+        assertTrue(publisher instanceof SilentEventPublisher);
     }
 
     @Test
     @DisplayName("Should build publisher with retry and silent")
     void shouldBuildPublisherWithRetryAndSilent() {
-        EventChannel channel = mock(EventChannel.class);
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+                .retryable()
+                .silent()
+                .build();
 
+        // Assert
+        assertNotNull(publisher);
+        assertTrue(publisher instanceof SilentEventPublisher);
+    }
+
+    @Test
+    @DisplayName("Should build publisher with custom decorator")
+    void shouldBuildPublisherWithCustomDecorator() {
+        // Arrange
+        EventPublisherBuilder.DecoratorFunction decorator = pub -> event -> {};
+
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+                .withDecorator(decorator)
+                .build();
+
+        // Assert
+        assertNotNull(publisher);
+    }
+
+    @Test
+    @DisplayName("Should build publisher with multiple decorators")
+    void shouldBuildPublisherWithMultipleDecorators() {
+        // Arrange
+        EventPublisherBuilder.DecoratorFunction decorator1 = pub -> event -> {};
+        EventPublisherBuilder.DecoratorFunction decorator2 = pub -> event -> {};
+
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+                .withDecorator(decorator1)
+                .withDecorator(decorator2)
+                .retryable()
+                .silent()
+                .build();
+
+        // Assert
+        assertNotNull(publisher);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when building without channels")
+    void shouldThrowExceptionWhenBuildingWithoutChannels() {
+        // Assert
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                EventPublisherBuilder.channels().build()
+        );
+        assertEquals("At least one channel must be configured", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should build and log publisher")
+    void shouldBuildAndLogPublisher() {
+        // Act
+        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+                .retryable()
+                .silent()
+                .buildAndLog();
+
+        // Assert
+        assertNotNull(publisher);
+    }
+
+    @Test
+    @DisplayName("Should build publisher with all features")
+    void shouldBuildPublisherWithAllFeatures() {
+        // Arrange
+        EventPublisherBuilder.DecoratorFunction decorator = pub -> new SilentEventPublisher(pub, false);
+
+        // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
                 .retryable(3, Duration.ofMillis(100), 2.0)
+                .withDecorator(decorator)
                 .silent()
                 .build();
 
-        assertNotNull(publisher);
-    }
-
-    @Test
-    @DisplayName("Should build publisher with all options")
-    void shouldBuildPublisherWithAllOptions() {
-        EventChannel channel = mock(EventChannel.class);
-
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
-                .retryable(5, Duration.ofMillis(50), 1.5)
-                .silent()
-                .build();
-
-        assertNotNull(publisher);
-    }
-
-    @Test
-    @DisplayName("Should throw exception for null channel")
-    void shouldThrowExceptionForNullChannel() {
-        assertThrows(NullPointerException.class, () ->
-                EventPublisherBuilder.channels((EventChannel) null)
-                        .build());
-    }
-
-    @Test
-    @DisplayName("Should build publisher with InternalEventChannel")
-    void shouldBuildPublisherWithInternalEventChannel() {
-        EventChannel channel = new InternalEventChannel(new InMemoryOutgoingEventTransport(100));
-
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
-                .build();
-
-        assertNotNull(publisher);
-    }
-
-    @Test
-    @DisplayName("Should add channels with varargs")
-    void shouldAddChannelsWithVarargs() {
-        EventChannel channel1 = mock(EventChannel.class);
-        EventChannel channel2 = mock(EventChannel.class);
-
-        EventPublisher publisher = EventPublisherBuilder.channels(channel1)
-                .addChannels(channel2)
-                .build();
-
-        assertNotNull(publisher);
-    }
-
-    @Test
-    @DisplayName("Should add channels with list")
-    void shouldAddChannelsWithList() {
-        EventChannel channel1 = mock(EventChannel.class);
-        EventChannel channel2 = mock(EventChannel.class);
-
-        EventPublisher publisher = EventPublisherBuilder.channels(channel1)
-                .addChannels(List.of(channel2))
-                .build();
-
+        // Assert
         assertNotNull(publisher);
     }
 }

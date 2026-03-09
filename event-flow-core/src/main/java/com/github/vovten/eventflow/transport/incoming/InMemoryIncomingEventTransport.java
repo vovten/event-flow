@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -40,27 +39,6 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
     private final BlockingDeque<Event> eventQueue;
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
-
-    /**
-     * Default queue size when not specified.
-     */
-    private static final int DEFAULT_QUEUE_SIZE = 1000;
-
-    /**
-     * Create in-memory transport with default queue size (1000).
-     */
-    public InMemoryIncomingEventTransport() {
-        this(new LinkedBlockingDeque<>(DEFAULT_QUEUE_SIZE), Executors.newSingleThreadExecutor());
-    }
-
-    /**
-     * Create in-memory transport with custom queue size.
-     *
-     * @param maxQueueSize maximum queue size for backpressure
-     */
-    public InMemoryIncomingEventTransport(int maxQueueSize) {
-        this(new LinkedBlockingDeque<>(maxQueueSize), Executors.newSingleThreadExecutor());
-    }
 
     /**
      * Create in-memory transport with existing queue.

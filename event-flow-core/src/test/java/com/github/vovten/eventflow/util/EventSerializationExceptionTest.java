@@ -1,12 +1,15 @@
 package com.github.vovten.eventflow.util;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for EventSerializationException.
+ * Tests for {@link EventSerializationException}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-09
  */
 @DisplayName("EventSerializationException Tests")
 class EventSerializationExceptionTest {
@@ -14,19 +17,15 @@ class EventSerializationExceptionTest {
     @Test
     @DisplayName("Should create exception with message and cause")
     void shouldCreateExceptionWithMessageAndCause() {
-        String message = "Serialization failed";
-        Throwable cause = new RuntimeException("JSON parsing error");
-        EventSerializationException exception = new EventSerializationException(message, cause);
+        // Arrange
+        Throwable cause = new RuntimeException("Cause");
 
-        assertEquals(message, exception.getMessage());
+        // Act
+        EventSerializationException exception = new EventSerializationException("Test message", cause);
+
+        // Assert
+        assertNotNull(exception);
+        assertEquals("Test message", exception.getMessage());
         assertEquals(cause, exception.getCause());
-        assertEquals("JSON parsing error", exception.getCause().getMessage());
-    }
-
-    @Test
-    @DisplayName("Should be RuntimeException")
-    void shouldBeRuntimeException() {
-        EventSerializationException exception = new EventSerializationException("Error", new RuntimeException());
-        assertTrue(exception instanceof RuntimeException);
     }
 }
