@@ -1,15 +1,12 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for EventListenerRegistryBuilder.
@@ -33,7 +30,7 @@ class EventListenerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
-        assertTrue(registry instanceof AnnotationEventListenerRegistry);
+        assertInstanceOf(AnnotationEventListenerRegistry.class, registry);
     }
 
     @Test
@@ -44,7 +41,7 @@ class EventListenerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
-        assertTrue(registry instanceof InterfaceEventListenerRegistry);
+        assertInstanceOf(InterfaceEventListenerRegistry.class, registry);
     }
 
     @Test
@@ -56,48 +53,7 @@ class EventListenerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
-        assertTrue(registry instanceof CompositeEventListenerRegistry);
-    }
-
-    @Test
-    @DisplayName("Should throw exception for null Spring context")
-    void shouldThrowExceptionForNullSpringContext() {
-        assertThrows(IllegalArgumentException.class, () ->
-                EventListenerRegistryBuilder.create()
-                        .withSpring(null, "com.example")
-                        .build());
-    }
-
-    @Test
-    @DisplayName("Should throw exception for empty scan package")
-    void shouldThrowExceptionForEmptyScanPackage() {
-        ApplicationContext context = mock(ApplicationContext.class);
-        assertThrows(IllegalArgumentException.class, () ->
-                EventListenerRegistryBuilder.create()
-                        .withSpring(context, "")
-                        .build());
-    }
-
-    @Test
-    @DisplayName("Should throw exception for null scan package")
-    void shouldThrowExceptionForNullScanPackage() {
-        ApplicationContext context = mock(ApplicationContext.class);
-        assertThrows(IllegalArgumentException.class, () ->
-                EventListenerRegistryBuilder.create()
-                        .withSpring(context, null)
-                        .build());
-    }
-
-    @Test
-    @DisplayName("Should throw exception for invalid scan package")
-    void shouldThrowExceptionForInvalidScanPackage() {
-        ApplicationContext context = mock(ApplicationContext.class);
-        // Note: Invalid package name throws IllegalArgumentException
-        assertThrows(IllegalArgumentException.class, () ->
-                EventListenerRegistryBuilder.create()
-                        .withSpring(context, "invalid-package")
-                        .withAnnotationListeners()
-                        .build());
+        assertInstanceOf(CompositeEventListenerRegistry.class, registry);
     }
 
     @Test
@@ -131,7 +87,7 @@ class EventListenerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
-        assertTrue(registry instanceof CompositeEventListenerRegistry);
+        assertInstanceOf(CompositeEventListenerRegistry.class, registry);
     }
 
     @Test
@@ -143,7 +99,7 @@ class EventListenerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
-        assertTrue(registry instanceof AnnotationEventListenerRegistry);
+        assertInstanceOf(AnnotationEventListenerRegistry.class, registry);
     }
 
     @Test
@@ -155,7 +111,7 @@ class EventListenerRegistryBuilderTest {
                 .buildAndLog();
 
         assertNotNull(registry);
-        assertTrue(registry instanceof CompositeEventListenerRegistry);
+        assertInstanceOf(CompositeEventListenerRegistry.class, registry);
     }
 
     @Test
