@@ -116,4 +116,11 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
             log.error("Error delivering event from in-memory queue: {}", event, e);
         }
     }
+
+    /**
+     * @return the event queue for consumption
+     */
+    public BlockingDeque<Event> getEventQueue() {
+        return eventQueue;
+    }
 }
