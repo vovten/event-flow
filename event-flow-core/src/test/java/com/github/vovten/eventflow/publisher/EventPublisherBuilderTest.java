@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,7 +26,7 @@ class EventPublisherBuilderTest {
 
     @BeforeEach
     void setUp() {
-        channel = new InternalEventChannel(new InMemoryOutgoingEventTransport());
+        channel = new InternalEventChannel(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(100)));
     }
 
     @Test
@@ -43,7 +44,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with multiple channels")
     void shouldBuildPublisherWithMultipleChannels() {
         // Arrange
-        EventChannel channel2 = new InternalEventChannel(new InMemoryOutgoingEventTransport());
+        EventChannel channel2 = new InternalEventChannel(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(100)));
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channel, channel2).build();
@@ -57,7 +58,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with channels list")
     void shouldBuildPublisherWithChannelsList() {
         // Arrange
-        List<EventChannel> channels = List.of(channel, new InternalEventChannel(new InMemoryOutgoingEventTransport()));
+        List<EventChannel> channels = List.of(channel, new InternalEventChannel(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(100))));
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channels).build();
@@ -70,7 +71,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should add channels to builder")
     void shouldAddChannelsToBuilder() {
         // Arrange
-        EventChannel channel2 = new InternalEventChannel(new InMemoryOutgoingEventTransport());
+        EventChannel channel2 = new InternalEventChannel(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(100)));
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channel)
@@ -85,8 +86,8 @@ class EventPublisherBuilderTest {
     @DisplayName("Should add channels list to builder")
     void shouldAddChannelsListToBuilder() {
         // Arrange
-        List<EventChannel> channels = List.of(new InternalEventChannel(new InMemoryOutgoingEventTransport()), 
-                new InternalEventChannel(new InMemoryOutgoingEventTransport()));
+        List<EventChannel> channels = List.of(new InternalEventChannel(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(100))),
+                new InternalEventChannel(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(100))));
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.channels(channel)

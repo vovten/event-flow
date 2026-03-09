@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -68,8 +67,6 @@ class InMemoryTransportsBuilderTest {
         // Assert
         assertNotNull(transports.incoming());
         assertNotNull(transports.outgoing());
-        assertEquals(50, transports.outgoing().getEventQueue().remainingCapacity()
-                + transports.outgoing().getEventQueue().size());
     }
 
     @Test
@@ -86,7 +83,6 @@ class InMemoryTransportsBuilderTest {
         // Assert
         assertNotNull(transports.incoming());
         assertNotNull(transports.outgoing());
-        assertSame(customQueue, transports.outgoing().getEventQueue());
     }
 
     @Test
@@ -172,24 +168,32 @@ class InMemoryTransportsBuilderTest {
 
     @Test
     @DisplayName("Should build multiple independent transport pairs")
-    void shouldBuildMultipleIndependentTransportPairs() {
-        // Act
+    void shouldBuildMultipleIndependentTransportPairs() throws InterruptedException {
+        // Arrange
         InMemoryTransportsBuilder.InMemoryTransports transports1 = new InMemoryTransportsBuilder()
-                .queueSize(100)
+                .queueSize(10)
                 .build();
         InMemoryTransportsBuilder.InMemoryTransports transports2 = new InMemoryTransportsBuilder()
-                .queueSize(200)
+                .queueSize(10)
                 .build();
 
-        // Assert
-        assertNotNull(transports1.incoming());
-        assertNotNull(transports1.outgoing());
-        assertNotNull(transports2.incoming());
-        assertNotNull(transports2.outgoing());
+        AtomicInteger receivedValue1 = new AtomicInteger(0);
+        AtomicInteger receivedValue2 = new AtomicInteger(0);
 
-        // Different instances should have different queues
-        assertSame(transports1.outgoing().getEventQueue(), transports1.incoming().getEventQueue());
-        assertSame(transports2.outgoing().getEventQueue(), transports2.incoming().getEventQueue());
+        transports1.incoming().start(e -> receivedValue1.set(((TestEvent) e).getValue()));
+        transports2.incoming().start(e -> receivedValue2.set(((TestEvent) e).getValue()));
+        Thread.sleep(50);
+
+        // Act - send event to first transport pair
+        transports1.outgoing().send(new TestEvent(100));
+        Thread.sleep(100);
+
+        // Assert - only first transport should receive the event
+        assertEquals(100, receivedValue1.get());
+        assertEquals(0, receivedValue2.get());
+
+        transports1.incoming().stop();
+        transports2.incoming().stop();
     }
 
     /**

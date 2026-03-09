@@ -2,13 +2,17 @@ package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link InMemoryOutgoingEventTransport}.
@@ -20,10 +24,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class InMemoryOutgoingEventTransportTest {
 
     @Test
-    @DisplayName("Should create with default queue size")
-    void shouldCreateWithDefaultQueueSize() {
+    @DisplayName("Should create transport with queue")
+    void shouldCreateTransportWithQueue() {
+        // Arrange
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
+
         // Act
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport();
+        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
 
         // Assert
         assertNotNull(transport);
@@ -31,36 +38,27 @@ class InMemoryOutgoingEventTransportTest {
     }
 
     @Test
-    @DisplayName("Should create with custom queue size")
-    void shouldCreateWithCustomQueueSize() {
-        // Act
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(100);
-
-        // Assert
-        assertNotNull(transport);
-        assertEquals(100, transport.getEventQueue().remainingCapacity() + transport.getEventQueue().size());
-    }
-
-    @Test
     @DisplayName("Should send event to queue")
-    void shouldSendEventToQueue() {
+    void shouldSendEventToQueue() throws InterruptedException {
         // Arrange
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport();
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
+        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
         TestEvent event = new TestEvent("test");
 
         // Act
         transport.send(event);
 
         // Assert
-        assertEquals(1, transport.getEventQueue().size());
-        assertEquals(event, transport.getEventQueue().peek());
+        assertEquals(1, queue.size());
+        assertEquals(event, queue.peek());
     }
 
     @Test
     @DisplayName("Should throw exception when queue is full")
     void shouldThrowExceptionWhenQueueIsFull() {
         // Arrange
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(2);
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>(2);
+        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
         TestEvent event1 = new TestEvent("test1");
         TestEvent event2 = new TestEvent("test2");
         TestEvent event3 = new TestEvent("test3");
@@ -74,19 +72,6 @@ class InMemoryOutgoingEventTransportTest {
                 transport.send(event3)
         );
         assertTrue(exception.getMessage().contains("Queue is full"));
-    }
-
-    @Test
-    @DisplayName("Should return event queue")
-    void shouldReturnEventQueue() {
-        // Arrange
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport();
-
-        // Act
-        BlockingDeque<Event> queue = transport.getEventQueue();
-
-        // Assert
-        assertNotNull(queue);
     }
 
     /**

@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -26,7 +25,8 @@ import java.util.function.Consumer;
  * <p>
  * <b>Configuration example:</b>
  * <pre>{@code
- * IncomingEventTransport transport = new InMemoryIncomingEventTransport(1000);
+ * BlockingDeque<Event> queue = new LinkedBlockingDeque<>(1000);
+ * IncomingEventTransport transport = new InMemoryIncomingEventTransport(queue);
  * transport.start(event -> dispatcher.dispatch(event));
  * }</pre>
  *
@@ -39,15 +39,6 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
     private final BlockingDeque<Event> eventQueue;
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
-
-    /**
-     * Create in-memory transport with existing queue.
-     *
-     * @param eventQueue the event queue to listen to
-     */
-    public InMemoryIncomingEventTransport(BlockingDeque<Event> eventQueue) {
-        this(eventQueue, Executors.newSingleThreadExecutor());
-    }
 
     /**
      * Create in-memory transport with existing queue and executor service.
@@ -115,12 +106,5 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
         } catch (Exception e) {
             log.error("Error delivering event from in-memory queue: {}", event, e);
         }
-    }
-
-    /**
-     * @return the event queue for consumption
-     */
-    public BlockingDeque<Event> getEventQueue() {
-        return eventQueue;
     }
 }

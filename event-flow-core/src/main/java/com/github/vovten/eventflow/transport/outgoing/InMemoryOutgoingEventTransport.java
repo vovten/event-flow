@@ -5,7 +5,6 @@ import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 
 import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * In-memory outgoing transport for internal event delivery.
@@ -23,7 +22,8 @@ import java.util.concurrent.LinkedBlockingDeque;
  * <p>
  * <b>Configuration example:</b>
  * <pre>{@code
- * OutgoingEventTransport transport = new InMemoryOutgoingEventTransport(1000);
+ * BlockingDeque<Event> queue = new LinkedBlockingDeque<>(1000);
+ * OutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
  * EventChannel channel = new InternalEventChannel(List.of(transport));
  * }</pre>
  *
@@ -35,31 +35,7 @@ public class InMemoryOutgoingEventTransport implements OutgoingEventTransport {
     private final BlockingDeque<Event> eventQueue;
 
     /**
-     * Default queue size when not specified.
-     */
-    private static final int DEFAULT_QUEUE_SIZE = 5000;
-
-    /**
-     * Create in-memory transport with default queue size (5000).
-     */
-    public InMemoryOutgoingEventTransport() {
-        this.eventQueue = new LinkedBlockingDeque<>(DEFAULT_QUEUE_SIZE);
-    }
-
-    /**
-     * Create in-memory transport with custom queue size.
-     *
-     * @param maxQueueSize maximum queue size for backpressure
-     */
-    public InMemoryOutgoingEventTransport(int maxQueueSize) {
-        this.eventQueue = new LinkedBlockingDeque<>(maxQueueSize);
-    }
-
-    /**
      * Create in-memory transport with existing queue.
-     * <p>
-     * This constructor allows sharing the same queue with other transports,
-     * such as {@link InMemoryIncomingEventTransport}.
      *
      * @param eventQueue the event queue to use
      */
@@ -77,12 +53,5 @@ public class InMemoryOutgoingEventTransport implements OutgoingEventTransport {
         if (!eventQueue.offer(event)) {
             throw new OutgoingEventTransportException("Queue is full, event rejected: " + event);
         }
-    }
-
-    /**
-     * @return the event queue for consumption by dispatchers
-     */
-    public BlockingDeque<Event> getEventQueue() {
-        return eventQueue;
     }
 }

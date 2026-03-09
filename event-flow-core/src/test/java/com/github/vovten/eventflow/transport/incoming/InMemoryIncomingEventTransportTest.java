@@ -36,35 +36,6 @@ class InMemoryIncomingEventTransportTest {
     }
 
     @Test
-    @DisplayName("Should create transport with default constructor")
-    void shouldCreateTransportWithDefaultConstructor() {
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(
-                new LinkedBlockingDeque<>(100)
-        );
-
-        assertEquals("in-memory", transport.name());
-    }
-
-    @Test
-    @DisplayName("Should create transport with custom queue size")
-    void shouldCreateTransportWithCustomQueueSize() {
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(
-                new LinkedBlockingDeque<>(100)
-        );
-
-        assertEquals("in-memory", transport.name());
-    }
-
-    @Test
-    @DisplayName("Should create transport with existing queue")
-    void shouldCreateTransportWithExistingQueue() {
-        BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue);
-
-        assertEquals("in-memory", transport.name());
-    }
-
-    @Test
     @DisplayName("Should create transport with queue and executor")
     void shouldCreateTransportWithQueueAndExecutor() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
