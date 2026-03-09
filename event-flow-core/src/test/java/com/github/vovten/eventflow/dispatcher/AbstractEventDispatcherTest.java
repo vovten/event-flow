@@ -221,6 +221,11 @@ class AbstractEventDispatcherTest {
         public void merge(EventListenerRegistry registry) {
         }
 
+        @Override
+        public String name() {
+            return "test";
+        }
+
         private class SimpleEventListener implements EventListener {
             private final TestEventListener delegate;
 

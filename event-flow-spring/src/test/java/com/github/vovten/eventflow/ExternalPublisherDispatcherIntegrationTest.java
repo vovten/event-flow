@@ -27,6 +27,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
@@ -64,7 +65,7 @@ class ExternalPublisherDispatcherIntegrationTest {
         kafkaProps.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         var kafkaTransport = new KafkaOutgoingEventTransport(kafkaProps, "test-events");
         var externalChannel = new ExternalEventChannel(List.of(kafkaTransport));
-        var internalChannel = new InternalEventChannel(List.of(new InMemoryOutgoingEventTransport(1000)));
+        var internalChannel = new InternalEventChannel(List.of(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(1000))));
 
         publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
         dispatcherExecutor = Executors.newFixedThreadPool(2);

@@ -160,6 +160,11 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
         }
     }
 
+    @Override
+    public String name() {
+        return "spring-annotation[" + scanPackage + "]";
+    }
+
     /**
      * Get all eligible beans from the application context.
      * <p>

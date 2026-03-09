@@ -134,4 +134,9 @@ public class SpringInterfaceEventListenerRegistry extends InterfaceEventListener
             }
         }
     }
+
+    @Override
+    public String name() {
+        return "spring-interface";
+    }
 }

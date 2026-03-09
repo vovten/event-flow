@@ -281,4 +281,9 @@ public class AnnotationEventListenerRegistry implements EventListenerRegistry {
             }
         }
     }
+
+    @Override
+    public String name() {
+        return "annotation";
+    }
 }
