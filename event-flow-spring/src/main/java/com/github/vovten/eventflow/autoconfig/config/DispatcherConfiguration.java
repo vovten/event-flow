@@ -1,5 +1,6 @@
-package com.github.vovten.eventflow.autoconfig;
+package com.github.vovten.eventflow.autoconfig.config;
 
+import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.IncomingTransportFactory;
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 import com.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
@@ -30,12 +31,12 @@ import static java.util.stream.Collectors.toMap;
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class EventFlowDispatcherConfiguration {
+public class DispatcherConfiguration {
 
     private final EventFlowProperties properties;
     private final Map<String, IncomingTransportFactory> incomingTransportFactories;
 
-    public EventFlowDispatcherConfiguration(
+    public DispatcherConfiguration(
             EventFlowProperties properties,
             List<IncomingTransportFactory> incomingTransportFactories) {
         this.properties = properties;

@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow.autoconfig;
 
+import com.github.vovten.eventflow.autoconfig.config.*;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -12,11 +13,11 @@ import org.springframework.context.annotation.Import;
  * <p>
  * This is a facade that imports modular configuration classes:
  * <ul>
- *   <li>{@link EventFlowRegistryConfiguration} - event listener registries</li>
- *   <li>{@link EventFlowCommonConfiguration} - executor service and in-memory transports</li>
- *   <li>{@link EventFlowChannelConfiguration} - event channels</li>
- *   <li>{@link EventFlowPublisherConfiguration} - event publisher</li>
- *   <li>{@link EventFlowDispatcherConfiguration} - event dispatcher</li>
+ *   <li>{@link RegistryConfiguration} - event listener registries</li>
+ *   <li>{@link CommonConfiguration} - executor service and in-memory transports</li>
+ *   <li>{@link ChannelConfiguration} - event channels</li>
+ *   <li>{@link PublisherConfiguration} - event publisher</li>
+ *   <li>{@link DispatcherConfiguration} - event dispatcher</li>
  * </ul>
  * <p>
  * <b>Configuration options:</b>
@@ -49,11 +50,11 @@ import org.springframework.context.annotation.Import;
 @EnableConfigurationProperties(EventFlowProperties.class)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
 @Import({
-    EventFlowRegistryConfiguration.class,
-    EventFlowCommonConfiguration.class,
-    EventFlowChannelConfiguration.class,
-    EventFlowPublisherConfiguration.class,
-    EventFlowDispatcherConfiguration.class
+    RegistryConfiguration.class,
+    CommonConfiguration.class,
+    ChannelConfiguration.class,
+    PublisherConfiguration.class,
+    DispatcherConfiguration.class
 })
 public class EventFlowAutoConfiguration {
 }

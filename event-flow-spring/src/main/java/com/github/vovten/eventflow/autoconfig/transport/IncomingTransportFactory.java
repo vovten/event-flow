@@ -1,13 +1,14 @@
 package com.github.vovten.eventflow.autoconfig.transport;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import com.github.vovten.eventflow.autoconfig.config.DispatcherConfiguration;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 
 /**
  * Factory for creating incoming event transports.
  * <p>
  * Implementations should be annotated with {@code @Component} to be
- * automatically discovered by {@link com.github.vovten.eventflow.autoconfig.EventFlowDispatcherConfiguration}.
+ * automatically discovered by {@link DispatcherConfiguration}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10

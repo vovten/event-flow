@@ -1,5 +1,6 @@
-package com.github.vovten.eventflow.autoconfig;
+package com.github.vovten.eventflow.autoconfig.config;
 
+import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
@@ -31,11 +32,11 @@ import static java.util.stream.Collectors.joining;
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class EventFlowRegistryConfiguration {
+public class RegistryConfiguration {
 
     private final EventFlowProperties properties;
 
-    public EventFlowRegistryConfiguration(EventFlowProperties properties) {
+    public RegistryConfiguration(EventFlowProperties properties) {
         this.properties = properties;
     }
 

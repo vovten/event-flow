@@ -1,5 +1,6 @@
-package com.github.vovten.eventflow.autoconfig;
+package com.github.vovten.eventflow.autoconfig.config;
 
+import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.publisher.EventPublisherBuilder;
@@ -24,11 +25,11 @@ import static java.util.stream.Collectors.joining;
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class EventFlowPublisherConfiguration {
+public class PublisherConfiguration {
 
     private final EventFlowProperties properties;
 
-    public EventFlowPublisherConfiguration(EventFlowProperties properties) {
+    public PublisherConfiguration(EventFlowProperties properties) {
         this.properties = properties;
     }
 

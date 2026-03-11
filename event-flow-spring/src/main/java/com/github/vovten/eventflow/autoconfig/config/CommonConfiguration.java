@@ -1,5 +1,6 @@
-package com.github.vovten.eventflow.autoconfig;
+package com.github.vovten.eventflow.autoconfig.config;
 
+import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.transport.InMemoryTransportsBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -19,11 +20,11 @@ import java.util.concurrent.ExecutorService;
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class EventFlowCommonConfiguration {
+public class CommonConfiguration {
 
     private final EventFlowProperties properties;
 
-    public EventFlowCommonConfiguration(EventFlowProperties properties) {
+    public CommonConfiguration(EventFlowProperties properties) {
         this.properties = properties;
     }
 

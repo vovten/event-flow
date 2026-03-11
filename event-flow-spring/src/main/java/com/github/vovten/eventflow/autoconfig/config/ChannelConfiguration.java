@@ -1,5 +1,6 @@
-package com.github.vovten.eventflow.autoconfig;
+package com.github.vovten.eventflow.autoconfig.config;
 
+import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutgoingTransportFactory;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
@@ -30,12 +31,12 @@ import static java.util.stream.Collectors.joining;
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class EventFlowChannelConfiguration {
+public class ChannelConfiguration {
 
     private final EventFlowProperties properties;
     private final Map<String, OutgoingTransportFactory> outgoingTransportFactories;
 
-    public EventFlowChannelConfiguration(
+    public ChannelConfiguration(
             EventFlowProperties properties,
             List<OutgoingTransportFactory> outgoingTransportFactories) {
         this.properties = properties;

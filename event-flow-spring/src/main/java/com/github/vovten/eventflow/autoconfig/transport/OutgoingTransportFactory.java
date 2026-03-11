@@ -1,13 +1,14 @@
 package com.github.vovten.eventflow.autoconfig.transport;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import com.github.vovten.eventflow.autoconfig.config.ChannelConfiguration;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 
 /**
  * Factory for creating outgoing event transports.
  * <p>
  * Implementations should be annotated with {@code @Component} to be
- * automatically discovered by {@link com.github.vovten.eventflow.autoconfig.EventFlowChannelConfiguration}.
+ * automatically discovered by {@link ChannelConfiguration}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
