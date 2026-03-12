@@ -2,7 +2,6 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventListener;
-import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
 import com.github.vovten.eventflow.registry.EventListenerRegistry;
 import lombok.extern.slf4j.Slf4j;
 

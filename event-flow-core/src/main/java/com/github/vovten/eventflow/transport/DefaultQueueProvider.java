@@ -10,7 +10,8 @@ import java.util.concurrent.LinkedBlockingDeque;
 /**
  * Default queue provider for in-memory transports.
  * <p>
- * Uses a single shared queue for all in-memory transports in the application.
+ * Maintains separate queues for each transport name, creating them on demand.
+ * All queues are bounded with the same capacity specified at provider creation.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-11

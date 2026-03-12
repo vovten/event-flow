@@ -6,8 +6,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -149,10 +147,10 @@ class AnnotationEventListenerRegistryTest {
     /**
      * Test event class.
      */
-    private static class TestEvent implements Event {
+    private static final class TestEvent implements Event {
         private final String data;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
         }
 
@@ -170,10 +168,10 @@ class AnnotationEventListenerRegistryTest {
     /**
      * Another test event class.
      */
-    private static class AnotherEvent implements Event {
+    private static final class AnotherEvent implements Event {
         private final String data;
 
-        public AnotherEvent(String data) {
+        AnotherEvent(String data) {
             this.data = data;
         }
 
@@ -191,7 +189,7 @@ class AnnotationEventListenerRegistryTest {
     /**
      * Listener with annotated method.
      */
-    private static class AnnotatedListener {
+    private static final class AnnotatedListener {
         @EventListener
         public void handleTestEvent(TestEvent event) {
         }
@@ -200,7 +198,7 @@ class AnnotationEventListenerRegistryTest {
     /**
      * Listener with multiple annotated methods.
      */
-    private static class MultiMethodListener {
+    private static final class MultiMethodListener {
         @EventListener
         public void handleTestEvent(TestEvent event) {
         }
@@ -213,7 +211,7 @@ class AnnotationEventListenerRegistryTest {
     /**
      * Generic listener for all events.
      */
-    private static class GenericListener {
+    private static final class GenericListener {
         @EventListener
         public void handleEvent(Event event) {
         }
@@ -222,7 +220,7 @@ class AnnotationEventListenerRegistryTest {
     /**
      * Listener with invalid method signature.
      */
-    private static class InvalidListener {
+    private static final class InvalidListener {
         @EventListener
         public void handleEvent(String invalidParam) {
         }

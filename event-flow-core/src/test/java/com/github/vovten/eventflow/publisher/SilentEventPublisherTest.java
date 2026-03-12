@@ -59,7 +59,9 @@ class SilentEventPublisherTest {
     void shouldSilentlyCatchExceptionAndLogWarning() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        EventPublisher delegate = e -> { throw new RuntimeException("Test exception"); };
+        EventPublisher delegate = e -> {
+            throw new RuntimeException("Test exception");
+        };
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, true);
 
         // Act & Assert
@@ -71,7 +73,9 @@ class SilentEventPublisherTest {
     void shouldSilentlyCatchExceptionAndLogDebug() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        EventPublisher delegate = e -> { throw new RuntimeException("Test exception"); };
+        EventPublisher delegate = e -> {
+            throw new RuntimeException("Test exception");
+        };
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, false);
 
         // Act & Assert
@@ -83,7 +87,9 @@ class SilentEventPublisherTest {
     void shouldHandleDifferentExceptionTypes() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        EventPublisher delegate = e -> { throw new EventPublisherException("Test"); };
+        EventPublisher delegate = e -> {
+            throw new EventPublisherException("Test");
+        };
         SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
         // Act & Assert
@@ -93,10 +99,10 @@ class SilentEventPublisherTest {
     /**
      * Test event class.
      */
-    private static class TestEvent implements Event {
+    private static final class TestEvent implements Event {
         private final String data;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
         }
 

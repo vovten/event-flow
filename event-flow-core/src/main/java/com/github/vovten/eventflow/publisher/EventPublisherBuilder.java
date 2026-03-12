@@ -60,14 +60,15 @@ import java.util.List;
  * @since 2026-03-05
  */
 @Slf4j
-public class EventPublisherBuilder {
+public final class EventPublisherBuilder {
 
     private boolean silent = false;
     private RetryConfig retryConfig;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
 
-    private EventPublisherBuilder() {}
+    private EventPublisherBuilder() {
+    }
 
     /**
      * Start building publisher with the given channels.
@@ -224,6 +225,12 @@ public class EventPublisherBuilder {
      */
     @FunctionalInterface
     public interface DecoratorFunction {
+        /**
+         * Applies decorator to the given publisher.
+         *
+         * @param publisher event publisher to decorate
+         * @return decorated event publisher
+         */
         EventPublisher apply(EventPublisher publisher);
     }
 

@@ -34,10 +34,10 @@ class EventListenerInvocationExceptionTest {
     /**
      * Test event class.
      */
-    private static class TestEvent implements Event {
+    private static final class TestEvent implements Event {
         private final String data;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
         }
 

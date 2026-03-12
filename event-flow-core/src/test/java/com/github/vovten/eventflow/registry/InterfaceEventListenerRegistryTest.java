@@ -166,10 +166,10 @@ class InterfaceEventListenerRegistryTest {
     /**
      * Test event class.
      */
-    private static class TestEvent implements Event {
+    private static final class TestEvent implements Event {
         private final String data;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
         }
 
@@ -187,10 +187,10 @@ class InterfaceEventListenerRegistryTest {
     /**
      * Another test event class.
      */
-    private static class AnotherEvent implements Event {
+    private static final class AnotherEvent implements Event {
         private final String data;
 
-        public AnotherEvent(String data) {
+        AnotherEvent(String data) {
             this.data = data;
         }
 
@@ -208,7 +208,7 @@ class InterfaceEventListenerRegistryTest {
     /**
      * Test listener for specific event type.
      */
-    private static class TestEventListener implements EventListener {
+    private static final class TestEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
             return List.of(TestEvent.class);
@@ -222,7 +222,7 @@ class InterfaceEventListenerRegistryTest {
     /**
      * Test listener for another event type.
      */
-    private static class AnotherEventListener implements EventListener {
+    private static final class AnotherEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
             return List.of(AnotherEvent.class);
@@ -236,7 +236,7 @@ class InterfaceEventListenerRegistryTest {
     /**
      * Test listener for multiple event types.
      */
-    private static class MultiEventListener implements EventListener {
+    private static final class MultiEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
             return List.of(TestEvent.class, AnotherEvent.class);
@@ -250,7 +250,7 @@ class InterfaceEventListenerRegistryTest {
     /**
      * Generic listener for all events.
      */
-    private static class GenericEventListener implements EventListener {
+    private static final class GenericEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
             return List.of(Event.class);

@@ -257,6 +257,11 @@ public class AnnotationEventListenerRegistry implements EventListenerRegistry {
                 .toList();
     }
 
+    @Override
+    public String name() {
+        return "annotation";
+    }
+
     /**
      * Wrapper that invokes a method on an object when an event is received.
      * <p>
@@ -280,10 +285,5 @@ public class AnnotationEventListenerRegistry implements EventListenerRegistry {
                 throw new EventListenerInvocationException(object, event, e);
             }
         }
-    }
-
-    @Override
-    public String name() {
-        return "annotation";
     }
 }

@@ -193,7 +193,7 @@ class RetryEventPublisherTest {
     private static class TestEvent implements Event {
         private final String data;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
         }
 
@@ -211,10 +211,10 @@ class RetryEventPublisherTest {
     /**
      * Test RetryEventPublisher that exposes sleep time.
      */
-    private static class TestRetryEventPublisher extends RetryEventPublisher {
+    private static final class TestRetryEventPublisher extends RetryEventPublisher {
         long lastSleepTime = 0;
 
-        public TestRetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
+        TestRetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
             super(origin, maxRetries, initialDelay, multiplier);
         }
 

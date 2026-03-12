@@ -64,31 +64,31 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class SilentEventPublisher implements EventPublisher {
 
-    private final EventPublisher delegate;
+    private final EventPublisher origin;
     private final boolean logWarnings;
 
     /**
      * Create silent publisher with default WARN level logging.
      *
-     * @param delegate the delegate publisher to wrap
+     * @param origin the delegate publisher to wrap
      * @throws IllegalArgumentException if delegate is null
      */
-    public SilentEventPublisher(EventPublisher delegate) {
-        this(delegate, true);
+    public SilentEventPublisher(EventPublisher origin) {
+        this(origin, true);
     }
 
     /**
      * Create silent publisher with custom log level.
      *
-     * @param delegate the delegate publisher to wrap
+     * @param origin the delegate publisher to wrap
      * @param logWarnings if true, log at WARN level; if false, log at DEBUG level
      * @throws IllegalArgumentException if delegate is null
      */
-    public SilentEventPublisher(EventPublisher delegate, boolean logWarnings) {
-        if (delegate == null) {
+    public SilentEventPublisher(EventPublisher origin, boolean logWarnings) {
+        if (origin == null) {
             throw new IllegalArgumentException("EventPublisher delegate must not be null");
         }
-        this.delegate = delegate;
+        this.origin = origin;
         this.logWarnings = logWarnings;
     }
 
@@ -103,22 +103,13 @@ public class SilentEventPublisher implements EventPublisher {
     @Override
     public void publish(Event event) {
         try {
-            delegate.publish(event);
+            origin.publish(event);
         } catch (Exception e) {
+            String msg = "Failed to publish event '{}' (silently ignored): {}";
             if (logWarnings) {
-                log.warn(
-                    "Failed to publish event '{}' (silently ignored): {}",
-                    event.type().getSimpleName(),
-                    e.getMessage(),
-                    e
-                );
+                log.warn(msg, event.type().getSimpleName(), e.getMessage(), e);
             } else {
-                log.debug(
-                    "Failed to publish event '{}' (silently ignored): {}",
-                    event.type().getSimpleName(),
-                    e.getMessage(),
-                    e
-                );
+                log.debug(msg, event.type().getSimpleName(), e.getMessage(), e);
             }
         }
     }

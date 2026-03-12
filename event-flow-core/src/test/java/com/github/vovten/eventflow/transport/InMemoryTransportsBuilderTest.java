@@ -1,8 +1,6 @@
 package com.github.vovten.eventflow.transport;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.transport.incoming.InMemoryIncomingEventTransport;
-import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,9 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link InMemoryTransportsBuilder}.
@@ -202,11 +198,11 @@ class InMemoryTransportsBuilderTest {
     private static class TestEvent implements Event {
         private final int value;
 
-        public TestEvent(int value) {
+        TestEvent(int value) {
             this.value = value;
         }
 
-        public int getValue() {
+        int getValue() {
             return value;
         }
 

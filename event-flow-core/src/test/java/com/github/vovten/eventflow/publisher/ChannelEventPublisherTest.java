@@ -3,7 +3,6 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
-import com.github.vovten.eventflow.test.TestEvent;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

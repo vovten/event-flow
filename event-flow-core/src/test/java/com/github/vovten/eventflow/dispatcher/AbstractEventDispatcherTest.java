@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -146,7 +144,7 @@ class AbstractEventDispatcherTest {
         private final String data;
         private final LocalDateTime timestamp;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
             this.timestamp = LocalDateTime.now();
         }
@@ -165,7 +163,7 @@ class AbstractEventDispatcherTest {
     /**
      * Test event listener.
      */
-    private static class TestEventListener {
+    private static final class TestEventListener {
         volatile boolean called = false;
         volatile TestEvent receivedEvent = null;
 
@@ -178,7 +176,7 @@ class AbstractEventDispatcherTest {
     /**
      * Test listener registry.
      */
-    private static class TestEventListenerRegistry implements EventListenerRegistry {
+    private static final class TestEventListenerRegistry implements EventListenerRegistry {
         private final List<Object> registeredListeners = new ArrayList<>();
         private final List<TestEventListener> listeners = new ArrayList<>();
         private Class<? extends Event> eventType;
