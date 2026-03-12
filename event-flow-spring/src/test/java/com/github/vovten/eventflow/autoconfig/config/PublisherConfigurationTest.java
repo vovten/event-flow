@@ -1,20 +1,15 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.channel.EventChannel;
-import com.github.vovten.eventflow.channel.InternalEventChannel;
+import com.github.vovten.eventflow.autoconfig.transport.InMemoryOutgoingTransportFactory;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.publisher.TransactionalEventPublisher;
 import com.github.vovten.eventflow.transport.DefaultQueueProvider;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
-import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,6 +32,7 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.register(InMemoryOutgoingTransportFactory.class);
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -56,7 +52,7 @@ class PublisherConfigurationTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().setTransactional(true);
-            
+
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
@@ -64,6 +60,7 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.register(InMemoryOutgoingTransportFactory.class);
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -91,6 +88,7 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.register(InMemoryOutgoingTransportFactory.class);
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -110,20 +108,21 @@ class PublisherConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
-            
+
             EventFlowProperties.ChannelConfig internalChannel = new EventFlowProperties.ChannelConfig();
             internalChannel.setName("internal");
             internalChannel.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
-            
+
             EventFlowProperties.ChannelConfig customChannel = new EventFlowProperties.ChannelConfig();
             customChannel.setName("custom");
             customChannel.getTransports().add(new EventFlowProperties.TransportRef("custom", "in-memory", new EventFlowProperties.TransportConfig()));
-            
+
             properties.getPublisher().getChannels().add(internalChannel);
             properties.getPublisher().getChannels().add(customChannel);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.register(InMemoryOutgoingTransportFactory.class);
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -142,7 +141,7 @@ class PublisherConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
-            
+
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             // No transports added
@@ -151,6 +150,7 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.register(InMemoryOutgoingTransportFactory.class);
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
 
@@ -167,7 +167,7 @@ class PublisherConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
-            
+
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
@@ -175,6 +175,7 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.register(InMemoryOutgoingTransportFactory.class);
             context.register(CustomPublisherConfig.class);
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
