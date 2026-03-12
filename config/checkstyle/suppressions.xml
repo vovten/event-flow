@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+        "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+        "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<suppressions>
+    <suppress
+            checks=".*"
+            files="(target[/\\]generated-sources[/\\]).+java$"/>
+    <suppress
+            checks=".*"
+            files="(build[/\\]generated-sources[/\\]).+java$"/>
+    <suppress
+            checks="MissingJavadocMethod|JavadocMethod|MissingJavadocType|ParameterNumber"
+            files="(src[/\\]test[/\\]java[/\\]).+java$"/>
+    <suppress
+            checks="ParameterNumber"
+            files="^*ClaimFactory.java$"/>
+    <suppress
+            id="VariableDeclarationUsageDistanceForMain"
+            files="(src[/\\]test[/\\]java[/\\]).+java$"/>
+    <suppress
+            id="VariableDeclarationUsageDistanceForTest"
+            files="(src[/\\]main[/\\]java[/\\]).+java$"/>
+</suppressions>

@@ -33,7 +33,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest
+@SpringBootTest(properties = "event-flow.enabled=false")
 @EmbeddedKafka(
         partitions = 1,
         brokerProperties = { "listeners=PLAINTEXT://localhost:9092", "port=9092" },

@@ -1,8 +1,9 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.transport.InMemoryTransportsBuilder;
+import com.github.vovten.eventflow.transport.DefaultQueueProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -19,7 +20,7 @@ import java.util.concurrent.ExecutorService;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnBean(EventFlowProperties.class)
 public class CommonConfiguration {
 
     private final EventFlowProperties properties;
@@ -30,15 +31,19 @@ public class CommonConfiguration {
 
     /**
      * Creates executor service for async event delivery.
+     * Only created when event-flow is enabled.
+     *
+     * @return executor service for dispatcher
      */
     @Bean
     @ConditionalOnMissingBean(name = "eventFlowExecutor")
+    @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
     public ExecutorService dispatcherExecutor() {
         var tp = properties.getDispatcher().getThreadPool();
-        log.info("Creating dispatcher executor: core={}, max={}, queue={}",
-                tp.getCoreSize(), tp.getMaxSize(), tp.getQueueCapacity());
+        var msg = "Creating dispatcher executor: core={}, max={}, queue={}";
+        log.info(msg, tp.getCoreSize(), tp.getMaxSize(), tp.getQueueCapacity());
 
-        ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
+        var taskExecutor = new ThreadPoolTaskExecutor();
         taskExecutor.setCorePoolSize(tp.getCoreSize());
         taskExecutor.setMaxPoolSize(tp.getMaxSize());
         taskExecutor.setQueueCapacity(tp.getQueueCapacity());
@@ -50,23 +55,21 @@ public class CommonConfiguration {
     }
 
     /**
-     * Creates in-memory transport pair (incoming + outgoing) sharing the same queue.
-     * This couples publisher and dispatcher through a shared queue.
+     * Creates queue provider for in-memory transports with configured capacity.
+     * Uses capacity from first configured transport or default value.
+     * Always created to support in-memory transports even when event-flow is disabled.
+     *
+     * @return queue provider for in-memory transports
      */
     @Bean
-    @ConditionalOnMissingBean(name = "inMemoryTransports")
-    @ConditionalOnProperty(prefix = "event-flow.dispatcher.transports[0]",
-        name = "type", havingValue = "in-memory", matchIfMissing = true)
-    public InMemoryTransportsBuilder.InMemoryTransports inMemoryTransports(ExecutorService eventFlowExecutor) {
-        var transportConfig = properties.getDispatcher().getTransports().isEmpty()
-                ? new EventFlowProperties.TransportConfig()
-                : properties.getDispatcher().getTransports().getFirst();
-
-        log.info("Creating in-memory transports with capacity: {}", transportConfig.getCapacity());
-
-        return new InMemoryTransportsBuilder()
-                .queueSize(transportConfig.getCapacity())
-                .executorService(eventFlowExecutor)
-                .build();
+    @ConditionalOnMissingBean
+    public DefaultQueueProvider queueProvider() {
+        int capacity = properties.getDispatcher().getTransports().stream()
+                .filter(config -> "in-memory".equalsIgnoreCase(config.getType()))
+                .findFirst()
+                .map(EventFlowProperties.TransportConfig::getCapacity)
+                .orElse(1000);
+        log.info("Creating QueueProvider with capacity: {}", capacity);
+        return new DefaultQueueProvider(capacity);
     }
 }

@@ -20,7 +20,7 @@ public class KafkaOutgoingTransportFactory implements OutgoingTransportFactory {
     }
 
     @Override
-    public OutgoingEventTransport createOutgoing(EventFlowProperties.ChannelConfig config) {
+    public OutgoingEventTransport createOutgoing(EventFlowProperties.TransportConfig config) {
         validate(config);
         return new KafkaOutgoingEventTransport(
             config.getBootstrapServers(),
@@ -29,15 +29,15 @@ public class KafkaOutgoingTransportFactory implements OutgoingTransportFactory {
     }
 
     @Override
-    public void validate(EventFlowProperties.ChannelConfig config) {
+    public void validate(EventFlowProperties.TransportConfig config) {
         if (config.getBootstrapServers() == null) {
             throw new IllegalStateException(
-                "Kafka channel requires bootstrap-servers configuration"
+                "Kafka transport requires bootstrap-servers configuration"
             );
         }
         if (config.getTopic() == null) {
             throw new IllegalStateException(
-                "Kafka channel requires topic configuration"
+                "Kafka transport requires topic configuration"
             );
         }
     }

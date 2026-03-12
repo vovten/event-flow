@@ -1,6 +1,8 @@
 package com.github.vovten.eventflow.autoconfig;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -28,8 +30,15 @@ import java.util.List;
  *       multiplier: 2.0
  *     channels:
  *       - name: internal
- *         type: in-memory
- *         capacity: 1000
+ *         transports:
+ *           - name: default  # ссылка на транспорт из dispatcher.transports
+ *       - name: external
+ *         transports:
+ *           - name: kafka-transport
+ *             type: kafka
+ *             config:
+ *               topic: events-topic
+ *               bootstrapServers: localhost:9092
  *   dispatcher:
  *     enabled: true
  *     thread-pool:
@@ -38,9 +47,14 @@ import java.util.List;
  *       queue-capacity: 100
  *       keep-alive-seconds: 60
  *     transports:
- *       - name: in-memory
+ *       - name: default
  *         type: in-memory
  *         capacity: 1000
+ *       - name: kafka-transport
+ *         type: kafka
+ *         topic: events-topic
+ *         bootstrapServers: localhost:9092
+ *         consumerGroup: event-flow-group
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -70,6 +84,9 @@ public class EventFlowProperties {
      */
     private DispatcherConfig dispatcher = new DispatcherConfig();
 
+    /**
+     * Publisher configuration settings.
+     */
     @Data
     public static class PublisherConfig {
         private boolean enabled = true;
@@ -79,6 +96,9 @@ public class EventFlowProperties {
         private List<ChannelConfig> channels = new ArrayList<>();
     }
 
+    /**
+     * Retry configuration for event publishing.
+     */
     @Data
     public static class RetryConfig {
         private boolean enabled = false;
@@ -87,15 +107,41 @@ public class EventFlowProperties {
         private double multiplier = 2.0;
     }
 
+    /**
+     * Channel configuration for event publishing.
+     */
     @Data
     public static class ChannelConfig {
         private String name = "default";
-        private String type = "in-memory";
-        private int capacity = 1000;
-        private String topic;
-        private String bootstrapServers;
+        /**
+         * Список транспортов канала.
+         * Каждый транспорт ссылается на имя транспорта из конфигурации диспетчера.
+         */
+        private List<TransportRef> transports = new ArrayList<>();
     }
 
+    /**
+     * Ссылка на транспорт по имени.
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TransportRef {
+        private String name = "default";
+        /**
+         * Тип транспорта (например, "in-memory", "kafka").
+         * Если не указан, используется тип транспорта из конфигурации диспетчера.
+         */
+        private String type;
+        /**
+         * Параметры транспорта для исходящих сообщений.
+         */
+        private TransportConfig config = new TransportConfig();
+    }
+
+    /**
+     * Dispatcher configuration settings.
+     */
     @Data
     public static class DispatcherConfig {
         private boolean enabled = true;
@@ -103,6 +149,9 @@ public class EventFlowProperties {
         private List<TransportConfig> transports = new ArrayList<>();
     }
 
+    /**
+     * Thread pool configuration for dispatcher.
+     */
     @Data
     public static class ThreadPoolConfig {
         private int coreSize = 4;
@@ -111,6 +160,9 @@ public class EventFlowProperties {
         private int keepAliveSeconds = 60;
     }
 
+    /**
+     * Transport configuration for dispatcher and channels.
+     */
     @Data
     public static class TransportConfig {
         private String name = "default";

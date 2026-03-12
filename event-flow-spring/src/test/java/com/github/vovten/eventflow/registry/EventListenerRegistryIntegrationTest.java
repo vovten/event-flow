@@ -18,7 +18,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for EventListenerRegistry implementations
  */
-@SpringBootTest(classes = EventFlowTestApplication.class)
+@SpringBootTest(
+    classes = EventFlowTestApplication.class,
+    properties = "event-flow.enabled=false"
+)
 class EventListenerRegistryIntegrationTest {
 
     @Autowired

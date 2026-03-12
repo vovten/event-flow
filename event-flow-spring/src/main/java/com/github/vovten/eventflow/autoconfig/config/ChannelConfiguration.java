@@ -5,7 +5,6 @@ import com.github.vovten.eventflow.autoconfig.transport.OutgoingTransportFactory
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
-import com.github.vovten.eventflow.transport.InMemoryTransportsBuilder;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -24,6 +23,7 @@ import static java.util.stream.Collectors.joining;
  * Auto-configuration for event channels.
  * <p>
  * Creates internal and external channels based on configuration.
+ * Uses transport factories for creating outgoing transports.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
@@ -36,64 +36,45 @@ public class ChannelConfiguration {
     private final EventFlowProperties properties;
     private final Map<String, OutgoingTransportFactory> outgoingTransportFactories;
 
-    public ChannelConfiguration(
-            EventFlowProperties properties,
-            List<OutgoingTransportFactory> outgoingTransportFactories) {
+    public ChannelConfiguration(EventFlowProperties properties,
+                                List<OutgoingTransportFactory> outgoingTransportFactories) {
         this.properties = properties;
         this.outgoingTransportFactories = collect(outgoingTransportFactories);
         log.info("Registered outgoing transport factories: {}", this.outgoingTransportFactories.keySet());
     }
 
     /**
-     * Creates all event channels
+     * Creates all event channels.
+     *
+     * @return list of created event channels
      */
     @Bean
     @ConditionalOnMissingBean(name = "eventChannels")
-    public List<EventChannel> eventChannels(InMemoryTransportsBuilder.InMemoryTransports inMemoryTransports) {
-        List<EventChannel> channels = new ArrayList<>();
-        channels.add(createInternalChannel(inMemoryTransports));
-        channels.addAll(createConfiguredChannels());
+    public List<EventChannel> eventChannels() {
+        List<EventChannel> channels = new ArrayList<>(createConfiguredChannels());
         log.info("Created {} event channels: {}",
-            channels.size(),
-            channels.stream().map(EventChannel::name).collect(joining(", ")));
+                channels.size(),
+                channels.stream().map(EventChannel::name).collect(joining(", "))
+        );
         return channels;
     }
 
     /**
-     * Create configured channels from properties (excluding internal)
+     * Create configured channels from properties.
+     *
+     * @return list of configured event channels
      */
     private List<EventChannel> createConfiguredChannels() {
         return properties.getPublisher().getChannels().stream()
-            .filter(config -> !"internal".equalsIgnoreCase(config.getName()))
             .map(this::createEventChannel)
             .toList();
     }
 
     /**
-     * Creates internal channel.
-     * <p>
-     * If internal channel is explicitly configured in properties, uses that configuration.
-     * Otherwise, defaults to in-memory transport with shared queue.
-     */
-    private EventChannel createInternalChannel(InMemoryTransportsBuilder.InMemoryTransports inMemoryTransports) {
-        // Check if internal channel is explicitly configured
-        var internalConfig = properties.getPublisher().getChannels().stream()
-            .filter(config -> "internal".equalsIgnoreCase(config.getName()))
-            .findFirst();
-
-        if (internalConfig.isPresent()) {
-            log.info("Creating internal channel with configured transport: {}", internalConfig.get().getType());
-            List<OutgoingEventTransport> transports = createOutgoingTransports(internalConfig.get());
-            return new InternalEventChannel(transports);
-        }
-
-        // Default: use in-memory transport with shared queue
-        log.debug("Creating internal event channel with default in-memory transport");
-        return new InternalEventChannel(List.of(inMemoryTransports.outgoing()));
-    }
-
-    /**
      * Create event channel from configuration.
+     *
+     * @param config channel configuration
+     * @return created event channel
      */
     private EventChannel createEventChannel(EventFlowProperties.ChannelConfig config) {
         List<OutgoingEventTransport> transports = createOutgoingTransports(config);
@@ -106,25 +87,50 @@ public class ChannelConfiguration {
 
     /**
      * Create outgoing transports for channel configuration.
-     * Delegates to appropriate transport factory.
+     * Uses factories based on transport type from configuration.
+     *
+     * @param config channel configuration
+     * @return list of outgoing event transports
+     * @throws IllegalArgumentException if channel has no transports configured
      */
     private List<OutgoingEventTransport> createOutgoingTransports(EventFlowProperties.ChannelConfig config) {
-        OutgoingTransportFactory factory = outgoingTransportFactories.get(config.getType());
-        if (factory == null) {
-            throw new IllegalArgumentException(
-                String.format("Unsupported transport type '%s' for channel '%s'. " +
-                    "Supported types: %s",
-                    config.getType(),
-                    config.getName(),
-                    outgoingTransportFactories.keySet())
-            );
+        if (config.getTransports().isEmpty()) {
+            String msg = "Channel '%s' must have at least one transport configured";
+            throw new IllegalArgumentException(String.format(msg, config.getName()));
         }
-        factory.validate(config);
-        return List.of(factory.createOutgoing(config));
+        return config.getTransports().stream()
+            .map(this::createOutgoingTransport)
+            .toList();
+    }
+
+    private OutgoingEventTransport createOutgoingTransport(EventFlowProperties.TransportRef transportRef) {
+        String type = transportRef.getType();
+        if (type == null || type.isEmpty()) {
+            // Default to in-memory for backward compatibility
+            type = "in-memory";
+        }
+        OutgoingTransportFactory factory = outgoingTransportFactories.get(type);
+        if (factory == null) {
+            String msg = "No factory found for transport type '%s'. Available factories: %s";
+            throw new IllegalStateException(String.format(msg, type, outgoingTransportFactories.keySet()));
+        }
+        // Use config from transport ref or create default
+        EventFlowProperties.TransportConfig transportConfig = transportRef.getConfig();
+        if (transportConfig == null) {
+            transportConfig = new EventFlowProperties.TransportConfig();
+        }
+        // Ensure name is set from transport ref
+        transportConfig.setName(transportRef.getName());
+
+        factory.validate(transportConfig);
+        return factory.createOutgoing(transportConfig);
     }
 
     /**
-     * Collect unique map of {@linkplain #outgoingTransportFactories}
+     * Collect unique map of outgoing transport factories.
+     *
+     * @param outgoingTransportFactories list of factories
+     * @return map of factories by type
      */
     private static Map<String, OutgoingTransportFactory> collect(List<OutgoingTransportFactory> outgoingTransportFactories) {
         return outgoingTransportFactories.stream()

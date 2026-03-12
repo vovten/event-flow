@@ -21,21 +21,21 @@ public interface OutgoingTransportFactory {
     String getType();
 
     /**
-     * Create outgoing transport from channel configuration.
+     * Create outgoing transport from transport configuration.
      *
-     * @param config channel configuration
+     * @param config transport configuration
      * @return outgoing transport instance
      */
-    OutgoingEventTransport createOutgoing(EventFlowProperties.ChannelConfig config);
+    OutgoingEventTransport createOutgoing(EventFlowProperties.TransportConfig config);
 
     /**
-     * Validate channel configuration.
+     * Validate transport configuration.
      * Override to add custom validation logic.
      *
-     * @param config channel configuration to validate
+     * @param config transport configuration to validate
      * @throws IllegalStateException if configuration is invalid
      */
-    default void validate(EventFlowProperties.ChannelConfig config) {
+    default void validate(EventFlowProperties.TransportConfig config) {
         // Default no-op validation
     }
 }
