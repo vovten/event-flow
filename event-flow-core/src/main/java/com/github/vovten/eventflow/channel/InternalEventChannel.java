@@ -28,9 +28,7 @@ import java.util.List;
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
-public class InternalEventChannel implements EventChannel {
-
-    private final List<OutgoingEventTransport> transports;
+public class InternalEventChannel extends AbstractEventChannel {
 
     /**
      * Create internal channel with custom transports.
@@ -38,7 +36,7 @@ public class InternalEventChannel implements EventChannel {
      * @param transports list of transports for this channel
      */
     public InternalEventChannel(List<OutgoingEventTransport> transports) {
-        this.transports = transports;
+        super(transports);
     }
 
     /**
@@ -47,16 +45,11 @@ public class InternalEventChannel implements EventChannel {
      * @param transport the transport for this channel
      */
     public InternalEventChannel(OutgoingEventTransport transport) {
-        this.transports = List.of(transport);
+        super(transport);
     }
 
     @Override
     public String name() {
         return "internal";
-    }
-
-    @Override
-    public List<OutgoingEventTransport> transports() {
-        return transports;
     }
 }

@@ -29,9 +29,7 @@ import java.util.List;
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
-public class ExternalEventChannel implements EventChannel {
-
-    private final List<OutgoingEventTransport> transports;
+public class ExternalEventChannel extends AbstractEventChannel {
 
     /**
      * Create external channel with custom transports.
@@ -39,7 +37,7 @@ public class ExternalEventChannel implements EventChannel {
      * @param transports list of transports for this channel
      */
     public ExternalEventChannel(List<OutgoingEventTransport> transports) {
-        this.transports = transports;
+        super(transports);
     }
 
     /**
@@ -48,16 +46,11 @@ public class ExternalEventChannel implements EventChannel {
      * @param transport the transport for this channel
      */
     public ExternalEventChannel(OutgoingEventTransport transport) {
-        this.transports = List.of(transport);
+        super(transport);
     }
 
     @Override
     public String name() {
         return "external";
-    }
-
-    @Override
-    public List<OutgoingEventTransport> transports() {
-        return transports;
     }
 }
