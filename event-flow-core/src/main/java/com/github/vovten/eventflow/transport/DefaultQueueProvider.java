@@ -8,9 +8,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 
 /**
- * Провайдер общей очереди для in-memory транспортов.
+ * Default queue provider for in-memory transports.
  * <p>
- * Использует одну очередь для всех in-memory транспортов в приложении.
+ * Uses a single shared queue for all in-memory transports in the application.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-11
@@ -21,9 +21,9 @@ public class DefaultQueueProvider implements QueueProvider {
     private final Map<String, BlockingDeque<Event>> queues;
 
     /**
-     * Создает провайдер с очередью указанной емкости.
+     * Creates provider with queue of specified capacity.
      *
-     * @param capacity емкость очереди
+     * @param capacity queue capacity
      */
     public DefaultQueueProvider(int capacity) {
         this.capacity = capacity;

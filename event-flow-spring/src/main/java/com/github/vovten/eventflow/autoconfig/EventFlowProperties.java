@@ -31,7 +31,7 @@ import java.util.List;
  *     channels:
  *       - name: internal
  *         transports:
- *           - name: default  # ссылка на транспорт из dispatcher.transports
+ *           - name: default  # reference to transport from dispatcher.transports
  *       - name: external
  *         transports:
  *           - name: kafka-transport
@@ -114,14 +114,14 @@ public class EventFlowProperties {
     public static class ChannelConfig {
         private String name = "default";
         /**
-         * Список транспортов канала.
-         * Каждый транспорт ссылается на имя транспорта из конфигурации диспетчера.
+         * List of channel transports.
+         * Each transport references a transport name from dispatcher configuration.
          */
         private List<TransportRef> transports = new ArrayList<>();
     }
 
     /**
-     * Ссылка на транспорт по имени.
+     * Transport reference by name.
      */
     @Data
     @NoArgsConstructor
@@ -129,12 +129,12 @@ public class EventFlowProperties {
     public static class TransportRef {
         private String name = "default";
         /**
-         * Тип транспорта (например, "in-memory", "kafka").
-         * Если не указан, используется тип транспорта из конфигурации диспетчера.
+         * Transport type (e.g., "in-memory", "kafka").
+         * If not specified, uses transport type from dispatcher configuration.
          */
         private String type;
         /**
-         * Параметры транспорта для исходящих сообщений.
+         * Transport configuration for outgoing messages.
          */
         private TransportConfig config = new TransportConfig();
     }

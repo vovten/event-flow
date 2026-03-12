@@ -5,27 +5,27 @@ import com.github.vovten.eventflow.Event;
 import java.util.concurrent.BlockingDeque;
 
 /**
- * Провайдер очередей для in-memory транспортов.
+ * Queue provider for in-memory transports.
  * <p>
- * Позволяет получать общую очередь по имени транспорта,
- * что обеспечивает связь между publisher и dispatcher.
+ * Allows getting a shared queue by transport name,
+ * which provides communication between publisher and dispatcher.
  */
 public interface QueueProvider {
 
     /**
-     * Получает очередь для транспорта с указанным именем.
+     * Gets queue for transport with specified name.
      *
-     * @param transportName имя транспорта
-     * @return очередь для событий
-     * @throws IllegalArgumentException если транспорт с таким именем не найден
+     * @param transportName transport name
+     * @return event queue
+     * @throws IllegalArgumentException if transport with given name is not found
      */
     BlockingDeque<Event> getQueue(String transportName);
 
     /**
-     * Проверяет наличие транспорта с указанным именем.
+     * Checks if transport with specified name exists.
      *
-     * @param transportName имя транспорта
-     * @return true если транспорт существует
+     * @param transportName transport name
+     * @return true if transport exists
      */
     boolean hasTransport(String transportName);
 }
