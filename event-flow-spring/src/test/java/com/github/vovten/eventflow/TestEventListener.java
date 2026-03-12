@@ -36,13 +36,13 @@ public class TestEventListener implements com.github.vovten.eventflow.EventListe
     }
 
     @Override
-    public List<Class<? extends Event>> events() {
-        return List.of(TestEvent.class);
-    }
-
-    @Override
     public void onEvent(Event event) {
         TestEvent testEvent = (TestEvent) event;
         interfaceResult = testEvent.id();
+    }
+
+    @Override
+    public List<Class<? extends Event>> events() {
+        return List.of(TestEvent.class);
     }
 }

@@ -42,6 +42,10 @@ public class RegistryConfiguration {
 
     /**
      * Creates Spring-aware annotation-based listener registry.
+     *
+     * @param appContext Spring application context
+     * @return annotation-based event listener registry
+     * @throws IllegalStateException if scan-packages is not configured
      */
     @Bean
     @ConditionalOnMissingBean(name = "springAnnotationEventListenerRegistry")
@@ -56,6 +60,9 @@ public class RegistryConfiguration {
 
     /**
      * Creates Spring-aware interface-based listener registry.
+     *
+     * @param appContext Spring application context
+     * @return interface-based event listener registry
      */
     @Bean
     @ConditionalOnMissingBean(name = "springInterfaceEventListenerRegistry")
@@ -66,15 +73,18 @@ public class RegistryConfiguration {
 
     /**
      * Creates composite listener registry from all available registries.
+     *
+     * @param registries list of event listener registries to combine
+     * @return composite event listener registry
      */
     @Bean
     @ConditionalOnMissingBean
     public EventListenerRegistry eventListenerRegistry(List<EventListenerRegistry> registries) {
         String registryNames = registries.stream()
-            .map(EventListenerRegistry::name)
-            .collect(joining(", "));
+                .map(EventListenerRegistry::name)
+                .collect(joining(", "));
         log.info("Creating CompositeEventListenerRegistry with {} registries: {}",
-            registries.size(), registryNames);
+                registries.size(), registryNames);
         return new CompositeEventListenerRegistry(registries);
     }
 }

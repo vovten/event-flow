@@ -35,17 +35,15 @@ public class PublisherConfiguration {
 
     /**
      * Creates event publisher with all configured channels.
+     *
+     * @param eventChannels list of event channels to configure
+     * @return configured event publisher
      */
     @Bean
     @ConditionalOnMissingBean
     public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
+        logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
-        log.info("Configuring EventPublisher with {} channels: {}",
-            eventChannels.size(),
-            eventChannels.stream()
-                .map(EventChannel::name)
-                .collect(joining(", "))
-        );
         EventPublisherBuilder builder = EventPublisherBuilder.channels(eventChannels);
         // Apply retry if enabled
         var retry = publisherConfig.getRetry();
@@ -64,5 +62,11 @@ public class PublisherConfiguration {
             publisher = new SilentEventPublisher(publisher);
         }
         return publisher;
+    }
+
+    private static void logInfo(List<EventChannel> eventChannels) {
+        String msg = "Configuring EventPublisher with {} channels: {}";
+        String channelNames = eventChannels.stream().map(EventChannel::name).collect(joining(", "));
+        log.info(msg, eventChannels.size(), channelNames);
     }
 }

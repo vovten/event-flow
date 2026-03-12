@@ -62,7 +62,7 @@ import java.util.regex.Pattern;
  * </ul>
  * <p>
  * <b>Spring lifecycle:</b>
- * This registry implements {@link ApplicationListener<ContextRefreshedEvent>}.
+ * This registry implements ApplicationListener of ContextRefreshedEvent.
  * When the Spring context is refreshed, it automatically scans and registers
  * all eligible beans.
  * <p>

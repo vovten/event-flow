@@ -10,11 +10,11 @@ import org.springframework.context.annotation.FilterType;
  */
 @SpringBootApplication
 @ComponentScan(
-    basePackages = "com.github.vovten.eventflow",
-    excludeFilters = @ComponentScan.Filter(
-        type = FilterType.REGEX,
-        pattern = ".*EventListenerRegistryIntegrationTest.*"
-    )
+        basePackages = "com.github.vovten.eventflow",
+        excludeFilters = @ComponentScan.Filter(
+                type = FilterType.REGEX,
+                pattern = ".*EventListenerRegistryIntegrationTest.*"
+        )
 )
 public class EventFlowTestApplication {
 }
