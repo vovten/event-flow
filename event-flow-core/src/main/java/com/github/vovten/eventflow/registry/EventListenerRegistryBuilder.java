@@ -42,7 +42,7 @@ import java.util.List;
  * @since 2024-12-07
  */
 @Slf4j
-public class EventListenerRegistryBuilder {
+public final class EventListenerRegistryBuilder {
 
     private boolean useInterfaceListeners = false;
     private boolean useAnnotationListeners = false;
@@ -55,6 +55,8 @@ public class EventListenerRegistryBuilder {
 
     /**
      * Start building a new EventListenerRegistry.
+     *
+     * @return new builder instance
      */
     public static EventListenerRegistryBuilder create() {
         return new EventListenerRegistryBuilder();

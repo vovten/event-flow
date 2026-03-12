@@ -147,4 +147,9 @@ public interface EventListenerRegistry {
      * @return total number of registered listeners
      */
     int listenerCount();
+
+    /**
+     * @return human-readable identifier/name
+     */
+    String name();
 }

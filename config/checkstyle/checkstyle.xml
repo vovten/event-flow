@@ -1,0 +1,366 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+
+    <property name="severity" value="error"/>
+
+    <property name="fileExtensions" value="java, properties, xml"/>
+    <!-- Excludes all 'module-info.java' files              -->
+    <!-- See https://checkstyle.org/config_filefilters.html -->
+    <module name="BeforeExecutionExclusionFileFilter">
+        <property name="fileNamePattern" value="module\-info\.java$"/>
+    </module>
+
+    <!--
+    Используем наиболее популярный подход в Java и Kotlin: отступ пробелами, а не табами.
+     -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+
+    <!--
+    Гарантия, что на любой системе (Linux / Windows) перевод строки всегда одинаков.
+    Правило форсится с помощью .editorconfig, здесь же — дополнительная проверка
+     -->
+    <module name="RegexpMultiline">
+        <property name="format" value="\r\n"/>
+        <property name="maximum" value="0"/>
+        <property name="message" value="Do not use Windows line endings"/>
+    </module>
+
+    <module name="SuppressionFilter">
+        <property name="file" value="config/checkstyle/suppressions.xml"/>
+        <property name="optional" value="false"/>
+    </module>
+
+    <!-- В property-файлах для разных языков одни и те же ключи -->
+    <!--    <module name="Translation"/>-->
+
+    <module name="TreeWalker">
+        <!-- Именование
+        Набор правил:
+         пакеты — lowercase;
+         классы, интерфейсы и generic-типы — CamelCase;
+         методы, поля, локальные переменные, параметры (метода, catch-блока), лямбды — camelCase;
+         константы (static final) — UPPERCASE_WITH_UNDERSCORE.
+
+        Имя класса/интерфейса должно совпадать с именем файла, в котором он лежит.
+        -->
+        <module name="CatchParameterName">
+            <property name="format" value="^[a-z]([a-zA-Z0-9]*)?$"/>
+        </module>
+        <module name="ClassTypeParameterName">
+            <property name="format" value="(^[A-Z][0-9]?)$|([A-Z][a-zA-Z0-9]*$)"/>
+        </module>
+        <!--        <module name="ConstantName"/>-->
+        <module name="InterfaceTypeParameterName">
+            <property name="format" value="(^[A-Z][0-9]?)$|([A-Z][a-zA-Z0-9]*$)"/>
+        </module>
+        <module name="LambdaParameterName"/>
+        <module name="LocalFinalVariableName"/>
+        <module name="LocalVariableName"/>
+        <module name="MemberName"/>
+        <module name="MethodName"/>
+        <module name="MethodTypeParameterName">
+            <property name="format" value="(^[A-Z][0-9]?)$|([A-Z][a-zA-Z0-9]*$)"/>
+        </module>
+        <module name="OuterTypeFilename"/>
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="ParameterName"/>
+        <module name="StaticVariableName"/>
+        <module name="TypeName">
+            <property name="format" value="^[A-Z][a-zA-Z0-9_]*$"/> <!-- Разрешает _ -->
+        </module>
+
+        <module name="IllegalImport"/>
+        <module name="RedundantImport"/>
+        <module name="UnusedImports"/>
+
+        <!-- Блоки кода
+         Запрещены пустые блоки (исключение — если внутри блока есть комментарий,
+         либо это catch-блок, в котором throwable переменная имеет название ignore или expected).
+         Тело условных операторов и циклов всегда должно оборачиваться в фигурные скобки
+         (даже если в 1 строку).
+         Открывающая фигурная скобка всегда в конце строки.
+         После закрывающей фигурной скобки допустимы лишь: try-catch-finally, if-else, do.
+         -->
+        <module name="AvoidNestedBlocks">
+            <property name="allowInSwitchCase" value="true"/>
+        </module>
+        <module name="EmptyBlock">
+            <property name="option" value="TEXT"/>
+            <property name="tokens" value="LITERAL_TRY, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE, LITERAL_SWITCH"/>
+        </module>
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="^(ignore|expected)$"/>
+        </module>
+        <module name="LeftCurly"/>
+        <module name="NeedBraces">
+            <property name="allowSingleLineStatement" value="true"/>
+        </module>
+        <module name="RightCurly">
+            <property name="id" value="RightCurlySame"/>
+            <property name="tokens"
+                      value="LITERAL_TRY, LITERAL_CATCH, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE,
+                    LITERAL_DO"/>
+        </module>
+        <module name="RightCurly">
+            <property name="id" value="RightCurlyAlone"/>
+            <property name="option" value="alone"/>
+            <property name="tokens"
+                      value="CLASS_DEF, METHOD_DEF, CTOR_DEF, LITERAL_FOR, LITERAL_WHILE, STATIC_INIT,
+                    INSTANCE_INIT"/>
+        </module>
+
+        <!-- Код
+        * Каждая аннотация должна быть размещена на отдельной строке.
+        * Анонимный класс не более чем на 20 строк.
+        * Массив объявляется "как в Яве", не "как в Си": String[] someArray .
+        * Печатные Юникод-символы в строках разрешены только с поясняющим комментарием справа.
+        Непечатные Юникод-символы разрешены.
+        * Перегрузка equals() требует перегрузки hashCode() и наоборот.
+        * Если объявлен метод equals(SomeType), то должен быть перегружен equals(Object).
+        * Объявление интерфейса / класса соответствует следующему шаблону: вначале статические поля, не статические поля, конструкторы, методы.
+        Внутри группы полей, в отличие от официальной спецификации, не накладывается требование упорядочения группы полей по модификаторам.
+        * Внутри switch "Проваливание" из одного case в другой запрещено.
+        * Switch должен содержать default. default должен быть на последнем месте.
+        * Класс, все конструкторы которого приватные, должен быть финальным.
+        * Параметр или локальная переменная не должны совпадать с именем поля. Исключения — параметры в конструкторе,
+        сеттере и абстрактных методах.
+        * Нельзя выбрасывать Throwable, Error, RuntimeException. Нельзя ловить Throwable.
+        * Внутренние классы объявляются после всех методов внешнего класса.
+        * Не более 100 методов в классе.
+        * Метод — не более чем на 100 строк.
+        * Переменные цикла for внутри самого цикла не меняются.
+        * Запрещена перегрузка finalize().
+        * Не более 7 параметров в конструкторе или методе из main-сорсета.
+        * 1 инструкция на 1 строку.
+        * Объявление каждой переменной на отдельной строчке.
+        * Внутри каждого файла — только один top level класс или интерфейс.
+        * long-значения нужно объявлять с большой L, а не с маленькой (100L vs 100l).
+        * Дистанция между объявлением переменной и её использованием — 3 инструкции в main-сорсете и 10 в test-сорсете
+        (дистанция считается очень хитро, подробности здесь:
+        https://checkstyle.sourceforge.io/config_coding.html#VariableDeclarationUsageDistance)
+        -->
+        <module name="AnnotationLocation">
+            <property name="tokens"
+                      value="CLASS_DEF, INTERFACE_DEF, PACKAGE_DEF, ENUM_CONSTANT_DEF, ENUM_DEF,
+                      METHOD_DEF, CTOR_DEF, VARIABLE_DEF"/>
+            <property name="allowSamelineSingleParameterlessAnnotation" value="false"/>
+            <property name="allowSamelineMultipleAnnotations" value="false"/>
+            <property name="allowSamelineParameterizedAnnotation" value="false"/>
+        </module>
+        <module name="AnonInnerLength"/>
+        <module name="ArrayTypeStyle"/> <!-- Java style by default -->
+        <module name="AvoidEscapedUnicodeCharacters">
+            <property name="allowEscapesForControlCharacters" value="true"/>
+            <property name="allowByTailComment" value="true"/>
+            <property name="allowNonPrintableEscapes" value="true"/>
+        </module>
+        <module name="CovariantEquals"/>
+        <module name="DeclarationOrder">
+            <property name="ignoreModifiers" value="true"/>
+        </module>
+        <module name="DefaultComesLast"/>
+        <module name="EqualsHashCode"/>
+        <module name="FallThrough">
+            <property name="checkLastCaseGroup" value="false"/>
+        </module>
+        <module name="FinalClass"/>
+        <module name="IllegalCatch">
+            <property name="illegalClassNames" value="java.lang.Throwable "/>
+        </module>
+        <!--        <module name="IllegalThrows"/>-->
+        <module name="IllegalTokenText">
+            <property name="tokens" value="STRING_LITERAL, CHAR_LITERAL"/>
+            <property name="format" value="\\u00(08|09|0(a|A)|0(c|C)|0(d|D)|22|27|5(C|c))|\\(0(10|11|12|14|15|42|47)|134)"/>
+            <property name="message" value="Consider using special escape sequence instead of octal value or Unicode escaped value."/>
+        </module>
+        <module name="InnerTypeLast"/>
+        <module name="MethodCount"/>
+        <module name="MethodLength">
+            <property name="max" value="100"/>
+            <property name="countEmpty" value="false"/>
+        </module>
+        <module name="MissingOverride"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="ModifiedControlVariable"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="NoFinalizer"/>
+        <module name="OneStatementPerLine"/>
+        <module name="OneTopLevelClass"/>
+        <module name="OverloadMethodsDeclarationOrder"/> <!-- Внимание: overload, а не override -->
+        <!--        <module name="ParameterNumber"> &lt;!&ndash; См. suppressions.xml — для тестов эта проверка не прогоняется &ndash;&gt;-->
+        <!--            <property name="ignoreOverriddenMethods" value="true" />-->
+        <!--        </module>-->
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="UpperEll"/>
+        <!--        <module name="VariableDeclarationUsageDistance">-->
+        <!--            <property name="id" value="VariableDeclarationUsageDistanceForMain" />-->
+        <!--        </module>-->
+        <module name="VariableDeclarationUsageDistance">
+            <property name="id" value="VariableDeclarationUsageDistanceForTest"/>
+            <property name="allowedDistance" value="10"/>
+        </module>
+
+        <!-- Javadoc
+        Неприватные классы, интерфейсы, конструкторы, методы в main-сорсете должны быть задокументированы.
+        См. также файл suppressions.xml
+        -->
+        <module name="AtclauseOrder">
+            <property name="tagOrder" value="@param, @return, @throws, @deprecated"/>
+            <property name="target" value="CLASS_DEF, INTERFACE_DEF, ENUM_DEF, METHOD_DEF, CTOR_DEF, VARIABLE_DEF"/>
+        </module>
+        <module name="InvalidJavadocPosition"/>
+        <module name="JavadocBlockTagLocation"/>
+        <module name="JavadocContentLocation"/> <!-- location is "second_line" by default -->
+        <module name="JavadocMethod">
+            <property name="validateThrows" value="true"/>
+            <property name="allowMissingParamTags" value="false"/>
+            <property name="allowMissingReturnTag" value="false"/>
+            <property name="allowedAnnotations" value="Override, Test, Before, After"/>
+            <property name="tokens" value="METHOD_DEF, ANNOTATION_FIELD_DEF"/>
+        </module>
+        <!--        <module name="JavadocParagraph">-->
+        <!--            <property name="allowNewlineParagraph" value="true"/>-->
+        <!--            <property name="severity" value="warning"/>-->
+        <!--        </module>-->
+        <module name="JavadocStyle">
+            <property name="checkFirstSentence" value="false"/>
+            <property name="checkEmptyJavadoc" value="false"/>
+        </module>
+        <module name="JavadocTagContinuationIndentation"/>
+        <module name="MissingJavadocMethod">
+            <property name="scope" value="package"/>
+            <property name="minLineCount" value="-1"/>
+            <property name="allowedAnnotations"
+                      value="Override, Test, BeforeEach, AfterEach, BeforeAll, AfterAll, Bean, PostConstruct, PreDestroy, PostMapping, PutMapping, GetMapping, ParameterizedTest"/>
+            <property name="allowMissingPropertyJavadoc" value="true"/>
+            <property name="ignoreMethodNamesRegex " value="^with.*$"/>
+            <property name="tokens" value="METHOD_DEF, ANNOTATION_FIELD_DEF"/>
+        </module>
+        <module name="MissingJavadocType">
+            <property name="scope" value="package"/>
+        </module>
+        <module name="NonEmptyAtclauseDescription"/>
+        <module name="SingleLineJavadoc">
+            <property name="ignoreInlineTags" value="false"/>
+        </module>
+
+        <!-- Модификаторы
+        Порядок модификаторов соответствует рекомендациям из спецификации Java
+        https://checkstyle.sourceforge.io/config_modifier.html#ModifierOrder
+        Не следует указывать модификаторы, если они выставляются неявно (например, не надо писать public
+        к методам интерфейса — они и так public).
+        -->
+        <module name="ModifierOrder"/>
+        <module name="RedundantModifier"/>
+
+        <!-- Пробелы, отступы, выравнивание
+        * Комментарии над кодом имеют тот же самый отступ, что и код.
+        * Поля нельзя разделять пустой строкой.
+        * Запрещены множественные пустые строки.
+        * Простановка и непростановка пробелов до/после запятых, круглых, фигурных и угловых скобок
+        соответствует рекомендациям из спецификаций Java.
+        * При разбиении длинной строки оператор должен переноситься на новую строку.
+        -->
+        <module name="CommentsIndentation"/>
+        <module name="EmptyLineSeparator">
+            <property name="allowNoEmptyLineBetweenFields" value="true"/>
+            <property name="allowMultipleEmptyLines" value="false"/>
+            <property name="allowMultipleEmptyLinesInsideClassMembers" value="false"/>
+            <property name="tokens"
+                      value="IMPORT, STATIC_IMPORT, CLASS_DEF, INTERFACE_DEF, ENUM_DEF, STATIC_INIT, INSTANCE_INIT,
+                       METHOD_DEF, CTOR_DEF, VARIABLE_DEF"/>
+        </module>
+        <module name="GenericWhitespace">
+            <message key="ws.followed"
+                     value="GenericWhitespace ''{0}'' is followed by whitespace."/>
+            <message key="ws.preceded"
+                     value="GenericWhitespace ''{0}'' is preceded with whitespace."/>
+            <message key="ws.illegalFollow"
+                     value="GenericWhitespace ''{0}'' should followed by whitespace."/>
+            <message key="ws.notPreceded"
+                     value="GenericWhitespace ''{0}'' is not preceded with whitespace."/>
+        </module>
+        <module name="Indentation">
+            <!-- Все значения дефолтные -->
+            <property name="basicOffset" value="4"/>
+            <property name="braceAdjustment" value="0"/>
+            <property name="caseIndent" value="4"/>
+            <property name="throwsIndent" value="4"/>
+            <property name="lineWrappingIndentation" value="8"/>
+            <property name="arrayInitIndent" value="4"/>
+        </module>
+        <module name="MethodParamPad"/>
+        <module name="NoLineWrap"/> <!-- по умолчанию: PACKAGE_DEF, IMPORT, STATIC_IMPORT -->
+        <module name="NoWhitespaceBefore">
+            <property name="tokens"
+                      value="COMMA, SEMI, POST_INC, POST_DEC, DOT, ELLIPSIS, METHOD_REF"/>
+            <property name="allowLineBreaks" value="true"/>
+        </module>
+        <!--        <module name="OperatorWrap">-->
+        <!--            <property name="option" value="nl"/>-->
+        <!--            <property name="tokens"-->
+        <!--                      value="BAND, BOR, BSR, BXOR, DIV, EQUAL, GE, GT, LAND, LE, LITERAL_INSTANCEOF, LOR, LT, MINUS, MOD, NOT_EQUAL, PLUS, QUESTION, SL, SR, STAR, METHOD_REF "/>-->
+        <!--        </module>-->
+        <module name="ParenPad"/>
+        <module name="SeparatorWrap">
+            <property name="id" value="SeparatorWrapDot"/>
+            <property name="tokens" value="DOT"/>
+            <property name="option" value="nl"/>
+        </module>
+        <module name="SeparatorWrap">
+            <property name="id" value="SeparatorWrapComma"/>
+            <property name="tokens" value="COMMA"/>
+            <property name="option" value="eol"/>
+        </module>
+        <module name="SeparatorWrap">
+            <!-- ELLIPSIS is EOL until https://github.com/google/styleguide/issues/259 -->
+            <property name="id" value="SeparatorWrapEllipsis"/>
+            <property name="tokens" value="ELLIPSIS"/>
+            <property name="option" value="eol"/>
+        </module>
+        <module name="SeparatorWrap">
+            <!-- ARRAY_DECLARATOR is EOL until https://github.com/google/styleguide/issues/258 -->
+            <property name="id" value="SeparatorWrapArrayDeclarator"/>
+            <property name="tokens" value="ARRAY_DECLARATOR"/>
+            <property name="option" value="eol"/>
+        </module>
+        <module name="SeparatorWrap">
+            <property name="id" value="SeparatorWrapMethodRef"/>
+            <property name="tokens" value="METHOD_REF"/>
+            <property name="option" value="nl"/>
+        </module>
+        <module name="TypecastParenPad"/>
+        <module name="WhitespaceAround">
+            <property name="allowEmptyConstructors" value="true"/>
+            <property name="allowEmptyLambdas" value="true"/>
+            <property name="allowEmptyMethods" value="true"/>
+            <property name="allowEmptyTypes" value="true"/>
+            <property name="allowEmptyLoops" value="true"/>
+            <message key="ws.notFollowed"
+                     value="WhitespaceAround: ''{0}'' is not followed by whitespace. Empty blocks may only be represented as '{}' when not part of a multi-block statement (4.1.3)"/>
+            <message key="ws.notPreceded"
+                     value="WhitespaceAround: ''{0}'' is not preceded with whitespace."/>
+        </module>
+
+        <!-- Другое -->
+        <!-- Можно выключить/включить проверки с помощью комментариев CHECKSTYLE:OFF и CHECKSTYLE:ON
+        См. также https://checkstyle.sourceforge.io/config_filters.html#SuppressionCommentFilter
+         -->
+        <module name="SuppressionCommentFilter"/>
+        <!-- Оставленные тудушки не должны теряться: пусть присутствуют в отчёте -->
+        <module name="TodoComment">
+            <property name="severity" value="info"/>
+        </module>
+
+    </module>
+</module>

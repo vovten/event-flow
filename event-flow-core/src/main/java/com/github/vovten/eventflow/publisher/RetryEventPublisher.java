@@ -177,6 +177,7 @@ public class RetryEventPublisher implements EventPublisher {
      * Package-private for testing.
      *
      * @param millis the duration to sleep in milliseconds
+     * @throws EventPublisherException if sleep is interrupted
      */
     void sleep(long millis) {
         try {

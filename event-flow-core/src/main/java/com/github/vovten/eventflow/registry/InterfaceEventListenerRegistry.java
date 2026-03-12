@@ -210,4 +210,9 @@ public class InterfaceEventListenerRegistry implements EventListenerRegistry {
             }
         }
     }
+
+    @Override
+    public String name() {
+        return "interface";
+    }
 }

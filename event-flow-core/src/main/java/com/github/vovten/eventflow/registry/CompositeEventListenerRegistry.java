@@ -172,4 +172,11 @@ public class CompositeEventListenerRegistry implements EventListenerRegistry {
             this.registries.add(registry);
         }
     }
+
+    @Override
+    public String name() {
+        return "composite[" + registries.stream()
+                .map(EventListenerRegistry::name)
+                .collect(java.util.stream.Collectors.joining(",")) + "]";
+    }
 }

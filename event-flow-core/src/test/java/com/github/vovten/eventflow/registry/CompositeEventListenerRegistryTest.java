@@ -122,10 +122,10 @@ class CompositeEventListenerRegistryTest {
     /**
      * Test event class.
      */
-    private static class TestEvent implements Event {
+    private static final class TestEvent implements Event {
         private final String data;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
         }
 
@@ -143,7 +143,7 @@ class CompositeEventListenerRegistryTest {
     /**
      * Test listener class.
      */
-    private static class TestEventListener implements EventListener {
+    private static final class TestEventListener implements EventListener {
         @Override
         public List<Class<? extends Event>> events() {
             return List.of(TestEvent.class);

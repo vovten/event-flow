@@ -93,8 +93,8 @@ public class InMemoryTransportsBuilder {
         }
 
         ExecutorService executor = executorService != null
-            ? executorService
-            : Executors.newSingleThreadExecutor();
+                ? executorService
+                : Executors.newSingleThreadExecutor();
 
         InMemoryIncomingEventTransport incoming = new InMemoryIncomingEventTransport(eventQueue, executor);
         InMemoryOutgoingEventTransport outgoing = new InMemoryOutgoingEventTransport(eventQueue);
@@ -109,8 +109,8 @@ public class InMemoryTransportsBuilder {
      * @param outgoing  the outgoing transport
      */
     public record InMemoryTransports(
-        InMemoryIncomingEventTransport incoming,
-        InMemoryOutgoingEventTransport outgoing
+            InMemoryIncomingEventTransport incoming,
+            InMemoryOutgoingEventTransport outgoing
     ) {
     }
 }

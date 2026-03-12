@@ -59,7 +59,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
  * }</pre>
  * <p>
  * <b>Spring lifecycle:</b>
- * This registry implements {@link ApplicationListener<ContextRefreshedEvent>}.
+ * This registry implements ApplicationListener of ContextRefreshedEvent.
  * When the Spring context is refreshed, it automatically discovers and registers
  * all beans implementing {@code EventListener}.
  * <p>
@@ -133,5 +133,10 @@ public class SpringInterfaceEventListenerRegistry extends InterfaceEventListener
                 register(listener);
             }
         }
+    }
+
+    @Override
+    public String name() {
+        return "spring-interface";
     }
 }

@@ -80,7 +80,7 @@ class InMemoryOutgoingEventTransportTest {
     private static class TestEvent implements Event {
         private final String data;
 
-        public TestEvent(String data) {
+        TestEvent(String data) {
             this.data = data;
         }
 

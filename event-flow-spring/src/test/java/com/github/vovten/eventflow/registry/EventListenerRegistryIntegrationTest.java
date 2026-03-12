@@ -18,7 +18,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for EventListenerRegistry implementations
  */
-@SpringBootTest(classes = EventFlowTestApplication.class)
+@SpringBootTest(
+        classes = EventFlowTestApplication.class,
+        properties = "event-flow.enabled=false"
+)
 class EventListenerRegistryIntegrationTest {
 
     @Autowired
@@ -61,7 +64,7 @@ class EventListenerRegistryIntegrationTest {
         annotationRegistry.register(annotationListener);
 
         CompositeEventListenerRegistry compositeRegistry = new CompositeEventListenerRegistry(
-            new java.util.ArrayList<>(List.of(interfaceRegistry, annotationRegistry)));
+                new java.util.ArrayList<>(List.of(interfaceRegistry, annotationRegistry)));
 
         TestEvent event = TestEvent.create("Composite listener test");
         var listeners = compositeRegistry.getListeners(event);
