@@ -32,29 +32,36 @@ event-flow:
     # When true, events are published only after the current transaction commits
     transactional: true
 
-    # Enable silent mode (catch and log all exceptions without rethrowing)
-    # When true, the publisher will never throw exceptions
-    silent: false
-
     # Retry configuration for event publishing
     retry:
       # Enable or disable retry mechanism
-      enabled: false
+      enabled: true
       # Maximum number of retry attempts
       max-attempts: 3
       # Initial delay between retries (use ms, s, m suffixes)
       initial-delay: 100ms
       # Backoff multiplier for exponential backoff
       multiplier: 2.0
+    # Enable silent mode (catch and log all exceptions without rethrowing)
+    # When true, the publisher will never throw exceptions
+      silent: false
 
-    # Event channels configuration (additional to default in-memory channel)
-    # At least one channel must be configured (defaults to in-memory if empty)
+    # Event channels configuration
+    # Each channel defines a logical route with a list of transports
+    # Transport name identifies the type (e.g., "in-memory", "kafka")
     channels:
-      # Example: Kafka channel
-      # - name: kafka-events
-      #   type: kafka
-      #   topic: events
-      #   bootstrap-servers: localhost:9092
+      # Default internal channel with in-memory transport
+      - name: internal
+        transports:
+          - name: in-memory
+            capacity: 1000
+
+      # Example: External channel with Kafka transport
+      # - name: external
+      #   transports:
+      #     - name: kafka
+      #       topic: events
+      #       bootstrapServers: localhost:9092
 
   # ---------------------------------------------------------------------------
   # Event Dispatcher Configuration
@@ -75,19 +82,17 @@ event-flow:
       keep-alive-seconds: 60
 
     # Incoming event transports to listen to
-    # First transport defaults to in-memory if not specified
+    # Default: in-memory transport if not specified
     transports:
-      # Example: In-memory transport (default if not specified)
-      # - name: in-memory
-      #   type: in-memory
-      #   capacity: 1000
+      # Default in-memory transport
+      - name: in-memory
+        capacity: 1000
 
       # Example: Kafka transport
-      # - name: kafka-events
-      #   type: kafka
+      # - name: kafka
       #   topic: events
-      #   bootstrap-servers: localhost:9092
-      #   consumer-group: event-flow-group
+      #   bootstrapServers: localhost:9092
+      #   consumerGroup: event-flow-group
 
 # =============================================================================
 # Configuration Examples
@@ -110,21 +115,27 @@ event-flow:
 #       initial-delay: 200ms
 #       multiplier: 2.0
 #     channels:
+#       - name: internal
+#         transports:
+#           - name: in-memory
+#             capacity: 1000
 #       - name: external
-#         type: kafka
-#         topic: events
-#         bootstrap-servers: kafka:9092
+#         transports:
+#           - name: kafka
+#             topic: events
+#             bootstrapServers: kafka:9092
 #   dispatcher:
 #     thread-pool:
 #       core-size: 8
 #       max-size: 32
 #       queue-capacity: 500
 #     transports:
-#       - name: kafka-in
-#         type: kafka
+#       - name: in-memory
+#         capacity: 1000
+#       - name: kafka
 #         topic: events
-#         bootstrap-servers: kafka:9092
-#         consumer-group: my-service-group
+#         bootstrapServers: kafka:9092
+#         consumerGroup: my-service-group
 #
 # Example 3: Development configuration (in-memory only)
 # ---------------------------------------------------------------------------

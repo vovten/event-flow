@@ -59,8 +59,7 @@ class DispatcherConfigurationTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("custom-transport");
-            transportConfig.setType("in-memory");
+            transportConfig.setName("in-memory");
             transportConfig.setCapacity(500);
             properties.getDispatcher().getTransports().add(transportConfig);
 
@@ -91,12 +90,10 @@ class DispatcherConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
 
             EventFlowProperties.TransportConfig transport1 = new EventFlowProperties.TransportConfig();
-            transport1.setName("transport-1");
-            transport1.setType("in-memory");
+            transport1.setName("in-memory");
 
             EventFlowProperties.TransportConfig transport2 = new EventFlowProperties.TransportConfig();
-            transport2.setName("transport-2");
-            transport2.setType("in-memory");
+            transport2.setName("in-memory");
 
             properties.getDispatcher().getTransports().add(transport1);
             properties.getDispatcher().getTransports().add(transport2);
@@ -125,8 +122,7 @@ class DispatcherConfigurationTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("kafka-transport");
-            transportConfig.setType("kafka");
+            transportConfig.setName("kafka");
             properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -152,8 +148,7 @@ class DispatcherConfigurationTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("kafka-transport");
-            transportConfig.setType("kafka");
+            transportConfig.setName("kafka");
             transportConfig.setTopic("test-topic");
             transportConfig.setBootstrapServers("localhost:9092");
             transportConfig.setConsumerGroup("test-group");

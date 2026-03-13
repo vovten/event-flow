@@ -37,7 +37,6 @@ class InMemoryTransportFactoryTest {
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("test-queue");
-        config.setType("in-memory");
 
         // when
         IncomingEventTransport transport = factory.createIncoming(config);
@@ -68,7 +67,7 @@ class InMemoryTransportFactoryTest {
         InMemoryOutgoingTransportFactory factory = new InMemoryOutgoingTransportFactory(queueProvider);
 
         // when
-        String type = factory.getType();
+        String type = factory.getName();
 
         // then
         assertThat(type).isEqualTo("in-memory");
@@ -83,7 +82,6 @@ class InMemoryTransportFactoryTest {
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("test-queue");
-        config.setType("in-memory");
 
         // when
         OutgoingEventTransport transport = factory.createOutgoing(config);

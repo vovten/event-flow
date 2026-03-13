@@ -65,7 +65,7 @@ public class CommonConfiguration {
     @ConditionalOnMissingBean
     public DefaultQueueProvider queueProvider() {
         int capacity = properties.getDispatcher().getTransports().stream()
-                .filter(config -> "in-memory".equalsIgnoreCase(config.getType()))
+                .filter(config -> "in-memory".equalsIgnoreCase(config.getName()))
                 .findFirst()
                 .map(EventFlowProperties.TransportConfig::getCapacity)
                 .orElse(1000);

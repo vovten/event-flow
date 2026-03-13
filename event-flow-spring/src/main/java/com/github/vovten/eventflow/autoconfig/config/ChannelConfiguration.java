@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutgoingTransportFactory;
+import com.github.vovten.eventflow.channel.BroadcastEventChannel;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
@@ -18,12 +19,13 @@ import java.util.Map;
 import java.util.function.Function;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Auto-configuration for event channels.
  * <p>
  * Creates internal and external channels based on configuration.
- * Uses transport factories for creating outgoing transports.
+ * Creates outgoing transports for each channel from transport configurations.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
@@ -81,13 +83,14 @@ public class ChannelConfiguration {
         return switch (config.getName().toLowerCase()) {
             case "internal" -> new InternalEventChannel(transports);
             case "external" -> new ExternalEventChannel(transports);
+            case "broadcast" -> new BroadcastEventChannel(transports);
             default -> new GenericEventChannel(config.getName(), transports);
         };
     }
 
     /**
      * Create outgoing transports for channel configuration.
-     * Uses factories based on transport type from configuration.
+     * Uses transport name to select factory.
      *
      * @param config channel configuration
      * @return list of outgoing event transports
@@ -103,25 +106,13 @@ public class ChannelConfiguration {
             .toList();
     }
 
-    private OutgoingEventTransport createOutgoingTransport(EventFlowProperties.TransportRef transportRef) {
-        String type = transportRef.getType();
-        if (type == null || type.isEmpty()) {
-            // Default to in-memory for backward compatibility
-            type = "in-memory";
-        }
-        OutgoingTransportFactory factory = outgoingTransportFactories.get(type);
+    private OutgoingEventTransport createOutgoingTransport(EventFlowProperties.TransportConfig transportConfig) {
+        String name = transportConfig.getName();
+        OutgoingTransportFactory factory = outgoingTransportFactories.get(name);
         if (factory == null) {
-            String msg = "No factory found for transport type '%s'. Available factories: %s";
-            throw new IllegalStateException(String.format(msg, type, outgoingTransportFactories.keySet()));
+            String msg = "No factory found for transport name '%s'. Available factories: %s";
+            throw new IllegalStateException(String.format(msg, name, outgoingTransportFactories.keySet()));
         }
-        // Use config from transport ref or create default
-        EventFlowProperties.TransportConfig transportConfig = transportRef.getConfig();
-        if (transportConfig == null) {
-            transportConfig = new EventFlowProperties.TransportConfig();
-        }
-        // Ensure name is set from transport ref
-        transportConfig.setName(transportRef.getName());
-
         factory.validate(transportConfig);
         return factory.createOutgoing(transportConfig);
     }
@@ -134,12 +125,12 @@ public class ChannelConfiguration {
      */
     private static Map<String, OutgoingTransportFactory> collect(List<OutgoingTransportFactory> outgoingTransportFactories) {
         return outgoingTransportFactories.stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        OutgoingTransportFactory::getType,
+                .collect(toMap(
+                        OutgoingTransportFactory::getName,
                         Function.identity(),
                         (existing, replacement) -> {
                             log.warn("Duplicate outgoing transport factory for type '{}', using: {}",
-                                    existing.getType(), existing.getClass().getSimpleName());
+                                    existing.getName(), existing.getClass().getSimpleName());
                             return existing;
                         }
                 ));

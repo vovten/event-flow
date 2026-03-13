@@ -16,9 +16,9 @@ import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 public interface OutgoingTransportFactory {
 
     /**
-     * @return the type identifier this factory handles (e.g., "kafka", "in-memory")
+     * @return the name identifier this factory handles (e.g., "kafka", "in-memory")
      */
-    String getType();
+    String getName();
 
     /**
      * Create outgoing transport from transport configuration.

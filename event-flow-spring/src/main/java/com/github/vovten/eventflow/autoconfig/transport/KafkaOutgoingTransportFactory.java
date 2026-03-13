@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 public class KafkaOutgoingTransportFactory implements OutgoingTransportFactory {
 
     @Override
-    public String getType() {
+    public String getName() {
         return "kafka";
     }
 

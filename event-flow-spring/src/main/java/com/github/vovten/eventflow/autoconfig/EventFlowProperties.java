@@ -1,8 +1,6 @@
 package com.github.vovten.eventflow.autoconfig;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -31,14 +29,13 @@ import java.util.List;
  *     channels:
  *       - name: internal
  *         transports:
- *           - name: default  # reference to transport from dispatcher.transports
+ *           - name: in-memory
+ *             capacity: 1000
  *       - name: external
  *         transports:
- *           - name: kafka-transport
- *             type: kafka
- *             config:
- *               topic: events-topic
- *               bootstrapServers: localhost:9092
+ *           - name: kafka
+ *             topic: events-topic
+ *             bootstrapServers: localhost:9092
  *   dispatcher:
  *     enabled: true
  *     thread-pool:
@@ -47,11 +44,9 @@ import java.util.List;
  *       queue-capacity: 100
  *       keep-alive-seconds: 60
  *     transports:
- *       - name: default
- *         type: in-memory
+ *       - name: in-memory
  *         capacity: 1000
- *       - name: kafka-transport
- *         type: kafka
+ *       - name: kafka
  *         topic: events-topic
  *         bootstrapServers: localhost:9092
  *         consumerGroup: event-flow-group
@@ -112,31 +107,12 @@ public class EventFlowProperties {
      */
     @Data
     public static class ChannelConfig {
-        private String name = "default";
+        private String name = "internal";
         /**
-         * List of channel transports.
-         * Each transport references a transport name from dispatcher configuration.
+         * List of transport configurations.
+         * Transport name identifies the type (e.g., "in-memory", "kafka").
          */
-        private List<TransportRef> transports = new ArrayList<>();
-    }
-
-    /**
-     * Transport reference by name.
-     */
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TransportRef {
-        private String name = "default";
-        /**
-         * Transport type (e.g., "in-memory", "kafka").
-         * If not specified, uses transport type from dispatcher configuration.
-         */
-        private String type;
-        /**
-         * Transport configuration for outgoing messages.
-         */
-        private TransportConfig config = new TransportConfig();
+        private List<TransportConfig> transports = new ArrayList<>();
     }
 
     /**
@@ -161,12 +137,12 @@ public class EventFlowProperties {
     }
 
     /**
-     * Transport configuration for dispatcher and channels.
+     * Transport configuration.
+     * Name identifies the transport type (e.g., "in-memory", "kafka").
      */
     @Data
     public static class TransportConfig {
-        private String name = "default";
-        private String type = "in-memory";
+        private String name = "in-memory";
         private int capacity = 1000;
         private String topic;
         private String bootstrapServers;

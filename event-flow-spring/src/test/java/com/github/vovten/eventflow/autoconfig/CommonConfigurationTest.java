@@ -67,7 +67,7 @@ class CommonConfigurationTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setType("in-memory");
+            transportConfig.setName("in-memory");
             transportConfig.setCapacity(500);
             properties.getDispatcher().getTransports().add(transportConfig);
 

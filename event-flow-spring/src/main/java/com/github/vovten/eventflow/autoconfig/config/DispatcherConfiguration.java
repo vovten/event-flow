@@ -70,36 +70,34 @@ public class DispatcherConfiguration {
 
     /**
      * Creates incoming transports from configuration using factories.
+     * Transport name identifies the type (e.g., "in-memory", "kafka").
      * Only created when event-flow is enabled.
      *
-     * @param dispatcherExecutor executor service for dispatcher
      * @return list of incoming event transports
-     * @throws IllegalArgumentException if unsupported transport type is configured
      */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public List<IncomingEventTransport> incomingEventTransports(ExecutorService dispatcherExecutor) {
+    public List<IncomingEventTransport> incomingEventTransports() {
         List<IncomingEventTransport> transports = new ArrayList<>();
         // Create transports from configuration
         if (!properties.getDispatcher().getTransports().isEmpty()) {
             for (EventFlowProperties.TransportConfig config : properties.getDispatcher().getTransports()) {
-                IncomingTransportFactory factory = incomingTransportFactories.get(config.getType());
+                IncomingTransportFactory factory = incomingTransportFactories.get(config.getName());
                 if (factory == null) {
                     throwUnsupportedTransportException(config);
                 }
                 factory.validate(config);
                 IncomingEventTransport transport = factory.createIncoming(config);
                 transports.add(transport);
-                log.info("Created incoming transport '{}' ({})", config.getName(), config.getType());
+                log.info("Created incoming transport '{}' ({})", config.getName(), config.getName());
             }
         } else {
             // Default: create in-memory transport if factory available
             IncomingTransportFactory factory = incomingTransportFactories.get("in-memory");
             if (factory != null) {
                 EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-                config.setName("default");
-                config.setType("in-memory");
+                config.setName("in-memory");
                 config.setCapacity(1000);
                 IncomingEventTransport transport = factory.createIncoming(config);
                 transports.add(transport);
@@ -111,7 +109,7 @@ public class DispatcherConfiguration {
 
     private void throwUnsupportedTransportException(EventFlowProperties.TransportConfig config) {
         String msg = "Unsupported transport type '%s'. Supported types: %s";
-        throw new IllegalArgumentException(String.format(msg, config.getType(), incomingTransportFactories.keySet()));
+        throw new IllegalArgumentException(String.format(msg, config.getName(), incomingTransportFactories.keySet()));
     }
 
     /**
