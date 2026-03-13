@@ -1,8 +1,8 @@
 package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventListener;
-import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.EventHandler;
+import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -18,35 +18,35 @@ import java.util.concurrent.ExecutorService;
 public abstract class AbstractEventDispatcher implements EventDispatcher {
 
     private final ExecutorService executorService;
-    private final EventListenerRegistry listenerRegistry;
+    private final EventHandlerRegistry handlerRegistry;
 
     protected AbstractEventDispatcher(ExecutorService executorService,
-                                      EventListenerRegistry listenerRegistry) {
+                                      EventHandlerRegistry handlerRegistry) {
         this.executorService = executorService;
-        this.listenerRegistry = listenerRegistry;
+        this.handlerRegistry = handlerRegistry;
     }
 
     @Override
     public void dispatch(Event event) {
-        List<EventListener> listeners = listenerRegistry.getListeners(event);
-        if (listeners.isEmpty()) {
-            log.debug("No listeners found for event: {}", event);
+        List<EventHandler> handlers = handlerRegistry.getHandlers(event);
+        if (handlers.isEmpty()) {
+            log.debug("No handlers found for event: {}", event);
             return;
         }
-        for (EventListener listener : listeners) {
-            executorService.execute(() -> listener.onEvent(event));
+        for (EventHandler handler : handlers) {
+            executorService.execute(() -> handler.onEvent(event));
         }
     }
 
     @Override
-    public void register(Object listener) {
-        if (!isRegistered(listener)) {
-            listenerRegistry.register(listener);
+    public void register(Object handler) {
+        if (!isRegistered(handler)) {
+            handlerRegistry.register(handler);
         }
     }
 
     @Override
-    public boolean isRegistered(Object listener) {
-        return listenerRegistry.isRegistered(listener);
+    public boolean isRegistered(Object handler) {
+        return handlerRegistry.isRegistered(handler);
     }
 }

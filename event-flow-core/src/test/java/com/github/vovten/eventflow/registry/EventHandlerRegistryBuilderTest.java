@@ -1,6 +1,8 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.EventHandler;
+import com.github.vovten.eventflow.EventSubscriber;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -9,59 +11,59 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for EventListenerRegistryBuilder.
+ * Unit tests for EventHandlerRegistryBuilder.
  */
-@DisplayName("EventListenerRegistryBuilder Tests")
-class EventListenerRegistryBuilderTest {
+@DisplayName("EventHandlerRegistryBuilder Tests")
+class EventHandlerRegistryBuilderTest {
 
     @Test
-    @DisplayName("Should throw exception when building without listeners")
-    void shouldThrowExceptionWhenBuildingWithoutListeners() {
+    @DisplayName("Should throw exception when building without handlers")
+    void shouldThrowExceptionWhenBuildingWithoutHandlers() {
         assertThrows(IllegalStateException.class, () ->
-                EventListenerRegistryBuilder.create()
+                EventHandlerRegistryBuilder.create()
                         .build());
     }
 
     @Test
     @DisplayName("Should build annotation-based registry without Spring")
     void shouldBuildAnnotationBasedRegistryWithoutSpring() {
-        EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+        EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
                 .withAnnotationListeners()
                 .build();
 
         assertNotNull(registry);
-        assertInstanceOf(AnnotationEventListenerRegistry.class, registry);
+        assertInstanceOf(EventListenerRegistry.class, registry);
     }
 
     @Test
     @DisplayName("Should build interface-based registry without Spring")
     void shouldBuildInterfaceBasedRegistryWithoutSpring() {
-        EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+        EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
                 .withInterfaceListeners()
                 .build();
 
         assertNotNull(registry);
-        assertInstanceOf(InterfaceEventListenerRegistry.class, registry);
+        assertInstanceOf(EventSubscriberRegistry.class, registry);
     }
 
     @Test
-    @DisplayName("Should build composite registry with multiple listener types")
-    void shouldBuildCompositeRegistryWithMultipleListenerTypes() {
-        EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+    @DisplayName("Should build composite registry with multiple handler types")
+    void shouldBuildCompositeRegistryWithMultipleHandlerTypes() {
+        EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
                 .withAnnotationListeners()
                 .withInterfaceListeners()
                 .build();
 
         assertNotNull(registry);
-        assertInstanceOf(CompositeEventListenerRegistry.class, registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
     @DisplayName("Should add custom registry")
     void shouldAddCustomRegistry() {
-        AnnotationEventListenerRegistry customRegistry = new AnnotationEventListenerRegistry();
+        EventListenerRegistry customRegistry = new EventListenerRegistry();
 
-        EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+        EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
                 .withCustomRegistry(customRegistry)
                 .build();
 
@@ -73,7 +75,7 @@ class EventListenerRegistryBuilderTest {
     @DisplayName("Should ignore null custom registry")
     void shouldIgnoreNullCustomRegistry() {
         assertThrows(IllegalStateException.class, () ->
-                EventListenerRegistryBuilder.create()
+                EventHandlerRegistryBuilder.create()
                         .withCustomRegistry(null)
                         .build());
     }
@@ -81,72 +83,72 @@ class EventListenerRegistryBuilderTest {
     @Test
     @DisplayName("Should apply decorator to registry")
     void shouldApplyDecoratorToRegistry() {
-        EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+        EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
                 .withAnnotationListeners()
-                .withDecorator(r -> new CompositeEventListenerRegistry(List.of(r)))
+                .withDecorator(r -> new CompositeEventHandlerRegistry(List.of(r)))
                 .build();
 
         assertNotNull(registry);
-        assertInstanceOf(CompositeEventListenerRegistry.class, registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
     @DisplayName("Should ignore null decorator")
     void shouldIgnoreNullDecorator() {
-        EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+        EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
                 .withAnnotationListeners()
                 .withDecorator(null)
                 .build();
 
         assertNotNull(registry);
-        assertInstanceOf(AnnotationEventListenerRegistry.class, registry);
+        assertInstanceOf(EventListenerRegistry.class, registry);
     }
 
     @Test
     @DisplayName("Should build and log configuration")
     void shouldBuildAndLogConfiguration() {
-        EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+        EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
                 .withAnnotationListeners()
                 .withInterfaceListeners()
                 .buildAndLog();
 
         assertNotNull(registry);
-        assertInstanceOf(CompositeEventListenerRegistry.class, registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
-    @DisplayName("Should register annotation listener")
-    void shouldRegisterAnnotationListener() {
-        AnnotationEventListenerRegistry registry = (AnnotationEventListenerRegistry) EventListenerRegistryBuilder.create()
+    @DisplayName("Should register annotation handler")
+    void shouldRegisterAnnotationHandler() {
+        EventListenerRegistry registry = (EventListenerRegistry) EventHandlerRegistryBuilder.create()
                 .withAnnotationListeners()
                 .build();
 
-        TestAnnotatedListener listener = new TestAnnotatedListener();
-        registry.register(listener);
+        TestAnnotatedHandler handler = new TestAnnotatedHandler();
+        registry.register(handler);
 
-        assertEquals(1, registry.listenerCount());
+        assertEquals(1, registry.handlerCount());
     }
 
     @Test
-    @DisplayName("Should register interface listener")
-    void shouldRegisterInterfaceListener() {
-        InterfaceEventListenerRegistry registry = (InterfaceEventListenerRegistry) EventListenerRegistryBuilder.create()
+    @DisplayName("Should register interface subscriber")
+    void shouldRegisterInterfaceSubscriber() {
+        EventSubscriberRegistry registry = (EventSubscriberRegistry) EventHandlerRegistryBuilder.create()
                 .withInterfaceListeners()
                 .build();
 
-        TestInterfaceListener listener = new TestInterfaceListener();
-        registry.register(listener);
+        TestEventSubscriber subscriber = new TestEventSubscriber();
+        registry.register(subscriber);
 
-        assertEquals(1, registry.listenerCount());
+        assertEquals(1, registry.handlerCount());
     }
 
-    static class TestAnnotatedListener {
-        @com.github.vovten.eventflow.annotation.EventListener
+    static class TestAnnotatedHandler {
+        @com.github.vovten.eventflow.EventListener
         public void handleEvent(Event event) {
         }
     }
 
-    static class TestInterfaceListener implements com.github.vovten.eventflow.EventListener {
+    static class TestEventSubscriber implements EventSubscriber {
         @Override
         public java.util.List<Class<? extends Event>> events() {
             return List.of(Event.class);

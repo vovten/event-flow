@@ -5,9 +5,9 @@ import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
 import com.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import com.github.vovten.eventflow.publisher.EventPublisher;
-import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
+import com.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
+import com.github.vovten.eventflow.registry.SpringEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
 import com.github.vovten.eventflow.transport.incoming.KafkaIncomingEventTransport;
 import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
 import com.github.vovten.eventflow.transport.outgoing.KafkaOutgoingEventTransport;
@@ -76,18 +76,18 @@ class ExternalPublisherDispatcherIntegrationTest {
         );
         dispatcher = new UnifiedEventDispatcher(
                 dispatcherExecutor,
-                createEventListenerRegistry(),
+                createEventHandlerRegistry(),
                 List.of(kafkaInTransport)
         );
         dispatcher.start();
         Thread.sleep(1000);
     }
 
-    private CompositeEventListenerRegistry createEventListenerRegistry() {
+    private CompositeEventHandlerRegistry createEventHandlerRegistry() {
         var scanPackage = TestEvent.class.getPackageName();
-        var annotationRegistry = new SpringAnnotationEventListenerRegistry(applicationContext, scanPackage);
-        var interfaceRegistry = new SpringInterfaceEventListenerRegistry(applicationContext);
-        return new CompositeEventListenerRegistry(List.of(annotationRegistry, interfaceRegistry));
+        var annotationRegistry = new SpringEventListenerRegistry(applicationContext, scanPackage);
+        var subscriberRegistry = new SpringEventSubscriberRegistry(applicationContext);
+        return new CompositeEventHandlerRegistry(List.of(annotationRegistry, subscriberRegistry));
     }
 
     @AfterEach

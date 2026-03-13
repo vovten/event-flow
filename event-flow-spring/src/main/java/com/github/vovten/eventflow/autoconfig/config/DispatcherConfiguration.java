@@ -4,7 +4,7 @@ import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.IncomingTransportFactory;
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 import com.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
-import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -48,7 +48,7 @@ public class DispatcherConfiguration {
      * Only created when event-flow is enabled.
      *
      * @param dispatcherExecutor      executor service for dispatcher
-     * @param eventListenerRegistry   event listener registry
+     * @param eventHandlerRegistry    event handler registry
      * @param incomingEventTransports list of incoming event transports
      * @return event dispatcher instance
      */
@@ -56,12 +56,12 @@ public class DispatcherConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
     public EventDispatcher eventDispatcher(ExecutorService dispatcherExecutor,
-                                           EventListenerRegistry eventListenerRegistry,
+                                           EventHandlerRegistry eventHandlerRegistry,
                                            List<IncomingEventTransport> incomingEventTransports) {
         log.info("Configuring EventDispatcher with {} transports", incomingEventTransports.size());
         UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
                 dispatcherExecutor,
-                eventListenerRegistry,
+                eventHandlerRegistry,
                 incomingEventTransports
         );
         dispatcher.start();

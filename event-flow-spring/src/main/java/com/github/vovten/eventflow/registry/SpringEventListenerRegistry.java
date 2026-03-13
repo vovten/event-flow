@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.annotation.EventListener;
+import com.github.vovten.eventflow.EventHandler;
+import com.github.vovten.eventflow.EventListener;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -12,10 +13,10 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Spring-aware registry that discovers event listeners from the application context
+ * Spring-aware registry that discovers event handlers from the application context
  * based on the {@code @EventListener} annotation.
  * <p>
- * This registry extends {@link AnnotationEventListenerRegistry} with Spring integration:
+ * This registry extends {@link EventListenerRegistry} with Spring integration:
  * <ul>
  *   <li>Automatically scans Spring beans for annotated methods</li>
  *   <li>Supports package-based filtering of beans</li>
@@ -37,14 +38,14 @@ import java.util.regex.Pattern;
  * public class EventConfig {
  *
  *     @Bean
- *     public EventListenerRegistry listenerRegistry(ApplicationContext context) {
- *         return new SpringAnnotationEventListenerRegistry("com.example", context);
+ *     public EventHandlerRegistry listenerRegistry(ApplicationContext context) {
+ *         return new SpringEventListenerRegistry("com.example", context);
  *     }
  * }
  *
- * // Listener bean — automatically discovered
+ * // Handler bean — automatically discovered
  * @Component
- * public class OrderEventListener {
+ * public class OrderEventHandler {
  *
  *     @EventListener
  *     public void handleOrderCreated(OrderCreatedEvent event) {
@@ -72,18 +73,18 @@ import java.util.regex.Pattern;
  *
  * @author Vladimir Aleshkov
  * @since 2024-12-07
- * @see AnnotationEventListenerRegistry
- * @see SpringInterfaceEventListenerRegistry
- * @see EventListener
+ * @see EventListenerRegistry
+ * @see SpringEventSubscriberRegistry
+ * @see EventHandler
  */
-public class SpringAnnotationEventListenerRegistry extends AnnotationEventListenerRegistry
+public class SpringEventListenerRegistry extends EventListenerRegistry
         implements ApplicationListener<ContextRefreshedEvent> {
 
     private static final Pattern packagePattern =
             Pattern.compile("^([a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*)?$", Pattern.CASE_INSENSITIVE);
 
     /**
-     * Package name to scan for listener beans.
+     * Package name to scan for handler beans.
      * Empty string means all beans.
      */
     private final String scanPackage;
@@ -103,7 +104,7 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
      * @param scanPackage        package prefix for filtering beans (required)
      * @throws IllegalArgumentException if applicationContext is null
      */
-    public SpringAnnotationEventListenerRegistry(ApplicationContext applicationContext, String scanPackage) {
+    public SpringEventListenerRegistry(ApplicationContext applicationContext, String scanPackage) {
         super();
         if (applicationContext == null) {
             throw new IllegalArgumentException("ApplicationContext is required");
@@ -170,7 +171,7 @@ public class SpringAnnotationEventListenerRegistry extends AnnotationEventListen
      * <p>
      * Beans are filtered by the configured scan package.
      *
-     * @return list of beans to register as listeners
+     * @return list of beans to register as handlers
      */
     private List<Object> allBeans() {
         return Arrays.stream(applicationContext.getBeanDefinitionNames())

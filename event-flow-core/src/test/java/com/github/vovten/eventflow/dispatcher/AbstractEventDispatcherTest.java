@@ -1,8 +1,9 @@
 package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventListener;
-import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.EventHandler;
+import com.github.vovten.eventflow.EventSubscriber;
+import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -27,22 +28,22 @@ class AbstractEventDispatcherTest {
 
     private ExecutorService executorService;
     private TestEventDispatcher dispatcher;
-    private TestEventListenerRegistry listenerRegistry;
+    private TestEventHandlerRegistry handlerRegistry;
 
     @BeforeEach
     void setUp() {
         executorService = Executors.newSingleThreadExecutor();
-        listenerRegistry = new TestEventListenerRegistry();
-        dispatcher = new TestEventDispatcher(executorService, listenerRegistry);
+        handlerRegistry = new TestEventHandlerRegistry();
+        dispatcher = new TestEventDispatcher(executorService, handlerRegistry);
     }
 
     @Test
-    @DisplayName("Should dispatch event to listener")
-    void shouldDispatchEventToListener() throws Exception {
+    @DisplayName("Should dispatch event to handler")
+    void shouldDispatchEventToHandler() throws Exception {
         // Arrange
         TestEvent event = new TestEvent("test-data");
-        TestEventListener listener = new TestEventListener();
-        listenerRegistry.addListener(TestEvent.class, listener);
+        TestEventHandler handler = new TestEventHandler();
+        handlerRegistry.addHandler(TestEvent.class, handler);
 
         // Act
         dispatcher.dispatch(event);
@@ -50,13 +51,13 @@ class AbstractEventDispatcherTest {
         executorService.awaitTermination(1, TimeUnit.SECONDS);
 
         // Assert
-        assertTrue(listener.called);
-        assertEquals(event, listener.receivedEvent);
+        assertTrue(handler.called);
+        assertEquals(event, handler.receivedEvent);
     }
 
     @Test
-    @DisplayName("Should not dispatch when no listeners")
-    void shouldNotDispatchWhenNoListeners() throws Exception {
+    @DisplayName("Should not dispatch when no handlers")
+    void shouldNotDispatchWhenNoHandlers() throws Exception {
         // Arrange
         TestEvent event = new TestEvent("test-data");
 
@@ -65,88 +66,72 @@ class AbstractEventDispatcherTest {
         executorService.shutdown();
         executorService.awaitTermination(1, TimeUnit.SECONDS);
 
-        // Assert
-        assertTrue(true); // No exception thrown
+        // Assert - should complete without errors
+        assertTrue(executorService.awaitTermination(1, TimeUnit.SECONDS));
     }
 
     @Test
-    @DisplayName("Should register listener")
-    void shouldRegisterListener() {
+    @DisplayName("Should handle multiple handlers")
+    void shouldHandleMultipleHandlers() throws Exception {
         // Arrange
-        Object listener = new Object();
+        TestEvent event = new TestEvent("test-data");
+        TestEventHandler handler1 = new TestEventHandler();
+        TestEventHandler handler2 = new TestEventHandler();
+        handlerRegistry.addHandler(TestEvent.class, handler1);
+        handlerRegistry.addHandler(TestEvent.class, handler2);
 
         // Act
-        dispatcher.register(listener);
+        dispatcher.dispatch(event);
+        executorService.shutdown();
+        executorService.awaitTermination(1, TimeUnit.SECONDS);
 
         // Assert
-        assertTrue(listenerRegistry.isRegistered(listener));
+        assertTrue(handler1.called);
+        assertTrue(handler2.called);
     }
 
     @Test
-    @DisplayName("Should not register already registered listener")
-    void shouldNotRegisterAlreadyRegisteredListener() {
+    @DisplayName("Should register handler")
+    void shouldRegisterHandler() {
         // Arrange
-        Object listener = new Object();
-        listenerRegistry.register(listener);
+        Object handler = new Object();
 
         // Act
-        dispatcher.register(listener);
+        dispatcher.register(handler);
 
-        // Assert - should not register again (registry already has it)
-        assertTrue(listenerRegistry.isRegistered(listener));
+        // Assert
+        assertTrue(handlerRegistry.registeredListeners.contains(handler));
     }
 
     @Test
-    @DisplayName("Should check if listener is registered")
-    void shouldCheckIfListenerIsRegistered() {
+    @DisplayName("Should check if handler is registered")
+    void shouldCheckIfHandlerIsRegistered() {
         // Arrange
-        Object listener = new Object();
-        listenerRegistry.register(listener);
+        Object handler = new Object();
+        handlerRegistry.registeredListeners.add(handler);
 
         // Act & Assert
-        assertTrue(dispatcher.isRegistered(listener));
-    }
-
-    @Test
-    @DisplayName("Should handle multiple listeners")
-    void shouldHandleMultipleListeners() throws Exception {
-        // Arrange
-        TestEvent event = new TestEvent("test-data");
-        TestEventListener listener1 = new TestEventListener();
-        TestEventListener listener2 = new TestEventListener();
-        listenerRegistry.addListener(TestEvent.class, listener1);
-        listenerRegistry.addListener(TestEvent.class, listener2);
-
-        // Act
-        dispatcher.dispatch(event);
-        executorService.shutdown();
-        executorService.awaitTermination(1, TimeUnit.SECONDS);
-
-        // Assert
-        assertTrue(listener1.called);
-        assertTrue(listener2.called);
+        assertTrue(dispatcher.isRegistered(handler));
     }
 
     /**
-     * Test implementation of AbstractEventDispatcher.
+     * Test event.
      */
-    private static class TestEventDispatcher extends AbstractEventDispatcher {
-        protected TestEventDispatcher(ExecutorService executorService,
-                                      EventListenerRegistry listenerRegistry) {
-            super(executorService, listenerRegistry);
-        }
-    }
-
-    /**
-     * Test event class.
-     */
-    private static class TestEvent implements Event {
+    private static final class TestEvent implements Event {
         private final String data;
         private final LocalDateTime timestamp;
 
         TestEvent(String data) {
             this.data = data;
             this.timestamp = LocalDateTime.now();
+        }
+
+        String getData() {
+            return data;
+        }
+
+        LocalDateTime getTimestamp() {
+            return timestamp;
         }
 
         @Override
@@ -161,11 +146,11 @@ class AbstractEventDispatcherTest {
     }
 
     /**
-     * Test event listener.
+     * Test event handler.
      */
-    private static final class TestEventListener {
-        volatile boolean called = false;
-        volatile TestEvent receivedEvent = null;
+    private static final class TestEventHandler {
+        private boolean called = false;
+        private TestEvent receivedEvent;
 
         void onEvent(TestEvent event) {
             this.called = true;
@@ -174,49 +159,49 @@ class AbstractEventDispatcherTest {
     }
 
     /**
-     * Test listener registry.
+     * Test handler registry.
      */
-    private static final class TestEventListenerRegistry implements EventListenerRegistry {
+    private static final class TestEventHandlerRegistry implements EventHandlerRegistry {
         private final List<Object> registeredListeners = new ArrayList<>();
-        private final List<TestEventListener> listeners = new ArrayList<>();
+        private final List<TestEventHandler> handlers = new ArrayList<>();
         private Class<? extends Event> eventType;
 
-        void addListener(Class<? extends Event> type, TestEventListener listener) {
+        void addHandler(Class<? extends Event> type, TestEventHandler handler) {
             this.eventType = type;
-            this.listeners.add(listener);
+            this.handlers.add(handler);
         }
 
         @Override
-        public List<EventListener> getListeners(Event event) {
-            List<EventListener> result = new ArrayList<>();
-            for (TestEventListener listener : listeners) {
-                result.add(new SimpleEventListener(listener));
+        public List<EventHandler> getHandlers(Event event) {
+            List<EventHandler> result = new ArrayList<>();
+            for (TestEventHandler handler : handlers) {
+                result.add(new SimpleEventHandler(handler));
             }
             return result;
         }
 
         @Override
-        public int listenerCount() {
-            return listeners.size();
+        public int handlerCount() {
+            return handlers.size();
         }
 
         @Override
-        public void register(Object listener) {
-            registeredListeners.add(listener);
+        public void register(Object handler) {
+            registeredListeners.add(handler);
         }
 
         @Override
-        public boolean unregister(Object listener) {
-            return registeredListeners.remove(listener);
+        public boolean unregister(Object handler) {
+            return registeredListeners.remove(handler);
         }
 
         @Override
-        public boolean isRegistered(Object listener) {
-            return registeredListeners.contains(listener);
+        public boolean isRegistered(Object handler) {
+            return registeredListeners.contains(handler);
         }
 
         @Override
-        public void merge(EventListenerRegistry registry) {
+        public void merge(EventHandlerRegistry registry) {
         }
 
         @Override
@@ -224,22 +209,26 @@ class AbstractEventDispatcherTest {
             return "test";
         }
 
-        private class SimpleEventListener implements EventListener {
-            private final TestEventListener delegate;
+        private class SimpleEventHandler implements EventHandler {
+            private final TestEventHandler delegate;
 
-            SimpleEventListener(TestEventListener delegate) {
+            SimpleEventHandler(TestEventHandler delegate) {
                 this.delegate = delegate;
-            }
-
-            @Override
-            public List<Class<? extends Event>> events() {
-                return List.of(TestEvent.class);
             }
 
             @Override
             public void onEvent(Event event) {
                 delegate.onEvent((TestEvent) event);
             }
+        }
+    }
+
+    /**
+     * Test dispatcher.
+     */
+    private static final class TestEventDispatcher extends AbstractEventDispatcher {
+        TestEventDispatcher(ExecutorService executorService, EventHandlerRegistry handlerRegistry) {
+            super(executorService, handlerRegistry);
         }
     }
 }

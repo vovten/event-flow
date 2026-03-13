@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.annotation.EventListener;
+import com.github.vovten.eventflow.EventHandler;
+import com.github.vovten.eventflow.EventListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -9,19 +10,19 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link AnnotationEventListenerRegistry}.
+ * Tests for {@link EventListenerRegistry}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-09
  */
-@DisplayName("AnnotationEventListenerRegistry Tests")
-class AnnotationEventListenerRegistryTest {
+@DisplayName("EventListenerRegistry Tests")
+class EventListenerRegistryTest {
 
-    private AnnotationEventListenerRegistry registry;
+    private EventListenerRegistry registry;
 
     @BeforeEach
     void setUp() {
-        registry = new AnnotationEventListenerRegistry();
+        registry = new EventListenerRegistry();
     }
 
     @Test
@@ -34,8 +35,8 @@ class AnnotationEventListenerRegistryTest {
         registry.register(listener);
 
         // Assert
-        var listeners = registry.getListeners(new TestEvent("test"));
-        assertEquals(1, listeners.size());
+        var handlers = registry.getHandlers(new TestEvent("test"));
+        assertEquals(1, handlers.size());
     }
 
     @Test
@@ -48,7 +49,7 @@ class AnnotationEventListenerRegistryTest {
         registry.register(listener);
 
         // Assert
-        assertEquals(2, registry.listenerCount());
+        assertEquals(2, registry.handlerCount());
     }
 
     @Test
@@ -61,8 +62,8 @@ class AnnotationEventListenerRegistryTest {
         registry.register(listener);
 
         // Assert
-        var listeners = registry.getListeners(new TestEvent("test"));
-        assertEquals(1, listeners.size());
+        var handlers = registry.getHandlers(new TestEvent("test"));
+        assertEquals(1, handlers.size());
     }
 
     @Test
@@ -89,7 +90,7 @@ class AnnotationEventListenerRegistryTest {
 
         // Assert
         assertTrue(unregistered);
-        assertTrue(registry.getListeners(new TestEvent("test")).isEmpty());
+        assertTrue(registry.getHandlers(new TestEvent("test")).isEmpty());
     }
 
     @Test
@@ -121,7 +122,7 @@ class AnnotationEventListenerRegistryTest {
     @DisplayName("Should throw exception for merge operation")
     void shouldThrowExceptionForMergeOperation() {
         // Arrange
-        InterfaceEventListenerRegistry otherRegistry = new InterfaceEventListenerRegistry();
+        EventSubscriberRegistry otherRegistry = new EventSubscriberRegistry();
 
         // Assert
         assertThrows(UnsupportedOperationException.class, () ->
@@ -140,8 +141,8 @@ class AnnotationEventListenerRegistryTest {
         registry.register(listener);
 
         // Assert
-        var listeners = registry.getListeners(new TestEvent("test"));
-        assertEquals(1, listeners.size());
+        var handlers = registry.getHandlers(new TestEvent("test"));
+        assertEquals(1, handlers.size());
     }
 
     /**

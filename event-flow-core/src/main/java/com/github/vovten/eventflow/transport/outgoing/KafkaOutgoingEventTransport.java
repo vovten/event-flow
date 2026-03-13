@@ -63,8 +63,8 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  */
 public class KafkaOutgoingEventTransport implements OutgoingEventTransport {
 
-    private final KafkaProducer<String, String> producer;
-    private final String topic;
+    protected final KafkaProducer<String, String> producer;
+    protected final String topic;
 
     /**
      * Create Kafka transport with custom configuration.
@@ -132,7 +132,16 @@ public class KafkaOutgoingEventTransport implements OutgoingEventTransport {
         trySend(event, new ProducerRecord<>(topic, key, value));
     }
 
-    private void trySend(Event event, ProducerRecord<String, String> record) {
+    /**
+     * Send a producer record with synchronous delivery.
+     * <p>
+     * This method is protected to allow subclasses to customize send behavior.
+     *
+     * @param event the event being sent
+     * @param record the producer record to send
+     * @throws OutgoingEventTransportException if send fails
+     */
+    protected void trySend(Event event, ProducerRecord<String, String> record) {
         try {
             // Synchronous send with 10 second timeout
             RecordMetadata metadata = producer.send(record).get(10, TimeUnit.SECONDS);

@@ -1,6 +1,5 @@
 package com.github.vovten.eventflow;
 
-import com.github.vovten.eventflow.annotation.EventListener;
 import com.github.vovten.eventflow.test.CompositeTestEvent;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,7 +11,7 @@ import java.util.concurrent.CountDownLatch;
 @Getter
 @Setter
 @Component
-public class TestEventListener implements com.github.vovten.eventflow.EventListener {
+public class TestEventListener implements EventSubscriber {
 
     private String annotationResult;
     private String compositeResult;

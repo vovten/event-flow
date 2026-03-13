@@ -7,13 +7,13 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link EventListenerInvocationException}.
+ * Tests for {@link EventHandlerInvocationException}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-09
  */
 @DisplayName("EventListenerInvocationException Tests")
-class EventListenerInvocationExceptionTest {
+class EventHandlerInvocationExceptionTest {
 
     @Test
     @DisplayName("Should create exception with listener and event")
@@ -23,7 +23,7 @@ class EventListenerInvocationExceptionTest {
         TestEvent event = new TestEvent("test");
 
         // Act
-        EventListenerInvocationException exception = new EventListenerInvocationException(listener, event, new RuntimeException("Cause"));
+        EventHandlerInvocationException exception = new EventHandlerInvocationException(listener, event, new RuntimeException("Cause"));
 
         // Assert
         assertNotNull(exception);
