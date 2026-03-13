@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventHandler;
+import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.EventSubscriber;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -143,14 +143,14 @@ class EventHandlerRegistryBuilderTest {
     }
 
     static class TestAnnotatedHandler {
-        @com.github.vovten.eventflow.EventListener
+        @EventListener
         public void handleEvent(Event event) {
         }
     }
 
     static class TestEventSubscriber implements EventSubscriber {
         @Override
-        public java.util.List<Class<? extends Event>> events() {
+        public List<Class<? extends Event>> events() {
             return List.of(Event.class);
         }
 

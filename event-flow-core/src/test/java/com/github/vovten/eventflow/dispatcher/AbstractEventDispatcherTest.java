@@ -2,11 +2,10 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.Event;
 import com.github.vovten.eventflow.EventHandler;
-import com.github.vovten.eventflow.EventSubscriber;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -15,7 +14,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link AbstractEventDispatcher}.
@@ -43,7 +43,7 @@ class AbstractEventDispatcherTest {
         // Arrange
         TestEvent event = new TestEvent("test-data");
         TestEventHandler handler = new TestEventHandler();
-        handlerRegistry.addHandler(TestEvent.class, handler);
+        handlerRegistry.addHandler(handler);
 
         // Act
         dispatcher.dispatch(event);
@@ -77,8 +77,8 @@ class AbstractEventDispatcherTest {
         TestEvent event = new TestEvent("test-data");
         TestEventHandler handler1 = new TestEventHandler();
         TestEventHandler handler2 = new TestEventHandler();
-        handlerRegistry.addHandler(TestEvent.class, handler1);
-        handlerRegistry.addHandler(TestEvent.class, handler2);
+        handlerRegistry.addHandler(handler1);
+        handlerRegistry.addHandler(handler2);
 
         // Act
         dispatcher.dispatch(event);
@@ -126,14 +126,6 @@ class AbstractEventDispatcherTest {
             this.timestamp = LocalDateTime.now();
         }
 
-        String getData() {
-            return data;
-        }
-
-        LocalDateTime getTimestamp() {
-            return timestamp;
-        }
-
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
@@ -164,10 +156,9 @@ class AbstractEventDispatcherTest {
     private static final class TestEventHandlerRegistry implements EventHandlerRegistry {
         private final List<Object> registeredListeners = new ArrayList<>();
         private final List<TestEventHandler> handlers = new ArrayList<>();
-        private Class<? extends Event> eventType;
 
-        void addHandler(Class<? extends Event> type, TestEventHandler handler) {
-            this.eventType = type;
+        void addHandler(TestEventHandler handler) {
+            Class<? extends Event> eventType = TestEvent.class;
             this.handlers.add(handler);
         }
 
@@ -209,7 +200,7 @@ class AbstractEventDispatcherTest {
             return "test";
         }
 
-        private class SimpleEventHandler implements EventHandler {
+        private static class SimpleEventHandler implements EventHandler {
             private final TestEventHandler delegate;
 
             SimpleEventHandler(TestEventHandler delegate) {

@@ -1,9 +1,9 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventHandler;
-import com.github.vovten.eventflow.EventSubscriber;
 import com.github.vovten.eventflow.EventFlowTestApplication;
+import com.github.vovten.eventflow.EventListener;
+import com.github.vovten.eventflow.EventSubscriber;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class EventHandlerRegistryIntegrationTest {
         TestEvent event = TestEvent.create("Annotation handler test");
         var handlers = registry.getHandlers(event);
         // Note: May include other handlers from the scanned package
-        assertTrue(handlers.size() >= 1);
+        assertFalse(handlers.isEmpty());
     }
 
     @Test
@@ -110,7 +110,7 @@ class EventHandlerRegistryIntegrationTest {
     // Annotation-based handler
     @Component
     public static class AnnotationBasedHandler {
-        @com.github.vovten.eventflow.EventListener
+        @EventListener
         public void handleTestEvent(TestEvent event) {
         }
     }
