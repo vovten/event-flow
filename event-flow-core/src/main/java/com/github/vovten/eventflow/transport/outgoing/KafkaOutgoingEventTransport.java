@@ -63,8 +63,8 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  */
 public class KafkaOutgoingEventTransport implements OutgoingEventTransport {
 
-    protected final KafkaProducer<String, String> producer;
-    protected final String topic;
+    protected KafkaProducer<String, String> producer;
+    protected String topic;
 
     /**
      * Create Kafka transport with custom configuration.
