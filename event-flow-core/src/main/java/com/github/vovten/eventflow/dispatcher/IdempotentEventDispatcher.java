@@ -22,15 +22,15 @@ import java.util.UUID;
 @Slf4j
 public class IdempotentEventDispatcher implements EventDispatcher {
 
-    private final EventDispatcher delegate;
+    private final EventDispatcher origin;
     private final Cache<UUID, Boolean> cache;
     private final boolean warnOnDuplicate;
 
-    public IdempotentEventDispatcher(EventDispatcher delegate,
+    public IdempotentEventDispatcher(EventDispatcher origin,
                                      Duration ttl,
                                      long maxSize,
                                      boolean warnOnDuplicate) {
-        this.delegate = delegate;
+        this.origin = origin;
         this.cache = Caffeine.newBuilder()
                 .expireAfterWrite(ttl)
                 .maximumSize(maxSize)
@@ -40,41 +40,42 @@ public class IdempotentEventDispatcher implements EventDispatcher {
 
     @Override
     public void start() {
-        delegate.start();
+        origin.start();
     }
 
     @Override
     public void stop() {
-        delegate.stop();
+        origin.stop();
         log.info("Cache stats: {}", cache.stats());
     }
 
     @Override
     public void dispatch(Event event) {
         if (!(event instanceof TraceableEvent traceable)) {
-            delegate.dispatch(event);
+            origin.dispatch(event);
             return;
         }
         UUID uid = traceable.uid();
+        Boolean existing = cache.getIfPresent(uid);
 
-        // put if absent - returns null if first time
-        Boolean existing = cache.get(uid, k -> {
-            delegate.dispatch(event);
-            return Boolean.TRUE;
-        });
-
-        if (existing != null && warnOnDuplicate) {
-            log.warn("Duplicate event ignored: {}", uid);
+        if (existing == null) {
+            origin.dispatch(event);
+            cache.put(uid, Boolean.TRUE);
+            log.debug("Event processed: {}", uid);
+        } else {
+            if (warnOnDuplicate) {
+                log.warn("Duplicate event ignored: {}", uid);
+            }
         }
     }
 
     @Override
     public void register(Object handler) {
-        delegate.register(handler);
+        origin.register(handler);
     }
 
     @Override
     public boolean isRegistered(Object handler) {
-        return delegate.isRegistered(handler);
+        return origin.isRegistered(handler);
     }
 }

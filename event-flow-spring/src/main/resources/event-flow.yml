@@ -42,8 +42,8 @@ event-flow:
       initial-delay: 100ms
       # Backoff multiplier for exponential backoff
       multiplier: 2.0
-    # Enable silent mode (catch and log all exceptions without rethrowing)
-    # When true, the publisher will never throw exceptions
+      # Enable silent mode (catch and log all exceptions without rethrowing)
+      # When true, the publisher will never throw exceptions
       silent: false
 
     # Event channels configuration
