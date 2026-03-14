@@ -2,6 +2,8 @@ package com.github.vovten.eventflow;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.test.CompositeTestEvent;
+import com.github.vovten.eventflow.test.ExternalTestEvent;
+import com.github.vovten.eventflow.test.TestEvent;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.stereotype.Component;
@@ -28,6 +30,14 @@ public class TestEventListener implements EventSubscriber {
     }
 
     @EventListener
+    public void onEvent(ExternalTestEvent event) {
+        annotationResult = event.getId();
+        if (latch != null) {
+            latch.countDown();
+        }
+    }
+
+    @EventListener
     public void onEvent(CompositeTestEvent event) {
         compositeResult = event.getMessage();
         if (latch != null) {
@@ -37,12 +47,18 @@ public class TestEventListener implements EventSubscriber {
 
     @Override
     public void onEvent(Event event) {
-        TestEvent testEvent = (TestEvent) event;
-        interfaceResult = testEvent.getId();
+        if (event instanceof TestEvent testEvent) {
+            interfaceResult = testEvent.getId();
+        } else if (event instanceof ExternalTestEvent externalTestEvent) {
+            interfaceResult = externalTestEvent.getId();
+        }
+        if (latch != null) {
+            latch.countDown();
+        }
     }
 
     @Override
     public List<Class<? extends Event>> events() {
-        return List.of(TestEvent.class);
+        return List.of(TestEvent.class, ExternalTestEvent.class);
     }
 }

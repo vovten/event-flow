@@ -188,7 +188,7 @@ class ChannelConfigurationTest {
             // when & then
             assertThatThrownBy(context::refresh)
                     .rootCause().isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("No factory found for transport type 'kafka'");
+                    .hasMessageContaining("No factory found for transport name 'kafka'");
         }
     }
 

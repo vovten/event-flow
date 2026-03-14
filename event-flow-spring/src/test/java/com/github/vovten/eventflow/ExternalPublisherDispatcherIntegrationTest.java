@@ -8,6 +8,7 @@ import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
+import com.github.vovten.eventflow.test.ExternalTestEvent;
 import com.github.vovten.eventflow.transport.incoming.KafkaIncomingEventTransport;
 import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
 import com.github.vovten.eventflow.transport.outgoing.KafkaOutgoingEventTransport;
@@ -22,24 +23,26 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.context.EmbeddedKafka;
-import org.springframework.test.annotation.DirtiesContext;
 
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(properties = "event-flow.enabled=false")
 @EmbeddedKafka(
         partitions = 1,
-        brokerProperties = { "listeners=PLAINTEXT://localhost:9092", "port=9092" },
+        brokerProperties = {
+                "listeners=PLAINTEXT://localhost:9092",
+                "port=9092"
+        },
         topics = { "test-events" }
 )
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ExternalPublisherDispatcherIntegrationTest {
 
@@ -65,7 +68,8 @@ class ExternalPublisherDispatcherIntegrationTest {
         kafkaProps.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         var kafkaTransport = new KafkaOutgoingEventTransport(kafkaProps, "test-events");
         var externalChannel = new ExternalEventChannel(List.of(kafkaTransport));
-        var internalChannel = new InternalEventChannel(List.of(new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(1000))));
+        var transport = new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(1000));
+        var internalChannel = new InternalEventChannel(List.of(transport));
 
         publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
         dispatcherExecutor = Executors.newFixedThreadPool(2);
@@ -80,7 +84,9 @@ class ExternalPublisherDispatcherIntegrationTest {
                 List.of(kafkaInTransport)
         );
         dispatcher.start();
-        Thread.sleep(1000);
+        
+        // Wait for consumer to subscribe
+        Thread.sleep(3000);
     }
 
     private CompositeEventHandlerRegistry createEventHandlerRegistry() {
@@ -112,25 +118,26 @@ class ExternalPublisherDispatcherIntegrationTest {
 
     @Test
     @DisplayName("Should publish event to Kafka topic")
-    void shouldPublishEventToKafkaTopic() {
+    void shouldPublishEventToKafkaTopic() throws InterruptedException {
         // arrange
-        TestEvent testEvent = new TestEvent("test-id-123");
+        ExternalTestEvent testEvent = new ExternalTestEvent("test-id-123", "test-payload");
+        eventListener.setLatch(new CountDownLatch(1));
 
         // act
         publisher.publish(testEvent);
 
-        // assert
-        await().atMost(5, SECONDS).untilAsserted(() -> {
-            assertEquals("test-id-123", eventListener.getAnnotationResult());
-            assertEquals("test-id-123", eventListener.getInterfaceResult());
-        });
+        // assert - wait for event to be received
+        boolean completed = eventListener.getLatch().await(15, SECONDS);
+        assertTrue(completed, "Event should be received within timeout");
+        assertEquals("test-id-123", eventListener.getAnnotationResult());
+        assertEquals("test-id-123", eventListener.getInterfaceResult());
     }
 
     private KafkaConsumer<String, String> createDispatcherConsumer() {
         Map<String, Object> properties = new HashMap<>();
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, uniqueGroupId);
-        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
