@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.publisher;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;

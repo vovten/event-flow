@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -84,14 +85,16 @@ class EventUtilsTest {
         assertNotNull(mapper.findAndRegisterModules());
     }
 
-    static class SimpleEvent implements Event {
+    static class SimpleEvent extends AbstractTraceableEvent {
         public String id;
         public int value;
 
         SimpleEvent() {
+            super();
         }
 
         SimpleEvent(String id, int value) {
+            super();
             this.id = id;
             this.value = value;
         }
@@ -102,15 +105,17 @@ class EventUtilsTest {
         }
     }
 
-    static class ComplexEvent implements Event {
+    static class ComplexEvent extends AbstractTraceableEvent {
         public String orderId;
         public List<String> items;
         public LocalDateTime timestamp;
 
         ComplexEvent() {
+            super();
         }
 
         ComplexEvent(String orderId, List<String> items, LocalDateTime timestamp) {
+            super();
             this.orderId = orderId;
             this.items = items;
             this.timestamp = timestamp;

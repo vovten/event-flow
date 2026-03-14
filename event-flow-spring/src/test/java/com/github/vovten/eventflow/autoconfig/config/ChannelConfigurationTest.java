@@ -29,7 +29,9 @@ class ChannelConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("in-memory");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -55,7 +57,9 @@ class ChannelConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("external");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("in-memory");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -81,7 +85,9 @@ class ChannelConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("custom-channel");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("in-memory");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -105,15 +111,19 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
-            
+
             EventFlowProperties.ChannelConfig internalChannel = new EventFlowProperties.ChannelConfig();
             internalChannel.setName("internal");
-            internalChannel.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
-            
+            EventFlowProperties.TransportConfig internalTransport = new EventFlowProperties.TransportConfig();
+            internalTransport.setName("in-memory");
+            internalChannel.getTransports().add(internalTransport);
+
             EventFlowProperties.ChannelConfig externalChannel = new EventFlowProperties.ChannelConfig();
             externalChannel.setName("external");
-            externalChannel.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
-            
+            EventFlowProperties.TransportConfig externalTransport = new EventFlowProperties.TransportConfig();
+            externalTransport.setName("in-memory");
+            externalChannel.getTransports().add(externalTransport);
+
             properties.getPublisher().getChannels().add(internalChannel);
             properties.getPublisher().getChannels().add(externalChannel);
 
@@ -158,43 +168,43 @@ class ChannelConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when no factory found for transport type")
-    void shouldThrowExceptionWhenNoFactoryFoundForTransportType() {
+    @DisplayName("Should throw exception when transport not found")
+    void shouldThrowExceptionWhenTransportNotFound() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "kafka", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("kafka");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            // Only in-memory factory registered, not kafka
             context.register(InMemoryOutgoingTransportFactory.class);
             context.register(ChannelConfiguration.class);
 
             // when & then
             assertThatThrownBy(context::refresh)
                     .rootCause().isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("No factory found for transport type 'kafka'");
+                    .hasMessageContaining("No factory found for transport name 'kafka'");
         }
     }
 
     @Test
-    @DisplayName("Should use Kafka factory when kafka transport type is configured")
-    void shouldUseKafkaFactoryWhenKafkaTransportTypeIsConfigured() {
+    @DisplayName("Should use Kafka transport from configuration")
+    void shouldUseKafkaTransportFromConfiguration() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("external");
-            
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("kafka");
             transportConfig.setTopic("test-topic");
             transportConfig.setBootstrapServers("localhost:9092");
-            
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("kafka-transport", "kafka", transportConfig));
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);

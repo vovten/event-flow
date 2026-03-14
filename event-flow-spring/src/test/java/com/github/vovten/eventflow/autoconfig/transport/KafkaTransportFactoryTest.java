@@ -35,7 +35,6 @@ class KafkaTransportFactoryTest {
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("kafka-incoming");
-        config.setType("kafka");
         config.setBootstrapServers("localhost:9092");
         config.setTopic("test-topic");
         config.setConsumerGroup("test-group");
@@ -84,7 +83,7 @@ class KafkaTransportFactoryTest {
         KafkaOutgoingTransportFactory factory = new KafkaOutgoingTransportFactory();
 
         // when
-        String type = factory.getType();
+        String type = factory.getName();
 
         // then
         assertThat(type).isEqualTo("kafka");
@@ -98,7 +97,6 @@ class KafkaTransportFactoryTest {
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("kafka-outgoing");
-        config.setType("kafka");
         config.setBootstrapServers("localhost:9092");
         config.setTopic("test-topic");
 

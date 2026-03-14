@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.transport;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.incoming.InMemoryIncomingEventTransport;
 import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
 

@@ -1,5 +1,7 @@
 package com.github.vovten.eventflow;
 
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -41,10 +43,11 @@ class EventTest {
     /**
      * Test event implementation.
      */
-    private static class TestEvent implements Event {
+    private static class TestEvent extends AbstractTraceableEvent {
         private final String data;
 
         TestEvent(String data) {
+            super();
             this.data = data;
         }
 

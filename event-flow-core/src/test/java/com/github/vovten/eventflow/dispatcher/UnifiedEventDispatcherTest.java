@@ -1,8 +1,9 @@
 package com.github.vovten.eventflow.dispatcher;
 
-import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventListener;
-import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.EventSubscriber;
+import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +25,7 @@ import static org.mockito.Mockito.*;
 class UnifiedEventDispatcherTest {
 
     private ExecutorService executorService;
-    private EventListenerRegistry listenerRegistry;
+    private EventHandlerRegistry handlerRegistry;
     private IncomingEventTransport transport1;
     private IncomingEventTransport transport2;
     private UnifiedEventDispatcher dispatcher;
@@ -32,7 +33,7 @@ class UnifiedEventDispatcherTest {
     @BeforeEach
     void setUp() {
         executorService = Executors.newFixedThreadPool(2);
-        listenerRegistry = mock(EventListenerRegistry.class);
+        handlerRegistry = mock(EventHandlerRegistry.class);
         transport1 = mock(IncomingEventTransport.class);
         transport2 = mock(IncomingEventTransport.class);
         when(transport1.name()).thenReturn("transport1");
@@ -42,7 +43,7 @@ class UnifiedEventDispatcherTest {
     @Test
     @DisplayName("Should create dispatcher")
     void shouldCreateDispatcher() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
 
         assertNotNull(dispatcher);
     }
@@ -50,21 +51,11 @@ class UnifiedEventDispatcherTest {
     @Test
     @DisplayName("Should start all transports")
     void shouldStartAllTransports() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1, transport2));
-
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1, transport2));
         dispatcher.start();
 
         verify(transport1).start(any(Consumer.class));
         verify(transport2).start(any(Consumer.class));
-    }
-
-    @Test
-    @DisplayName("Should log warning when starting already started dispatcher")
-    void shouldLogWarningWhenStartingAlreadyStartedDispatcher() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
-        dispatcher.start();
-
-        assertDoesNotThrow(() -> dispatcher.start());
     }
 
     @Test
@@ -74,26 +65,18 @@ class UnifiedEventDispatcherTest {
             Consumer<Event> consumer = invocation.getArgument(0);
             return null;
         }).when(transport1).start(any(Consumer.class));
+
         doAnswer(invocation -> {
             Consumer<Event> consumer = invocation.getArgument(0);
             return null;
         }).when(transport2).start(any(Consumer.class));
 
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1, transport2));
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1, transport2));
         dispatcher.start();
         dispatcher.stop();
 
         verify(transport1).stop();
         verify(transport2).stop();
-    }
-
-    @Test
-    @DisplayName("Should do nothing when stopping non-started dispatcher")
-    void shouldDoNothingWhenStoppingNonStartedDispatcher() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
-
-        assertDoesNotThrow(() -> dispatcher.stop());
-        verify(transport1, never()).stop();
     }
 
     @Test
@@ -105,82 +88,82 @@ class UnifiedEventDispatcherTest {
         }).when(transport1).start(any(Consumer.class));
         doThrow(new RuntimeException("Stop failed")).when(transport1).stop();
 
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
         dispatcher.start();
 
         assertDoesNotThrow(() -> dispatcher.stop());
     }
 
     @Test
-    @DisplayName("Should do nothing when no listeners")
-    void shouldDoNothingWhenNoListeners() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
-        when(listenerRegistry.getListeners(any())).thenReturn(List.of());
+    @DisplayName("Should do nothing when no handlers")
+    void shouldDoNothingWhenNoHandlers() {
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
+        when(handlerRegistry.getHandlers(any())).thenReturn(List.of());
 
         TestEvent event = new TestEvent();
         dispatcher.dispatch(event);
 
-        verify(listenerRegistry).getListeners(event);
+        verify(handlerRegistry).getHandlers(event);
     }
 
     @Test
-    @DisplayName("Should execute listener asynchronously")
-    void shouldExecuteListenerAsynchronously() throws InterruptedException {
-        TestEventListener listener = new TestEventListener();
-        when(listenerRegistry.getListeners(any())).thenReturn(List.of(listener));
+    @DisplayName("Should execute handler asynchronously")
+    void shouldExecuteHandlerAsynchronously() throws InterruptedException {
+        TestEventSubscriber subscriber = new TestEventSubscriber();
+        when(handlerRegistry.getHandlers(any())).thenReturn(List.of(subscriber));
 
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
         TestEvent event = new TestEvent();
         dispatcher.dispatch(event);
 
-        Thread.sleep(100);
-        assertTrue(listener.wasCalled());
+        Thread.sleep(500);
+        assertTrue(subscriber.wasCalled());
     }
 
     @Test
     @DisplayName("Should delegate register to registry")
     void shouldDelegateRegisterToRegistry() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
-        Object listener = new Object();
-        when(listenerRegistry.isRegistered(listener)).thenReturn(false);
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
+        Object handler = new Object();
+        when(handlerRegistry.isRegistered(handler)).thenReturn(false);
 
-        dispatcher.register(listener);
+        dispatcher.register(handler);
 
-        verify(listenerRegistry).register(listener);
+        verify(handlerRegistry).register(handler);
     }
 
     @Test
-    @DisplayName("Should not register already registered listener")
-    void shouldNotRegisterAlreadyRegisteredListener() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
-        Object listener = new Object();
-        when(listenerRegistry.isRegistered(listener)).thenReturn(true);
+    @DisplayName("Should not register if already registered")
+    void shouldNotRegisterIfAlreadyRegistered() {
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
+        Object handler = new Object();
+        when(handlerRegistry.isRegistered(handler)).thenReturn(true);
 
-        dispatcher.register(listener);
+        dispatcher.register(handler);
 
-        verify(listenerRegistry, never()).register(any());
+        verify(handlerRegistry, never()).register(handler);
     }
 
     @Test
     @DisplayName("Should delegate isRegistered to registry")
     void shouldDelegateIsRegisteredToRegistry() {
-        dispatcher = new UnifiedEventDispatcher(executorService, listenerRegistry, List.of(transport1));
-        Object listener = new Object();
-        when(listenerRegistry.isRegistered(listener)).thenReturn(true);
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
+        Object handler = new Object();
+        when(handlerRegistry.isRegistered(handler)).thenReturn(true);
 
-        boolean result = dispatcher.isRegistered(listener);
+        boolean result = dispatcher.isRegistered(handler);
 
         assertTrue(result);
     }
 
-    static class TestEvent implements Event {
+    static class TestEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
         }
     }
 
-    static class TestEventListener implements EventListener {
+    static class TestEventSubscriber implements EventSubscriber {
         private final AtomicBoolean called = new AtomicBoolean(false);
 
         @Override

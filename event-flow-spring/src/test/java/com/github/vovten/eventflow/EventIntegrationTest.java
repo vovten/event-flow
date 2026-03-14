@@ -1,11 +1,13 @@
 package com.github.vovten.eventflow;
 
 import com.github.vovten.eventflow.channel.InternalEventChannel;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -61,9 +63,11 @@ class EventIntegrationTest {
     @DisplayName("Should produce consistent JSON output")
     void shouldProduceConsistentJsonOutput() {
         LocalDateTime dateTime = LocalDateTime.of(2026, 3, 4, 12, 0, 0);
+        UUID sameUid = UUID.randomUUID();
+        UUID sameTraceId = UUID.randomUUID();
         // given
-        TestEvent event1 = TestEvent.create("same-id", "same-message", dateTime);
-        TestEvent event2 = TestEvent.create("same-id", "same-message", dateTime);
+        TestEvent event1 = new TestEvent(sameUid, sameTraceId, "same-id", "same-message", dateTime);
+        TestEvent event2 = new TestEvent(sameUid, sameTraceId, "same-id", "same-message", dateTime);
 
         // when
         String json1 = event1.asJson();

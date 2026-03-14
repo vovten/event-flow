@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.test;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 
@@ -12,20 +13,31 @@ import java.util.UUID;
 /**
  * Test event for replicas dispatcher
  */
-public class ReplicasTestEvent implements Event {
+public class ReplicasTestEvent extends AbstractTraceableEvent {
 
     private String id;
     private String data;
-    private LocalDateTime timestamp;
 
     public ReplicasTestEvent() {
-        this(UUID.randomUUID().toString(), "Replicas test event data", LocalDateTime.now());
+        this(UUID.randomUUID().toString(), "Replicas test event data");
+    }
+
+    public ReplicasTestEvent(String id, String data) {
+        super();
+        this.id = id;
+        this.data = data;
+    }
+
+    public ReplicasTestEvent(UUID uid, UUID traceId, String id, String data, LocalDateTime timestamp) {
+        super(uid, traceId, timestamp);
+        this.id = id;
+        this.data = data;
     }
 
     public ReplicasTestEvent(String id, String data, LocalDateTime timestamp) {
+        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
         this.id = id;
         this.data = data;
-        this.timestamp = timestamp;
     }
 
     public static ReplicasTestEvent create() {
@@ -33,7 +45,7 @@ public class ReplicasTestEvent implements Event {
     }
 
     public static ReplicasTestEvent create(String data) {
-        return new ReplicasTestEvent(UUID.randomUUID().toString(), data, LocalDateTime.now());
+        return new ReplicasTestEvent(UUID.randomUUID().toString(), data);
     }
 
     public String getId() {
@@ -50,14 +62,6 @@ public class ReplicasTestEvent implements Event {
 
     public void setData(String data) {
         this.data = data;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
     }
 
     @Override
@@ -88,7 +92,8 @@ public class ReplicasTestEvent implements Event {
         return "ReplicasTestEvent{" +
                 "id='" + id + '\'' +
                 ", data='" + data + '\'' +
-                ", timestamp=" + timestamp +
+                ", uid=" + uid() +
+                ", timestamp=" + this.occurredAt() +
                 '}';
     }
 }

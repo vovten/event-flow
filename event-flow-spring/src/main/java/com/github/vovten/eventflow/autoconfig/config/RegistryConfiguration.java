@@ -1,10 +1,10 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.registry.CompositeEventListenerRegistry;
-import com.github.vovten.eventflow.registry.EventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringAnnotationEventListenerRegistry;
-import com.github.vovten.eventflow.registry.SpringInterfaceEventListenerRegistry;
+import com.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
+import com.github.vovten.eventflow.registry.EventHandlerRegistry;
+import com.github.vovten.eventflow.registry.SpringEventListenerRegistry;
+import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,9 +21,9 @@ import static java.util.stream.Collectors.joining;
  * <p>
  * Configures:
  * <ul>
- *   <li>{@link SpringAnnotationEventListenerRegistry} - for @EventListener annotated beans</li>
- *   <li>{@link SpringInterfaceEventListenerRegistry} - for interface-based listeners</li>
- *   <li>{@link CompositeEventListenerRegistry} - combines all registries</li>
+ *   <li>{@link SpringEventListenerRegistry} - for @EventListener annotated beans</li>
+ *   <li>{@link SpringEventSubscriberRegistry} - for interface-based subscribers</li>
+ *   <li>{@link CompositeEventHandlerRegistry} - combines all registries</li>
  * </ul>
  *
  * @author Vladimir Aleshkov
@@ -48,27 +48,27 @@ public class RegistryConfiguration {
      * @throws IllegalStateException if scan-packages is not configured
      */
     @Bean
-    @ConditionalOnMissingBean(name = "springAnnotationEventListenerRegistry")
-    public EventListenerRegistry springAnnotationEventListenerRegistry(ApplicationContext appContext) {
+    @ConditionalOnMissingBean(name = "springEventListenerRegistry")
+    public EventHandlerRegistry springEventListenerRegistry(ApplicationContext appContext) {
         String scanPackage = properties.getScanPackages();
         if (scanPackage == null || scanPackage.isEmpty()) {
             throw new IllegalStateException("event-flow.scan-packages must be configured");
         }
-        log.info("Creating SpringAnnotationEventListenerRegistry with scan package: {}", scanPackage);
-        return new SpringAnnotationEventListenerRegistry(appContext, scanPackage);
+        log.info("Creating SpringEventListenerRegistry with scan package: {}", scanPackage);
+        return new SpringEventListenerRegistry(appContext, scanPackage);
     }
 
     /**
-     * Creates Spring-aware interface-based listener registry.
+     * Creates Spring-aware interface-based subscriber registry.
      *
      * @param appContext Spring application context
-     * @return interface-based event listener registry
+     * @return interface-based event subscriber registry
      */
     @Bean
-    @ConditionalOnMissingBean(name = "springInterfaceEventListenerRegistry")
-    public EventListenerRegistry springInterfaceEventListenerRegistry(ApplicationContext appContext) {
-        log.info("Creating SpringInterfaceEventListenerRegistry");
-        return new SpringInterfaceEventListenerRegistry(appContext);
+    @ConditionalOnMissingBean(name = "springEventSubscriberRegistry")
+    public EventHandlerRegistry springEventSubscriberRegistry(ApplicationContext appContext) {
+        log.info("Creating SpringEventSubscriberRegistry");
+        return new SpringEventSubscriberRegistry(appContext);
     }
 
     /**
@@ -79,12 +79,12 @@ public class RegistryConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    public EventListenerRegistry eventListenerRegistry(List<EventListenerRegistry> registries) {
+    public EventHandlerRegistry eventHandlerRegistry(List<EventHandlerRegistry> registries) {
         String registryNames = registries.stream()
-                .map(EventListenerRegistry::name)
+                .map(EventHandlerRegistry::name)
                 .collect(joining(", "));
-        log.info("Creating CompositeEventListenerRegistry with {} registries: {}",
+        log.info("Creating CompositeEventHandlerRegistry with {} registries: {}",
                 registries.size(), registryNames);
-        return new CompositeEventListenerRegistry(registries);
+        return new CompositeEventHandlerRegistry(registries);
     }
 }

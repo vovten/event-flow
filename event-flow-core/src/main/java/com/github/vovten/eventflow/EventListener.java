@@ -1,24 +1,23 @@
 package com.github.vovten.eventflow;
 
-import java.util.List;
+import com.github.vovten.eventflow.dispatcher.EventDispatcher;
+import com.github.vovten.eventflow.event.Event;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Listener for events occurring in the application
+ * <p>Annotation applied to public methods that handle events dispatched by the dispatcher
+ * (see {@link EventDispatcher}).
+ * <p>Methods annotated with this must accept exactly one parameter of type
+ * {@link Event}.
  *
  * @author Vladimir Aleshkov
- * @since 2024-11-21
+ * @since 2024-12-06
  */
-public interface EventListener {
-
-    /**
-     * @return list of event types handled by this listener
-     */
-    List<Class<? extends Event>> events();
-
-    /**
-     * Method that processes the event
-     *
-     * @param event the event to process
-     */
-    void onEvent(Event event);
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface EventListener {
 }

@@ -27,7 +27,7 @@ public class InMemoryOutgoingTransportFactory implements OutgoingTransportFactor
     }
 
     @Override
-    public String getType() {
+    public String getName() {
         return "in-memory";
     }
 

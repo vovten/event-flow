@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.dispatcher;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 
 /**
  * <p>Event dispatcher.
@@ -32,4 +32,20 @@ public interface EventDispatcher {
      * @return true if the listener is registered, false otherwise
      */
     boolean isRegistered(Object listener);
+
+    /**
+     * Start the dispatcher and all configured transports.
+     * <p>
+     * This method activates all transports and begins delivering events to
+     * registered handlers.
+     */
+    void start();
+
+
+    /**
+     * Stop the dispatcher and all configured transports.
+     * <p>
+     * This method gracefully shuts down all transports and releases resources.
+     */
+    void stop();
 }

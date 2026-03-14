@@ -1,26 +1,27 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.EventListener;
+import com.github.vovten.eventflow.EventSubscriber;
+import jakarta.annotation.PostConstruct;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 
 /**
- * Spring-aware registry that discovers event listeners implementing {@link EventListener}
+ * Spring-aware registry that discovers event subscribers implementing {@link EventSubscriber}
  * from the application context.
  * <p>
- * This registry extends {@link InterfaceEventListenerRegistry} with Spring integration:
+ * This registry extends {@link EventSubscriberRegistry} with Spring integration:
  * <ul>
- *   <li>Automatically discovers EventListener beans from Spring context</li>
+ *   <li>Automatically discovers EventSubscriber beans from Spring context</li>
  *   <li>Integrates with Spring's application lifecycle</li>
  *   <li>Supports all Spring bean scopes and features</li>
  * </ul>
  * <p>
  * <b>Key features:</b>
  * <ul>
- *   <li>Automatic EventListener bean discovery</li>
+ *   <li>Automatic EventSubscriber bean discovery</li>
  *   <li>Lifecycle integration via ContextRefreshedEvent</li>
- *   <li>Support for Spring dependency injection in listeners</li>
+ *   <li>Support for Spring dependency injection in subscribers</li>
  *   <li>Compatible with all Spring bean scopes</li>
  * </ul>
  * <p>
@@ -30,18 +31,18 @@ import org.springframework.context.event.ContextRefreshedEvent;
  * public class EventConfig {
  *
  *     @Bean
- *     public EventListenerRegistry listenerRegistry(ApplicationContext context) {
- *         return new SpringInterfaceEventListenerRegistry(context);
+ *     public EventHandlerRegistry listenerRegistry(ApplicationContext context) {
+ *         return new SpringEventSubscriberRegistry(context);
  *     }
  * }
  *
- * // Listener bean — automatically discovered
+ * // Subscriber bean — automatically discovered
  * @Component
- * public class OrderCreatedListener implements EventListener {
+ * public class OrderCreatedSubscriber implements EventSubscriber {
  *
  *     private final OrderService orderService;
  *
- *     public OrderCreatedListener(OrderService orderService) {
+ *     public OrderCreatedSubscriber(OrderService orderService) {
  *         this.orderService = orderService;
  *     }
  *
@@ -61,31 +62,31 @@ import org.springframework.context.event.ContextRefreshedEvent;
  * <b>Spring lifecycle:</b>
  * This registry implements ApplicationListener of ContextRefreshedEvent.
  * When the Spring context is refreshed, it automatically discovers and registers
- * all beans implementing {@code EventListener}.
+ * all beans implementing {@code EventSubscriber}.
  * <p>
  * <b>Dependency injection:</b>
- * Since listeners are Spring beans, they can have any dependencies injected
+ * Since subscribers are Spring beans, they can have any dependencies injected
  * via constructor, setter, or field injection.
  * <p>
  * <b>Combining with annotation-based registry:</b>
  * For maximum flexibility, use both registries in a composite:
  * <pre>{@code
  * @Bean
- * public EventListenerRegistry listenerRegistry(ApplicationContext context) {
- *     return new CompositeEventListenerRegistry(List.of(
- *         new SpringAnnotationEventListenerRegistry("com.example", context),
- *         new SpringInterfaceEventListenerRegistry(context)
+ * public EventHandlerRegistry listenerRegistry(ApplicationContext context) {
+ *     return new CompositeEventHandlerRegistry(List.of(
+ *         new SpringEventListenerRegistry("com.example", context),
+ *         new SpringEventSubscriberRegistry(context)
  *     ));
  * }
  * }</pre>
  *
  * @author Vladimir Aleshkov
  * @since 2024-12-07
- * @see InterfaceEventListenerRegistry
- * @see SpringAnnotationEventListenerRegistry
- * @see EventListener
+ * @see EventSubscriberRegistry
+ * @see SpringEventListenerRegistry
+ * @see EventSubscriber
  */
-public class SpringInterfaceEventListenerRegistry extends InterfaceEventListenerRegistry
+public class SpringEventSubscriberRegistry extends EventSubscriberRegistry
         implements ApplicationListener<ContextRefreshedEvent> {
 
     /**
@@ -96,25 +97,32 @@ public class SpringInterfaceEventListenerRegistry extends InterfaceEventListener
     /**
      * Creates a Spring-aware interface-based registry.
      * <p>
-     * Immediately scans and registers EventListener beans from the application context.
+     * Immediately scans and registers EventSubscriber beans from the application context.
      * Also registers itself as an ApplicationListener to receive ContextRefreshedEvent.
      *
      * @param applicationContext Spring application context (required)
      * @throws IllegalArgumentException if applicationContext is null
      */
-    public SpringInterfaceEventListenerRegistry(ApplicationContext applicationContext) {
+    public SpringEventSubscriberRegistry(ApplicationContext applicationContext) {
         super();
         if (applicationContext == null) {
             throw new IllegalArgumentException("ApplicationContext is required");
         }
         this.applicationContext = applicationContext;
-        this.init();
+    }
+
+    /**
+     * Initializes after construction
+     */
+    @PostConstruct
+    public void postConstructInitialize() {
+        init();
     }
 
     /**
      * Handle Spring context refresh event.
      * <p>
-     * When the context is refreshed, re-scans EventListener beans from the context.
+     * When the context is refreshed, re-scans EventSubscriber beans from the context.
      *
      * @param event the context refreshed event
      */
@@ -125,12 +133,12 @@ public class SpringInterfaceEventListenerRegistry extends InterfaceEventListener
     }
 
     /**
-     * Initialize by scanning and registering EventListener beans from the context.
+     * Initialize by scanning and registering EventSubscriber beans from the context.
      */
     private void init() {
         if (applicationContext != null) {
-            for (EventListener listener : applicationContext.getBeansOfType(EventListener.class).values()) {
-                register(listener);
+            for (EventSubscriber subscriber : applicationContext.getBeansOfType(EventSubscriber.class).values()) {
+                register(subscriber);
             }
         }
     }

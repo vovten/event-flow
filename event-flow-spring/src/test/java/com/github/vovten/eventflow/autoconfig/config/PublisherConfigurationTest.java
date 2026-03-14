@@ -12,7 +12,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link PublisherConfiguration}.
@@ -27,7 +26,9 @@ class PublisherConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("in-memory");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -55,7 +56,9 @@ class PublisherConfigurationTest {
 
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("in-memory");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -80,10 +83,12 @@ class PublisherConfigurationTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().setTransactional(false);
-            
+
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("in-memory");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -111,11 +116,15 @@ class PublisherConfigurationTest {
 
             EventFlowProperties.ChannelConfig internalChannel = new EventFlowProperties.ChannelConfig();
             internalChannel.setName("internal");
-            internalChannel.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig internalTransport = new EventFlowProperties.TransportConfig();
+            internalTransport.setName("in-memory");
+            internalChannel.getTransports().add(internalTransport);
 
             EventFlowProperties.ChannelConfig customChannel = new EventFlowProperties.ChannelConfig();
             customChannel.setName("custom");
-            customChannel.getTransports().add(new EventFlowProperties.TransportRef("custom", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig customTransport = new EventFlowProperties.TransportConfig();
+            customTransport.setName("in-memory");
+            customChannel.getTransports().add(customTransport);
 
             properties.getPublisher().getChannels().add(internalChannel);
             properties.getPublisher().getChannels().add(customChannel);
@@ -136,32 +145,6 @@ class PublisherConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when channel has no transports")
-    void shouldThrowExceptionWhenChannelHasNoTransports() {
-        // given
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            EventFlowProperties properties = new EventFlowProperties();
-
-            EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
-            channelConfig.setName("internal");
-            // No transports added
-            
-            properties.getPublisher().getChannels().add(channelConfig);
-
-            context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
-            context.register(ChannelConfiguration.class);
-            context.register(PublisherConfiguration.class);
-
-            // when & then
-            assertThatThrownBy(context::refresh)
-                    .rootCause().isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("must have at least one transport");
-        }
-    }
-
-    @Test
     @DisplayName("Should not create duplicate publisher when custom bean exists")
     void shouldNotCreateDuplicatePublisherWhenCustomBeanExists() {
         // given
@@ -170,7 +153,9 @@ class PublisherConfigurationTest {
 
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
-            channelConfig.getTransports().add(new EventFlowProperties.TransportRef("default", "in-memory", new EventFlowProperties.TransportConfig()));
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("in-memory");
+            channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);

@@ -1,36 +1,37 @@
 package com.github.vovten.eventflow.registry;
 
+import com.github.vovten.eventflow.EventSubscriber;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Fluent builder for creating configured {@link EventListenerRegistry} instances.
+ * Fluent builder for creating configured {@link EventHandlerRegistry} instances.
  *
  * <p>
- * This builder supports only non-Spring listener discovery strategies:
+ * This builder supports only non-Spring handler discovery strategies:
  * <ul>
- *   <li>{@link AnnotationEventListenerRegistry} — methods annotated with {@code @EventListener}</li>
- *   <li>{@link InterfaceEventListenerRegistry} — beans implementing {@link EventListener} interface</li>
- *   <li>Custom registries via {@link #withCustomRegistry(EventListenerRegistry)}</li>
+ *   <li>{@link EventListenerRegistry} — methods annotated with {@code @EventListener}</li>
+ *   <li>{@link EventSubscriberRegistry} — beans implementing {@link EventSubscriber} interface</li>
+ *   <li>Custom registries via {@link #withCustomRegistry(EventHandlerRegistry)}</li>
  * </ul>
  *
  * <p>
  * <b>Usage examples:</b>
  * <pre>
  * // Simple annotation-based registry
- * EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+ * EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
  *     .withAnnotationListeners()
  *     .build();
  *
  * // Interface-based registry
- * EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+ * EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
  *     .withInterfaceListeners()
  *     .build();
  *
  * // Composite registry with multiple strategies
- * EventListenerRegistry registry = EventListenerRegistryBuilder.create()
+ * EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
  *     .withAnnotationListeners()
  *     .withInterfaceListeners()
  *     .withCustomRegistry(customRegistry)
@@ -42,48 +43,48 @@ import java.util.List;
  * @since 2024-12-07
  */
 @Slf4j
-public final class EventListenerRegistryBuilder {
+public final class EventHandlerRegistryBuilder {
 
     private boolean useInterfaceListeners = false;
     private boolean useAnnotationListeners = false;
 
     private final List<DecoratorFunction> decorators = new ArrayList<>();
-    private final List<EventListenerRegistry> additionalRegistries = new ArrayList<>();
+    private final List<EventHandlerRegistry> additionalRegistries = new ArrayList<>();
 
-    private EventListenerRegistryBuilder() {
+    private EventHandlerRegistryBuilder() {
     }
 
     /**
-     * Start building a new EventListenerRegistry.
+     * Start building a new EventHandlerRegistry.
      *
      * @return new builder instance
      */
-    public static EventListenerRegistryBuilder create() {
-        return new EventListenerRegistryBuilder();
+    public static EventHandlerRegistryBuilder create() {
+        return new EventHandlerRegistryBuilder();
     }
 
     /**
-     * Include listeners based on annotations (e.g., {@code @EventListener}).
+     * Include handlers based on annotations (e.g., {@code @EventListener}).
      * <p>
-     * Uses {@link AnnotationEventListenerRegistry} to discover methods
+     * Uses {@link EventListenerRegistry} to discover methods
      * annotated with the {@code @EventListener} annotation.
      *
      * @return this builder
      */
-    public EventListenerRegistryBuilder withAnnotationListeners() {
+    public EventHandlerRegistryBuilder withAnnotationListeners() {
         this.useAnnotationListeners = true;
         return this;
     }
 
     /**
-     * Include listeners based on interface implementation (e.g., {@link EventListener} interface).
+     * Include handlers based on interface implementation (e.g., {@link EventSubscriber} interface).
      * <p>
-     * Uses {@link InterfaceEventListenerRegistry} to discover beans that implement
-     * the {@code EventListener} interface.
+     * Uses {@link EventSubscriberRegistry} to discover beans that implement
+     * the {@code EventSubscriber} interface.
      *
      * @return this builder
      */
-    public EventListenerRegistryBuilder withInterfaceListeners() {
+    public EventHandlerRegistryBuilder withInterfaceListeners() {
         this.useInterfaceListeners = true;
         return this;
     }
@@ -94,7 +95,7 @@ public final class EventListenerRegistryBuilder {
      * @param registry custom registry to add
      * @return this builder
      */
-    public EventListenerRegistryBuilder withCustomRegistry(EventListenerRegistry registry) {
+    public EventHandlerRegistryBuilder withCustomRegistry(EventHandlerRegistry registry) {
         if (registry != null) {
             this.additionalRegistries.add(registry);
         }
@@ -107,7 +108,7 @@ public final class EventListenerRegistryBuilder {
      * @param decorator decorator function to apply
      * @return this builder
      */
-    public EventListenerRegistryBuilder withDecorator(DecoratorFunction decorator) {
+    public EventHandlerRegistryBuilder withDecorator(DecoratorFunction decorator) {
         if (decorator != null) {
             this.decorators.add(decorator);
         }
@@ -117,11 +118,11 @@ public final class EventListenerRegistryBuilder {
     /**
      * Build the registry without logging.
      *
-     * @return configured EventListenerRegistry instance
+     * @return configured EventHandlerRegistry instance
      */
-    public EventListenerRegistry build() {
+    public EventHandlerRegistry build() {
         validateConfiguration();
-        EventListenerRegistry registry = createRegistry();
+        EventHandlerRegistry registry = createRegistry();
 
         for (DecoratorFunction decorator : decorators) {
             registry = decorator.apply(registry);
@@ -133,12 +134,12 @@ public final class EventListenerRegistryBuilder {
     /**
      * Build the registry and log the configuration.
      *
-     * @return configured EventListenerRegistry instance
+     * @return configured EventHandlerRegistry instance
      */
-    public EventListenerRegistry buildAndLog() {
-        EventListenerRegistry registry = build();
+    public EventHandlerRegistry buildAndLog() {
+        EventHandlerRegistry registry = build();
 
-        log.info("Built EventListenerRegistry: annotationListeners={}, " +
+        log.info("Built EventHandlerRegistry: annotationListeners={}, " +
                         "interfaceListeners={}, customRegistries={}, decorators={}",
                 useAnnotationListeners,
                 useInterfaceListeners,
@@ -152,27 +153,27 @@ public final class EventListenerRegistryBuilder {
     // ==================== Private methods ====================
 
     private void validateConfiguration() {
-        // Must have at least one listener source
+        // Must have at least one handler source
         if (!useAnnotationListeners && !useInterfaceListeners && additionalRegistries.isEmpty()) {
             throw new IllegalStateException(
                     """
-                            At least one listener source must be configured.
+                            At least one handler source must be configured.
                             Use withAnnotationListeners(), withInterfaceListeners(), or withCustomRegistry()."""
             );
         }
     }
 
-    private EventListenerRegistry createRegistry() {
-        List<EventListenerRegistry> registries = new ArrayList<>();
+    private EventHandlerRegistry createRegistry() {
+        List<EventHandlerRegistry> registries = new ArrayList<>();
 
         // Add annotation-based registry if requested
         if (useAnnotationListeners) {
-            registries.add(new AnnotationEventListenerRegistry());
+            registries.add(new EventListenerRegistry());
         }
 
         // Add interface-based registry if requested
         if (useInterfaceListeners) {
-            registries.add(new InterfaceEventListenerRegistry());
+            registries.add(new EventSubscriberRegistry());
         }
 
         // Add custom registries
@@ -183,13 +184,13 @@ public final class EventListenerRegistryBuilder {
             return registries.getFirst();
         }
 
-        return new CompositeEventListenerRegistry(registries);
+        return new CompositeEventHandlerRegistry(registries);
     }
 
     // ==================== Inner types ====================
 
     /**
-     * Functional interface for decorating event listener registries.
+     * Functional interface for decorating event handler registries.
      */
     @FunctionalInterface
     public interface DecoratorFunction {
@@ -199,6 +200,6 @@ public final class EventListenerRegistryBuilder {
          * @param registry the registry to decorate
          * @return decorated registry
          */
-        EventListenerRegistry apply(EventListenerRegistry registry);
+        EventHandlerRegistry apply(EventHandlerRegistry registry);
     }
 }

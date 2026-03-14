@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.transport.outgoing;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -77,10 +78,11 @@ class InMemoryOutgoingEventTransportTest {
     /**
      * Test event class.
      */
-    private static class TestEvent implements Event {
+    private static class TestEvent extends AbstractTraceableEvent {
         private final String data;
 
         TestEvent(String data) {
+            super();
             this.data = data;
         }
 

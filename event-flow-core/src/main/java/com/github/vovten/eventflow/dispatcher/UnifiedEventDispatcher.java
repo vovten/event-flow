@@ -1,8 +1,8 @@
 package com.github.vovten.eventflow.dispatcher;
 
-import com.github.vovten.eventflow.Event;
-import com.github.vovten.eventflow.EventListener;
-import com.github.vovten.eventflow.registry.EventListenerRegistry;
+import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.EventHandler;
+import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import lombok.extern.slf4j.Slf4j;
 
@@ -17,19 +17,19 @@ import static java.util.stream.Collectors.joining;
  * <p>
  * This dispatcher can listen to multiple
  * {@link IncomingEventTransport} instances simultaneously, delivering events from all
- * sources to the registered listeners.
+ * sources to the registered handlers.
  * <p>
  * <b>Key features:</b>
  * <ul>
  *   <li>Single dispatcher implementation for all transport types</li>
  *   <li>Support for multiple transports (in-memory, Kafka, etc.)</li>
- *   <li>Thread-safe event delivery to listeners</li>
- *   <li>External listener registry injection</li>
+ *   <li>Thread-safe event delivery to handlers</li>
+ *   <li>External handler registry injection</li>
  * </ul>
  * <p>
  * <b>Architecture:</b>
  * <pre>{@code
- * IncomingEventTransport(s) → UnifiedEventDispatcher → EventListener(s)
+ * IncomingEventTransport(s) → UnifiedEventDispatcher → EventHandler(s)
  *      ↓ Kafka
  *      ↓ In-Memory
  *      ↓ Custom...
@@ -43,9 +43,9 @@ import static java.util.stream.Collectors.joining;
  *     "localhost:9092", "events", "my-group"
  * );
  *
- * // Create listener registry
- * EventListenerRegistry registry = new CompositeEventListenerRegistry(
- *     List.of(annotationRegistry, interfaceRegistry)
+ * // Create handler registry
+ * EventHandlerRegistry registry = new CompositeEventHandlerRegistry(
+ *     List.of(annotationRegistry, subscriberRegistry)
  * );
  *
  * // Create dispatcher with multiple transports
@@ -64,31 +64,26 @@ import static java.util.stream.Collectors.joining;
 public class UnifiedEventDispatcher implements EventDispatcher {
 
     private final ExecutorService executorService;
-    private final EventListenerRegistry listenerRegistry;
+    private final EventHandlerRegistry handlerRegistry;
     private final List<IncomingEventTransport> transports;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
-     * Create unified dispatcher with custom listener registry.
+     * Create unified dispatcher with custom handler registry.
      *
-     * @param executorService  executor service for async listener execution
-     * @param listenerRegistry custom listener registry
+     * @param executorService  executor service for async handler execution
+     * @param handlerRegistry  custom handler registry
      * @param transports       list of transports to listen to
      */
     public UnifiedEventDispatcher(ExecutorService executorService,
-                                  EventListenerRegistry listenerRegistry,
+                                  EventHandlerRegistry handlerRegistry,
                                   List<IncomingEventTransport> transports) {
         this.transports = transports;
         this.executorService = executorService;
-        this.listenerRegistry = listenerRegistry;
+        this.handlerRegistry = handlerRegistry;
     }
 
-    /**
-     * Start the dispatcher and all configured transports.
-     * <p>
-     * This method activates all transports and begins delivering events to
-     * registered listeners.
-     */
+    @Override
     public void start() {
         if (started.compareAndSet(false, true)) {
             for (IncomingEventTransport transport : transports) {
@@ -100,11 +95,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         }
     }
 
-    /**
-     * Stop the dispatcher and all configured transports.
-     * <p>
-     * This method gracefully shuts down all transports and releases resources.
-     */
+    @Override
     public void stop() {
         if (started.compareAndSet(true, false)) {
             log.info("Stopping UnifiedEventDispatcher...");
@@ -117,26 +108,26 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     @Override
     public void dispatch(Event event) {
-        List<EventListener> listeners = listenerRegistry.getListeners(event);
-        if (listeners.isEmpty()) {
-            log.debug("No listeners found for event: {}", event);
+        List<EventHandler> handlers = handlerRegistry.getHandlers(event);
+        if (handlers.isEmpty()) {
+            log.debug("No handlers found for event: {}", event);
             return;
         }
-        for (EventListener listener : listeners) {
-            executorService.execute(() -> listener.onEvent(event));
+        for (EventHandler handler : handlers) {
+            executorService.execute(() -> handler.onEvent(event));
         }
     }
 
     @Override
-    public void register(Object listener) {
-        if (!isRegistered(listener)) {
-            listenerRegistry.register(listener);
+    public void register(Object handler) {
+        if (!isRegistered(handler)) {
+            handlerRegistry.register(handler);
         }
     }
 
     @Override
-    public boolean isRegistered(Object listener) {
-        return listenerRegistry.isRegistered(listener);
+    public boolean isRegistered(Object handler) {
+        return handlerRegistry.isRegistered(handler);
     }
 
     private void tryStop(IncomingEventTransport transport) {

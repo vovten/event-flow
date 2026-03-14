@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 
 /**
  * Error when the dispatcher invokes a method to handle an event
@@ -8,9 +8,9 @@ import com.github.vovten.eventflow.Event;
  * @author Vladimir Aleshkov
  * @since 2024-12-07
  */
-public class EventListenerInvocationException extends RuntimeException {
+public class EventHandlerInvocationException extends RuntimeException {
 
-    public EventListenerInvocationException(Object bean, Event event, Throwable cause) {
+    public EventHandlerInvocationException(Object bean, Event event, Throwable cause) {
         super(String.format("Error when dispatcher invokes event listener. " +
                 "Listener: %s, event: %s", bean.getClass(), event), cause);
     }
