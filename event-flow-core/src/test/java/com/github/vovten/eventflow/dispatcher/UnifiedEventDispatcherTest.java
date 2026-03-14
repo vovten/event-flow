@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.dispatcher;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventSubscriber;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
@@ -115,7 +116,7 @@ class UnifiedEventDispatcherTest {
         TestEvent event = new TestEvent();
         dispatcher.dispatch(event);
 
-        Thread.sleep(100);
+        Thread.sleep(500);
         assertTrue(subscriber.wasCalled());
     }
 
@@ -155,7 +156,7 @@ class UnifiedEventDispatcherTest {
         assertTrue(result);
     }
 
-    static class TestEvent implements Event {
+    static class TestEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;

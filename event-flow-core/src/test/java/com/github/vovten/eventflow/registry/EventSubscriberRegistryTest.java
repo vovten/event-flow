@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.EventSubscriber;
 import org.junit.jupiter.api.BeforeEach;
@@ -167,10 +168,11 @@ class EventSubscriberRegistryTest {
     /**
      * Test event class.
      */
-    private static final class TestEvent implements Event {
+    private static final class TestEvent extends AbstractTraceableEvent {
         private final String data;
 
         TestEvent(String data) {
+            super();
             this.data = data;
         }
 
@@ -188,10 +190,11 @@ class EventSubscriberRegistryTest {
     /**
      * Another test event class.
      */
-    private static final class AnotherEvent implements Event {
+    private static final class AnotherEvent extends AbstractTraceableEvent {
         private final String data;
 
         AnotherEvent(String data) {
+            super();
             this.data = data;
         }
 

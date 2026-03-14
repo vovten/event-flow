@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.test;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
@@ -13,20 +14,31 @@ import java.util.UUID;
 /**
  * Test event for both internal and external buses
  */
-public class CompositeTestEvent implements Event {
+public class CompositeTestEvent extends AbstractTraceableEvent {
 
     private String id;
     private String content;
-    private LocalDateTime timestamp;
 
     public CompositeTestEvent() {
-        this(UUID.randomUUID().toString(), "Composite test event content", LocalDateTime.now());
+        this(UUID.randomUUID().toString(), "Composite test event content");
+    }
+
+    public CompositeTestEvent(String id, String content) {
+        super();
+        this.id = id;
+        this.content = content;
+    }
+
+    public CompositeTestEvent(UUID uid, UUID traceId, String id, String content, LocalDateTime timestamp) {
+        super(uid, traceId, timestamp);
+        this.id = id;
+        this.content = content;
     }
 
     public CompositeTestEvent(String id, String content, LocalDateTime timestamp) {
+        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
         this.id = id;
         this.content = content;
-        this.timestamp = timestamp;
     }
 
     public static CompositeTestEvent create() {
@@ -34,7 +46,7 @@ public class CompositeTestEvent implements Event {
     }
 
     public static CompositeTestEvent create(String content) {
-        return new CompositeTestEvent(UUID.randomUUID().toString(), content, LocalDateTime.now());
+        return new CompositeTestEvent(UUID.randomUUID().toString(), content);
     }
 
     public String getId() {
@@ -51,14 +63,6 @@ public class CompositeTestEvent implements Event {
 
     public void setContent(String content) {
         this.content = content;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
     }
 
     /**
@@ -96,7 +100,8 @@ public class CompositeTestEvent implements Event {
         return "CompositeTestEvent{" +
                 "id='" + id + '\'' +
                 ", content='" + content + '\'' +
-                ", timestamp=" + timestamp +
+                ", uid=" + uid() +
+                ", timestamp=" + this.occurredAt() +
                 '}';
     }
 }

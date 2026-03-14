@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.test;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 
@@ -12,38 +13,43 @@ import java.util.UUID;
 /**
  * Base test event for unit and integration tests
  */
-public class TestEvent implements Event {
-    
+public class TestEvent extends AbstractTraceableEvent {
+
     private String id;
     private String message;
-    private LocalDateTime timestamp;
-    
+
     public TestEvent() {
-        this(UUID.randomUUID().toString(), "Test event message", LocalDateTime.now());
-    }
-    
-    public TestEvent(String id, String message, LocalDateTime timestamp) {
-        this.id = id;
-        this.message = message;
-        this.timestamp = timestamp;
+        this(UUID.randomUUID().toString(), "Test event message");
     }
 
     public TestEvent(String id, String message) {
+        super();
         this.id = id;
         this.message = message;
-        this.timestamp = timestamp;
     }
-    
+
+    public TestEvent(UUID uid, UUID traceId, String id, String message, LocalDateTime timestamp) {
+        super(uid, traceId, timestamp);
+        this.id = id;
+        this.message = message;
+    }
+
+    public TestEvent(String id, String message, LocalDateTime timestamp) {
+        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
+        this.id = id;
+        this.message = message;
+    }
+
     public static TestEvent create() {
         return new TestEvent();
     }
-    
+
     public static TestEvent create(String message) {
-        return new TestEvent(UUID.randomUUID().toString(), message, LocalDateTime.now());
+        return new TestEvent(UUID.randomUUID().toString(), message);
     }
-    
+
     public static TestEvent create(String id, String message) {
-        return new TestEvent(id, message, LocalDateTime.now());
+        return new TestEvent(id, message);
     }
 
     public static TestEvent create(String id, String message, LocalDateTime dateTime) {
@@ -64,14 +70,6 @@ public class TestEvent implements Event {
 
     public void setMessage(String message) {
         this.message = message;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
     }
 
     @Override
@@ -103,7 +101,8 @@ public class TestEvent implements Event {
         return "TestEvent{" +
                 "id='" + id + '\'' +
                 ", message='" + message + '\'' +
-                ", timestamp=" + timestamp +
+                ", uid=" + uid() +
+                ", timestamp=" + this.occurredAt() +
                 '}';
     }
 }

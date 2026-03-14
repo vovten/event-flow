@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 
 import java.util.List;

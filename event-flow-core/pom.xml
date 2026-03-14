@@ -58,6 +58,14 @@
             <artifactId>jakarta.annotation-api</artifactId>
         </dependency>
 
+        <!-- Caffeine cache-->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>3.2.3</version>
+            <scope>compile</scope>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

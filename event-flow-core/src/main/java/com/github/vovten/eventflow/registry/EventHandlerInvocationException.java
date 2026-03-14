@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 
 /**
  * Error when the dispatcher invokes a method to handle an event

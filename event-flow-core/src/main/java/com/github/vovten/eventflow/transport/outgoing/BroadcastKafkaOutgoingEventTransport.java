@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.transport.outgoing;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.PartitionInfo;
@@ -90,7 +90,6 @@ public class BroadcastKafkaOutgoingEventTransport extends KafkaOutgoingEventTran
                     String.format("Topic '%s' has no partitions for event %s", topic, event.type().getSimpleName())
             );
         }
-
         String key = event.type().getName();
         String value = event.asJson();
         List<Integer> successfulPartitions = new ArrayList<>();
@@ -106,7 +105,6 @@ public class BroadcastKafkaOutgoingEventTransport extends KafkaOutgoingEventTran
                 failedPartitions.add(new PartitionSendResult(partitionId, e));
             }
         }
-
         handleSendResults(event, partitions.size(), successfulPartitions, failedPartitions);
     }
 

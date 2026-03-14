@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.publisher;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
@@ -89,7 +90,7 @@ class ChannelEventPublisherTest {
         assertTrue(exception.getMessage().contains("internal"));
     }
 
-    static class TestEvent implements Event {
+    static class TestEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
@@ -101,7 +102,7 @@ class ChannelEventPublisherTest {
         }
     }
 
-    static class TestEventWithExternalChannel implements Event {
+    static class TestEventWithExternalChannel extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return TestEventWithExternalChannel.class;

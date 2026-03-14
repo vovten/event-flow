@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.transport.outgoing;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.test.TestEvent;
 import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -179,10 +180,11 @@ class BroadcastKafkaOutgoingEventTransportTest {
         return partitions;
     }
 
-    private static class BroadcastTestEvent implements Event {
+    private static class BroadcastTestEvent extends AbstractTraceableEvent {
         private final String data;
 
         BroadcastTestEvent(String data) {
+            super();
             this.data = data;
         }
 

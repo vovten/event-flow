@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow;
 
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.test.CompositeTestEvent;
 import lombok.Getter;
 import lombok.Setter;
@@ -20,7 +21,7 @@ public class TestEventListener implements EventSubscriber {
 
     @EventListener
     public void onEvent(TestEvent event) {
-        annotationResult = event.id();
+        annotationResult = event.getId();
         if (latch != null) {
             latch.countDown();
         }
@@ -37,7 +38,7 @@ public class TestEventListener implements EventSubscriber {
     @Override
     public void onEvent(Event event) {
         TestEvent testEvent = (TestEvent) event;
-        interfaceResult = testEvent.id();
+        interfaceResult = testEvent.getId();
     }
 
     @Override

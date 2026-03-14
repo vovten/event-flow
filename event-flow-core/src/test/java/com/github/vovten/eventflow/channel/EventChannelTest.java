@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -82,7 +83,7 @@ class EventChannelTest {
         }
     }
 
-    static class TestEvent implements Event {
+    static class TestEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;

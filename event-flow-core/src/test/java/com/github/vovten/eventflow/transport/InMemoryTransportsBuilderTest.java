@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.transport;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -195,10 +196,11 @@ class InMemoryTransportsBuilderTest {
     /**
      * Test event class.
      */
-    private static class TestEvent implements Event {
+    private static class TestEvent extends AbstractTraceableEvent {
         private final int value;
 
         TestEvent(int value) {
+            super();
             this.value = value;
         }
 

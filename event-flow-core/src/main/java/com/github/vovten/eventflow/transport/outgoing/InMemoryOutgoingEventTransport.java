@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.transport.outgoing;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
 

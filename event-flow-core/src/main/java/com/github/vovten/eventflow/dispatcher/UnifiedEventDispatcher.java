@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.dispatcher;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
@@ -83,12 +83,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         this.handlerRegistry = handlerRegistry;
     }
 
-    /**
-     * Start the dispatcher and all configured transports.
-     * <p>
-     * This method activates all transports and begins delivering events to
-     * registered handlers.
-     */
+    @Override
     public void start() {
         if (started.compareAndSet(false, true)) {
             for (IncomingEventTransport transport : transports) {
@@ -100,11 +95,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         }
     }
 
-    /**
-     * Stop the dispatcher and all configured transports.
-     * <p>
-     * This method gracefully shuts down all transports and releases resources.
-     */
+    @Override
     public void stop() {
         if (started.compareAndSet(true, false)) {
             log.info("Stopping UnifiedEventDispatcher...");

@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventListener;
 import com.github.vovten.eventflow.EventSubscriber;
 import org.junit.jupiter.api.DisplayName;

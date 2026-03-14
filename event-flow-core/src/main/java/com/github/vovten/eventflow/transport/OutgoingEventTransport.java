@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.transport;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 
 /**
  * Outgoing event transport — a mechanism for sending events to external destinations.

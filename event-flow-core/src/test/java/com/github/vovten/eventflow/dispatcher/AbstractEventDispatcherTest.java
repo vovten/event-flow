@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.dispatcher;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -117,11 +118,12 @@ class AbstractEventDispatcherTest {
     /**
      * Test event.
      */
-    private static final class TestEvent implements Event {
+    private static final class TestEvent extends AbstractTraceableEvent {
         private final String data;
         private final LocalDateTime timestamp;
 
         TestEvent(String data) {
+            super();
             this.data = data;
             this.timestamp = LocalDateTime.now();
         }
@@ -220,6 +222,16 @@ class AbstractEventDispatcherTest {
     private static final class TestEventDispatcher extends AbstractEventDispatcher {
         TestEventDispatcher(ExecutorService executorService, EventHandlerRegistry handlerRegistry) {
             super(executorService, handlerRegistry);
+        }
+
+        @Override
+        public void start() {
+            // No-op for tests
+        }
+
+        @Override
+        public void stop() {
+            // No-op for tests
         }
     }
 }

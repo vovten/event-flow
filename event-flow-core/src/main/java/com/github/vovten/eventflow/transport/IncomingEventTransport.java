@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.transport;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.Event;
 
 import java.util.function.Consumer;
 

@@ -1,5 +1,7 @@
 package com.github.vovten.eventflow;
 
+import com.github.vovten.eventflow.event.Event;
+
 /**
  * Handler for events occurring in the application.
  * <p>

@@ -1,8 +1,9 @@
 package com.github.vovten.eventflow.test;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
+import com.github.vovten.eventflow.event.Event;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,20 +13,31 @@ import java.util.UUID;
 /**
  * Test event for external bus (Kafka)
  */
-public class ExternalTestEvent implements Event {
+public class ExternalTestEvent extends AbstractTraceableEvent {
 
     private String id;
     private String payload;
-    private LocalDateTime timestamp;
 
     public ExternalTestEvent() {
-        this(UUID.randomUUID().toString(), "External test event payload", LocalDateTime.now());
+        this(UUID.randomUUID().toString(), "External test event payload");
+    }
+
+    public ExternalTestEvent(String id, String payload) {
+        super();
+        this.id = id;
+        this.payload = payload;
     }
 
     public ExternalTestEvent(String id, String payload, LocalDateTime timestamp) {
+        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
         this.id = id;
         this.payload = payload;
-        this.timestamp = timestamp;
+    }
+
+    public ExternalTestEvent(UUID uid, UUID traceId, String id, String payload, LocalDateTime timestamp) {
+        super(uid, traceId, timestamp);
+        this.id = id;
+        this.payload = payload;
     }
 
     public static ExternalTestEvent create() {
@@ -33,7 +45,7 @@ public class ExternalTestEvent implements Event {
     }
 
     public static ExternalTestEvent create(String payload) {
-        return new ExternalTestEvent(UUID.randomUUID().toString(), payload, LocalDateTime.now());
+        return new ExternalTestEvent(UUID.randomUUID().toString(), payload);
     }
 
     public String getId() {
@@ -50,14 +62,6 @@ public class ExternalTestEvent implements Event {
 
     public void setPayload(String payload) {
         this.payload = payload;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
     }
 
     /**
@@ -95,7 +99,8 @@ public class ExternalTestEvent implements Event {
         return "ExternalTestEvent{" +
                 "id='" + id + '\'' +
                 ", payload='" + payload + '\'' +
-                ", timestamp=" + timestamp +
+                ", uid=" + uid() +
+                ", timestamp=" + this.occurredAt() +
                 '}';
     }
 }

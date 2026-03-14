@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.Event;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.EventSubscriber;
 import org.junit.jupiter.api.BeforeEach;
@@ -176,7 +177,7 @@ class SpringEventSubscriberRegistryTest {
         }
     }
 
-    static class TestEvent implements Event {
+    static class TestEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
@@ -194,7 +195,7 @@ class SpringEventSubscriberRegistryTest {
         }
     }
 
-    static class SpecificEvent implements Event {
+    static class SpecificEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return SpecificEvent.class;
