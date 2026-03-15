@@ -27,6 +27,7 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -34,10 +35,13 @@ class ChannelConfigurationTest {
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
+            DefaultQueueProvider queueProvider = new DefaultQueueProvider(1000);
+            InMemoryOutgoingTransportFactory factory = new InMemoryOutgoingTransportFactory(queueProvider);
+
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
-            context.register(ChannelConfiguration.class);
+            context.registerBean(DefaultQueueProvider.class, () -> queueProvider);
+            context.registerBean("testOutgoingTransportFactory1", InMemoryOutgoingTransportFactory.class, () -> factory);
+            context.registerBean(ChannelConfiguration.class, () -> new ChannelConfiguration(properties, List.of(factory)));
             context.refresh();
 
             // when
@@ -55,6 +59,7 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("external");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -64,7 +69,8 @@ class ChannelConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory2", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -83,6 +89,7 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("custom-channel");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -92,7 +99,8 @@ class ChannelConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory3", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -111,6 +119,7 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
 
             EventFlowProperties.ChannelConfig internalChannel = new EventFlowProperties.ChannelConfig();
             internalChannel.setName("internal");
@@ -129,7 +138,8 @@ class ChannelConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory4", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -149,6 +159,7 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             // No transports
@@ -157,7 +168,8 @@ class ChannelConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory5", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
 
             // when & then
@@ -173,6 +185,7 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -182,7 +195,8 @@ class ChannelConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory6", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
 
             // when & then
@@ -198,6 +212,7 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("external");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -209,7 +224,8 @@ class ChannelConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(KafkaOutgoingTransportFactory.class);
+            context.registerBean(KafkaOutgoingTransportFactory.class,
+                    () -> new KafkaOutgoingTransportFactory());
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -228,11 +244,13 @@ class ChannelConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
             // No channels configured
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory7", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 

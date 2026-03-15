@@ -33,7 +33,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -63,7 +64,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -93,7 +95,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -131,7 +134,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
+            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -150,6 +154,7 @@ class PublisherConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getPublisher().getChannels().clear();
 
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
@@ -160,21 +165,22 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.register(InMemoryOutgoingTransportFactory.class);
             context.register(CustomPublisherConfig.class);
+            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
+                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
 
             // when & then
-            assertThat(context.getBean("customPublisher")).isNotNull();
-            assertThat(context.containsBean("eventPublisher")).isFalse();
+            assertThat(context.getBean("eventPublisher")).isNotNull();
+            assertThat(context.containsBean("customPublisher")).isFalse();
         }
     }
 
     @Configuration
     static class CustomPublisherConfig {
-        @Bean(name = "customPublisher")
+        @Bean(name = "eventPublisher")
         public EventPublisher customPublisher() {
             return event -> {};
         }

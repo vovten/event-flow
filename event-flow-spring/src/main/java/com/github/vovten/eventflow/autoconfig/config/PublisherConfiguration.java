@@ -40,7 +40,7 @@ public class PublisherConfiguration {
      * @return configured event publisher
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = "eventPublisher")
     public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
         logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();

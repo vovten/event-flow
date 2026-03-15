@@ -34,10 +34,11 @@ class DispatcherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean("testIncomingTransportFactory1", InMemoryIncomingTransportFactory.class,
+                    () -> new InMemoryIncomingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.register(InMemoryIncomingTransportFactory.class);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -58,6 +59,7 @@ class DispatcherConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("in-memory");
             transportConfig.setCapacity(500);
@@ -65,10 +67,11 @@ class DispatcherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean("testIncomingTransportFactory2", InMemoryIncomingTransportFactory.class,
+                    () -> new InMemoryIncomingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.register(InMemoryIncomingTransportFactory.class);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -88,6 +91,7 @@ class DispatcherConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getDispatcher().getTransports().clear();
 
             EventFlowProperties.TransportConfig transport1 = new EventFlowProperties.TransportConfig();
             transport1.setName("in-memory");
@@ -100,10 +104,11 @@ class DispatcherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean("testIncomingTransportFactory3", InMemoryIncomingTransportFactory.class,
+                    () -> new InMemoryIncomingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.register(InMemoryIncomingTransportFactory.class);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -131,7 +136,8 @@ class DispatcherConfigurationTest {
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
             // Only in-memory factory, not kafka
-            context.register(InMemoryIncomingTransportFactory.class);
+            context.registerBean("testIncomingTransportFactory4", InMemoryIncomingTransportFactory.class,
+                    () -> new InMemoryIncomingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(DispatcherConfiguration.class);
 
             // when & then
@@ -147,6 +153,7 @@ class DispatcherConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
+            properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
             transportConfig.setTopic("test-topic");
@@ -159,7 +166,7 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.register(KafkaIncomingTransportFactory.class);
+            context.registerBean(KafkaIncomingTransportFactory.class, () -> new KafkaIncomingTransportFactory());
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -184,7 +191,8 @@ class DispatcherConfigurationTest {
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
             context.registerBean("customDispatcher", EventDispatcher.class, () -> null);
-            context.register(InMemoryIncomingTransportFactory.class);
+            context.registerBean("testIncomingTransportFactory5", InMemoryIncomingTransportFactory.class,
+                    () -> new InMemoryIncomingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -205,13 +213,15 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.registerBean("customIncomingEventTransports", List.class, () -> List.of());
-            context.register(InMemoryIncomingTransportFactory.class);
+            context.registerBean("incomingEventTransports", List.class, () -> List.of());
+            context.registerBean("testIncomingTransportFactory6", InMemoryIncomingTransportFactory.class,
+                    () -> new InMemoryIncomingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
             // when & then
-            assertThat(context.containsBean("incomingEventTransports")).isFalse();
+            assertThat(context.containsBean("incomingEventTransports")).isTrue();
+            assertThat(context.getBean("incomingEventTransports", List.class)).isEmpty();
         }
     }
 
@@ -224,10 +234,11 @@ class DispatcherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean("testIncomingTransportFactory7", InMemoryIncomingTransportFactory.class,
+                    () -> new InMemoryIncomingTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.register(InMemoryIncomingTransportFactory.class);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 

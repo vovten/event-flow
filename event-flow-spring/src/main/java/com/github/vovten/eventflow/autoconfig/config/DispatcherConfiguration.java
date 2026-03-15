@@ -7,6 +7,7 @@ import com.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -55,9 +56,9 @@ public class DispatcherConfiguration {
     @Bean(destroyMethod = "stop")
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public EventDispatcher eventDispatcher(ExecutorService dispatcherExecutor,
-                                           EventHandlerRegistry eventHandlerRegistry,
-                                           List<IncomingEventTransport> incomingEventTransports) {
+    public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
+                                           @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
+                                           @Qualifier("incomingEventTransports") List<IncomingEventTransport> incomingEventTransports) {
         log.info("Configuring EventDispatcher with {} transports", incomingEventTransports.size());
         UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
                 dispatcherExecutor,
@@ -75,8 +76,8 @@ public class DispatcherConfiguration {
      *
      * @return list of incoming event transports
      */
-    @Bean
-    @ConditionalOnMissingBean
+    @Bean("incomingEventTransports")
+    @ConditionalOnMissingBean(name = "incomingEventTransports")
     @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
     public List<IncomingEventTransport> incomingEventTransports() {
         List<IncomingEventTransport> transports = new ArrayList<>();
