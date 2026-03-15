@@ -3,7 +3,6 @@ package com.github.vovten.eventflow.autoconfig.config;
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.transport.DefaultQueueProvider;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -20,7 +19,7 @@ import java.util.concurrent.ExecutorService;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnBean(EventFlowProperties.class)
+@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class CommonConfiguration {
 
     private final EventFlowProperties properties;
@@ -35,9 +34,7 @@ public class CommonConfiguration {
      *
      * @return executor service for dispatcher
      */
-    @Bean
-    @ConditionalOnMissingBean(name = "eventFlowExecutor")
-    @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+    @Bean("dispatcherExecutor")
     public ExecutorService dispatcherExecutor() {
         var tp = properties.getDispatcher().getThreadPool();
         var msg = "Creating dispatcher executor: core={}, max={}, queue={}";

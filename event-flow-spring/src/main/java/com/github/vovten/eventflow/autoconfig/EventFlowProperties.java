@@ -88,7 +88,17 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private boolean silent = false;
         private RetryConfig retry = new RetryConfig();
-        private List<ChannelConfig> channels = new ArrayList<>();
+        private List<ChannelConfig> channels = new ArrayList<>(List.of(createDefaultChannel()));
+
+        private static ChannelConfig createDefaultChannel() {
+            ChannelConfig config = new ChannelConfig();
+            config.setName("internal");
+            TransportConfig transport = new TransportConfig();
+            transport.setName("in-memory");
+            transport.setCapacity(1000);
+            config.setTransports(List.of(transport));
+            return config;
+        }
     }
 
     /**
@@ -122,7 +132,14 @@ public class EventFlowProperties {
     public static class DispatcherConfig {
         private boolean enabled = true;
         private ThreadPoolConfig threadPool = new ThreadPoolConfig();
-        private List<TransportConfig> transports = new ArrayList<>();
+        private List<TransportConfig> transports = new ArrayList<>(List.of(createDefaultTransport()));
+
+        private static TransportConfig createDefaultTransport() {
+            TransportConfig config = new TransportConfig();
+            config.setName("in-memory");
+            config.setCapacity(1000);
+            return config;
+        }
     }
 
     /**

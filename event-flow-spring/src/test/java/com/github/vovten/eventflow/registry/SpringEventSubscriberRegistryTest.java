@@ -1,9 +1,9 @@
 package com.github.vovten.eventflow.registry;
 
-import com.github.vovten.eventflow.event.AbstractTraceableEvent;
-import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.EventSubscriber;
+import com.github.vovten.eventflow.event.AbstractTraceableEvent;
+import com.github.vovten.eventflow.event.Event;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for SpringEventSubscriberRegistry.

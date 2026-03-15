@@ -209,18 +209,6 @@ class EventFlowPropertiesTest {
     }
 
     @Test
-    @DisplayName("Should initialize empty lists for channels and transports by default")
-    void shouldInitializeEmptyListsForChannelsAndTransportsByDefault() {
-        // given
-        EventFlowProperties properties = new EventFlowProperties();
-
-        // then
-        assertThat(properties.getPublisher().getChannels()).isEmpty();
-        assertThat(properties.getDispatcher().getTransports()).isEmpty();
-        assertThat(properties.getPublisher().getRetry().isEnabled()).isFalse();
-    }
-
-    @Test
     @DisplayName("Should bind complex configuration with all features")
     void shouldBindComplexConfigurationWithAllFeatures() {
         // given

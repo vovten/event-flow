@@ -77,8 +77,7 @@ public class RegistryConfiguration {
      * @param registries list of event listener registries to combine
      * @return composite event listener registry
      */
-    @Bean
-    @ConditionalOnMissingBean
+    @Bean("eventHandlerRegistry")
     public EventHandlerRegistry eventHandlerRegistry(List<EventHandlerRegistry> registries) {
         String registryNames = registries.stream()
                 .map(EventHandlerRegistry::name)

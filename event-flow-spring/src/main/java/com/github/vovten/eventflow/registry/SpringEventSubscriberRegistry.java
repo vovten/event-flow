@@ -1,7 +1,6 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.EventSubscriber;
-import jakarta.annotation.PostConstruct;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -114,7 +113,6 @@ public class SpringEventSubscriberRegistry extends EventSubscriberRegistry
     /**
      * Initializes after construction
      */
-    @PostConstruct
     public void postConstructInitialize() {
         init();
     }
