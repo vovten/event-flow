@@ -3,7 +3,6 @@ package com.github.vovten.eventflow.autoconfig.transport;
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.transport.OutgoingEventTransport;
 import com.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutgoingEventTransport;
-import org.springframework.stereotype.Component;
 
 /**
  * Factory for creating broadcast Kafka-based outgoing event transports.
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
  * @since 2026-03-13
  * @see BroadcastKafkaOutgoingEventTransport
  */
-@Component
 public class BroadcastKafkaOutgoingTransportFactory implements OutgoingTransportFactory {
 
     @Override

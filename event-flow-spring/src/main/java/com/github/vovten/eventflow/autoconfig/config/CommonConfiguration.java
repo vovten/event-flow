@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import com.github.vovten.eventflow.autoconfig.transport.*;
 import com.github.vovten.eventflow.transport.DefaultQueueProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -68,5 +69,57 @@ public class CommonConfiguration {
                 .orElse(1000);
         log.info("Creating QueueProvider with capacity: {}", capacity);
         return new DefaultQueueProvider(capacity);
+    }
+
+    /**
+     * Creates factory for in-memory outgoing event transports.
+     *
+     * @param queueProvider queue provider for in-memory transports
+     * @return in-memory outgoing transport factory
+     */
+    @Bean
+    public InMemoryOutgoingTransportFactory inMemoryOutgoingTransportFactory(DefaultQueueProvider queueProvider) {
+        return new InMemoryOutgoingTransportFactory(queueProvider);
+    }
+
+    /**
+     * Creates factory for in-memory incoming event transports.
+     *
+     * @param queueProvider queue provider for in-memory transports
+     * @return in-memory incoming transport factory
+     */
+    @Bean
+    public InMemoryIncomingTransportFactory inMemoryIncomingTransportFactory(DefaultQueueProvider queueProvider) {
+        return new InMemoryIncomingTransportFactory(queueProvider);
+    }
+
+    /**
+     * Creates factory for Kafka outgoing event transports.
+     *
+     * @return Kafka outgoing transport factory
+     */
+    @Bean
+    public KafkaOutgoingTransportFactory kafkaOutgoingTransportFactory() {
+        return new KafkaOutgoingTransportFactory();
+    }
+
+    /**
+     * Creates factory for Kafka incoming event transports.
+     *
+     * @return Kafka incoming transport factory
+     */
+    @Bean
+    public KafkaIncomingTransportFactory kafkaIncomingTransportFactory() {
+        return new KafkaIncomingTransportFactory();
+    }
+
+    /**
+     * Creates factory for broadcast Kafka outgoing event transports.
+     *
+     * @return broadcast Kafka outgoing transport factory
+     */
+    @Bean
+    public BroadcastKafkaOutgoingTransportFactory broadcastKafkaOutgoingTransportFactory() {
+        return new BroadcastKafkaOutgoingTransportFactory();
     }
 }

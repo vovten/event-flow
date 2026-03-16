@@ -3,7 +3,6 @@ package com.github.vovten.eventflow.autoconfig.transport;
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import com.github.vovten.eventflow.transport.incoming.KafkaIncomingEventTransport;
-import org.springframework.stereotype.Component;
 
 /**
  * Factory for creating Kafka-based incoming event transports.
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Component;
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-@Component
 public class KafkaIncomingTransportFactory implements IncomingTransportFactory {
 
     @Override

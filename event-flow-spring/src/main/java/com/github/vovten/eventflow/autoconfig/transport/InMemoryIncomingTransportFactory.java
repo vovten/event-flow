@@ -4,8 +4,6 @@ import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.transport.IncomingEventTransport;
 import com.github.vovten.eventflow.transport.DefaultQueueProvider;
 import com.github.vovten.eventflow.transport.incoming.InMemoryIncomingEventTransport;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.stereotype.Component;
 
 /**
  * Factory for creating in-memory incoming event transports.
@@ -15,8 +13,6 @@ import org.springframework.stereotype.Component;
  * @author Vladimir Aleshkov
  * @since 2026-03-11
  */
-@Component
-@ConditionalOnBean(DefaultQueueProvider.class)
 public class InMemoryIncomingTransportFactory implements IncomingTransportFactory {
 
     private final DefaultQueueProvider queueProvider;

@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                 "listeners=PLAINTEXT://localhost:9092",
                 "port=9092"
         },
-        topics = { "test-events" }
+        topics = {"test-events"}
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ExternalPublisherDispatcherIntegrationTest {
@@ -84,7 +84,7 @@ class ExternalPublisherDispatcherIntegrationTest {
                 List.of(kafkaInTransport)
         );
         dispatcher.start();
-        
+
         // Wait for consumer to subscribe
         Thread.sleep(3000);
     }
