@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.InMemoryOutgoingTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.publisher.InMemoryPublisherTransportFactory;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.publisher.TransactionalEventPublisher;
 import com.github.vovten.eventflow.transport.DefaultQueueProvider;
@@ -33,8 +33,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", InMemoryPublisherTransportFactory.class,
+                    () -> new InMemoryPublisherTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -64,8 +64,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", InMemoryPublisherTransportFactory.class,
+                    () -> new InMemoryPublisherTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -95,8 +95,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", InMemoryPublisherTransportFactory.class,
+                    () -> new InMemoryPublisherTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -134,8 +134,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", InMemoryPublisherTransportFactory.class,
+                    () -> new InMemoryPublisherTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -166,8 +166,8 @@ class PublisherConfigurationTest {
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
             context.register(CustomPublisherConfig.class);
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", InMemoryPublisherTransportFactory.class,
+                    () -> new InMemoryPublisherTransportFactory(context.getBean(DefaultQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();

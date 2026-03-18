@@ -4,7 +4,7 @@ import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventSubscriber;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
-import com.github.vovten.eventflow.transport.IncomingEventTransport;
+import com.github.vovten.eventflow.transport.DispatcherTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,16 +26,16 @@ class UnifiedEventDispatcherTest {
 
     private ExecutorService executorService;
     private EventHandlerRegistry handlerRegistry;
-    private IncomingEventTransport transport1;
-    private IncomingEventTransport transport2;
+    private DispatcherTransport transport1;
+    private DispatcherTransport transport2;
     private UnifiedEventDispatcher dispatcher;
 
     @BeforeEach
     void setUp() {
         executorService = Executors.newFixedThreadPool(2);
         handlerRegistry = mock(EventHandlerRegistry.class);
-        transport1 = mock(IncomingEventTransport.class);
-        transport2 = mock(IncomingEventTransport.class);
+        transport1 = mock(DispatcherTransport.class);
+        transport2 = mock(DispatcherTransport.class);
         when(transport1.name()).thenReturn("transport1");
         when(transport2.name()).thenReturn("transport2");
     }

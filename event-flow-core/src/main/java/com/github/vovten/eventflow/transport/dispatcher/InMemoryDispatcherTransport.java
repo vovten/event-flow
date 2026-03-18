@@ -1,7 +1,7 @@
-package com.github.vovten.eventflow.transport.incoming;
+package com.github.vovten.eventflow.transport.dispatcher;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.IncomingEventTransport;
+import com.github.vovten.eventflow.transport.DispatcherTransport;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.BlockingDeque;
@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * In-memory incoming transport for receiving internal events.
+ * In-memory dispatcher transport for receiving internal events.
  * <p>
  * This transport listens to a bounded {@link BlockingDeque} and delivers events
  * to the registered consumer. It provides backpressure support by rejecting events
@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  * <b>Configuration example:</b>
  * <pre>{@code
  * BlockingDeque<Event> queue = new LinkedBlockingDeque<>(1000);
- * IncomingEventTransport transport = new InMemoryIncomingEventTransport(queue);
+ * DispatcherTransport transport = new InMemoryDispatcherTransport(queue);
  * transport.start(event -> dispatcher.dispatch(event));
  * }</pre>
  *
@@ -35,7 +35,7 @@ import java.util.function.Consumer;
  * @since 2026-03-06
  */
 @Slf4j
-public class InMemoryIncomingEventTransport implements IncomingEventTransport {
+public class InMemoryDispatcherTransport implements DispatcherTransport {
 
     private final BlockingDeque<Event> eventQueue;
     private final ExecutorService executorService;
@@ -46,7 +46,7 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
      *
      * @param eventQueue        the event queue to listen to
      */
-    public InMemoryIncomingEventTransport(BlockingDeque<Event> eventQueue) {
+    public InMemoryDispatcherTransport(BlockingDeque<Event> eventQueue) {
         this.eventQueue = eventQueue;
         this.executorService = Executors.newSingleThreadExecutor();
     }
@@ -57,7 +57,7 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
      * @param eventQueue        the event queue to listen to
      * @param executorService   executor service for running the consumer loop
      */
-    public InMemoryIncomingEventTransport(BlockingDeque<Event> eventQueue, ExecutorService executorService) {
+    public InMemoryDispatcherTransport(BlockingDeque<Event> eventQueue, ExecutorService executorService) {
         this.eventQueue = eventQueue;
         this.executorService = executorService;
     }
@@ -71,16 +71,16 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
     public void start(Consumer<Event> eventConsumer) {
         if (running.compareAndSet(false, true)) {
             executorService.execute(() -> consumeLoop(eventConsumer));
-            log.debug("InMemoryIncomingEventTransport started");
+            log.debug("InMemoryDispatcherTransport started");
         } else {
-            log.warn("InMemoryIncomingEventTransport is already running");
+            log.warn("InMemoryDispatcherTransport is already running");
         }
     }
 
     @Override
     public void stop() {
         if (running.compareAndSet(true, false)) {
-            log.info("InMemoryIncomingEventTransport stopped");
+            log.info("InMemoryDispatcherTransport stopped");
             if (executorService != null && !executorService.isShutdown()) {
                 executorService.shutdownNow();
             }
@@ -95,7 +95,7 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
                     tryDeliver(event, eventConsumer);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    log.debug("InMemoryIncomingEventTransport consumer loop interrupted");
+                    log.debug("InMemoryDispatcherTransport consumer loop interrupted");
                     break;
                 } catch (Exception e) {
                     if (running.get()) {
@@ -105,7 +105,7 @@ public class InMemoryIncomingEventTransport implements IncomingEventTransport {
             }
         } catch (Exception e) {
             if (running.get()) {
-                log.error("InMemoryIncomingEventTransport loop error", e);
+                log.error("InMemoryDispatcherTransport loop error", e);
             }
         }
     }

@@ -1,9 +1,9 @@
-package com.github.vovten.eventflow.transport.outgoing;
+package com.github.vovten.eventflow.transport.publisher;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.test.TestEvent;
-import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
+import com.github.vovten.eventflow.transport.TransportException;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -32,14 +32,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests for {@link BroadcastKafkaOutgoingEventTransport}.
+ * Tests for {@link BroadcastKafkaPublisherTransport}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-13
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("BroadcastKafkaOutgoingEventTransport Tests")
-class BroadcastKafkaOutgoingEventTransportTest {
+@DisplayName("BroadcastKafkaPublisherTransport Tests")
+class BroadcastKafkaPublisherTransportTest {
 
     @Mock
     private KafkaProducer<String, String> mockProducer;
@@ -59,7 +59,7 @@ class BroadcastKafkaOutgoingEventTransportTest {
         Properties props = new Properties();
         props.setProperty("bootstrap.servers", "localhost:9092");
 
-        BroadcastKafkaOutgoingEventTransport transport = new BroadcastKafkaOutgoingEventTransport(props, "test-topic");
+        BroadcastKafkaPublisherTransport transport = new BroadcastKafkaPublisherTransport(props, "test-topic");
 
         assertEquals("kafka", transport.name());
     }
@@ -75,7 +75,7 @@ class BroadcastKafkaOutgoingEventTransportTest {
 
         TestEvent event = TestEvent.create("test-id", "test-message");
 
-        BroadcastKafkaOutgoingEventTransport transport = new BroadcastKafkaOutgoingEventTransport("localhost:9092", "test-topic");
+        BroadcastKafkaPublisherTransport transport = new BroadcastKafkaPublisherTransport("localhost:9092", "test-topic");
         transport.producer = mockProducer;
 
         transport.send(event);
@@ -100,11 +100,11 @@ class BroadcastKafkaOutgoingEventTransportTest {
 
         TestEvent event = TestEvent.create("test-id", "test-message");
 
-        BroadcastKafkaOutgoingEventTransport transport = new BroadcastKafkaOutgoingEventTransport("localhost:9092", "test-topic");
+        BroadcastKafkaPublisherTransport transport = new BroadcastKafkaPublisherTransport("localhost:9092", "test-topic");
         transport.producer = mockProducer;
 
         assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(OutgoingEventTransportException.class)
+                .isInstanceOf(TransportException.class)
                 .hasMessageContaining("Failed to broadcast event")
                 .hasMessageContaining("0/2 successful");
     }
@@ -127,7 +127,7 @@ class BroadcastKafkaOutgoingEventTransportTest {
 
         TestEvent event = TestEvent.create("test-id", "test-message");
 
-        BroadcastKafkaOutgoingEventTransport transport = new BroadcastKafkaOutgoingEventTransport("localhost:9092", "test-topic");
+        BroadcastKafkaPublisherTransport transport = new BroadcastKafkaPublisherTransport("localhost:9092", "test-topic");
         transport.producer = mockProducer;
 
         transport.send(event);
@@ -142,11 +142,11 @@ class BroadcastKafkaOutgoingEventTransportTest {
 
         TestEvent event = TestEvent.create("test-id", "test-message");
 
-        BroadcastKafkaOutgoingEventTransport transport = new BroadcastKafkaOutgoingEventTransport("localhost:9092", "test-topic");
+        BroadcastKafkaPublisherTransport transport = new BroadcastKafkaPublisherTransport("localhost:9092", "test-topic");
         transport.producer = mockProducer;
 
         assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(OutgoingEventTransportException.class)
+                .isInstanceOf(TransportException.class)
                 .hasMessageContaining("has no partitions");
     }
 
@@ -161,7 +161,7 @@ class BroadcastKafkaOutgoingEventTransportTest {
 
         TestEvent event = TestEvent.create("test-id", "test-message");
 
-        BroadcastKafkaOutgoingEventTransport transport = new BroadcastKafkaOutgoingEventTransport("localhost:9092", "test-topic");
+        BroadcastKafkaPublisherTransport transport = new BroadcastKafkaPublisherTransport("localhost:9092", "test-topic");
         transport.producer = mockProducer;
 
         transport.send(event);

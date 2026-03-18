@@ -2,10 +2,10 @@ package com.github.vovten.eventflow.autoconfig.transport;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.config.ChannelConfiguration;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.PublisherTransport;
 
 /**
- * Factory for creating outgoing event transports.
+ * Factory for creating publisher event transports.
  * <p>
  * Implementations should be annotated with {@code @Component} to be
  * automatically discovered by {@link ChannelConfiguration}.
@@ -13,7 +13,7 @@ import com.github.vovten.eventflow.transport.OutgoingEventTransport;
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-public interface OutgoingTransportFactory {
+public interface PublisherTransportFactory {
 
     /**
      * @return the name identifier this factory handles (e.g., "kafka", "in-memory")
@@ -21,12 +21,12 @@ public interface OutgoingTransportFactory {
     String getName();
 
     /**
-     * Create outgoing transport from transport configuration.
+     * Create publisher transport from transport configuration.
      *
      * @param config transport configuration
-     * @return outgoing transport instance
+     * @return publisher transport instance
      */
-    OutgoingEventTransport createOutgoing(EventFlowProperties.TransportConfig config);
+    PublisherTransport createPublisher(EventFlowProperties.TransportConfig config);
 
     /**
      * Validate transport configuration.

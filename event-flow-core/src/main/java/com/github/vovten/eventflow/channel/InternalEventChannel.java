@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.PublisherTransport;
 
 import java.util.List;
 
@@ -21,7 +21,7 @@ import java.util.List;
  * <b>Configuration example:</b>
  * <pre>{@code
  * EventChannel internalChannel = new InternalEventChannel(
- *     List.of(new InMemoryOutgoingEventTransport(1000))
+ *     List.of(new InMemoryPublisherTransport(queue))
  * );
  * }</pre>
  *
@@ -35,7 +35,7 @@ public class InternalEventChannel extends AbstractEventChannel {
      *
      * @param transports list of transports for this channel
      */
-    public InternalEventChannel(List<OutgoingEventTransport> transports) {
+    public InternalEventChannel(List<PublisherTransport> transports) {
         super(transports);
     }
 
@@ -44,7 +44,7 @@ public class InternalEventChannel extends AbstractEventChannel {
      *
      * @param transport the transport for this channel
      */
-    public InternalEventChannel(OutgoingEventTransport transport) {
+    public InternalEventChannel(PublisherTransport transport) {
         super(transport);
     }
 

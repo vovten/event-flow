@@ -1,7 +1,7 @@
-package com.github.vovten.eventflow.transport.incoming;
+package com.github.vovten.eventflow.transport.dispatcher;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.IncomingEventTransport;
+import com.github.vovten.eventflow.transport.DispatcherTransport;
 import com.github.vovten.eventflow.util.EventUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Kafka incoming transport for receiving external events.
+ * Kafka dispatcher transport for receiving external events.
  * <p>
  * This transport listens to one or more Kafka topics and delivers events
  * to the registered consumer. It uses synchronous polling with configurable
@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>
  * <b>Configuration example:</b>
  * <pre>{@code
- * IncomingEventTransport transport = new KafkaIncomingEventTransport(
+ * DispatcherTransport transport = new KafkaDispatcherTransport(
  *     "localhost:9092",
  *     "events",
  *     "my-group"
@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 2026-03-06
  */
 @Slf4j
-public class KafkaIncomingEventTransport implements IncomingEventTransport {
+public class KafkaDispatcherTransport implements DispatcherTransport {
 
     private final Consumer<String, String> kafkaConsumer;
     private final List<String> topics;
@@ -64,7 +64,7 @@ public class KafkaIncomingEventTransport implements IncomingEventTransport {
      * @param topicsConfig     comma-separated list of topics to subscribe to
      * @param groupId          consumer group ID
      */
-    public KafkaIncomingEventTransport(String bootstrapServers, String topicsConfig, String groupId) {
+    public KafkaDispatcherTransport(String bootstrapServers, String topicsConfig, String groupId) {
         this(createConsumer(bootstrapServers, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor());
     }
 
@@ -75,7 +75,7 @@ public class KafkaIncomingEventTransport implements IncomingEventTransport {
      * @param topicsConfig comma-separated list of topics to subscribe to
      * @param groupId      consumer group ID
      */
-    public KafkaIncomingEventTransport(Properties properties, String topicsConfig, String groupId) {
+    public KafkaDispatcherTransport(Properties properties, String topicsConfig, String groupId) {
         this(createConsumer(properties, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor());
     }
 
@@ -85,7 +85,7 @@ public class KafkaIncomingEventTransport implements IncomingEventTransport {
      * @param kafkaConsumer Kafka consumer instance
      * @param topics        list of topics to subscribe to
      */
-    public KafkaIncomingEventTransport(Consumer<String, String> kafkaConsumer, List<String> topics) {
+    public KafkaDispatcherTransport(Consumer<String, String> kafkaConsumer, List<String> topics) {
         this(kafkaConsumer, topics, Executors.newSingleThreadExecutor());
     }
 
@@ -96,9 +96,9 @@ public class KafkaIncomingEventTransport implements IncomingEventTransport {
      * @param topics          list of topics to subscribe to
      * @param executorService executor service for running the consumer loop
      */
-    public KafkaIncomingEventTransport(Consumer<String, String> kafkaConsumer,
-                                       List<String> topics,
-                                       ExecutorService executorService) {
+    public KafkaDispatcherTransport(Consumer<String, String> kafkaConsumer,
+                                    List<String> topics,
+                                    ExecutorService executorService) {
         this.topics = topics;
         this.kafkaConsumer = kafkaConsumer;
         this.executorService = executorService;
@@ -113,21 +113,21 @@ public class KafkaIncomingEventTransport implements IncomingEventTransport {
     public void start(java.util.function.Consumer<Event> eventConsumer) {
         if (running.compareAndSet(false, true)) {
             executorService.execute(() -> consumeLoop(eventConsumer));
-            log.info("KafkaIncomingEventTransport started, listening to topics: {}", topics);
+            log.info("KafkaDispatcherTransport started, listening to topics: {}", topics);
         } else {
-            log.warn("KafkaIncomingEventTransport is already running");
+            log.warn("KafkaDispatcherTransport is already running");
         }
     }
 
     @Override
     public void stop() {
         if (running.compareAndSet(true, false)) {
-            log.info("Stopping KafkaIncomingEventTransport...");
+            log.info("Stopping KafkaDispatcherTransport...");
             if (kafkaConsumer != null) {
                 tryStopConsumer();
             }
             executorService.shutdownNow();
-            log.info("KafkaIncomingEventTransport stopped");
+            log.info("KafkaDispatcherTransport stopped");
         }
     }
 
@@ -139,7 +139,7 @@ public class KafkaIncomingEventTransport implements IncomingEventTransport {
             }
         } catch (Exception e) {
             if (running.get()) {
-                log.error("KafkaIncomingEventTransport loop error", e);
+                log.error("KafkaDispatcherTransport loop error", e);
             }
         }
     }

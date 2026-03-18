@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.PublisherTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,7 @@ class InternalEventChannelTest {
     @Test
     @DisplayName("Should create channel with single transport")
     void shouldCreateChannelWithSingleTransport() {
-        OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
+        PublisherTransport transport = mock(PublisherTransport.class);
         InternalEventChannel channel = new InternalEventChannel(transport);
 
         assertEquals("internal", channel.name());
@@ -28,9 +28,9 @@ class InternalEventChannelTest {
     @Test
     @DisplayName("Should create channel with multiple transports")
     void shouldCreateChannelWithMultipleTransports() {
-        OutgoingEventTransport transport1 = mock(OutgoingEventTransport.class);
-        OutgoingEventTransport transport2 = mock(OutgoingEventTransport.class);
-        List<OutgoingEventTransport> transports = List.of(transport1, transport2);
+        PublisherTransport transport1 = mock(PublisherTransport.class);
+        PublisherTransport transport2 = mock(PublisherTransport.class);
+        List<PublisherTransport> transports = List.of(transport1, transport2);
 
         InternalEventChannel channel = new InternalEventChannel(transports);
 
@@ -43,9 +43,9 @@ class InternalEventChannelTest {
     @Test
     @DisplayName("Should return immutable transports list")
     void shouldReturnImmutableTransportsList() {
-        OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
+        PublisherTransport transport = mock(PublisherTransport.class);
         InternalEventChannel channel = new InternalEventChannel(transport);
 
-        assertThrows(UnsupportedOperationException.class, () -> channel.transports().add(mock(OutgoingEventTransport.class)));
+        assertThrows(UnsupportedOperationException.class, () -> channel.transports().add(mock(PublisherTransport.class)));
     }
 }

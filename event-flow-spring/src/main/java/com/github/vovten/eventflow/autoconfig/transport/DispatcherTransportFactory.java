@@ -2,10 +2,10 @@ package com.github.vovten.eventflow.autoconfig.transport;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.config.DispatcherConfiguration;
-import com.github.vovten.eventflow.transport.IncomingEventTransport;
+import com.github.vovten.eventflow.transport.DispatcherTransport;
 
 /**
- * Factory for creating incoming event transports.
+ * Factory for creating dispatcher event transports.
  * <p>
  * Implementations should be annotated with {@code @Component} to be
  * automatically discovered by {@link DispatcherConfiguration}.
@@ -13,7 +13,7 @@ import com.github.vovten.eventflow.transport.IncomingEventTransport;
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-public interface IncomingTransportFactory {
+public interface DispatcherTransportFactory {
 
     /**
      * @return the type identifier this factory handles (e.g., "kafka", "in-memory")
@@ -21,12 +21,12 @@ public interface IncomingTransportFactory {
     String getType();
 
     /**
-     * Create incoming transport from transport configuration.
+     * Create dispatcher transport from transport configuration.
      *
      * @param config transport configuration
-     * @return incoming transport instance
+     * @return dispatcher transport instance
      */
-    IncomingEventTransport createIncoming(EventFlowProperties.TransportConfig config);
+    DispatcherTransport createDispatcher(EventFlowProperties.TransportConfig config);
 
     /**
      * Validate transport configuration.

@@ -6,19 +6,19 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link OutgoingEventTransportException}.
+ * Tests for {@link TransportException}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-09
  */
-@DisplayName("OutgoingEventTransportException Tests")
-class OutgoingEventTransportExceptionTest {
+@DisplayName("TransportException Tests")
+class TransportExceptionTest {
 
     @Test
     @DisplayName("Should create exception with message")
     void shouldCreateExceptionWithMessage() {
         // Act
-        OutgoingEventTransportException exception = new OutgoingEventTransportException("Test message");
+        TransportException exception = new TransportException("Test message");
 
         // Assert
         assertNotNull(exception);
@@ -32,7 +32,7 @@ class OutgoingEventTransportExceptionTest {
         Throwable cause = new RuntimeException("Cause");
 
         // Act
-        OutgoingEventTransportException exception = new OutgoingEventTransportException("Test message", cause);
+        TransportException exception = new TransportException("Test message", cause);
 
         // Assert
         assertNotNull(exception);

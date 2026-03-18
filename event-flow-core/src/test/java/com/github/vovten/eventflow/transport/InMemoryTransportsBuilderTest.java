@@ -47,10 +47,10 @@ class InMemoryTransportsBuilderTest {
                 .build();
 
         // Assert
-        assertNotNull(transports.incoming());
-        assertNotNull(transports.outgoing());
-        assertEquals("in-memory", transports.incoming().name());
-        assertEquals("in-memory", transports.outgoing().name());
+        assertNotNull(transports.dispatcher());
+        assertNotNull(transports.publisher());
+        assertEquals("in-memory", transports.dispatcher().name());
+        assertEquals("in-memory", transports.publisher().name());
     }
 
     @Test
@@ -62,8 +62,8 @@ class InMemoryTransportsBuilderTest {
                 .build();
 
         // Assert
-        assertNotNull(transports.incoming());
-        assertNotNull(transports.outgoing());
+        assertNotNull(transports.dispatcher());
+        assertNotNull(transports.publisher());
     }
 
     @Test
@@ -78,8 +78,8 @@ class InMemoryTransportsBuilderTest {
                 .build();
 
         // Assert
-        assertNotNull(transports.incoming());
-        assertNotNull(transports.outgoing());
+        assertNotNull(transports.dispatcher());
+        assertNotNull(transports.publisher());
     }
 
     @Test
@@ -91,12 +91,12 @@ class InMemoryTransportsBuilderTest {
                 .build();
 
         // Assert
-        assertNotNull(transports.incoming());
-        assertNotNull(transports.outgoing());
+        assertNotNull(transports.dispatcher());
+        assertNotNull(transports.publisher());
     }
 
     @Test
-    @DisplayName("Should share the same queue between incoming and outgoing transports")
+    @DisplayName("Should share the same queue between dispatcher and publisher transports")
     void shouldShareSameQueueBetweenTransports() throws InterruptedException {
         // Arrange
         InMemoryTransportsBuilder.InMemoryTransports transports = new InMemoryTransportsBuilder()
@@ -105,17 +105,17 @@ class InMemoryTransportsBuilderTest {
         AtomicInteger receivedValue = new AtomicInteger(0);
 
         // Act
-        transports.incoming().start(e -> receivedValue.set(((TestEvent) e).getValue()));
+        transports.dispatcher().start(e -> receivedValue.set(((TestEvent) e).getValue()));
         Thread.sleep(50);
 
         TestEvent event = new TestEvent(42);
-        transports.outgoing().send(event);
+        transports.publisher().send(event);
         Thread.sleep(100);
 
         // Assert
         assertEquals(42, receivedValue.get(), "Event should be delivered through shared queue");
 
-        transports.incoming().stop();
+        transports.dispatcher().stop();
     }
 
     @Test
@@ -128,12 +128,12 @@ class InMemoryTransportsBuilderTest {
         java.util.List<Integer> deliveredValues = new java.util.concurrent.CopyOnWriteArrayList<>();
 
         // Act
-        transports.incoming().start(e -> deliveredValues.add(((TestEvent) e).getValue()));
+        transports.dispatcher().start(e -> deliveredValues.add(((TestEvent) e).getValue()));
         Thread.sleep(50);
 
-        transports.outgoing().send(new TestEvent(1));
-        transports.outgoing().send(new TestEvent(2));
-        transports.outgoing().send(new TestEvent(3));
+        transports.publisher().send(new TestEvent(1));
+        transports.publisher().send(new TestEvent(2));
+        transports.publisher().send(new TestEvent(3));
         Thread.sleep(200);
 
         // Assert
@@ -142,7 +142,7 @@ class InMemoryTransportsBuilderTest {
         assertEquals(2, deliveredValues.get(1));
         assertEquals(3, deliveredValues.get(2));
 
-        transports.incoming().stop();
+        transports.dispatcher().stop();
     }
 
     @Test
@@ -154,12 +154,12 @@ class InMemoryTransportsBuilderTest {
                 .build();
 
         // Act
-        transports.outgoing().send(new TestEvent(1));
-        transports.outgoing().send(new TestEvent(2));
+        transports.publisher().send(new TestEvent(1));
+        transports.publisher().send(new TestEvent(2));
 
         // Assert
-        assertThrows(com.github.vovten.eventflow.transport.OutgoingEventTransportException.class, () ->
-                transports.outgoing().send(new TestEvent(3))
+        assertThrows(TransportException.class, () ->
+                transports.publisher().send(new TestEvent(3))
         );
     }
 
@@ -177,20 +177,20 @@ class InMemoryTransportsBuilderTest {
         AtomicInteger receivedValue1 = new AtomicInteger(0);
         AtomicInteger receivedValue2 = new AtomicInteger(0);
 
-        transports1.incoming().start(e -> receivedValue1.set(((TestEvent) e).getValue()));
-        transports2.incoming().start(e -> receivedValue2.set(((TestEvent) e).getValue()));
+        transports1.dispatcher().start(e -> receivedValue1.set(((TestEvent) e).getValue()));
+        transports2.dispatcher().start(e -> receivedValue2.set(((TestEvent) e).getValue()));
         Thread.sleep(50);
 
         // Act - send event to first transport pair
-        transports1.outgoing().send(new TestEvent(100));
+        transports1.publisher().send(new TestEvent(100));
         Thread.sleep(100);
 
         // Assert - only first transport should receive the event
         assertEquals(100, receivedValue1.get());
         assertEquals(0, receivedValue2.get());
 
-        transports1.incoming().stop();
-        transports2.incoming().stop();
+        transports1.dispatcher().stop();
+        transports2.dispatcher().stop();
     }
 
     /**

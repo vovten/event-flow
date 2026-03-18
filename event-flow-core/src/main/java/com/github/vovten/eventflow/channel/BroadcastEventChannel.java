@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.PublisherTransport;
 import java.util.List;
 
 /**
@@ -33,26 +33,26 @@ import java.util.List;
  * <pre>{@code
  * // Broadcasting to multiple Kafka clusters
  * EventChannel broadcastChannel = new BroadcastEventChannel(List.of(
- *     new KafkaOutgoingEventTransport("cluster1:9092", "events-topic"),
- *     new KafkaOutgoingEventTransport("cluster2:9092", "events-topic")
+ *     new KafkaPublisherTransport("cluster1:9092", "events-topic"),
+ *     new KafkaPublisherTransport("cluster2:9092", "events-topic")
  * ));
  *
  * // Broadcasting to different message brokers
  * EventChannel hybridChannel = new BroadcastEventChannel(List.of(
- *     new KafkaOutgoingEventTransport("localhost:9092", "domain-events"),
- *     new RabbitMqOutgoingEventTransport("localhost:5672", "events-exchange")
+ *     new KafkaPublisherTransport("localhost:9092", "domain-events"),
+ *     new RabbitMqPublisherTransport("localhost:5672", "events-exchange")
  * ));
  *
  * // Broadcasting to all pods in a Kubernetes deployment
  * // When used with a transport that supports Kubernetes headless services,
  * // all pods in the deployment will receive a copy of the event
  * EventChannel k8sBroadcastChannel = new BroadcastEventChannel(
- *     new KafkaOutgoingEventTransport("kafka-headless.kafka.svc.cluster.local:9092", "pod-events")
+ *     new KafkaPublisherTransport("kafka-headless.kafka.svc.cluster.local:9092", "pod-events")
  * );
  *
  * // Single transport (acts like a regular channel)
  * EventChannel simpleChannel = new BroadcastEventChannel(
- *     new KafkaOutgoingEventTransport("localhost:9092", "events")
+ *     new KafkaPublisherTransport("localhost:9092", "events")
  * );
  * }</pre>
  *
@@ -69,7 +69,7 @@ public class BroadcastEventChannel extends AbstractEventChannel {
      *
      * @param transports list of transports for broadcasting events
      */
-    public BroadcastEventChannel(List<OutgoingEventTransport> transports) {
+    public BroadcastEventChannel(List<PublisherTransport> transports) {
         super(transports);
     }
 
@@ -81,7 +81,7 @@ public class BroadcastEventChannel extends AbstractEventChannel {
      *
      * @param transport the transport for this channel
      */
-    public BroadcastEventChannel(OutgoingEventTransport transport) {
+    public BroadcastEventChannel(PublisherTransport transport) {
         super(transport);
     }
 

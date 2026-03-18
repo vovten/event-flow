@@ -1,7 +1,11 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.*;
+import com.github.vovten.eventflow.autoconfig.transport.dispatcher.InMemoryDispatcherTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.dispatcher.KafkaDispatcherTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.publisher.BroadcastKafkaPublisherTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.publisher.InMemoryPublisherTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.publisher.KafkaPublisherTransportFactory;
 import com.github.vovten.eventflow.transport.DefaultQueueProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -72,54 +76,54 @@ public class CommonConfiguration {
     }
 
     /**
-     * Creates factory for in-memory outgoing event transports.
+     * Creates factory for in-memory publisher transports.
      *
      * @param queueProvider queue provider for in-memory transports
-     * @return in-memory outgoing transport factory
+     * @return in-memory publisher transport factory
      */
     @Bean
-    public InMemoryOutgoingTransportFactory inMemoryOutgoingTransportFactory(DefaultQueueProvider queueProvider) {
-        return new InMemoryOutgoingTransportFactory(queueProvider);
+    public InMemoryPublisherTransportFactory inMemoryPublisherTransportFactory(DefaultQueueProvider queueProvider) {
+        return new InMemoryPublisherTransportFactory(queueProvider);
     }
 
     /**
-     * Creates factory for in-memory incoming event transports.
+     * Creates factory for in-memory dispatcher transports.
      *
      * @param queueProvider queue provider for in-memory transports
-     * @return in-memory incoming transport factory
+     * @return in-memory dispatcher transport factory
      */
     @Bean
-    public InMemoryIncomingTransportFactory inMemoryIncomingTransportFactory(DefaultQueueProvider queueProvider) {
-        return new InMemoryIncomingTransportFactory(queueProvider);
+    public InMemoryDispatcherTransportFactory inMemoryDispatcherTransportFactory(DefaultQueueProvider queueProvider) {
+        return new InMemoryDispatcherTransportFactory(queueProvider);
     }
 
     /**
-     * Creates factory for Kafka outgoing event transports.
+     * Creates factory for Kafka publisher transports.
      *
-     * @return Kafka outgoing transport factory
+     * @return Kafka publisher transport factory
      */
     @Bean
-    public KafkaOutgoingTransportFactory kafkaOutgoingTransportFactory() {
-        return new KafkaOutgoingTransportFactory();
+    public KafkaPublisherTransportFactory kafkaPublisherTransportFactory() {
+        return new KafkaPublisherTransportFactory();
     }
 
     /**
-     * Creates factory for Kafka incoming event transports.
+     * Creates factory for Kafka dispatcher transports.
      *
-     * @return Kafka incoming transport factory
+     * @return Kafka dispatcher transport factory
      */
     @Bean
-    public KafkaIncomingTransportFactory kafkaIncomingTransportFactory() {
-        return new KafkaIncomingTransportFactory();
+    public KafkaDispatcherTransportFactory kafkaDispatcherTransportFactory() {
+        return new KafkaDispatcherTransportFactory();
     }
 
     /**
-     * Creates factory for broadcast Kafka outgoing event transports.
+     * Creates factory for broadcast Kafka publisher transports.
      *
-     * @return broadcast Kafka outgoing transport factory
+     * @return broadcast Kafka publisher transport factory
      */
     @Bean
-    public BroadcastKafkaOutgoingTransportFactory broadcastKafkaOutgoingTransportFactory() {
-        return new BroadcastKafkaOutgoingTransportFactory();
+    public BroadcastKafkaPublisherTransportFactory broadcastKafkaPublisherTransportFactory() {
+        return new BroadcastKafkaPublisherTransportFactory();
     }
 }

@@ -1,8 +1,8 @@
 package com.github.vovten.eventflow.transport;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.incoming.InMemoryIncomingEventTransport;
-import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
+import com.github.vovten.eventflow.transport.dispatcher.InMemoryDispatcherTransport;
+import com.github.vovten.eventflow.transport.publisher.InMemoryPublisherTransport;
 
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -10,11 +10,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Builder for creating a pair of in-memory incoming and outgoing event transports.
+ * Builder for creating a pair of in-memory dispatcher and publisher event transports.
  * <p>
  * This builder creates both transports sharing the same {@link BlockingDeque} for
- * in-process event communication. The outgoing transport puts events into the queue,
- * and the incoming transport consumes events from the same queue.
+ * in-process event communication. The publisher transport puts events into the queue,
+ * and the dispatcher transport consumes events from the same queue.
  * <p>
  * <b>Usage example:</b>
  * <pre>{@code
@@ -22,8 +22,8 @@ import java.util.concurrent.Executors;
  *     .queueSize(1000);
  *
  * InMemoryTransportsBuilder.InMemoryTransports transports = builder.build();
- * OutgoingEventTransport outgoing = transports.outgoing();
- * IncomingEventTransport incoming = transports.incoming();
+ * PublisherTransport publisher = transports.publisher();
+ * DispatcherTransport dispatcher = transports.dispatcher();
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -72,7 +72,7 @@ public class InMemoryTransportsBuilder {
     }
 
     /**
-     * Set a custom executor service for the incoming transport.
+     * Set a custom executor service for the dispatcher transport.
      *
      * @param executorService the executor service
      * @return this builder
@@ -85,7 +85,7 @@ public class InMemoryTransportsBuilder {
     /**
      * Build and return a pair of in-memory transports sharing the same queue.
      *
-     * @return a pair of incoming and outgoing transports
+     * @return a pair of dispatcher and publisher transports
      */
     public InMemoryTransports build() {
         if (eventQueue == null) {
@@ -96,21 +96,21 @@ public class InMemoryTransportsBuilder {
                 ? executorService
                 : Executors.newSingleThreadExecutor();
 
-        InMemoryIncomingEventTransport incoming = new InMemoryIncomingEventTransport(eventQueue, executor);
-        InMemoryOutgoingEventTransport outgoing = new InMemoryOutgoingEventTransport(eventQueue);
+        InMemoryDispatcherTransport dispatcher = new InMemoryDispatcherTransport(eventQueue, executor);
+        InMemoryPublisherTransport publisher = new InMemoryPublisherTransport(eventQueue);
 
-        return new InMemoryTransports(incoming, outgoing);
+        return new InMemoryTransports(dispatcher, publisher);
     }
 
     /**
      * Record holding a pair of in-memory transports.
      *
-     * @param incoming  the incoming transport
-     * @param outgoing  the outgoing transport
+     * @param dispatcher  the dispatcher transport
+     * @param publisher  the publisher transport
      */
     public record InMemoryTransports(
-            InMemoryIncomingEventTransport incoming,
-            InMemoryOutgoingEventTransport outgoing
+            InMemoryDispatcherTransport dispatcher,
+            InMemoryPublisherTransport publisher
     ) {
     }
 }

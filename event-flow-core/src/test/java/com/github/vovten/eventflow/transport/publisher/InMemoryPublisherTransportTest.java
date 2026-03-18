@@ -1,8 +1,8 @@
-package com.github.vovten.eventflow.transport.outgoing;
+package com.github.vovten.eventflow.transport.publisher;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
+import com.github.vovten.eventflow.transport.TransportException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,13 +16,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@link InMemoryOutgoingEventTransport}.
+ * Tests for {@link InMemoryPublisherTransport}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-09
  */
-@DisplayName("InMemoryOutgoingEventTransport Tests")
-class InMemoryOutgoingEventTransportTest {
+@DisplayName("InMemoryPublisherTransport Tests")
+class InMemoryPublisherTransportTest {
 
     @Test
     @DisplayName("Should create transport with queue")
@@ -31,7 +31,7 @@ class InMemoryOutgoingEventTransportTest {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
 
         // Act
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
+        InMemoryPublisherTransport transport = new InMemoryPublisherTransport(queue);
 
         // Assert
         assertNotNull(transport);
@@ -43,7 +43,7 @@ class InMemoryOutgoingEventTransportTest {
     void shouldSendEventToQueue() throws InterruptedException {
         // Arrange
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
+        InMemoryPublisherTransport transport = new InMemoryPublisherTransport(queue);
         TestEvent event = new TestEvent("test");
 
         // Act
@@ -59,7 +59,7 @@ class InMemoryOutgoingEventTransportTest {
     void shouldThrowExceptionWhenQueueIsFull() {
         // Arrange
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(2);
-        InMemoryOutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
+        InMemoryPublisherTransport transport = new InMemoryPublisherTransport(queue);
         TestEvent event1 = new TestEvent("test1");
         TestEvent event2 = new TestEvent("test2");
         TestEvent event3 = new TestEvent("test3");
@@ -69,7 +69,7 @@ class InMemoryOutgoingEventTransportTest {
         transport.send(event2);
 
         // Assert
-        OutgoingEventTransportException exception = assertThrows(OutgoingEventTransportException.class, () ->
+        TransportException exception = assertThrows(TransportException.class, () ->
                 transport.send(event3)
         );
         assertTrue(exception.getMessage().contains("Queue is full"));

@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.PublisherTransport;
 
 import java.util.List;
 
@@ -16,7 +16,7 @@ import java.util.List;
  * <pre>{@code
  * // Create channel with multiple transports
  * EventChannel channel = new ExternalEventChannel(
- *     List.of(new KafkaOutgoingEventTransport(bootstrapServers, "events"))
+ *     List.of(new KafkaPublisherTransport(bootstrapServers, "events"))
  * );
  *
  * // Send event through channel
@@ -27,7 +27,7 @@ import java.util.List;
  * @since 2026-03-05
  */
 public interface EventChannel {
-    
+
     /**
      * @return unique channel name (e.g., "internal", "external")
      */
@@ -36,7 +36,7 @@ public interface EventChannel {
     /**
      * @return list of transports configured for this channel
      */
-    List<OutgoingEventTransport> transports();
+    List<PublisherTransport> transports();
 
     /**
      * Send event to all transports associated with this channel.
@@ -48,7 +48,7 @@ public interface EventChannel {
      * @param event the event to send
      */
     default void send(Event event) {
-        for (OutgoingEventTransport transport : transports()) {
+        for (PublisherTransport transport : transports()) {
             transport.send(event);
         }
     }

@@ -1,4 +1,4 @@
-package com.github.vovten.eventflow.transport.incoming;
+package com.github.vovten.eventflow.transport.dispatcher;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
@@ -17,10 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Unit tests for InMemoryIncomingEventTransport.
+ * Unit tests for InMemoryDispatcherTransport.
  */
-@DisplayName("InMemoryIncomingEventTransport Tests")
-class InMemoryIncomingEventTransportTest {
+@DisplayName("InMemoryDispatcherTransport Tests")
+class InMemoryDispatcherTransportTest {
 
     private ExecutorService testExecutor;
 
@@ -41,7 +41,7 @@ class InMemoryIncomingEventTransportTest {
     void shouldCreateTransportWithQueueAndExecutor() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, executor);
+        InMemoryDispatcherTransport transport = new InMemoryDispatcherTransport(queue, executor);
 
         assertEquals("in-memory", transport.name());
     }
@@ -50,7 +50,7 @@ class InMemoryIncomingEventTransportTest {
     @DisplayName("Should deliver events when started")
     void shouldDeliverEventsWhenStarted() throws InterruptedException {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
+        InMemoryDispatcherTransport transport = new InMemoryDispatcherTransport(queue, testExecutor);
         AtomicInteger deliveredCount = new AtomicInteger(0);
         AtomicInteger receivedValue = new AtomicInteger(0);
 
@@ -73,7 +73,7 @@ class InMemoryIncomingEventTransportTest {
     @DisplayName("Should log warning when starting already running transport")
     void shouldLogWarningWhenStartingAlreadyRunningTransport() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
+        InMemoryDispatcherTransport transport = new InMemoryDispatcherTransport(queue, testExecutor);
 
         transport.start(e -> {});
         assertDoesNotThrow(() -> transport.start(e -> {}));
@@ -85,7 +85,7 @@ class InMemoryIncomingEventTransportTest {
     @DisplayName("Should stop processing after stop is called")
     void shouldStopProcessingAfterStopIsCalled() throws InterruptedException {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
+        InMemoryDispatcherTransport transport = new InMemoryDispatcherTransport(queue, testExecutor);
         AtomicInteger deliveredCount = new AtomicInteger(0);
 
         transport.start(e -> deliveredCount.incrementAndGet());
@@ -106,7 +106,7 @@ class InMemoryIncomingEventTransportTest {
     @DisplayName("Should not throw when stop is called multiple times")
     void shouldNotThrowWhenStopIsCalledMultipleTimes() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
+        InMemoryDispatcherTransport transport = new InMemoryDispatcherTransport(queue, testExecutor);
 
         assertDoesNotThrow(() -> {
             transport.stop();
@@ -119,7 +119,7 @@ class InMemoryIncomingEventTransportTest {
     @DisplayName("Should do nothing when stop is called on non-running transport")
     void shouldDoNothingWhenStopIsCalledOnNonRunningTransport() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
+        InMemoryDispatcherTransport transport = new InMemoryDispatcherTransport(queue, testExecutor);
 
         assertDoesNotThrow(transport::stop);
     }
@@ -128,7 +128,7 @@ class InMemoryIncomingEventTransportTest {
     @DisplayName("Should deliver multiple events in order")
     void shouldDeliverMultipleEventsInOrder() throws InterruptedException {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
-        InMemoryIncomingEventTransport transport = new InMemoryIncomingEventTransport(queue, testExecutor);
+        InMemoryDispatcherTransport transport = new InMemoryDispatcherTransport(queue, testExecutor);
         java.util.List<Integer> deliveredValues = new java.util.concurrent.CopyOnWriteArrayList<>();
 
         transport.start(e -> deliveredValues.add(((TestEvent) e).getValue()));

@@ -1,13 +1,13 @@
-package com.github.vovten.eventflow.transport.outgoing;
+package com.github.vovten.eventflow.transport.publisher;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
-import com.github.vovten.eventflow.transport.OutgoingEventTransportException;
+import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.TransportException;
 
 import java.util.concurrent.BlockingDeque;
 
 /**
- * In-memory outgoing transport for internal event delivery.
+ * In-memory publisher transport for internal event delivery.
  * <p>
  * This transport uses a bounded {@link BlockingDeque} to queue events
  * for consumption by local event dispatchers. It provides backpressure support
@@ -23,14 +23,14 @@ import java.util.concurrent.BlockingDeque;
  * <b>Configuration example:</b>
  * <pre>{@code
  * BlockingDeque<Event> queue = new LinkedBlockingDeque<>(1000);
- * OutgoingEventTransport transport = new InMemoryOutgoingEventTransport(queue);
+ * PublisherTransport transport = new InMemoryPublisherTransport(queue);
  * EventChannel channel = new InternalEventChannel(List.of(transport));
  * }</pre>
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
-public class InMemoryOutgoingEventTransport implements OutgoingEventTransport {
+public class InMemoryPublisherTransport implements PublisherTransport {
 
     private final BlockingDeque<Event> eventQueue;
 
@@ -39,7 +39,7 @@ public class InMemoryOutgoingEventTransport implements OutgoingEventTransport {
      *
      * @param eventQueue the event queue to use
      */
-    public InMemoryOutgoingEventTransport(BlockingDeque<Event> eventQueue) {
+    public InMemoryPublisherTransport(BlockingDeque<Event> eventQueue) {
         this.eventQueue = eventQueue;
     }
 
@@ -51,7 +51,7 @@ public class InMemoryOutgoingEventTransport implements OutgoingEventTransport {
     @Override
     public void send(Event event) {
         if (!eventQueue.offer(event)) {
-            throw new OutgoingEventTransportException("Queue is full, event rejected: " + event);
+            throw new TransportException("Queue is full, event rejected: " + event);
         }
     }
 }

@@ -2,7 +2,7 @@ package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.PublisherTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,15 +18,15 @@ import static org.mockito.Mockito.*;
 @DisplayName("EventChannel Tests")
 class EventChannelTest {
 
-    private OutgoingEventTransport transport1;
-    private OutgoingEventTransport transport2;
+    private PublisherTransport transport1;
+    private PublisherTransport transport2;
     private TestEventChannel channel;
     private TestEvent testEvent;
 
     @BeforeEach
     void setUp() {
-        transport1 = mock(OutgoingEventTransport.class);
-        transport2 = mock(OutgoingEventTransport.class);
+        transport1 = mock(PublisherTransport.class);
+        transport2 = mock(PublisherTransport.class);
         channel = new TestEventChannel(List.of(transport1, transport2));
         testEvent = new TestEvent();
     }
@@ -58,7 +58,7 @@ class EventChannelTest {
     @Test
     @DisplayName("Should return configured transports")
     void shouldReturnConfiguredTransports() {
-        List<OutgoingEventTransport> transports = channel.transports();
+        List<PublisherTransport> transports = channel.transports();
 
         assertEquals(2, transports.size());
         assertTrue(transports.contains(transport1));
@@ -66,9 +66,9 @@ class EventChannelTest {
     }
 
     static class TestEventChannel implements EventChannel {
-        private final List<OutgoingEventTransport> transports;
+        private final List<PublisherTransport> transports;
 
-        TestEventChannel(List<OutgoingEventTransport> transports) {
+        TestEventChannel(List<PublisherTransport> transports) {
             this.transports = transports;
         }
 
@@ -78,7 +78,7 @@ class EventChannelTest {
         }
 
         @Override
-        public List<OutgoingEventTransport> transports() {
+        public List<PublisherTransport> transports() {
             return transports;
         }
     }

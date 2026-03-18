@@ -1,20 +1,21 @@
-package com.github.vovten.eventflow.autoconfig.transport;
+package com.github.vovten.eventflow.autoconfig.transport.publisher;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
-import com.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutgoingEventTransport;
+import com.github.vovten.eventflow.autoconfig.transport.PublisherTransportFactory;
+import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.publisher.BroadcastKafkaPublisherTransport;
 
 /**
- * Factory for creating broadcast Kafka-based outgoing event transports.
+ * Factory for creating broadcast Kafka-based publisher event transports.
  * <p>
- * This factory creates {@link BroadcastKafkaOutgoingEventTransport} instances
+ * This factory creates {@link BroadcastKafkaPublisherTransport} instances
  * that send events to all partitions of a Kafka topic.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-13
- * @see BroadcastKafkaOutgoingEventTransport
+ * @see BroadcastKafkaPublisherTransport
  */
-public class BroadcastKafkaOutgoingTransportFactory implements OutgoingTransportFactory {
+public class BroadcastKafkaPublisherTransportFactory implements PublisherTransportFactory {
 
     @Override
     public String getName() {
@@ -22,9 +23,9 @@ public class BroadcastKafkaOutgoingTransportFactory implements OutgoingTransport
     }
 
     @Override
-    public OutgoingEventTransport createOutgoing(EventFlowProperties.TransportConfig config) {
+    public PublisherTransport createPublisher(EventFlowProperties.TransportConfig config) {
         validate(config);
-        return new BroadcastKafkaOutgoingEventTransport(
+        return new BroadcastKafkaPublisherTransport(
             config.getBootstrapServers(),
             config.getTopic()
         );

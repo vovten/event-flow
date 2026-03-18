@@ -1,16 +1,17 @@
-package com.github.vovten.eventflow.autoconfig.transport;
+package com.github.vovten.eventflow.autoconfig.transport.publisher;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
-import com.github.vovten.eventflow.transport.outgoing.KafkaOutgoingEventTransport;
+import com.github.vovten.eventflow.autoconfig.transport.PublisherTransportFactory;
+import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.publisher.KafkaPublisherTransport;
 
 /**
- * Factory for creating Kafka-based outgoing event transports.
+ * Factory for creating Kafka-based publisher event transports.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-public class KafkaOutgoingTransportFactory implements OutgoingTransportFactory {
+public class KafkaPublisherTransportFactory implements PublisherTransportFactory {
 
     @Override
     public String getName() {
@@ -18,9 +19,9 @@ public class KafkaOutgoingTransportFactory implements OutgoingTransportFactory {
     }
 
     @Override
-    public OutgoingEventTransport createOutgoing(EventFlowProperties.TransportConfig config) {
+    public PublisherTransport createPublisher(EventFlowProperties.TransportConfig config) {
         validate(config);
-        return new KafkaOutgoingEventTransport(
+        return new KafkaPublisherTransport(
             config.getBootstrapServers(),
             config.getTopic()
         );
