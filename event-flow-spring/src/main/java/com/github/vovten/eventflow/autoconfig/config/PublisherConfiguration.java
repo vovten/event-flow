@@ -24,7 +24,7 @@ import static java.util.stream.Collectors.joining;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class PublisherConfiguration {
 
     private final EventFlowProperties properties;

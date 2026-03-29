@@ -31,7 +31,7 @@ import static java.util.stream.Collectors.toMap;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class DispatcherConfiguration {
 
     private final EventFlowProperties properties;
@@ -55,7 +55,7 @@ public class DispatcherConfiguration {
      */
     @Bean(destroyMethod = "stop")
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
     public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
                                            @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
                                            @Qualifier("dispatcherTransports") List<InTransport> inTransports) {
@@ -78,7 +78,7 @@ public class DispatcherConfiguration {
      */
     @Bean("dispatcherTransports")
     @ConditionalOnMissingBean(name = "dispatcherTransports")
-    @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
     public List<InTransport> dispatcherTransports() {
         List<InTransport> transports = new ArrayList<>();
         // Create transports from configuration

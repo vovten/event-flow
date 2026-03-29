@@ -12,10 +12,11 @@
 </dependency>
 ```
 
-### 2. Configure (Required: scan-packages, channels, and transports)
+### 2. Configure (Required: enable and configure components)
 
 ```yaml
 event-flow:
+  enabled: true
   scan-packages: com.example.listener
   publisher:
     enabled: true
@@ -35,7 +36,7 @@ event-flow:
         capacity: 1000
 ```
 
-> **Note:** Both publisher and dispatcher are disabled by default. You must explicitly enable them and configure at least one channel/transport.
+> **Note:** All components are disabled by default. You must explicitly enable `event-flow`, `publisher`, and `dispatcher` in your configuration.
 
 ### 3. Create Event Listeners
 
@@ -73,7 +74,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `event-flow.enabled` | `true` | Enable/disable all auto-configuration |
+| `event-flow.enabled` | `false` | Enable/disable all auto-configuration |
 | `event-flow.scan-packages` | `""` | **Required!** Packages to scan for listeners |
 | `event-flow.publisher.enabled` | `false` | Enable/disable publisher |
 | `event-flow.dispatcher.enabled` | `false` | Enable/disable dispatcher |
@@ -95,6 +96,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 
 ```yaml
 event-flow:
+  enabled: true
   scan-packages: com.example
   publisher:
     enabled: true
@@ -110,7 +112,7 @@ event-flow:
         capacity: 1000
 ```
 
-> **Note:** You must explicitly enable publisher and dispatcher, and configure at least one channel/transport.
+> **Note:** You must explicitly enable `event-flow`, `publisher`, and `dispatcher`, and configure at least one channel/transport.
 
 ### Production with Kafka
 

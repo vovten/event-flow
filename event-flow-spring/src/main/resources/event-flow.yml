@@ -13,8 +13,8 @@
 
 event-flow:
   # Enable or disable all Event Flow auto-configuration
-  # Set to false to completely disable auto-configuration and provide your own beans
-  enabled: true
+  # Set to true to enable auto-configuration (disabled by default)
+  enabled: false
 
   # Package(s) to scan for @EventListener annotated beans
   # Multiple packages can be specified as comma-separated values
@@ -102,6 +102,7 @@ event-flow:
 # Example 1: Minimal configuration with local-queue
 # ---------------------------------------------------------------------------
 # event-flow:
+#   enabled: true
 #   scan-packages: com.example
 #   publisher:
 #     enabled: true
@@ -119,6 +120,7 @@ event-flow:
 # Example 2: Production configuration with Kafka
 # ---------------------------------------------------------------------------
 # event-flow:
+#   enabled: true
 #   scan-packages: com.example.listener
 #   publisher:
 #     enabled: true
@@ -155,6 +157,7 @@ event-flow:
 # Example 3: Development configuration (local-queue only)
 # ---------------------------------------------------------------------------
 # event-flow:
+#   enabled: true
 #   scan-packages: com.example
 #   publisher:
 #     enabled: true

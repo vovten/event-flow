@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.test.context.support.TestPropertySourceUtils;
 
 import java.util.concurrent.ExecutorService;
 
@@ -23,6 +24,8 @@ class CommonConfigurationTest {
     void shouldCreateExecutorServiceWithCustomProperties() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getThreadPool().setCoreSize(2);
             properties.getDispatcher().getThreadPool().setMaxSize(8);
@@ -47,6 +50,8 @@ class CommonConfigurationTest {
     void shouldCreateQueueProviderWithDefaultCapacity() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            
             EventFlowProperties properties = new EventFlowProperties();
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.register(CommonConfiguration.class);
@@ -65,6 +70,8 @@ class CommonConfigurationTest {
     void shouldCreateQueueProviderWithCustomCapacityFromLocalQueueTransport() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("local-queue");
@@ -104,22 +111,21 @@ class CommonConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should still create queue provider when event-flow is disabled")
-    void shouldStillCreateQueueProviderWhenEventFlowIsDisabled() {
+    @DisplayName("Should not create beans when event-flow is disabled")
+    void shouldNotCreateBeansWhenEventFlowIsDisabled() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=false");
+            
             EventFlowProperties properties = new EventFlowProperties();
-            properties.setEnabled(false);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.register(CommonConfiguration.class);
             context.refresh();
 
-            // when
-            DefaultLocalQueueProvider queueProvider = context.getBean(DefaultLocalQueueProvider.class);
-
-            // then
-            assertThat(queueProvider).isNotNull();
+            // when & then
+            assertThat(context.containsBean("dispatcherExecutor")).isFalse();
+            assertThat(context.containsBean("queueProvider")).isFalse();
         }
     }
 
@@ -128,6 +134,8 @@ class CommonConfigurationTest {
     void shouldNotCreateDuplicateExecutorWhenCustomBeanExists() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -148,6 +156,8 @@ class CommonConfigurationTest {
     void shouldNotCreateDuplicateQueueProviderWhenCustomBeanExists() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
