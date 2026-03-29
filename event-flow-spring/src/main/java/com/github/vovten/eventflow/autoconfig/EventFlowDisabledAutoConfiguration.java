@@ -35,30 +35,28 @@ public class EventFlowDisabledAutoConfiguration {
     public static class EventFlowDisabledLogger implements ApplicationListener<ApplicationReadyEvent> {
 
         private static final String MESSAGE = """
-
-                ╔═══════════════════════════════════════════════════════════╗
-                ║  Event Flow is disabled                                   ║
-                ║                                                           ║
-                ║  To enable Event Flow auto-configuration, add to          ║
-                ║  application.yml:                                         ║
-                ║                                                           ║
-                ║  event-flow:                                              ║
-                ║    enabled: true                                          ║
-                ║    scan-packages: com.example.listener                    ║
-                ║    publisher:                                             ║
-                ║      enabled: true                                        ║
-                ║      channels:                                            ║
-                ║        - name: internal                                   ║
-                ║          transports:                                      ║
-                ║            - name: local-queue                            ║
-                ║    dispatcher:                                            ║
-                ║      enabled: true                                        ║
-                ║      transports:                                          ║
-                ║        - name: local-queue                                ║
-                ║                                                           ║
-                ║  This is a minimal configuration example. For detailed    ║
-                ║  configuration options see event-flow.yml                 ║
-                ╚═══════════════════════════════════════════════════════════╝
+               ╔═══════════════════════════════════════════════════════════╗
+               ║ Event Flow is disabled                                    ║
+               ║ To enable Event Flow auto-configuration, add:             ║
+               ╚═══════════════════════════════════════════════════════════╝
+                event-flow:
+                  enabled: true
+                  scan-packages: com.example.listener
+                  publisher:
+                    enabled: true
+                    channels:
+                      - name: internal
+                        transports:
+                          - name: local-queue
+                  dispatcher:
+                    enabled: true
+                    transports:
+                      - name: local-queue
+               ╔═══════════════════════════════════════════════════════════╗
+               ║ This is a minimal configuration example. For detailed     ║
+               ║ configuration options, see event-flow.yml and default     ║
+               ║ values in EventFlowProperties class.                      ║
+               ╚═══════════════════════════════════════════════════════════╝
                 """;
 
         @Override

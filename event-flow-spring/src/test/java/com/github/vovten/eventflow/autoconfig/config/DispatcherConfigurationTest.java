@@ -31,7 +31,9 @@ class DispatcherConfigurationTest {
     void shouldCreateEventDispatcherWithDefaultLocalQueueTransport() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("local-queue");
@@ -64,7 +66,9 @@ class DispatcherConfigurationTest {
     void shouldCreateEventDispatcherWithConfiguredTransports() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -97,7 +101,9 @@ class DispatcherConfigurationTest {
     void shouldCreateMultipleDispatcherTransports() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getTransports().clear();
 
@@ -133,7 +139,9 @@ class DispatcherConfigurationTest {
     void shouldThrowExceptionWhenNoFactoryFoundForTransportType() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
@@ -161,7 +169,9 @@ class DispatcherConfigurationTest {
     void shouldCreateKafkaDispatcherTransportWhenKafkaFactoryIsAvailable() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -193,7 +203,9 @@ class DispatcherConfigurationTest {
     void shouldNotCreateDuplicateDispatcherWhenCustomBeanExists() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -217,7 +229,9 @@ class DispatcherConfigurationTest {
     void shouldNotCreateDuplicateDispatcherTransportsWhenCustomBeanExists() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -242,8 +256,14 @@ class DispatcherConfigurationTest {
     void shouldStartDispatcherOnCreation() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("local-queue");
+            transportConfig.setCapacity(1000);
+            properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));

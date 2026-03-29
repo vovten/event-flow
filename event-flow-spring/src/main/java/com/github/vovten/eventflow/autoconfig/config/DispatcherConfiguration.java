@@ -55,7 +55,7 @@ public class DispatcherConfiguration {
      */
     @Bean(destroyMethod = "stop")
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "event-flow.dispathcer", name = "enabled", havingValue = "true")
+    @ConditionalOnProperty(prefix = "event-flow.dispatcher", name = "enabled", havingValue = "true")
     public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
                                            @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
                                            @Qualifier("dispatcherTransports") List<InTransport> inTransports) {
@@ -79,7 +79,7 @@ public class DispatcherConfiguration {
      */
     @Bean("dispatcherTransports")
     @ConditionalOnMissingBean(name = "dispatcherTransports")
-    @ConditionalOnProperty(prefix = "event-flow.dispathcer", name = "enabled", havingValue = "true")
+    @ConditionalOnProperty(prefix = "event-flow.dispatcher", name = "enabled", havingValue = "true")
     public List<InTransport> dispatcherTransports() {
         List<InTransport> transports = new ArrayList<>();
         // Create transports from configuration
@@ -96,22 +96,17 @@ public class DispatcherConfiguration {
             }
         } else {
             log.warn("""
-                    
                     ╔═════════════════════════════════════════════════════════════╗
-                    ║  Event Flow Dispatcher enabled but no transports configured ║
-                    ║                                                             ║
-                    ║  To enable event dispatching, add at least one transport    ║
-                    ║  to your application.yml:                                   ║
+                    ║ Event Flow Dispatcher enabled but no transports configured  ║
+                    ║ To enable event dispatching, add at least one transport:    ║
                     ╚═════════════════════════════════════════════════════════════╝
-                      event-flow
-                        dispatcher:                                            
-                          enabled: true                                        
-                          transports:                                          
-                            - name: local-queue                                
-                              capacity: 1000                                   
-                    ╔════════════════════════════════════════════════════════════╗
-                    ║  Available transport types: {}                             ║
-                    ╚════════════════════════════════════════════════════════════╝
+                    event-flow:
+                      dispatcher:
+                        enabled: true
+                        transports:
+                          - name: local-queue
+                            capacity: 1000
+                    Available transport types: {}
                     """, dispatcherTransportFactories.keySet());
         }
         return transports;

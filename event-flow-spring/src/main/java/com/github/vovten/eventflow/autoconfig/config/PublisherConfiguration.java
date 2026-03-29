@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.publisher.EventPublisherBuilder;
@@ -13,8 +14,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Auto-configuration for event publisher.
@@ -28,9 +32,13 @@ import static java.util.stream.Collectors.joining;
 public class PublisherConfiguration {
 
     private final EventFlowProperties properties;
+    private final Map<String, OutTransportFactory> publisherTransportFactories;
 
-    public PublisherConfiguration(EventFlowProperties properties) {
+    public PublisherConfiguration(EventFlowProperties properties,
+                                  List<OutTransportFactory> publisherTransportFactories) {
         this.properties = properties;
+        this.publisherTransportFactories = collect(publisherTransportFactories);
+        log.info("Registered publisher transport factories: {}", this.publisherTransportFactories.keySet());
     }
 
     /**
@@ -43,6 +51,23 @@ public class PublisherConfiguration {
     @ConditionalOnMissingBean(name = "eventPublisher")
     @ConditionalOnProperty(prefix = "event-flow.publisher", name = "enabled", havingValue = "true")
     public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
+        if (eventChannels.isEmpty()) {
+            log.warn("""
+                    ╔═════════════════════════════════════════════════════════════╗
+                    ║ Event Flow Publisher enabled but no channels configured     ║
+                    ║ To enable event publishing, add at least one channel:       ║
+                    ╚═════════════════════════════════════════════════════════════╝
+                    event-flow:
+                      publisher:
+                        enabled: true
+                        channels:
+                          - name: internal
+                            transports:
+                              - name: local-queue
+                                capacity: 1000
+                    Available transport types: {}
+                    """, publisherTransportFactories.keySet());
+        }
         logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
         EventPublisherBuilder builder = EventPublisherBuilder.channels(eventChannels);
@@ -69,5 +94,24 @@ public class PublisherConfiguration {
         String msg = "Configuring EventPublisher with {} channels: {}";
         String channelNames = eventChannels.stream().map(EventChannel::name).collect(joining(", "));
         log.info(msg, eventChannels.size(), channelNames);
+    }
+
+    /**
+     * Collect unique map of publisher transport factories.
+     *
+     * @param publisherTransportFactories list of factories
+     * @return map of factories by type
+     */
+    private static Map<String, OutTransportFactory> collect(List<OutTransportFactory> publisherTransportFactories) {
+        return publisherTransportFactories.stream()
+                .collect(toMap(
+                        OutTransportFactory::getName,
+                        Function.identity(),
+                        (existing, replacement) -> {
+                            log.warn("Duplicate publisher transport factory for type '{}', using: {}",
+                                    existing.getName(), existing.getClass().getSimpleName());
+                            return existing;
+                        }
+                ));
     }
 }
