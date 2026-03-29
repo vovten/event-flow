@@ -5,9 +5,7 @@ import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.util.EventUtils;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * An event that occurs in the application and can be delivered to all interested parties
@@ -18,20 +16,6 @@ import java.util.UUID;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 public interface Event {
-
-    /**
-     * Returns the unique identifier of the event.
-     *
-     * @return the unique trace identifier
-     */
-    UUID uid();
-
-    /**
-     * Returns the timestamp when the event occurred.
-     *
-     * @return the event occurrence timestamp
-     */
-    LocalDateTime occurredAt();
 
     /**
      * @return the event type
