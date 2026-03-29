@@ -57,8 +57,7 @@ public class EventFlowDisabledAutoConfiguration {
                 ║        - name: local-queue                                ║
                 ║                                                           ║
                 ║  This is a minimal configuration example. For detailed    ║
-                ║  configuration options, see event-flow.yml and default    ║
-                ║  values in EventFlowProperties class.                     ║
+                ║  configuration options see event-flow.yml                 ║
                 ╚═══════════════════════════════════════════════════════════╝
                 """;
 
