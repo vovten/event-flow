@@ -72,6 +72,7 @@ public class DispatcherConfiguration {
     /**
      * Creates dispatcher transports from configuration using factories.
      * Transport name identifies the type (e.g., "local-queue", "kafka").
+     * At least one transport must be explicitly configured when dispatcher is enabled.
      * Only created when event-flow is enabled.
      *
      * @return list of dispatcher transports
@@ -94,16 +95,25 @@ public class DispatcherConfiguration {
                 log.info("Created dispatcher transport '{}' ({})", config.getName(), config.getName());
             }
         } else {
-            // Default: create local-queue transport if factory available
-            InTransportFactory factory = dispatcherTransportFactories.get("local-queue");
-            if (factory != null) {
-                EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-                config.setName("local-queue");
-                config.setCapacity(1000);
-                InTransport transport = factory.createDispatcher(config);
-                transports.add(transport);
-                log.info("Created default local-queue dispatcher transport");
-            }
+            // Dispatcher enabled but no transports configured - log helpful message
+            log.warn("""
+                    
+                    ╔═══════════════════════════════════════════════════════════╗
+                    ║  Event Flow Dispatcher enabled but no transports configured ║
+                    ║                                                           ║
+                    ║  To enable event dispatching, add at least one transport  ║
+                    ║  to your application.yml:                                 ║
+                    ║                                                           ║
+                    ║  event-flow:                                              ║
+                    ║    dispatcher:                                            ║
+                    ║      enabled: true                                        ║
+                    ║      transports:                                          ║
+                    ║        - name: local-queue                                ║
+                    ║          capacity: 1000                                   ║
+                    ║                                                           ║
+                    ║  Available transport types: {}                            ║
+                    ╚═══════════════════════════════════════════════════════════╝
+                    """, dispatcherTransportFactories.keySet());
         }
         return transports;
     }

@@ -27,12 +27,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DispatcherConfigurationTest {
 
     @Test
-    @DisplayName("Should create EventDispatcher with default local-queue transport")
+    @DisplayName("Should create EventDispatcher with explicitly configured local-queue transport")
     void shouldCreateEventDispatcherWithDefaultLocalQueueTransport() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
+            EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
+            transportConfig.setName("local-queue");
+            transportConfig.setCapacity(1000);
+            properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));

@@ -41,6 +41,7 @@ public class PublisherConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(name = "eventPublisher")
+    @ConditionalOnProperty(prefix = "event-flow.publisher", name = "enabled", havingValue = "true")
     public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
         logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
