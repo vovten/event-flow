@@ -1,12 +1,12 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.PublisherTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import com.github.vovten.eventflow.channel.BroadcastEventChannel;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
-import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -36,10 +36,10 @@ import static java.util.stream.Collectors.toMap;
 public class ChannelConfiguration {
 
     private final EventFlowProperties properties;
-    private final Map<String, PublisherTransportFactory> publisherTransportFactories;
+    private final Map<String, OutTransportFactory> publisherTransportFactories;
 
     public ChannelConfiguration(EventFlowProperties properties,
-                                List<PublisherTransportFactory> publisherTransportFactories) {
+                                List<OutTransportFactory> publisherTransportFactories) {
         this.properties = properties;
         this.publisherTransportFactories = collect(publisherTransportFactories);
         log.info("Registered publisher transport factories: {}", this.publisherTransportFactories.keySet());
@@ -79,7 +79,7 @@ public class ChannelConfiguration {
      * @return created event channel
      */
     private EventChannel createEventChannel(EventFlowProperties.ChannelConfig config) {
-        List<PublisherTransport> transports = createPublisherTransports(config);
+        List<OutTransport> transports = createPublisherTransports(config);
         return switch (config.getName().toLowerCase()) {
             case "internal" -> new InternalEventChannel(transports);
             case "external" -> new ExternalEventChannel(transports);
@@ -96,7 +96,7 @@ public class ChannelConfiguration {
      * @return list of publisher transports
      * @throws IllegalArgumentException if channel has no transports configured
      */
-    private List<PublisherTransport> createPublisherTransports(EventFlowProperties.ChannelConfig config) {
+    private List<OutTransport> createPublisherTransports(EventFlowProperties.ChannelConfig config) {
         if (config.getTransports().isEmpty()) {
             String msg = "Channel '%s' must have at least one transport configured";
             throw new IllegalArgumentException(String.format(msg, config.getName()));
@@ -106,9 +106,9 @@ public class ChannelConfiguration {
             .toList();
     }
 
-    private PublisherTransport createPublisherTransport(EventFlowProperties.TransportConfig transportConfig) {
+    private OutTransport createPublisherTransport(EventFlowProperties.TransportConfig transportConfig) {
         String name = transportConfig.getName();
-        PublisherTransportFactory factory = publisherTransportFactories.get(name);
+        OutTransportFactory factory = publisherTransportFactories.get(name);
         if (factory == null) {
             String msg = "No factory found for transport name '%s'. Available factories: %s";
             throw new IllegalStateException(String.format(msg, name, publisherTransportFactories.keySet()));
@@ -123,10 +123,10 @@ public class ChannelConfiguration {
      * @param publisherTransportFactories list of factories
      * @return map of factories by type
      */
-    private static Map<String, PublisherTransportFactory> collect(List<PublisherTransportFactory> publisherTransportFactories) {
+    private static Map<String, OutTransportFactory> collect(List<OutTransportFactory> publisherTransportFactories) {
         return publisherTransportFactories.stream()
                 .collect(toMap(
-                        PublisherTransportFactory::getName,
+                        OutTransportFactory::getName,
                         Function.identity(),
                         (existing, replacement) -> {
                             log.warn("Duplicate publisher transport factory for type '{}', using: {}",
@@ -139,6 +139,6 @@ public class ChannelConfiguration {
     /**
      * Generic event channel for custom channel names.
      */
-    private record GenericEventChannel(String name, List<PublisherTransport> transports) implements EventChannel {
+    private record GenericEventChannel(String name, List<OutTransport> transports) implements EventChannel {
     }
 }

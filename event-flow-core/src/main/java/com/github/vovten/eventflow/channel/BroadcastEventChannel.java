@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 import java.util.List;
 
 /**
@@ -69,7 +69,7 @@ public class BroadcastEventChannel extends AbstractEventChannel {
      *
      * @param transports list of transports for broadcasting events
      */
-    public BroadcastEventChannel(List<PublisherTransport> transports) {
+    public BroadcastEventChannel(List<OutTransport> transports) {
         super(transports);
     }
 
@@ -81,7 +81,7 @@ public class BroadcastEventChannel extends AbstractEventChannel {
      *
      * @param transport the transport for this channel
      */
-    public BroadcastEventChannel(PublisherTransport transport) {
+    public BroadcastEventChannel(OutTransport transport) {
         super(transport);
     }
 

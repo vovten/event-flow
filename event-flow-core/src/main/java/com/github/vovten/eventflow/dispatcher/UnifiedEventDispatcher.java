@@ -3,7 +3,7 @@ package com.github.vovten.eventflow.dispatcher;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
-import com.github.vovten.eventflow.transport.DispatcherTransport;
+import com.github.vovten.eventflow.transport.InTransport;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -16,7 +16,7 @@ import static java.util.stream.Collectors.joining;
  * Unified event dispatcher that listens to events from multiple transport sources.
  * <p>
  * This dispatcher can listen to multiple
- * {@link DispatcherTransport} instances simultaneously, delivering events from all
+ * {@link InTransport} instances simultaneously, delivering events from all
  * sources to the registered handlers.
  * <p>
  * <b>Key features:</b>
@@ -65,7 +65,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     private final ExecutorService executorService;
     private final EventHandlerRegistry handlerRegistry;
-    private final List<DispatcherTransport> transports;
+    private final List<InTransport> transports;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
@@ -77,7 +77,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
      */
     public UnifiedEventDispatcher(ExecutorService executorService,
                                   EventHandlerRegistry handlerRegistry,
-                                  List<DispatcherTransport> transports) {
+                                  List<InTransport> transports) {
         this.transports = transports;
         this.executorService = executorService;
         this.handlerRegistry = handlerRegistry;
@@ -86,7 +86,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     @Override
     public void start() {
         if (started.compareAndSet(false, true)) {
-            for (DispatcherTransport transport : transports) {
+            for (InTransport transport : transports) {
                 transport.start(this::dispatch);
             }
             log.info(buildDispatcherStartedMsg());
@@ -99,7 +99,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     public void stop() {
         if (started.compareAndSet(true, false)) {
             log.info("Stopping UnifiedEventDispatcher...");
-            for (DispatcherTransport transport : transports) {
+            for (InTransport transport : transports) {
                 tryStop(transport);
             }
             log.info("UnifiedEventDispatcher stopped");
@@ -130,7 +130,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         return handlerRegistry.isRegistered(handler);
     }
 
-    private void tryStop(DispatcherTransport transport) {
+    private void tryStop(InTransport transport) {
         try {
             transport.stop();
         } catch (Exception e) {
@@ -140,7 +140,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     private String buildDispatcherStartedMsg() {
         String msg = "UnifiedEventDispatcher started with %s transport(s): %s";
-        String names = transports.stream().map(DispatcherTransport::name).collect(joining(","));
+        String names = transports.stream().map(InTransport::name).collect(joining(","));
         return String.format(msg, transports.size(), names);
     }
 }

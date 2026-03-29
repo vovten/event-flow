@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 
 import java.util.List;
 
@@ -36,7 +36,7 @@ public interface EventChannel {
     /**
      * @return list of transports configured for this channel
      */
-    List<PublisherTransport> transports();
+    List<OutTransport> transports();
 
     /**
      * Send event to all transports associated with this channel.
@@ -48,7 +48,7 @@ public interface EventChannel {
      * @param event the event to send
      */
     default void send(Event event) {
-        for (PublisherTransport transport : transports()) {
+        for (OutTransport transport : transports()) {
             transport.send(event);
         }
     }

@@ -2,7 +2,7 @@ package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,15 +18,15 @@ import static org.mockito.Mockito.*;
 @DisplayName("EventChannel Tests")
 class EventChannelTest {
 
-    private PublisherTransport transport1;
-    private PublisherTransport transport2;
+    private OutTransport transport1;
+    private OutTransport transport2;
     private TestEventChannel channel;
     private TestEvent testEvent;
 
     @BeforeEach
     void setUp() {
-        transport1 = mock(PublisherTransport.class);
-        transport2 = mock(PublisherTransport.class);
+        transport1 = mock(OutTransport.class);
+        transport2 = mock(OutTransport.class);
         channel = new TestEventChannel(List.of(transport1, transport2));
         testEvent = new TestEvent();
     }
@@ -58,7 +58,7 @@ class EventChannelTest {
     @Test
     @DisplayName("Should return configured transports")
     void shouldReturnConfiguredTransports() {
-        List<PublisherTransport> transports = channel.transports();
+        List<OutTransport> transports = channel.transports();
 
         assertEquals(2, transports.size());
         assertTrue(transports.contains(transport1));
@@ -66,9 +66,9 @@ class EventChannelTest {
     }
 
     static class TestEventChannel implements EventChannel {
-        private final List<PublisherTransport> transports;
+        private final List<OutTransport> transports;
 
-        TestEventChannel(List<PublisherTransport> transports) {
+        TestEventChannel(List<OutTransport> transports) {
             this.transports = transports;
         }
 
@@ -78,7 +78,7 @@ class EventChannelTest {
         }
 
         @Override
-        public List<PublisherTransport> transports() {
+        public List<OutTransport> transports() {
             return transports;
         }
     }

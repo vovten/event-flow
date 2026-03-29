@@ -156,25 +156,25 @@ public class CustomEventFlowConfig {
 
 ### Custom Transport Factory
 
-Implement `TransportFactory` to add custom transport types:
+Implement `OutTransportFactory` or `InTransportFactory` to add custom transport types:
 
 ```java
 @Component
-public class RabbitMqTransportFactory implements TransportFactory {
-    
+public class RabbitMqTransportFactory implements OutTransportFactory, InTransportFactory {
+
     @Override
-    public String getType() {
+    public String getName() {
         return "rabbitmq";
     }
-    
+
     @Override
-    public OutgoingEventTransport createOutgoing(ChannelConfig config) {
-        return new RabbitMqOutgoingTransport(config.getRabbitMqConfig());
+    public OutTransport createPublisher(EventFlowProperties.ChannelConfig config) {
+        return new RabbitMqOutTransport(config.getRabbitMqConfig());
     }
-    
+
     @Override
-    public IncomingEventTransport createIncoming(TransportConfig config) {
-        return new RabbitMqIncomingTransport(config.getRabbitMqConfig());
+    public InTransport createDispatcher(EventFlowProperties.TransportConfig config) {
+        return new RabbitMqInTransport(config.getRabbitMqConfig());
     }
 }
 ```
@@ -241,15 +241,19 @@ event-flow:
 
 ### Transport Factory Pattern
 
-The auto-configuration uses a pluggable `TransportFactory` SPI:
+The auto-configuration uses pluggable `OutTransportFactory` and `InTransportFactory` SPIs:
 
 ```
-TransportFactory (interface)
-├── InMemoryTransportFactory (default)
-└── KafkaTransportFactory (auto-discovered)
+OutTransportFactory (interface)
+├── InMemoryOutTransportFactory (default)
+└── KafkaOutTransportFactory (auto-discovered)
+
+InTransportFactory (interface)
+├── LocalQueueInTransportFactory (default)
+└── KafkaInTransportFactory (auto-discovered)
 ```
 
-New transport types can be added by implementing `TransportFactory` and annotating with `@Component`.
+New transport types can be added by implementing `OutTransportFactory` or `InTransportFactory` and annotating with `@Component`.
 
 ### Auto-Configured Beans
 
@@ -259,12 +263,12 @@ New transport types can be added by implementing `TransportFactory` and annotati
 | `SpringInterfaceEventListenerRegistry` | Scans EventListener implementers | Provide custom bean |
 | `EventListenerRegistry` | Composite of all registries | Provide custom bean |
 | `eventFlowExecutor` | Thread pool for dispatcher | Provide `ExecutorService` bean |
-| `inMemoryTransports` | Shared queue for in-memory | Provide custom bean |
+| `localQueueProvider` | Shared queue for in-memory | Provide custom bean |
 | `eventChannels` | All channels (internal + external) | Provide custom bean |
 | `eventPublisher` | Main publisher with decorators | Provide `EventPublisher` bean |
 | `eventDispatcher` | Main dispatcher | Provide `EventDispatcher` bean |
 | `incomingEventTransports` | Additional incoming transports | Provide custom beans |
-| `TransportFactory` implementations | Create transports from config | Provide custom factory |
+| `OutTransportFactory` / `InTransportFactory` implementations | Create transports from config | Provide custom factory |
 
 ### Channel Configuration
 
@@ -291,29 +295,29 @@ event-flow:
 
 ### Custom Transport Factory
 
-1. Implement `TransportFactory`:
+1. Implement `OutTransportFactory` or `InTransportFactory`:
 
 ```java
 @Component
-public class CustomTransportFactory implements TransportFactory {
-    
+public class CustomTransportFactory implements OutTransportFactory, InTransportFactory {
+
     @Override
-    public String getType() {
+    public String getName() {
         return "custom";
     }
-    
+
     @Override
-    public OutgoingEventTransport createOutgoing(ChannelConfig config) {
+    public OutTransport createPublisher(EventFlowProperties.ChannelConfig config) {
         // Create outgoing transport
     }
-    
+
     @Override
-    public IncomingEventTransport createIncoming(TransportConfig config) {
+    public InTransport createDispatcher(EventFlowProperties.TransportConfig config) {
         // Create incoming transport
     }
-    
+
     @Override
-    public void validate(ChannelConfig config) {
+    public void validate(EventFlowProperties.ChannelConfig config) {
         // Custom validation
     }
 }

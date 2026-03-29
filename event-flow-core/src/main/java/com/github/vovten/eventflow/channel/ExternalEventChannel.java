@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 
 import java.util.List;
 
@@ -36,7 +36,7 @@ public class ExternalEventChannel extends AbstractEventChannel {
      *
      * @param transports list of transports for this channel
      */
-    public ExternalEventChannel(List<PublisherTransport> transports) {
+    public ExternalEventChannel(List<OutTransport> transports) {
         super(transports);
     }
 
@@ -45,7 +45,7 @@ public class ExternalEventChannel extends AbstractEventChannel {
      *
      * @param transport the transport for this channel
      */
-    public ExternalEventChannel(PublisherTransport transport) {
+    public ExternalEventChannel(OutTransport transport) {
         super(transport);
     }
 

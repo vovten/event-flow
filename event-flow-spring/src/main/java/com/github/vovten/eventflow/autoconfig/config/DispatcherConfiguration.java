@@ -1,11 +1,11 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.DispatcherTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.InTransportFactory;
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 import com.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
-import com.github.vovten.eventflow.transport.DispatcherTransport;
+import com.github.vovten.eventflow.transport.InTransport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -35,10 +35,10 @@ import static java.util.stream.Collectors.toMap;
 public class DispatcherConfiguration {
 
     private final EventFlowProperties properties;
-    private final Map<String, DispatcherTransportFactory> dispatcherTransportFactories;
+    private final Map<String, InTransportFactory> dispatcherTransportFactories;
 
     public DispatcherConfiguration(EventFlowProperties properties,
-                                   List<DispatcherTransportFactory> dispatcherTransportFactories) {
+                                   List<InTransportFactory> dispatcherTransportFactories) {
         this.properties = properties;
         this.dispatcherTransportFactories = collect(dispatcherTransportFactories);
         log.info("Registered dispatcher transport factories: {}", this.dispatcherTransportFactories.keySet());
@@ -50,7 +50,7 @@ public class DispatcherConfiguration {
      *
      * @param dispatcherExecutor      executor service for dispatcher
      * @param eventHandlerRegistry    event handler registry
-     * @param dispatcherTransports    list of dispatcher transports
+     * @param inTransports    list of dispatcher transports
      * @return event dispatcher instance
      */
     @Bean(destroyMethod = "stop")
@@ -58,12 +58,12 @@ public class DispatcherConfiguration {
     @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
     public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
                                            @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
-                                           @Qualifier("dispatcherTransports") List<DispatcherTransport> dispatcherTransports) {
-        log.info("Configuring EventDispatcher with {} transports", dispatcherTransports.size());
+                                           @Qualifier("dispatcherTransports") List<InTransport> inTransports) {
+        log.info("Configuring EventDispatcher with {} transports", inTransports.size());
         UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
                 dispatcherExecutor,
                 eventHandlerRegistry,
-                dispatcherTransports
+                inTransports
         );
         dispatcher.start();
         return dispatcher;
@@ -79,28 +79,28 @@ public class DispatcherConfiguration {
     @Bean("dispatcherTransports")
     @ConditionalOnMissingBean(name = "dispatcherTransports")
     @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public List<DispatcherTransport> dispatcherTransports() {
-        List<DispatcherTransport> transports = new ArrayList<>();
+    public List<InTransport> dispatcherTransports() {
+        List<InTransport> transports = new ArrayList<>();
         // Create transports from configuration
         if (!properties.getDispatcher().getTransports().isEmpty()) {
             for (EventFlowProperties.TransportConfig config : properties.getDispatcher().getTransports()) {
-                DispatcherTransportFactory factory = dispatcherTransportFactories.get(config.getName());
+                InTransportFactory factory = dispatcherTransportFactories.get(config.getName());
                 if (factory == null) {
                     throwUnsupportedTransportException(config);
                 }
                 factory.validate(config);
-                DispatcherTransport transport = factory.createDispatcher(config);
+                InTransport transport = factory.createDispatcher(config);
                 transports.add(transport);
                 log.info("Created dispatcher transport '{}' ({})", config.getName(), config.getName());
             }
         } else {
             // Default: create in-memory transport if factory available
-            DispatcherTransportFactory factory = dispatcherTransportFactories.get("in-memory");
+            InTransportFactory factory = dispatcherTransportFactories.get("in-memory");
             if (factory != null) {
                 EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
                 config.setName("in-memory");
                 config.setCapacity(1000);
-                DispatcherTransport transport = factory.createDispatcher(config);
+                InTransport transport = factory.createDispatcher(config);
                 transports.add(transport);
                 log.info("Created default in-memory dispatcher transport");
             }
@@ -119,10 +119,10 @@ public class DispatcherConfiguration {
      * @param dispatcherTransportFactories list of factories
      * @return map of factories by type
      */
-    private static Map<String, DispatcherTransportFactory> collect(List<DispatcherTransportFactory> dispatcherTransportFactories) {
+    private static Map<String, InTransportFactory> collect(List<InTransportFactory> dispatcherTransportFactories) {
         return dispatcherTransportFactories.stream()
                 .collect(toMap(
-                        DispatcherTransportFactory::getType,
+                        InTransportFactory::getType,
                         Function.identity(),
                         (existing, replacement) -> {
                             log.warn("Duplicate dispatcher transport factory for type '{}', using: {}",

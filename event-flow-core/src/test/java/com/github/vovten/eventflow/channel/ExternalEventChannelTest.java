@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.PublisherTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,7 @@ class ExternalEventChannelTest {
     @Test
     @DisplayName("Should create channel with single transport")
     void shouldCreateChannelWithSingleTransport() {
-        PublisherTransport transport = mock(PublisherTransport.class);
+        OutTransport transport = mock(OutTransport.class);
         ExternalEventChannel channel = new ExternalEventChannel(transport);
 
         assertEquals("external", channel.name());
@@ -28,9 +28,9 @@ class ExternalEventChannelTest {
     @Test
     @DisplayName("Should create channel with multiple transports")
     void shouldCreateChannelWithMultipleTransports() {
-        PublisherTransport transport1 = mock(PublisherTransport.class);
-        PublisherTransport transport2 = mock(PublisherTransport.class);
-        List<PublisherTransport> transports = List.of(transport1, transport2);
+        OutTransport transport1 = mock(OutTransport.class);
+        OutTransport transport2 = mock(OutTransport.class);
+        List<OutTransport> transports = List.of(transport1, transport2);
 
         ExternalEventChannel channel = new ExternalEventChannel(transports);
 
@@ -43,9 +43,9 @@ class ExternalEventChannelTest {
     @Test
     @DisplayName("Should return immutable transports list")
     void shouldReturnImmutableTransportsList() {
-        PublisherTransport transport = mock(PublisherTransport.class);
+        OutTransport transport = mock(OutTransport.class);
         ExternalEventChannel channel = new ExternalEventChannel(transport);
 
-        assertThrows(UnsupportedOperationException.class, () -> channel.transports().add(mock(PublisherTransport.class)));
+        assertThrows(UnsupportedOperationException.class, () -> channel.transports().add(mock(OutTransport.class)));
     }
 }

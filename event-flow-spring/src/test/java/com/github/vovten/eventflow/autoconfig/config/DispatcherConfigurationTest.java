@@ -1,14 +1,14 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.dispatcher.InMemoryDispatcherTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.dispatcher.KafkaDispatcherTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTransportFactory;
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
-import com.github.vovten.eventflow.transport.DefaultQueueProvider;
-import com.github.vovten.eventflow.transport.DispatcherTransport;
-import com.github.vovten.eventflow.transport.dispatcher.InMemoryDispatcherTransport;
+import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
+import com.github.vovten.eventflow.transport.InTransport;
+import com.github.vovten.eventflow.transport.incoming.LocalQueueInTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -33,9 +33,9 @@ class DispatcherConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testDispatcherTransportFactory1", InMemoryDispatcherTransportFactory.class,
-                    () -> new InMemoryDispatcherTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testDispatcherTransportFactory1", LocalQueueInTransportFactory.class,
+                    () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
@@ -44,12 +44,12 @@ class DispatcherConfigurationTest {
 
             // when
             EventDispatcher dispatcher = context.getBean(EventDispatcher.class);
-            List<DispatcherTransport> transports = context.getBean("dispatcherTransports", List.class);
+            List<InTransport> transports = context.getBean("dispatcherTransports", List.class);
 
             // then
             assertThat(dispatcher).isNotNull();
             assertThat(transports).hasSize(1);
-            assertThat(transports.get(0)).isInstanceOf(InMemoryDispatcherTransport.class);
+            assertThat(transports.get(0)).isInstanceOf(LocalQueueInTransport.class);
         }
     }
 
@@ -66,9 +66,9 @@ class DispatcherConfigurationTest {
             properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testDispatcherTransportFactory2", InMemoryDispatcherTransportFactory.class,
-                    () -> new InMemoryDispatcherTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testDispatcherTransportFactory2", LocalQueueInTransportFactory.class,
+                    () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
@@ -77,7 +77,7 @@ class DispatcherConfigurationTest {
 
             // when
             EventDispatcher dispatcher = context.getBean(EventDispatcher.class);
-            List<DispatcherTransport> transports = context.getBean("dispatcherTransports", List.class);
+            List<InTransport> transports = context.getBean("dispatcherTransports", List.class);
 
             // then
             assertThat(dispatcher).isNotNull();
@@ -103,9 +103,9 @@ class DispatcherConfigurationTest {
             properties.getDispatcher().getTransports().add(transport2);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testDispatcherTransportFactory3", InMemoryDispatcherTransportFactory.class,
-                    () -> new InMemoryDispatcherTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testDispatcherTransportFactory3", LocalQueueInTransportFactory.class,
+                    () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
@@ -113,7 +113,7 @@ class DispatcherConfigurationTest {
             context.refresh();
 
             // when
-            List<DispatcherTransport> transports = context.getBean("dispatcherTransports", List.class);
+            List<InTransport> transports = context.getBean("dispatcherTransports", List.class);
 
             // then
             assertThat(transports).hasSize(2);
@@ -131,13 +131,13 @@ class DispatcherConfigurationTest {
             properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
             // Only in-memory factory, not kafka
-            context.registerBean("testDispatcherTransportFactory4", InMemoryDispatcherTransportFactory.class,
-                    () -> new InMemoryDispatcherTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testDispatcherTransportFactory4", LocalQueueInTransportFactory.class,
+                    () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(DispatcherConfiguration.class);
 
             // when & then
@@ -162,16 +162,16 @@ class DispatcherConfigurationTest {
             properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.registerBean(KafkaDispatcherTransportFactory.class, () -> new KafkaDispatcherTransportFactory());
+            context.registerBean(KafkaInTransportFactory.class, () -> new KafkaInTransportFactory());
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
             // when
-            List<DispatcherTransport> transports = context.getBean("dispatcherTransports", List.class);
+            List<InTransport> transports = context.getBean("dispatcherTransports", List.class);
 
             // then
             assertThat(transports).hasSize(1);
@@ -186,13 +186,13 @@ class DispatcherConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
             context.registerBean("customDispatcher", EventDispatcher.class, () -> null);
-            context.registerBean("testDispatcherTransportFactory5", InMemoryDispatcherTransportFactory.class,
-                    () -> new InMemoryDispatcherTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testDispatcherTransportFactory5", LocalQueueInTransportFactory.class,
+                    () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -209,13 +209,13 @@ class DispatcherConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
             context.registerBean("dispatcherTransports", List.class, () -> List.of());
-            context.registerBean("testDispatcherTransportFactory6", InMemoryDispatcherTransportFactory.class,
-                    () -> new InMemoryDispatcherTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean("testDispatcherTransportFactory6", LocalQueueInTransportFactory.class,
+                    () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -233,9 +233,9 @@ class DispatcherConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testDispatcherTransportFactory7", InMemoryDispatcherTransportFactory.class,
-                    () -> new InMemoryDispatcherTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testDispatcherTransportFactory7", LocalQueueInTransportFactory.class,
+                    () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));

@@ -1,12 +1,12 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.dispatcher.InMemoryDispatcherTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.dispatcher.KafkaDispatcherTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.publisher.BroadcastKafkaPublisherTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.publisher.InMemoryPublisherTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.publisher.KafkaPublisherTransportFactory;
-import com.github.vovten.eventflow.transport.DefaultQueueProvider;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.InMemoryOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
+import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -65,14 +65,14 @@ public class CommonConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    public DefaultQueueProvider queueProvider() {
+    public DefaultLocalQueueProvider queueProvider() {
         int capacity = properties.getDispatcher().getTransports().stream()
                 .filter(config -> "in-memory".equalsIgnoreCase(config.getName()))
                 .findFirst()
                 .map(EventFlowProperties.TransportConfig::getCapacity)
                 .orElse(1000);
         log.info("Creating QueueProvider with capacity: {}", capacity);
-        return new DefaultQueueProvider(capacity);
+        return new DefaultLocalQueueProvider(capacity);
     }
 
     /**
@@ -82,8 +82,8 @@ public class CommonConfiguration {
      * @return in-memory publisher transport factory
      */
     @Bean
-    public InMemoryPublisherTransportFactory inMemoryPublisherTransportFactory(DefaultQueueProvider queueProvider) {
-        return new InMemoryPublisherTransportFactory(queueProvider);
+    public InMemoryOutTransportFactory inMemoryPublisherTransportFactory(DefaultLocalQueueProvider queueProvider) {
+        return new InMemoryOutTransportFactory(queueProvider);
     }
 
     /**
@@ -93,8 +93,8 @@ public class CommonConfiguration {
      * @return in-memory dispatcher transport factory
      */
     @Bean
-    public InMemoryDispatcherTransportFactory inMemoryDispatcherTransportFactory(DefaultQueueProvider queueProvider) {
-        return new InMemoryDispatcherTransportFactory(queueProvider);
+    public LocalQueueInTransportFactory inMemoryDispatcherTransportFactory(DefaultLocalQueueProvider queueProvider) {
+        return new LocalQueueInTransportFactory(queueProvider);
     }
 
     /**
@@ -103,8 +103,8 @@ public class CommonConfiguration {
      * @return Kafka publisher transport factory
      */
     @Bean
-    public KafkaPublisherTransportFactory kafkaPublisherTransportFactory() {
-        return new KafkaPublisherTransportFactory();
+    public KafkaOutTransportFactory kafkaPublisherTransportFactory() {
+        return new KafkaOutTransportFactory();
     }
 
     /**
@@ -113,8 +113,8 @@ public class CommonConfiguration {
      * @return Kafka dispatcher transport factory
      */
     @Bean
-    public KafkaDispatcherTransportFactory kafkaDispatcherTransportFactory() {
-        return new KafkaDispatcherTransportFactory();
+    public KafkaInTransportFactory kafkaDispatcherTransportFactory() {
+        return new KafkaInTransportFactory();
     }
 
     /**
@@ -123,7 +123,7 @@ public class CommonConfiguration {
      * @return broadcast Kafka publisher transport factory
      */
     @Bean
-    public BroadcastKafkaPublisherTransportFactory broadcastKafkaPublisherTransportFactory() {
-        return new BroadcastKafkaPublisherTransportFactory();
+    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory() {
+        return new BroadcastKafkaOutTransportFactory();
     }
 }

@@ -9,9 +9,9 @@ import com.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
 import com.github.vovten.eventflow.test.ExternalTestEvent;
-import com.github.vovten.eventflow.transport.dispatcher.KafkaDispatcherTransport;
-import com.github.vovten.eventflow.transport.publisher.InMemoryPublisherTransport;
-import com.github.vovten.eventflow.transport.publisher.KafkaPublisherTransport;
+import com.github.vovten.eventflow.transport.incoming.KafkaInTransport;
+import com.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
+import com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -66,14 +66,14 @@ class ExternalPublisherDispatcherIntegrationTest {
 
         Properties kafkaProps = new Properties();
         kafkaProps.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
-        var kafkaTransport = new KafkaPublisherTransport(kafkaProps, "test-events");
+        var kafkaTransport = new KafkaOutTransport(kafkaProps, "test-events");
         var externalChannel = new ExternalEventChannel(List.of(kafkaTransport));
-        var transport = new InMemoryPublisherTransport(new LinkedBlockingDeque<>(1000));
+        var transport = new LocalQueueOutTransport(new LinkedBlockingDeque<>(1000));
         var internalChannel = new InternalEventChannel(List.of(transport));
 
         publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
         dispatcherExecutor = Executors.newFixedThreadPool(2);
-        KafkaDispatcherTransport kafkaInTransport = new KafkaDispatcherTransport(
+        KafkaInTransport kafkaInTransport = new KafkaInTransport(
                 createDispatcherConsumer(),
                 List.of("test-events"),
                 dispatcherExecutor

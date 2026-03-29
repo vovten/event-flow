@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.autoconfig;
 
 import com.github.vovten.eventflow.autoconfig.config.CommonConfiguration;
-import com.github.vovten.eventflow.transport.DefaultQueueProvider;
+import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -53,7 +53,7 @@ class CommonConfigurationTest {
             context.refresh();
 
             // when
-            DefaultQueueProvider queueProvider = context.getBean(DefaultQueueProvider.class);
+            DefaultLocalQueueProvider queueProvider = context.getBean(DefaultLocalQueueProvider.class);
 
             // then
             assertThat(queueProvider).isNotNull();
@@ -76,7 +76,7 @@ class CommonConfigurationTest {
             context.refresh();
 
             // when
-            DefaultQueueProvider queueProvider = context.getBean(DefaultQueueProvider.class);
+            DefaultLocalQueueProvider queueProvider = context.getBean(DefaultLocalQueueProvider.class);
 
             // then
             assertThat(queueProvider).isNotNull();
@@ -116,7 +116,7 @@ class CommonConfigurationTest {
             context.refresh();
 
             // when
-            DefaultQueueProvider queueProvider = context.getBean(DefaultQueueProvider.class);
+            DefaultLocalQueueProvider queueProvider = context.getBean(DefaultLocalQueueProvider.class);
 
             // then
             assertThat(queueProvider).isNotNull();
@@ -156,7 +156,7 @@ class CommonConfigurationTest {
             context.refresh();
 
             // when
-            DefaultQueueProvider queueProvider = context.getBean("customQueueProvider", DefaultQueueProvider.class);
+            DefaultLocalQueueProvider queueProvider = context.getBean("customQueueProvider", DefaultLocalQueueProvider.class);
 
             // then
             assertThat(queueProvider).isNotNull();
@@ -176,8 +176,8 @@ class CommonConfigurationTest {
     static class CustomQueueProviderConfig {
         @Bean(name = "customQueueProvider")
         @ConditionalOnMissingBean
-        public DefaultQueueProvider customQueueProvider() {
-            return new DefaultQueueProvider(100);
+        public DefaultLocalQueueProvider customQueueProvider() {
+            return new DefaultLocalQueueProvider(100);
         }
     }
 }
