@@ -67,6 +67,23 @@ public class ChannelConfiguration {
      * @return list of configured event channels
      */
     private List<EventChannel> createConfiguredChannels() {
+        if (properties.getPublisher().getChannels().isEmpty()) {
+            log.warn("""
+                   ╔═══════════════════════════════════════════════════════════╗
+                   ║ Event Flow Publisher enabled but no channels configured   ║
+                   ║ To enable event publishing, add at least one channel:     ║
+                   ╚═══════════════════════════════════════════════════════════╝
+                    event-flow:
+                      publisher:
+                        enabled: true
+                        channels:
+                          - name: internal
+                            transports:
+                              - name: local-queue
+                                capacity: 1000
+                    Available transport types: {}
+                    """, publisherTransportFactories.keySet());
+        }
         return properties.getPublisher().getChannels().stream()
             .map(this::createEventChannel)
             .toList();
