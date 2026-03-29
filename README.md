@@ -21,7 +21,7 @@
 
 - **Event Model** — Type-safe events with JSON serialization
 - **Flexible Routing** — Event channels with configurable transports
-- **Multiple Transports** — In-Memory and Apache Kafka support out of the box
+- **Multiple Transports** — Local-Queue and Apache Kafka support out of the box
 - **Annotation-Based** — Event handling via `@EventListener`
 - **Interface-Based** — Event handling via `EventListener` interface implementation
 - **Spring Integration** — Automatic listener discovery in Spring Context
@@ -41,7 +41,7 @@
 │  │   Publisher  │────────▶│           Event Channels                │  │
 │  │   (Builder)  │         │  ┌─────────────┐  ┌─────────────────┐   │  │
 │  └──────────────┘         │  │   Internal  │  │    External     │   │  │
-│                           │  │  (In-Memory)│  │    (Kafka)      │   │  │
+│                           │  │  (Local-Queue)│  │    (Kafka)      │   │  │
 │                           │  └──────┬──────┘  └────────┬────────┘   │  │
 │                           │         │                 │                │
 │                           └─────────┼─────────────────┼────────────┘   │
@@ -49,7 +49,7 @@
 │                           ┌─────────▼─────────────────▼────────────┐   │
 │                           │     Outgoing Event Transports           │  │
 │                           │  ┌─────────────┐  ┌─────────────────┐  │  │
-│                           │  │  In-Memory  │  │      Kafka      │  │  │
+│                           │  │  Local-Queue  │  │      Kafka      │  │  │
 │                           │  │   Queue     │  │    Producer     │  │  │
 │                           │  └─────────────┘  └─────────────────┘  │  │
 │                           └─────────────────────────────────────────┘  │
@@ -66,7 +66,7 @@
 │                           ┌─────────────────────────────────────────┐  │
 │                           │      Incoming Event Transports          │  │
 │                           │  ┌─────────────┐  ┌─────────────────┐  │  │
-│                           │  │  In-Memory  │  │      Kafka      │  │  │
+│                           │  │  Local-Queue  │  │      Kafka      │  │  │
 │                           │  │   Queue     │  │    Consumer     │  │  │
 │                           │  └─────────────┘  └─────────────────┘  │  │
 │                           └─────────┬─────────────────┬────────────┘  │
@@ -443,11 +443,11 @@ Registry for discovering and managing listeners.
 Transports for event delivery.
 
 **Incoming Transports (`InTransport`):**
-- `LocalQueueInTransport` — receive from in-memory queue
+- `LocalQueueInTransport` — receive from local-queue
 - `KafkaInTransport` — receive from Kafka topics
 
 **Outgoing Transports (`OutTransport`):**
-- `LocalQueueOutTransport` — send to in-memory queue
+- `LocalQueueOutTransport` — send to local-queue
 - `KafkaOutTransport` — send to Kafka topic
 - `BroadcastKafkaOutTransport` — send to all Kafka topic partitions
 
@@ -599,7 +599,7 @@ event.listener.scan.package=com.example
 # Unified dispatcher
 event.dispatcher.enabled=true
 
-# Internal event bus (in-memory)
+# Internal event bus (local-queue)
 event.internal.enabled=true
 
 # External event bus (Kafka)

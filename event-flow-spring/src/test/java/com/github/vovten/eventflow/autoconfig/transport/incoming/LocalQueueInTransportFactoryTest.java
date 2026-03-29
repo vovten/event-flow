@@ -9,13 +9,13 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Unit tests for in-memory dispatcher transport factory.
+ * Unit tests for local-queue dispatcher transport factory.
  */
 class LocalQueueInTransportFactoryTest {
 
     @Test
-    @DisplayName("InMemoryDispatcherTransportFactory should have correct type")
-    void inMemoryDispatcherTransportFactoryShouldHaveCorrectType() {
+    @DisplayName("LocalQueueDispatcherTransportFactory should have correct type")
+    void localQueueDispatcherTransportFactoryShouldHaveCorrectType() {
         // given
         DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
         LocalQueueInTransportFactory factory = new LocalQueueInTransportFactory(queueProvider);
@@ -24,12 +24,12 @@ class LocalQueueInTransportFactoryTest {
         String type = factory.getType();
 
         // then
-        assertThat(type).isEqualTo("in-memory");
+        assertThat(type).isEqualTo("local-queue");
     }
 
     @Test
-    @DisplayName("InMemoryDispatcherTransportFactory should create dispatcher transport")
-    void inMemoryDispatcherTransportFactoryShouldCreateDispatcherTransport() {
+    @DisplayName("LocalQueueDispatcherTransportFactory should create dispatcher transport")
+    void localQueueDispatcherTransportFactoryShouldCreateDispatcherTransport() {
         // given
         DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
         LocalQueueInTransportFactory factory = new LocalQueueInTransportFactory(queueProvider);
@@ -45,8 +45,8 @@ class LocalQueueInTransportFactoryTest {
     }
 
     @Test
-    @DisplayName("InMemoryDispatcherTransportFactory should validate config without error")
-    void inMemoryDispatcherTransportFactoryShouldValidateConfigWithoutError() {
+    @DisplayName("LocalQueueDispatcherTransportFactory should validate config without error")
+    void localQueueDispatcherTransportFactoryShouldValidateConfigWithoutError() {
         // given
         DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
         LocalQueueInTransportFactory factory = new LocalQueueInTransportFactory(queueProvider);

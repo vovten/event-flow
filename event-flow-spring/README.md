@@ -114,7 +114,7 @@ event-flow:
         consumer-group: my-service-group
 ```
 
-### Custom In-Memory Configuration
+### Custom Local-Queue Configuration
 
 ```yaml
 event-flow:
@@ -125,7 +125,7 @@ event-flow:
       max-size: 4
       queue-capacity: 500
     transports:
-      - type: in-memory
+      - type: local-queue
         capacity: 500
 ```
 
@@ -223,15 +223,15 @@ event-flow:
         bootstrap-servers: localhost:9092
 ```
 
-### Coupled In-Memory Publisher/Dispatcher
+### Coupled Local-Queue Publisher/Dispatcher
 
-By default, publisher and dispatcher share the same in-memory queue for efficient internal communication:
+By default, publisher and dispatcher share the same local-queue queue for efficient internal communication:
 
 ```yaml
 event-flow:
   dispatcher:
     transports:
-      - type: in-memory
+      - type: local-queue
         capacity: 1000  # Shared queue size
 ```
 
@@ -245,7 +245,7 @@ The auto-configuration uses pluggable `OutTransportFactory` and `InTransportFact
 
 ```
 OutTransportFactory (interface)
-├── InMemoryOutTransportFactory (default)
+├── LocalQueueOutTransportFactory (default)
 └── KafkaOutTransportFactory (auto-discovered)
 
 InTransportFactory (interface)
@@ -263,7 +263,7 @@ New transport types can be added by implementing `OutTransportFactory` or `InTra
 | `SpringInterfaceEventListenerRegistry` | Scans EventListener implementers | Provide custom bean |
 | `EventListenerRegistry` | Composite of all registries | Provide custom bean |
 | `eventFlowExecutor` | Thread pool for dispatcher | Provide `ExecutorService` bean |
-| `localQueueProvider` | Shared queue for in-memory | Provide custom bean |
+| `localQueueProvider` | Shared queue for local-queue | Provide custom bean |
 | `eventChannels` | All channels (internal + external) | Provide custom bean |
 | `eventPublisher` | Main publisher with decorators | Provide `EventPublisher` bean |
 | `eventDispatcher` | Main dispatcher | Provide `EventDispatcher` bean |
@@ -279,7 +279,7 @@ event-flow:
   publisher:
     channels:
       - name: internal      # → InternalEventChannel
-        type: in-memory
+        type: local-queue
         capacity: 1000
       - name: external      # → ExternalEventChannel
         type: kafka

@@ -27,14 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * <pre>{@code
  * Event → ChannelEventPublisher → EventChannel → OutgoingEventTransport(s)
  *                                      ↓
- *                              KafkaTransport, InMemoryTransport, etc.
+ *                              KafkaTransport, LocalQueueTransport, etc.
  * }</pre>
  * <p>
  * <b>Usage example (manual configuration):</b>
  * <pre>{@code
  * // Create channels with their transports
  * EventChannel internalChannel = new InternalEventChannel(
- *     List.of(new InMemoryOutgoingEventTransport(1000))
+ *     List.of(new LocalQueueOutgoingEventTransport(1000))
  * );
  * EventChannel externalChannel = new ExternalEventChannel(
  *     List.of(new KafkaOutgoingEventTransport(bootstrapServers, "events"))

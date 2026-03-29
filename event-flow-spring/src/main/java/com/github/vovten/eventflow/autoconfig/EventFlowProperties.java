@@ -29,7 +29,7 @@ import java.util.List;
  *     channels:
  *       - name: internal
  *         transports:
- *           - name: in-memory
+ *           - name: local-queue
  *             capacity: 1000
  *       - name: external
  *         transports:
@@ -44,7 +44,7 @@ import java.util.List;
  *       queue-capacity: 100
  *       keep-alive-seconds: 60
  *     transports:
- *       - name: in-memory
+ *       - name: local-queue
  *         capacity: 1000
  *       - name: kafka
  *         topic: events-topic
@@ -94,7 +94,7 @@ public class EventFlowProperties {
             ChannelConfig config = new ChannelConfig();
             config.setName("internal");
             TransportConfig transport = new TransportConfig();
-            transport.setName("in-memory");
+            transport.setName("local-queue");
             transport.setCapacity(1000);
             config.setTransports(List.of(transport));
             return config;
@@ -120,7 +120,7 @@ public class EventFlowProperties {
         private String name = "internal";
         /**
          * List of transport configurations.
-         * Transport name identifies the type (e.g., "in-memory", "kafka").
+         * Transport name identifies the type (e.g., "local-queue", "kafka").
          */
         private List<TransportConfig> transports = new ArrayList<>();
     }
@@ -136,7 +136,7 @@ public class EventFlowProperties {
 
         private static TransportConfig createDefaultTransport() {
             TransportConfig config = new TransportConfig();
-            config.setName("in-memory");
+            config.setName("local-queue");
             config.setCapacity(1000);
             return config;
         }
@@ -155,11 +155,11 @@ public class EventFlowProperties {
 
     /**
      * Transport configuration.
-     * Name identifies the transport type (e.g., "in-memory", "kafka").
+     * Name identifies the transport type (e.g., "local-queue", "kafka").
      */
     @Data
     public static class TransportConfig {
-        private String name = "in-memory";
+        private String name = "local-queue";
         private int capacity = 1000;
         private String topic;
         private String bootstrapServers;

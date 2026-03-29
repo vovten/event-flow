@@ -7,9 +7,9 @@ import com.github.vovten.eventflow.transport.InTransport;
 import com.github.vovten.eventflow.transport.incoming.LocalQueueInTransport;
 
 /**
- * Factory for creating in-memory dispatcher event transports.
+ * Factory for creating local-queue dispatcher event transports.
  * <p>
- * Uses a shared {@link DefaultLocalQueueProvider} for all in-memory transports.
+ * Uses a shared {@link DefaultLocalQueueProvider} for all local-queue transports.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-11
@@ -24,7 +24,7 @@ public class LocalQueueInTransportFactory implements InTransportFactory {
 
     @Override
     public String getType() {
-        return "in-memory";
+        return "local-queue";
     }
 
     @Override
@@ -35,6 +35,6 @@ public class LocalQueueInTransportFactory implements InTransportFactory {
 
     @Override
     public void validate(EventFlowProperties.TransportConfig config) {
-        // In-memory transport requires no additional configuration
+        // Local-queue transport requires no additional configuration
     }
 }

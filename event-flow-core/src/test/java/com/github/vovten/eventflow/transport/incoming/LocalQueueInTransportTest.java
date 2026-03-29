@@ -17,9 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Unit tests for InMemoryDispatcherTransport.
+ * Unit tests for LocalQueueDispatcherTransport.
  */
-@DisplayName("InMemoryDispatcherTransport Tests")
+@DisplayName("LocalQueueDispatcherTransport Tests")
 class LocalQueueInTransportTest {
 
     private ExecutorService testExecutor;
@@ -43,7 +43,7 @@ class LocalQueueInTransportTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         LocalQueueInTransport transport = new LocalQueueInTransport(queue, executor);
 
-        assertEquals("in-memory", transport.name());
+        assertEquals("local-queue", transport.name());
     }
 
     @Test

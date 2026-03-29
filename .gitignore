@@ -4,8 +4,9 @@
 /.idea/modules.xml
 /src/test/resources/logback-test.xml
 /.idea/
-"target/"  
+"target/"
 /event-flow-core/event-flow-core.iml
 /event-flow-spring/event-flow-spring.iml
 /event-flow-core/target/
 /event-flow-spring/target/
+.qwen/

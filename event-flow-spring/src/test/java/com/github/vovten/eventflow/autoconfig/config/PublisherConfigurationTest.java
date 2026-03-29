@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.outgoing.InMemoryOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.publisher.TransactionalEventPublisher;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
@@ -27,14 +27,14 @@ class PublisherConfigurationTest {
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutTransportFactory.class,
-                    () -> new InMemoryOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -58,14 +58,14 @@ class PublisherConfigurationTest {
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutTransportFactory.class,
-                    () -> new InMemoryOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -89,14 +89,14 @@ class PublisherConfigurationTest {
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutTransportFactory.class,
-                    () -> new InMemoryOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -120,13 +120,13 @@ class PublisherConfigurationTest {
             EventFlowProperties.ChannelConfig internalChannel = new EventFlowProperties.ChannelConfig();
             internalChannel.setName("internal");
             EventFlowProperties.TransportConfig internalTransport = new EventFlowProperties.TransportConfig();
-            internalTransport.setName("in-memory");
+            internalTransport.setName("local-queue");
             internalChannel.getTransports().add(internalTransport);
 
             EventFlowProperties.ChannelConfig customChannel = new EventFlowProperties.ChannelConfig();
             customChannel.setName("custom");
             EventFlowProperties.TransportConfig customTransport = new EventFlowProperties.TransportConfig();
-            customTransport.setName("in-memory");
+            customTransport.setName("local-queue");
             customChannel.getTransports().add(customTransport);
 
             properties.getPublisher().getChannels().add(internalChannel);
@@ -134,8 +134,8 @@ class PublisherConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutTransportFactory.class,
-                    () -> new InMemoryOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -159,15 +159,15 @@ class PublisherConfigurationTest {
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.register(CustomPublisherConfig.class);
-            context.registerBean("testOutgoingTransportFactory", InMemoryOutTransportFactory.class,
-                    () -> new InMemoryOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();

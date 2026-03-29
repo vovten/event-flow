@@ -48,12 +48,12 @@ event-flow:
 
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
-    # Transport name identifies the type (e.g., "in-memory", "kafka")
+    # Transport name identifies the type (e.g., "local-queue", "kafka")
     channels:
-      # Default internal channel with in-memory transport
+      # Default internal channel with local-queue transport
       - name: internal
         transports:
-          - name: in-memory
+          - name: local-queue
             capacity: 1000
 
       # Example: External channel with Kafka transport
@@ -82,10 +82,10 @@ event-flow:
       keep-alive-seconds: 60
 
     # Incoming event transports to listen to
-    # Default: in-memory transport if not specified
+    # Default: local-queue transport if not specified
     transports:
-      # Default in-memory transport
-      - name: in-memory
+      # Default local-queue transport
+      - name: local-queue
         capacity: 1000
 
       # Example: Kafka transport
@@ -117,7 +117,7 @@ event-flow:
 #     channels:
 #       - name: internal
 #         transports:
-#           - name: in-memory
+#           - name: local-queue
 #             capacity: 1000
 #       - name: external
 #         transports:
@@ -130,14 +130,14 @@ event-flow:
 #       max-size: 32
 #       queue-capacity: 500
 #     transports:
-#       - name: in-memory
+#       - name: local-queue
 #         capacity: 1000
 #       - name: kafka
 #         topic: events
 #         bootstrapServers: kafka:9092
 #         consumerGroup: my-service-group
 #
-# Example 3: Development configuration (in-memory only)
+# Example 3: Development configuration (local-queue only)
 # ---------------------------------------------------------------------------
 # event-flow:
 #   scan-packages: com.example

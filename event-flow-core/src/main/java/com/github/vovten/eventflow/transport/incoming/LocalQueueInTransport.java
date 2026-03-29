@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * In-memory dispatcher transport for receiving internal events.
+ * Local-queue dispatcher transport for receiving internal events.
  * <p>
  * This transport listens to a bounded {@link BlockingDeque} and delivers events
  * to the registered consumer. It provides backpressure support by rejecting events
@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  * <b>Configuration example:</b>
  * <pre>{@code
  * BlockingDeque<Event> queue = new LinkedBlockingDeque<>(1000);
- * DispatcherTransport transport = new InMemoryDispatcherTransport(queue);
+ * DispatcherTransport transport = new LocalQueueDispatcherTransport(queue);
  * transport.start(event -> dispatcher.dispatch(event));
  * }</pre>
  *
@@ -42,7 +42,7 @@ public class LocalQueueInTransport implements InTransport {
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     /**
-     * Create in-memory transport with existing queue and newSingleThreadExecutor service.
+     * Create local-queue transport with existing queue and newSingleThreadExecutor service.
      *
      * @param eventQueue        the event queue to listen to
      */
@@ -52,7 +52,7 @@ public class LocalQueueInTransport implements InTransport {
     }
 
     /**
-     * Create in-memory transport with existing queue and executor service.
+     * Create local-queue transport with existing queue and executor service.
      *
      * @param eventQueue        the event queue to listen to
      * @param executorService   executor service for running the consumer loop
@@ -64,23 +64,23 @@ public class LocalQueueInTransport implements InTransport {
 
     @Override
     public String name() {
-        return "in-memory";
+        return "local-queue";
     }
 
     @Override
     public void start(Consumer<Event> eventConsumer) {
         if (running.compareAndSet(false, true)) {
             executorService.execute(() -> consumeLoop(eventConsumer));
-            log.debug("InMemoryDispatcherTransport started");
+            log.debug("LocalQueueDispatcherTransport started");
         } else {
-            log.warn("InMemoryDispatcherTransport is already running");
+            log.warn("LocalQueueDispatcherTransport is already running");
         }
     }
 
     @Override
     public void stop() {
         if (running.compareAndSet(true, false)) {
-            log.info("InMemoryDispatcherTransport stopped");
+            log.info("LocalQueueDispatcherTransport stopped");
             if (executorService != null && !executorService.isShutdown()) {
                 executorService.shutdownNow();
             }
@@ -95,7 +95,7 @@ public class LocalQueueInTransport implements InTransport {
                     tryDeliver(event, eventConsumer);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    log.debug("InMemoryDispatcherTransport consumer loop interrupted");
+                    log.debug("LocalQueueDispatcherTransport consumer loop interrupted");
                     break;
                 } catch (Exception e) {
                     if (running.get()) {
@@ -105,7 +105,7 @@ public class LocalQueueInTransport implements InTransport {
             }
         } catch (Exception e) {
             if (running.get()) {
-                log.error("InMemoryDispatcherTransport loop error", e);
+                log.error("LocalQueueDispatcherTransport loop error", e);
             }
         }
     }
@@ -113,9 +113,9 @@ public class LocalQueueInTransport implements InTransport {
     private void tryDeliver(Event event, Consumer<Event> eventConsumer) {
         try {
             eventConsumer.accept(event);
-            log.debug("Event delivered from in-memory queue: {}", event.type().getSimpleName());
+            log.debug("Event delivered from local-queue: {}", event.type().getSimpleName());
         } catch (Exception e) {
-            log.error("Error delivering event from in-memory queue: {}", event, e);
+            log.error("Error delivering event from local-queue: {}", event, e);
         }
     }
 }

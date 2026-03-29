@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 
 /**
- * Default queue provider for in-memory transports.
+ * Default queue provider for local-queue transports.
  * <p>
  * Maintains separate queues for each transport name, creating them on demand.
  * All queues are bounded with the same capacity specified at provider creation.

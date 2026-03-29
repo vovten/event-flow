@@ -61,13 +61,13 @@ class CommonConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should create queue provider with custom capacity from in-memory transport")
-    void shouldCreateQueueProviderWithCustomCapacityFromInMemoryTransport() {
+    @DisplayName("Should create queue provider with custom capacity from local-queue transport")
+    void shouldCreateQueueProviderWithCustomCapacityFromLocalQueueTransport() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             transportConfig.setCapacity(500);
             properties.getDispatcher().getTransports().add(transportConfig);
 

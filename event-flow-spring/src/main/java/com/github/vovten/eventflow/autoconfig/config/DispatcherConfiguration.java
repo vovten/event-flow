@@ -71,7 +71,7 @@ public class DispatcherConfiguration {
 
     /**
      * Creates dispatcher transports from configuration using factories.
-     * Transport name identifies the type (e.g., "in-memory", "kafka").
+     * Transport name identifies the type (e.g., "local-queue", "kafka").
      * Only created when event-flow is enabled.
      *
      * @return list of dispatcher transports
@@ -94,15 +94,15 @@ public class DispatcherConfiguration {
                 log.info("Created dispatcher transport '{}' ({})", config.getName(), config.getName());
             }
         } else {
-            // Default: create in-memory transport if factory available
-            InTransportFactory factory = dispatcherTransportFactories.get("in-memory");
+            // Default: create local-queue transport if factory available
+            InTransportFactory factory = dispatcherTransportFactories.get("local-queue");
             if (factory != null) {
                 EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-                config.setName("in-memory");
+                config.setName("local-queue");
                 config.setCapacity(1000);
                 InTransport transport = factory.createDispatcher(config);
                 transports.add(transport);
-                log.info("Created default in-memory dispatcher transport");
+                log.info("Created default local-queue dispatcher transport");
             }
         }
         return transports;

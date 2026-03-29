@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author Vladimir Aleshkov
  * @since 2026-03-09
  */
-@DisplayName("InMemoryPublisherTransport Tests")
+@DisplayName("LocalQueuePublisherTransport Tests")
 class LocalQueueOutTransportTest {
 
     @Test
@@ -35,7 +35,7 @@ class LocalQueueOutTransportTest {
 
         // Assert
         assertNotNull(transport);
-        assertEquals("in-memory", transport.name());
+        assertEquals("local-queue", transport.name());
     }
 
     @Test

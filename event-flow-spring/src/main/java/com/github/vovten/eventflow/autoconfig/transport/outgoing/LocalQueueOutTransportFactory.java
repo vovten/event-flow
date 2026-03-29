@@ -7,24 +7,24 @@ import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
 
 /**
- * Factory for creating in-memory publisher event transports.
+ * Factory for creating local-queue publisher event transports.
  * <p>
- * Uses a shared {@link DefaultLocalQueueProvider} for all in-memory transports.
+ * Uses a shared {@link DefaultLocalQueueProvider} for all local-queue transports.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-11
  */
-public class InMemoryOutTransportFactory implements OutTransportFactory {
+public class LocalQueueOutTransportFactory implements OutTransportFactory {
 
     private final DefaultLocalQueueProvider queueProvider;
 
-    public InMemoryOutTransportFactory(DefaultLocalQueueProvider queueProvider) {
+    public LocalQueueOutTransportFactory(DefaultLocalQueueProvider queueProvider) {
         this.queueProvider = queueProvider;
     }
 
     @Override
     public String getName() {
-        return "in-memory";
+        return "local-queue";
     }
 
     @Override
@@ -35,6 +35,6 @@ public class InMemoryOutTransportFactory implements OutTransportFactory {
 
     @Override
     public void validate(EventFlowProperties.TransportConfig config) {
-        // In-memory transport requires no additional configuration
+        // Local-queue transport requires no additional configuration
     }
 }

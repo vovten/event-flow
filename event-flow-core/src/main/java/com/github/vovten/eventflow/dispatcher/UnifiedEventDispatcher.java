@@ -22,7 +22,7 @@ import static java.util.stream.Collectors.joining;
  * <b>Key features:</b>
  * <ul>
  *   <li>Single dispatcher implementation for all transport types</li>
- *   <li>Support for multiple transports (in-memory, Kafka, etc.)</li>
+ *   <li>Support for multiple transports (local-queue, Kafka, etc.)</li>
  *   <li>Thread-safe event delivery to handlers</li>
  *   <li>External handler registry injection</li>
  * </ul>
@@ -31,14 +31,14 @@ import static java.util.stream.Collectors.joining;
  * <pre>{@code
  * DispatcherTransport(s) → UnifiedEventDispatcher → EventHandler(s)
  *      ↓ Kafka
- *      ↓ In-Memory
+ *      ↓ Local-Queue
  *      ↓ Custom...
  * }</pre>
  * <p>
  * <b>Usage example:</b>
  * <pre>{@code
  * // Create transports
- * DispatcherTransport memoryTransport = new InMemoryDispatcherTransport(queue);
+ * DispatcherTransport localQueueTransport = new LocalQueueDispatcherTransport(queue);
  * DispatcherTransport kafkaTransport = new KafkaDispatcherTransport(
  *     "localhost:9092", "events", "my-group"
  * );
@@ -51,7 +51,7 @@ import static java.util.stream.Collectors.joining;
  * // Create dispatcher with multiple transports
  * UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
  *     executorService,
- *     List.of(memoryTransport, kafkaTransport),
+ *     List.of(localQueueTransport, kafkaTransport),
  *     registry
  * );
  * dispatcher.start();

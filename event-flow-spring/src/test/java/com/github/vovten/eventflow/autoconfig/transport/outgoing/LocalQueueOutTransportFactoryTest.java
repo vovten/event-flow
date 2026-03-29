@@ -9,30 +9,30 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Unit tests for in-memory publisher transport factory.
+ * Unit tests for local-queue publisher transport factory.
  */
 class LocalQueueOutTransportFactoryTest {
 
     @Test
-    @DisplayName("InMemoryPublisherTransportFactory should have correct type")
-    void inMemoryPublisherTransportFactoryShouldHaveCorrectType() {
+    @DisplayName("LocalQueuePublisherTransportFactory should have correct type")
+    void localQueuePublisherTransportFactoryShouldHaveCorrectType() {
         // given
         DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
-        InMemoryOutTransportFactory factory = new InMemoryOutTransportFactory(queueProvider);
+        LocalQueueOutTransportFactory factory = new LocalQueueOutTransportFactory(queueProvider);
 
         // when
         String type = factory.getName();
 
         // then
-        assertThat(type).isEqualTo("in-memory");
+        assertThat(type).isEqualTo("local-queue");
     }
 
     @Test
-    @DisplayName("InMemoryPublisherTransportFactory should create publisher transport")
-    void inMemoryPublisherTransportFactoryShouldCreatePublisherTransport() {
+    @DisplayName("LocalQueuePublisherTransportFactory should create publisher transport")
+    void localQueuePublisherTransportFactoryShouldCreatePublisherTransport() {
         // given
         DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
-        InMemoryOutTransportFactory factory = new InMemoryOutTransportFactory(queueProvider);
+        LocalQueueOutTransportFactory factory = new LocalQueueOutTransportFactory(queueProvider);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("test-queue");
@@ -45,11 +45,11 @@ class LocalQueueOutTransportFactoryTest {
     }
 
     @Test
-    @DisplayName("InMemoryPublisherTransportFactory should validate config without error")
-    void inMemoryPublisherTransportFactoryShouldValidateConfigWithoutError() {
+    @DisplayName("LocalQueuePublisherTransportFactory should validate config without error")
+    void localQueuePublisherTransportFactoryShouldValidateConfigWithoutError() {
         // given
         DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
-        InMemoryOutTransportFactory factory = new InMemoryOutTransportFactory(queueProvider);
+        LocalQueueOutTransportFactory factory = new LocalQueueOutTransportFactory(queueProvider);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("test-queue");

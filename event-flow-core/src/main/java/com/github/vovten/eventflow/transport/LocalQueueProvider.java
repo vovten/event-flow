@@ -5,7 +5,7 @@ import com.github.vovten.eventflow.event.Event;
 import java.util.concurrent.BlockingDeque;
 
 /**
- * Queue provider for in-memory transports.
+ * Queue provider for local-queue transports.
  * <p>
  * Allows getting a shared queue by transport name,
  * which provides communication between publisher and dispatcher.

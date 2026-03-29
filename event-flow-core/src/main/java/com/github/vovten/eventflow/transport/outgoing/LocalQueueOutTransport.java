@@ -7,7 +7,7 @@ import com.github.vovten.eventflow.transport.TransportException;
 import java.util.concurrent.BlockingDeque;
 
 /**
- * In-memory publisher transport for internal event delivery.
+ * Local-queue publisher transport for internal event delivery.
  * <p>
  * This transport uses a bounded {@link BlockingDeque} to queue events
  * for consumption by local event dispatchers. It provides backpressure support
@@ -23,7 +23,7 @@ import java.util.concurrent.BlockingDeque;
  * <b>Configuration example:</b>
  * <pre>{@code
  * BlockingDeque<Event> queue = new LinkedBlockingDeque<>(1000);
- * PublisherTransport transport = new InMemoryPublisherTransport(queue);
+ * PublisherTransport transport = new LocalQueuePublisherTransport(queue);
  * EventChannel channel = new InternalEventChannel(List.of(transport));
  * }</pre>
  *
@@ -35,7 +35,7 @@ public class LocalQueueOutTransport implements OutTransport {
     private final BlockingDeque<Event> eventQueue;
 
     /**
-     * Create in-memory transport with existing queue.
+     * Create local-queue transport with existing queue.
      *
      * @param eventQueue the event queue to use
      */
@@ -45,7 +45,7 @@ public class LocalQueueOutTransport implements OutTransport {
 
     @Override
     public String name() {
-        return "in-memory";
+        return "local-queue";
     }
 
     @Override

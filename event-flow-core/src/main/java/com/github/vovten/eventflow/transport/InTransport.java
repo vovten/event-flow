@@ -8,12 +8,12 @@ import java.util.function.Consumer;
  * Incoming transport — a mechanism for receiving events from external sources.
  * <p>
  * An incoming transport is responsible for receiving events from a source
- * (e.g., in-memory queue, Kafka topic) and delivering them
+ * (e.g., local-queue, Kafka topic) and delivering them
  * to the event dispatcher for further processing by listeners.
  * <p>
  * <b>Implementations:</b>
  * <ul>
- *   <li>{@link com.github.vovten.eventflow.transport.incoming.LocalQueueInTransport} — receives events from in-memory queue</li>
+ *   <li>{@link com.github.vovten.eventflow.transport.incoming.LocalQueueInTransport} — receives events from local-queue</li>
  *   <li>{@link com.github.vovten.eventflow.transport.incoming.KafkaInTransport} — receives events from Kafka topic</li>
  * </ul>
  * <p>
@@ -29,7 +29,7 @@ import java.util.function.Consumer;
 public interface InTransport {
 
     /**
-     * @return unique transport name (e.g., "kafka", "in-memory")
+     * @return unique transport name (e.g., "kafka", "local-queue")
      */
     String name();
 

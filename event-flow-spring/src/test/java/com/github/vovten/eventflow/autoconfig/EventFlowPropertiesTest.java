@@ -107,7 +107,7 @@ class EventFlowPropertiesTest {
         // given
         Map<String, String> properties = Map.of(
                 "event-flow.publisher.channels[0].name", "internal",
-                "event-flow.publisher.channels[0].transports[0].name", "in-memory",
+                "event-flow.publisher.channels[0].transports[0].name", "local-queue",
                 "event-flow.publisher.channels[0].transports[0].capacity", "500",
                 "event-flow.publisher.channels[1].name", "external",
                 "event-flow.publisher.channels[1].transports[0].name", "kafka",
@@ -127,7 +127,7 @@ class EventFlowPropertiesTest {
         var internalChannel = eventFlowProperties.getPublisher().getChannels().get(0);
         assertThat(internalChannel.getName()).isEqualTo("internal");
         assertThat(internalChannel.getTransports()).hasSize(1);
-        assertThat(internalChannel.getTransports().get(0).getName()).isEqualTo("in-memory");
+        assertThat(internalChannel.getTransports().get(0).getName()).isEqualTo("local-queue");
         assertThat(internalChannel.getTransports().get(0).getCapacity()).isEqualTo(500);
 
         var externalChannel = eventFlowProperties.getPublisher().getChannels().get(1);
@@ -144,7 +144,7 @@ class EventFlowPropertiesTest {
     void shouldBindCustomDispatcherTransportsConfiguration() {
         // given
         Map<String, String> properties = Map.of(
-                "event-flow.dispatcher.transports[0].name", "in-memory",
+                "event-flow.dispatcher.transports[0].name", "local-queue",
                 "event-flow.dispatcher.transports[0].capacity", "500",
                 "event-flow.dispatcher.transports[1].name", "kafka",
                 "event-flow.dispatcher.transports[1].topic", "events-topic",
@@ -161,9 +161,9 @@ class EventFlowPropertiesTest {
         // then
         assertThat(eventFlowProperties.getDispatcher().getTransports()).hasSize(2);
 
-        var inMemoryTransport = eventFlowProperties.getDispatcher().getTransports().get(0);
-        assertThat(inMemoryTransport.getName()).isEqualTo("in-memory");
-        assertThat(inMemoryTransport.getCapacity()).isEqualTo(500);
+        var localQueueTransport = eventFlowProperties.getDispatcher().getTransports().get(0);
+        assertThat(localQueueTransport.getName()).isEqualTo("local-queue");
+        assertThat(localQueueTransport.getCapacity()).isEqualTo(500);
 
         var kafkaTransport = eventFlowProperties.getDispatcher().getTransports().get(1);
         assertThat(kafkaTransport.getName()).isEqualTo("kafka");
@@ -221,11 +221,11 @@ class EventFlowPropertiesTest {
                 Map.entry("event-flow.publisher.retry.enabled", "true"),
                 Map.entry("event-flow.publisher.retry.max-attempts", "3"),
                 Map.entry("event-flow.publisher.channels[0].name", "internal"),
-                Map.entry("event-flow.publisher.channels[0].transports[0].name", "in-memory"),
+                Map.entry("event-flow.publisher.channels[0].transports[0].name", "local-queue"),
                 Map.entry("event-flow.dispatcher.enabled", "true"),
                 Map.entry("event-flow.dispatcher.thread-pool.core-size", "4"),
                 Map.entry("event-flow.dispatcher.thread-pool.max-size", "16"),
-                Map.entry("event-flow.dispatcher.transports[0].name", "in-memory"),
+                Map.entry("event-flow.dispatcher.transports[0].name", "local-queue"),
                 Map.entry("event-flow.dispatcher.transports[0].capacity", "1000")
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);

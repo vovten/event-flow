@@ -4,7 +4,7 @@ import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.outgoing.InMemoryOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Auto-configuration for common components: executor service and in-memory transports.
+ * Auto-configuration for common components: executor service and local-queue transports.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
@@ -57,17 +57,17 @@ public class CommonConfiguration {
     }
 
     /**
-     * Creates queue provider for in-memory transports with configured capacity.
+     * Creates queue provider for local-queue transports with configured capacity.
      * Uses capacity from first configured transport or default value.
-     * Always created to support in-memory transports even when event-flow is disabled.
+     * Always created to support local-queue transports even when event-flow is disabled.
      *
-     * @return queue provider for in-memory transports
+     * @return queue provider for local-queue transports
      */
     @Bean
     @ConditionalOnMissingBean
     public DefaultLocalQueueProvider queueProvider() {
         int capacity = properties.getDispatcher().getTransports().stream()
-                .filter(config -> "in-memory".equalsIgnoreCase(config.getName()))
+                .filter(config -> "local-queue".equalsIgnoreCase(config.getName()))
                 .findFirst()
                 .map(EventFlowProperties.TransportConfig::getCapacity)
                 .orElse(1000);
@@ -76,24 +76,24 @@ public class CommonConfiguration {
     }
 
     /**
-     * Creates factory for in-memory publisher transports.
+     * Creates factory for local-queue publisher transports.
      *
-     * @param queueProvider queue provider for in-memory transports
-     * @return in-memory publisher transport factory
+     * @param queueProvider queue provider for local-queue transports
+     * @return local-queue publisher transport factory
      */
     @Bean
-    public InMemoryOutTransportFactory inMemoryPublisherTransportFactory(DefaultLocalQueueProvider queueProvider) {
-        return new InMemoryOutTransportFactory(queueProvider);
+    public LocalQueueOutTransportFactory localQueuePublisherTransportFactory(DefaultLocalQueueProvider queueProvider) {
+        return new LocalQueueOutTransportFactory(queueProvider);
     }
 
     /**
-     * Creates factory for in-memory dispatcher transports.
+     * Creates factory for local-queue dispatcher transports.
      *
-     * @param queueProvider queue provider for in-memory transports
-     * @return in-memory dispatcher transport factory
+     * @param queueProvider queue provider for local-queue transports
+     * @return local-queue dispatcher transport factory
      */
     @Bean
-    public LocalQueueInTransportFactory inMemoryDispatcherTransportFactory(DefaultLocalQueueProvider queueProvider) {
+    public LocalQueueInTransportFactory localQueueDispatcherTransportFactory(DefaultLocalQueueProvider queueProvider) {
         return new LocalQueueInTransportFactory(queueProvider);
     }
 

@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Vladimir Aleshkov
  * @since 2026-03-09
  */
-@DisplayName("InMemoryTransportsBuilder Tests")
+@DisplayName("LocalQueueTransportsBuilder Tests")
 class LocalQueueTransportsBuilderTest {
 
     private ExecutorService testExecutor;
@@ -43,21 +43,21 @@ class LocalQueueTransportsBuilderTest {
     @DisplayName("Should build transports with default queue size")
     void shouldBuildTransportsWithDefaultQueueSize() {
         // Act
-        LocalQueueTransportsBuilder.InMemoryTransports transports = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .build();
 
         // Assert
         assertNotNull(transports.dispatcher());
         assertNotNull(transports.publisher());
-        assertEquals("in-memory", transports.dispatcher().name());
-        assertEquals("in-memory", transports.publisher().name());
+        assertEquals("local-queue", transports.dispatcher().name());
+        assertEquals("local-queue", transports.publisher().name());
     }
 
     @Test
     @DisplayName("Should build transports with custom queue size")
     void shouldBuildTransportsWithCustomQueueSize() {
         // Act
-        LocalQueueTransportsBuilder.InMemoryTransports transports = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queueSize(50)
                 .build();
 
@@ -73,7 +73,7 @@ class LocalQueueTransportsBuilderTest {
         BlockingDeque<Event> customQueue = new LinkedBlockingDeque<>(100);
 
         // Act
-        LocalQueueTransportsBuilder.InMemoryTransports transports = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queue(customQueue)
                 .build();
 
@@ -86,7 +86,7 @@ class LocalQueueTransportsBuilderTest {
     @DisplayName("Should build transports with custom executor service")
     void shouldBuildTransportsWithCustomExecutorService() {
         // Act
-        LocalQueueTransportsBuilder.InMemoryTransports transports = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .executorService(testExecutor)
                 .build();
 
@@ -99,7 +99,7 @@ class LocalQueueTransportsBuilderTest {
     @DisplayName("Should share the same queue between dispatcher and publisher transports")
     void shouldShareSameQueueBetweenTransports() throws InterruptedException {
         // Arrange
-        LocalQueueTransportsBuilder.InMemoryTransports transports = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queueSize(10)
                 .build();
         AtomicInteger receivedValue = new AtomicInteger(0);
@@ -122,7 +122,7 @@ class LocalQueueTransportsBuilderTest {
     @DisplayName("Should deliver multiple events through shared queue")
     void shouldDeliverMultipleEventsThroughSharedQueue() throws InterruptedException {
         // Arrange
-        LocalQueueTransportsBuilder.InMemoryTransports transports = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queueSize(10)
                 .build();
         java.util.List<Integer> deliveredValues = new java.util.concurrent.CopyOnWriteArrayList<>();
@@ -149,7 +149,7 @@ class LocalQueueTransportsBuilderTest {
     @DisplayName("Should reject events when shared queue is full")
     void shouldRejectEventsWhenSharedQueueIsFull() {
         // Arrange
-        LocalQueueTransportsBuilder.InMemoryTransports transports = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queueSize(2)
                 .build();
 
@@ -167,10 +167,10 @@ class LocalQueueTransportsBuilderTest {
     @DisplayName("Should build multiple independent transport pairs")
     void shouldBuildMultipleIndependentTransportPairs() throws InterruptedException {
         // Arrange
-        LocalQueueTransportsBuilder.InMemoryTransports transports1 = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports1 = new LocalQueueTransportsBuilder()
                 .queueSize(10)
                 .build();
-        LocalQueueTransportsBuilder.InMemoryTransports transports2 = new LocalQueueTransportsBuilder()
+        LocalQueueTransportsBuilder.LocalQueueTransports transports2 = new LocalQueueTransportsBuilder()
                 .queueSize(10)
                 .build();
 

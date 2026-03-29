@@ -26,8 +26,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DispatcherConfigurationTest {
 
     @Test
-    @DisplayName("Should create EventDispatcher with default in-memory transport")
-    void shouldCreateEventDispatcherWithDefaultInMemoryTransport() {
+    @DisplayName("Should create EventDispatcher with default local-queue transport")
+    void shouldCreateEventDispatcherWithDefaultLocalQueueTransport() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             EventFlowProperties properties = new EventFlowProperties();
@@ -61,7 +61,7 @@ class DispatcherConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             transportConfig.setCapacity(500);
             properties.getDispatcher().getTransports().add(transportConfig);
 
@@ -94,10 +94,10 @@ class DispatcherConfigurationTest {
             properties.getDispatcher().getTransports().clear();
 
             EventFlowProperties.TransportConfig transport1 = new EventFlowProperties.TransportConfig();
-            transport1.setName("in-memory");
+            transport1.setName("local-queue");
 
             EventFlowProperties.TransportConfig transport2 = new EventFlowProperties.TransportConfig();
-            transport2.setName("in-memory");
+            transport2.setName("local-queue");
 
             properties.getDispatcher().getTransports().add(transport1);
             properties.getDispatcher().getTransports().add(transport2);
@@ -135,7 +135,7 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            // Only in-memory factory, not kafka
+            // Only local-queue factory, not kafka
             context.registerBean("testDispatcherTransportFactory4", LocalQueueInTransportFactory.class,
                     () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(DispatcherConfiguration.class);

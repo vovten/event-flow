@@ -10,7 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Builder for creating a pair of in-memory dispatcher and publisher event transports.
+ * Builder for creating a pair of local-queue dispatcher and publisher event transports.
  * <p>
  * This builder creates both transports sharing the same {@link BlockingDeque} for
  * in-process event communication. The publisher transport puts events into the queue,
@@ -18,10 +18,10 @@ import java.util.concurrent.Executors;
  * <p>
  * <b>Usage example:</b>
  * <pre>{@code
- * InMemoryTransportsBuilder builder = new InMemoryTransportsBuilder()
+ * LocalQueueTransportsBuilder builder = new LocalQueueTransportsBuilder()
  *     .queueSize(1000);
  *
- * InMemoryTransportsBuilder.InMemoryTransports transports = builder.build();
+ * LocalQueueTransportsBuilder.LocalQueueTransports transports = builder.build();
  * PublisherTransport publisher = transports.publisher();
  * DispatcherTransport dispatcher = transports.dispatcher();
  * }</pre>
@@ -83,11 +83,11 @@ public class LocalQueueTransportsBuilder {
     }
 
     /**
-     * Build and return a pair of in-memory transports sharing the same queue.
+     * Build and return a pair of local-queue transports sharing the same queue.
      *
      * @return a pair of dispatcher and publisher transports
      */
-    public InMemoryTransports build() {
+    public LocalQueueTransports build() {
         if (eventQueue == null) {
             eventQueue = new LinkedBlockingDeque<>(queueSize);
         }
@@ -99,16 +99,16 @@ public class LocalQueueTransportsBuilder {
         LocalQueueInTransport dispatcher = new LocalQueueInTransport(eventQueue, executor);
         LocalQueueOutTransport publisher = new LocalQueueOutTransport(eventQueue);
 
-        return new InMemoryTransports(dispatcher, publisher);
+        return new LocalQueueTransports(dispatcher, publisher);
     }
 
     /**
-     * Record holding a pair of in-memory transports.
+     * Record holding a pair of local-queue transports.
      *
      * @param dispatcher  the dispatcher transport
      * @param publisher  the publisher transport
      */
-    public record InMemoryTransports(
+    public record LocalQueueTransports(
             LocalQueueInTransport dispatcher,
             LocalQueueOutTransport publisher
     ) {

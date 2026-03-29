@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Import;
  * This is a facade that imports modular configuration classes:
  * <ul>
  *   <li>{@link RegistryConfiguration} - event listener registries</li>
- *   <li>{@link CommonConfiguration} - executor service and in-memory transports</li>
+ *   <li>{@link CommonConfiguration} - executor service and local-queue transports</li>
  *   <li>{@link ChannelConfiguration} - event channels</li>
  *   <li>{@link PublisherConfiguration} - event publisher</li>
  *   <li>{@link DispatcherConfiguration} - event dispatcher</li>

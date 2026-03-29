@@ -10,7 +10,7 @@ import com.github.vovten.eventflow.event.Event;
  * <p>
  * <b>Implementations:</b>
  * <ul>
- *   <li>{@link com.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport} — in-memory queue for local delivery</li>
+ *   <li>{@link com.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport} — local-queue for local delivery</li>
  *   <li>{@link com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport} — Apache Kafka for distributed delivery</li>
  *   <li>{@link com.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutTransport} — sends to all Kafka topic partitions</li>
  * </ul>
@@ -27,7 +27,7 @@ import com.github.vovten.eventflow.event.Event;
 public interface OutTransport {
 
     /**
-     * @return unique transport name (e.g., "kafka", "in-memory")
+     * @return unique transport name (e.g., "kafka", "local-queue")
      */
     String name();
 
