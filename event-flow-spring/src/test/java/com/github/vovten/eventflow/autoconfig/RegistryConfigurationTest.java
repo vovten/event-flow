@@ -6,6 +6,7 @@ import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.test.context.support.TestPropertySourceUtils;
 
 import java.util.List;
 
@@ -43,6 +44,7 @@ class RegistryConfigurationTest {
         properties.setScanPackages("");
         RegistryConfiguration config = new RegistryConfiguration(properties);
         var context = new AnnotationConfigApplicationContext();
+        TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
         context.refresh();
 
         // when & then
@@ -59,6 +61,7 @@ class RegistryConfigurationTest {
         properties.setScanPackages("com.example.listener");
         RegistryConfiguration config = new RegistryConfiguration(properties);
         var context = new AnnotationConfigApplicationContext();
+        TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
         context.refresh();
 
         // when
@@ -79,10 +82,12 @@ class RegistryConfigurationTest {
         RegistryConfiguration config = new RegistryConfiguration(properties);
 
         var context1 = new AnnotationConfigApplicationContext();
+        TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context1, "event-flow.enabled=true");
         context1.refresh();
         var registry1 = new SpringEventSubscriberRegistry(context1);
 
         var context2 = new AnnotationConfigApplicationContext();
+        TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context2, "event-flow.enabled=true");
         context2.refresh();
         var registry2 = new SpringEventSubscriberRegistry(context2);
 
@@ -120,6 +125,7 @@ class RegistryConfigurationTest {
         RegistryConfiguration config = new RegistryConfiguration(properties);
 
         var context = new AnnotationConfigApplicationContext();
+        TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
         context.refresh();
         var registry = new SpringEventSubscriberRegistry(context);
 

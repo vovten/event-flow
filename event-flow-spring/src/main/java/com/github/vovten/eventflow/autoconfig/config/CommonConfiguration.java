@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutorService;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class CommonConfiguration {
 
     private final EventFlowProperties properties;

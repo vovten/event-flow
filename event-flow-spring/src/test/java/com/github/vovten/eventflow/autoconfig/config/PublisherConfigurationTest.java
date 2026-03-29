@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.test.context.support.TestPropertySourceUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,6 +24,7 @@ class PublisherConfigurationTest {
     void shouldCreateEventPublisherWithInternalChannel() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
@@ -52,6 +54,7 @@ class PublisherConfigurationTest {
     void shouldWrapPublisherWithTransactionalEventPublisher() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().setTransactional(true);
 
@@ -83,6 +86,7 @@ class PublisherConfigurationTest {
     void shouldNotWrapPublisherWhenTransactionalIsDisabled() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().setTransactional(false);
 
@@ -115,6 +119,7 @@ class PublisherConfigurationTest {
     void shouldCreatePublisherWithMultipleChannels() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
 
             EventFlowProperties.ChannelConfig internalChannel = new EventFlowProperties.ChannelConfig();
@@ -153,6 +158,7 @@ class PublisherConfigurationTest {
     void shouldNotCreateDuplicatePublisherWhenCustomBeanExists() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
 

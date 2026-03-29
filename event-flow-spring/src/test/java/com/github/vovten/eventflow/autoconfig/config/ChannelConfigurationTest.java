@@ -10,6 +10,7 @@ import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.test.context.support.TestPropertySourceUtils;
 
 import java.util.List;
 
@@ -26,6 +27,7 @@ class ChannelConfigurationTest {
     void shouldCreateInternalEventChannelForInternalChannelName() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -58,6 +60,7 @@ class ChannelConfigurationTest {
     void shouldCreateExternalEventChannelForExternalChannelName() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -88,6 +91,7 @@ class ChannelConfigurationTest {
     void shouldCreateGenericChannelForCustomChannelName() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -118,6 +122,7 @@ class ChannelConfigurationTest {
     void shouldCreateMultipleChannels() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
 
@@ -158,6 +163,7 @@ class ChannelConfigurationTest {
     void shouldThrowExceptionWhenChannelHasNoTransports() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -184,6 +190,7 @@ class ChannelConfigurationTest {
     void shouldThrowExceptionWhenTransportNotFound() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -211,6 +218,7 @@ class ChannelConfigurationTest {
     void shouldUseKafkaTransportFromConfiguration() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -243,6 +251,7 @@ class ChannelConfigurationTest {
     void shouldCreateEmptyChannelsListWhenNoChannelsConfigured() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             // No channels configured

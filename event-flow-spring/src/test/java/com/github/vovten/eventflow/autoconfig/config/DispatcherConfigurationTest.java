@@ -12,6 +12,7 @@ import com.github.vovten.eventflow.transport.incoming.LocalQueueInTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.test.context.support.TestPropertySourceUtils;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +31,7 @@ class DispatcherConfigurationTest {
     void shouldCreateEventDispatcherWithDefaultLocalQueueTransport() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -58,6 +60,7 @@ class DispatcherConfigurationTest {
     void shouldCreateEventDispatcherWithConfiguredTransports() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -90,6 +93,7 @@ class DispatcherConfigurationTest {
     void shouldCreateMultipleDispatcherTransports() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getTransports().clear();
 
@@ -125,6 +129,7 @@ class DispatcherConfigurationTest {
     void shouldThrowExceptionWhenNoFactoryFoundForTransportType() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
@@ -152,6 +157,7 @@ class DispatcherConfigurationTest {
     void shouldCreateKafkaDispatcherTransportWhenKafkaFactoryIsAvailable() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
@@ -183,6 +189,7 @@ class DispatcherConfigurationTest {
     void shouldNotCreateDuplicateDispatcherWhenCustomBeanExists() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -206,6 +213,7 @@ class DispatcherConfigurationTest {
     void shouldNotCreateDuplicateDispatcherTransportsWhenCustomBeanExists() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
@@ -230,6 +238,7 @@ class DispatcherConfigurationTest {
     void shouldStartDispatcherOnCreation() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
