@@ -35,7 +35,7 @@ import java.util.List;
  *         transports:
  *           - name: kafka
  *             topic: events-topic
- *             bootstrapServers: localhost:9092
+ *             servers: localhost:9092
  *   dispatcher:
  *     enabled: true
  *     thread-pool:
@@ -48,7 +48,7 @@ import java.util.List;
  *         capacity: 1000
  *       - name: kafka
  *         topic: events-topic
- *         bootstrapServers: localhost:9092
+ *         servers: localhost:9092
  *         consumerGroup: event-flow-group
  * }</pre>
  *
@@ -84,21 +84,11 @@ public class EventFlowProperties {
      */
     @Data
     public static class PublisherConfig {
-        private boolean enabled = true;
+        private boolean enabled = false;
         private boolean transactional = true;
         private boolean silent = false;
         private RetryConfig retry = new RetryConfig();
-        private List<ChannelConfig> channels = new ArrayList<>(List.of(createDefaultChannel()));
-
-        private static ChannelConfig createDefaultChannel() {
-            ChannelConfig config = new ChannelConfig();
-            config.setName("internal");
-            TransportConfig transport = new TransportConfig();
-            transport.setName("local-queue");
-            transport.setCapacity(1000);
-            config.setTransports(List.of(transport));
-            return config;
-        }
+        private List<ChannelConfig> channels = new ArrayList<>();
     }
 
     /**
@@ -130,16 +120,9 @@ public class EventFlowProperties {
      */
     @Data
     public static class DispatcherConfig {
-        private boolean enabled = true;
+        private boolean enabled = false;
         private ThreadPoolConfig threadPool = new ThreadPoolConfig();
-        private List<TransportConfig> transports = new ArrayList<>(List.of(createDefaultTransport()));
-
-        private static TransportConfig createDefaultTransport() {
-            TransportConfig config = new TransportConfig();
-            config.setName("local-queue");
-            config.setCapacity(1000);
-            return config;
-        }
+        private List<TransportConfig> transports = new ArrayList<>();
     }
 
     /**
@@ -162,7 +145,7 @@ public class EventFlowProperties {
         private String name = "local-queue";
         private int capacity = 1000;
         private String topic;
-        private String bootstrapServers;
+        private String servers;
         private String consumerGroup = "event-flow-group";
     }
 }

@@ -12,17 +12,30 @@
 </dependency>
 ```
 
-### 2. Configure (Required: scan-packages)
+### 2. Configure (Required: scan-packages, channels, and transports)
 
 ```yaml
 event-flow:
   scan-packages: com.example.listener
   publisher:
+    enabled: true
+    channels:
+      - name: internal
+        transports:
+          - name: local-queue
+            capacity: 1000
     transactional: true
     retry:
       enabled: true
       max-attempts: 3
+  dispatcher:
+    enabled: true
+    transports:
+      - name: local-queue
+        capacity: 1000
 ```
+
+> **Note:** Both publisher and dispatcher are disabled by default. You must explicitly enable them and configure at least one channel/transport.
 
 ### 3. Create Event Listeners
 
@@ -62,8 +75,8 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 |----------|---------|-------------|
 | `event-flow.enabled` | `true` | Enable/disable all auto-configuration |
 | `event-flow.scan-packages` | `""` | **Required!** Packages to scan for listeners |
-| `event-flow.publisher.enabled` | `true` | Enable/disable publisher |
-| `event-flow.dispatcher.enabled` | `true` | Enable/disable dispatcher |
+| `event-flow.publisher.enabled` | `false` | Enable/disable publisher |
+| `event-flow.dispatcher.enabled` | `false` | Enable/disable dispatcher |
 | `event-flow.publisher.transactional` | `true` | Defer publishing until after transaction commit |
 | `event-flow.publisher.silent` | `false` | Catch and log all exceptions |
 | `event-flow.publisher.retry.enabled` | `false` | Enable retry on publish failure |
@@ -83,7 +96,21 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 ```yaml
 event-flow:
   scan-packages: com.example
+  publisher:
+    enabled: true
+    channels:
+      - name: internal
+        transports:
+          - name: local-queue
+            capacity: 1000
+  dispatcher:
+    enabled: true
+    transports:
+      - name: local-queue
+        capacity: 1000
 ```
+
+> **Note:** You must explicitly enable publisher and dispatcher, and configure at least one channel/transport.
 
 ### Production with Kafka
 
@@ -91,27 +118,35 @@ event-flow:
 event-flow:
   scan-packages: com.example.listener
   publisher:
+    enabled: true
     transactional: true
     retry:
       enabled: true
       max-attempts: 3
       initial-delay: 200ms
     channels:
+      - name: internal
+        transports:
+          - name: local-queue
+            capacity: 1000
       - name: external
-        type: kafka
-        topic: events
-        bootstrap-servers: kafka:9092
+        transports:
+          - name: kafka
+            topic: events
+            servers: kafka:9092
   dispatcher:
+    enabled: true
     thread-pool:
       core-size: 8
       max-size: 32
       queue-capacity: 500
     transports:
+      - name: local-queue
+        capacity: 1000
       - name: kafka-in
-        type: kafka
         topic: events
-        bootstrap-servers: kafka:9092
-        consumer-group: my-service-group
+        servers: kafka:9092
+        consumerGroup: my-service-group
 ```
 
 ### Custom Local-Queue Configuration
@@ -119,13 +154,21 @@ event-flow:
 ```yaml
 event-flow:
   scan-packages: com.example
+  publisher:
+    enabled: true
+    channels:
+      - name: internal
+        transports:
+          - name: local-queue
+            capacity: 500
   dispatcher:
+    enabled: true
     thread-pool:
       core-size: 2
       max-size: 4
       queue-capacity: 500
     transports:
-      - type: local-queue
+      - name: local-queue
         capacity: 500
 ```
 

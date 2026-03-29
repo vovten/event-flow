@@ -157,7 +157,7 @@ class DispatcherConfigurationTest {
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
             transportConfig.setTopic("test-topic");
-            transportConfig.setBootstrapServers("localhost:9092");
+            transportConfig.setServers("localhost:9092");
             transportConfig.setConsumerGroup("test-group");
             properties.getDispatcher().getTransports().add(transportConfig);
 
