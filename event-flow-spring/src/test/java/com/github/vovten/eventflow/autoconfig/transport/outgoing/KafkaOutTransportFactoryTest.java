@@ -34,7 +34,7 @@ class KafkaOutTransportFactoryTest {
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("kafka-publisher");
-        config.setBootstrapServers("localhost:9092");
+        config.setServers("localhost:9092");
         config.setTopic("test-topic");
 
         // when
@@ -45,8 +45,8 @@ class KafkaOutTransportFactoryTest {
     }
 
     @Test
-    @DisplayName("KafkaPublisherTransportFactory should throw exception when bootstrapServers is missing")
-    void kafkaPublisherTransportFactoryShouldThrowExceptionWhenBootstrapServersIsMissing() {
+    @DisplayName("KafkaPublisherTransportFactory should throw exception when servers is missing")
+    void kafkaPublisherTransportFactoryShouldThrowExceptionWhenServersIsMissing() {
         // given
         KafkaOutTransportFactory factory = new KafkaOutTransportFactory();
 
@@ -56,7 +56,7 @@ class KafkaOutTransportFactoryTest {
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Kafka transport requires bootstrap-servers configuration");
+                .hasMessageContaining("Kafka transport requires 'servers' configuration");
     }
 
     @Test
@@ -66,7 +66,7 @@ class KafkaOutTransportFactoryTest {
         KafkaOutTransportFactory factory = new KafkaOutTransportFactory();
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-        config.setBootstrapServers("localhost:9092");
+        config.setServers("localhost:9092");
 
         // when & then
         assertThatThrownBy(() -> factory.validate(config))

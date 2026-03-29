@@ -62,7 +62,7 @@ public class EventFlowProperties {
     /**
      * Enable or disable Event Flow auto-configuration completely.
      */
-    private boolean enabled = true;
+    private boolean enabled = false;
 
     /**
      * Package(s) to scan for @EventListener annotated beans.

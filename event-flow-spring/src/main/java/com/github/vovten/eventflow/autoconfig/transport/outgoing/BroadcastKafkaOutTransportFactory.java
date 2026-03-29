@@ -26,16 +26,16 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
     public OutTransport createPublisher(EventFlowProperties.TransportConfig config) {
         validate(config);
         return new BroadcastKafkaOutTransport(
-            config.getBootstrapServers(),
+            config.getServers(),
             config.getTopic()
         );
     }
 
     @Override
     public void validate(EventFlowProperties.TransportConfig config) {
-        if (config.getBootstrapServers() == null) {
+        if (config.getServers() == null) {
             throw new IllegalStateException(
-                "Broadcast Kafka transport requires bootstrap-servers configuration"
+                "Broadcast Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
         if (config.getTopic() == null) {

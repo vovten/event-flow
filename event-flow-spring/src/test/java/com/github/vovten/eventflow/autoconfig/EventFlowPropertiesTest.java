@@ -29,7 +29,7 @@ class EventFlowPropertiesTest {
                 .orElseGet(EventFlowProperties::new);
 
         // then
-        assertThat(eventFlowProperties.isEnabled()).isTrue();
+        assertThat(eventFlowProperties.isEnabled()).isFalse();
         assertThat(eventFlowProperties.getScanPackages()).isEmpty();
         assertThat(eventFlowProperties.getPublisher().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getPublisher().isTransactional()).isTrue();

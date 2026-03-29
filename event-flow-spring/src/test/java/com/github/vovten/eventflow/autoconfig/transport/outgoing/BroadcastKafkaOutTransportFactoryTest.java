@@ -39,7 +39,7 @@ class BroadcastKafkaOutTransportFactoryTest {
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("broadcast-kafka-publisher");
-        config.setBootstrapServers("localhost:9092");
+        config.setServers("localhost:9092");
         config.setTopic("test-topic");
 
         // when
@@ -51,8 +51,8 @@ class BroadcastKafkaOutTransportFactoryTest {
     }
 
     @Test
-    @DisplayName("BroadcastKafkaPublisherTransportFactory should throw exception when bootstrapServers is missing")
-    void broadcastKafkaPublisherTransportFactoryShouldThrowExceptionWhenBootstrapServersIsMissing() {
+    @DisplayName("BroadcastKafkaPublisherTransportFactory should throw exception when servers is missing")
+    void broadcastKafkaPublisherTransportFactoryShouldThrowExceptionWhenServersIsMissing() {
         // given
         BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory();
 
@@ -62,7 +62,7 @@ class BroadcastKafkaOutTransportFactoryTest {
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Broadcast Kafka transport requires bootstrap-servers configuration");
+                .hasMessageContaining("Broadcast Kafka transport requires 'servers' configuration");
     }
 
     @Test
@@ -72,7 +72,7 @@ class BroadcastKafkaOutTransportFactoryTest {
         BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory();
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-        config.setBootstrapServers("localhost:9092");
+        config.setServers("localhost:9092");
 
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
@@ -88,7 +88,7 @@ class BroadcastKafkaOutTransportFactoryTest {
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("broadcast-kafka");
-        config.setBootstrapServers("localhost:9092");
+        config.setServers("localhost:9092");
         config.setTopic("test-topic");
 
         // when & then - should not throw any exception
