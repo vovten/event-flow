@@ -53,10 +53,10 @@ public class PublisherConfiguration {
     public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
         if (eventChannels.isEmpty()) {
             log.warn("""
-                    ╔═════════════════════════════════════════════════════════════╗
-                    ║ Event Flow Publisher enabled but no channels configured     ║
-                    ║ To enable event publishing, add at least one channel:       ║
-                    ╚═════════════════════════════════════════════════════════════╝
+                   ╔═════════════════════════════════════════════════════════════╗
+                   ║ Event Flow Publisher enabled but no channels configured     ║
+                   ║ To enable event publishing, add at least one channel:       ║
+                   ╚═════════════════════════════════════════════════════════════╝
                     event-flow:
                       publisher:
                         enabled: true
