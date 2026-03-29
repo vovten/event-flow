@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow.registry;
 
+import com.github.vovten.eventflow.autoconfig.EventFlowDisabledAutoConfiguration;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventFlowTestApplication;
 import com.github.vovten.eventflow.EventListener;
@@ -8,6 +9,7 @@ import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
@@ -19,10 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for EventHandlerRegistry implementations
  */
-@SpringBootTest(
-        classes = EventFlowTestApplication.class,
-        properties = "event-flow.enabled=false"
-)
+@SpringBootTest(classes = EventFlowTestApplication.class, properties = "event-flow.enabled=false")
+@ImportAutoConfiguration(exclude = EventFlowDisabledAutoConfiguration.class)
 class EventHandlerRegistryIntegrationTest {
 
     @Autowired
