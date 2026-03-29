@@ -69,6 +69,7 @@ public class ChannelConfiguration {
     private List<EventChannel> createConfiguredChannels() {
         if (properties.getPublisher().getChannels().isEmpty()) {
             log.warn("""
+                   
                    ╔═══════════════════════════════════════════════════════════╗
                    ║ Event Flow Publisher enabled but no channels configured   ║
                    ║ To enable event publishing, add at least one channel:     ║

@@ -53,6 +53,7 @@ public class PublisherConfiguration {
     public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
         if (eventChannels.isEmpty()) {
             log.warn("""
+                   
                    ╔═════════════════════════════════════════════════════════════╗
                    ║ Event Flow Publisher enabled but no channels configured     ║
                    ║ To enable event publishing, add at least one channel:       ║
@@ -67,6 +68,7 @@ public class PublisherConfiguration {
                                 capacity: 1000
                     Available transport types: {}
                     """, publisherTransportFactories.keySet());
+            return null;
         }
         logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();

@@ -96,6 +96,7 @@ public class DispatcherConfiguration {
             }
         } else {
             log.warn("""
+                   
                    ╔═════════════════════════════════════════════════════════════╗
                    ║ Event Flow Dispatcher enabled but no transports configured  ║
                    ║ To enable event dispatching, add at least one transport:    ║
