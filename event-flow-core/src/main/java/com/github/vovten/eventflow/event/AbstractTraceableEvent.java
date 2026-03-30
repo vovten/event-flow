@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.event;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -19,7 +19,7 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
 
     private final UUID uid;
     private final UUID traceId;
-    private final LocalDateTime occurredAt;
+    private final Instant occurredAt;
 
     /**
      * Creates a new traceable event with auto-generated UID, traceId and occurredAt.
@@ -27,7 +27,7 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
     protected AbstractTraceableEvent() {
         this.uid = UUID.randomUUID();
         this.traceId = UUID.randomUUID();
-        this.occurredAt = LocalDateTime.now();
+        this.occurredAt = Instant.now();
     }
 
     /**
@@ -38,7 +38,7 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
     protected AbstractTraceableEvent(UUID traceId) {
         this.uid = UUID.randomUUID();
         this.traceId = traceId;
-        this.occurredAt = LocalDateTime.now();
+        this.occurredAt = Instant.now();
     }
 
     /**
@@ -48,7 +48,7 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
      * @param traceId the correlation ID
      * @param occurredAt the event timestamp
      */
-    protected AbstractTraceableEvent(UUID uid, UUID traceId, LocalDateTime occurredAt) {
+    protected AbstractTraceableEvent(UUID uid, UUID traceId, Instant occurredAt) {
         this.uid = Objects.requireNonNull(uid, "UID must not be null");
         this.traceId = Objects.requireNonNull(traceId, "TraceId must not be null");
         this.occurredAt = Objects.requireNonNull(occurredAt, "OccurredAt must not be null");
@@ -65,7 +65,7 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
     }
 
     @Override
-    public LocalDateTime occurredAt() {
+    public Instant occurredAt() {
         return occurredAt;
     }
 

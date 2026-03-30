@@ -6,7 +6,7 @@ import com.github.vovten.eventflow.event.Event;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,7 +32,7 @@ class EventUtilsTest {
     @Test
     @DisplayName("Should convert complex event to JSON")
     void shouldConvertComplexEventToJson() {
-        ComplexEvent event = new ComplexEvent("order-123", List.of("item1", "item2"), LocalDateTime.of(2024, 1, 1, 10, 0));
+        ComplexEvent event = new ComplexEvent("order-123", List.of("item1", "item2"), Instant.ofEpochSecond(1704103200));
 
         String json = EventUtils.toJson(event);
 
@@ -108,13 +108,13 @@ class EventUtilsTest {
     static class ComplexEvent extends AbstractTraceableEvent {
         public String orderId;
         public List<String> items;
-        public LocalDateTime timestamp;
+        public Instant timestamp;
 
         ComplexEvent() {
             super();
         }
 
-        ComplexEvent(String orderId, List<String> items, LocalDateTime timestamp) {
+        ComplexEvent(String orderId, List<String> items, Instant timestamp) {
             super();
             this.orderId = orderId;
             this.items = items;

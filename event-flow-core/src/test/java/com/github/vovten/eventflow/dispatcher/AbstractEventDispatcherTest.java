@@ -8,7 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -120,12 +120,12 @@ class AbstractEventDispatcherTest {
      */
     private static final class TestEvent extends AbstractTraceableEvent {
         private final String data;
-        private final LocalDateTime timestamp;
+        private final Instant timestamp;
 
         TestEvent(String data) {
             super();
             this.data = data;
-            this.timestamp = LocalDateTime.now();
+            this.timestamp = Instant.now();
         }
 
         @Override

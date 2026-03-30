@@ -5,7 +5,7 @@ import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -28,13 +28,13 @@ public class TestEvent extends AbstractTraceableEvent {
         this.message = message;
     }
 
-    public TestEvent(UUID uid, UUID traceId, String id, String message, LocalDateTime timestamp) {
+    public TestEvent(UUID uid, UUID traceId, String id, String message, Instant timestamp) {
         super(uid, traceId, timestamp);
         this.id = id;
         this.message = message;
     }
 
-    public TestEvent(String id, String message, LocalDateTime timestamp) {
+    public TestEvent(String id, String message, Instant timestamp) {
         super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
         this.id = id;
         this.message = message;
@@ -52,7 +52,7 @@ public class TestEvent extends AbstractTraceableEvent {
         return new TestEvent(id, message);
     }
 
-    public static TestEvent create(String id, String message, LocalDateTime dateTime) {
+    public static TestEvent create(String id, String message, Instant dateTime) {
         return new TestEvent(id, message, dateTime);
     }
 

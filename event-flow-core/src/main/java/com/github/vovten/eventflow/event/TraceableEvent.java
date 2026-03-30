@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.event;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -30,5 +30,5 @@ public interface TraceableEvent extends Event {
      *
      * @return the event occurrence timestamp
      */
-    LocalDateTime occurredAt();
+    Instant occurredAt();
 }
