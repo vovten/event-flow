@@ -20,16 +20,16 @@ import java.util.UUID;
  * @since 2026-03-13
  */
 @Slf4j
-public class IdempotentEventDispatcher implements EventDispatcher {
+public final class IdempotentEventDispatcher implements EventDispatcher {
 
     private final EventDispatcher origin;
     private final Cache<UUID, Boolean> cache;
     private final boolean warnOnDuplicate;
 
-    public IdempotentEventDispatcher(EventDispatcher origin,
-                                     Duration ttl,
-                                     long maxSize,
-                                     boolean warnOnDuplicate) {
+    IdempotentEventDispatcher(EventDispatcher origin,
+                              Duration ttl,
+                              long maxSize,
+                              boolean warnOnDuplicate) {
         this.origin = origin;
         this.cache = Caffeine.newBuilder()
                 .expireAfterWrite(ttl)

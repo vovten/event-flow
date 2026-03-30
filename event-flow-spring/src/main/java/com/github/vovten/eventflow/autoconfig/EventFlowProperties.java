@@ -38,6 +38,11 @@ import java.util.List;
  *             servers: localhost:9092
  *   dispatcher:
  *     enabled: true
+ *     idempotent:
+ *       enabled: true
+ *       ttl: 10m
+ *       max-size: 10000
+ *       warn-on-duplicate: true
  *     thread-pool:
  *       core-size: 4
  *       max-size: 16
@@ -123,6 +128,18 @@ public class EventFlowProperties {
         private boolean enabled = false;
         private ThreadPoolConfig threadPool = new ThreadPoolConfig();
         private List<TransportConfig> transports = new ArrayList<>();
+        private IdempotentConfig idempotent = new IdempotentConfig();
+    }
+
+    /**
+     * Idempotent configuration for dispatcher.
+     */
+    @Data
+    public static class IdempotentConfig {
+        private boolean enabled = false;
+        private Duration ttl = Duration.ofMinutes(10);
+        private long maxSize = 10_000;
+        private boolean warnOnDuplicate = true;
     }
 
     /**

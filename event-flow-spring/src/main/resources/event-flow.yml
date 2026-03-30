@@ -95,6 +95,18 @@ event-flow:
       #   servers: localhost:9092
       #   consumerGroup: event-flow-group
 
+    # Idempotent event processing configuration
+    # Prevents duplicate event processing using a Caffeine cache
+    idempotent:
+      # Enable or disable idempotent processing
+      enabled: false
+      # Time-to-live for cached event UIDs (use ms, s, m, h suffixes)
+      ttl: 10m
+      # Maximum number of entries in the cache
+      max-size: 10000
+      # Log warnings when duplicate events are received
+      warn-on-duplicate: true
+
 # =============================================================================
 # Configuration Examples
 # =============================================================================
@@ -176,7 +188,30 @@ event-flow:
 #       - name: local-queue
 #         capacity: 500
 #
-# Example 4: Disable auto-configuration and provide custom beans
+# Example 4: Configuration with idempotent event processing
+# ---------------------------------------------------------------------------
+# event-flow:
+#   enabled: true
+#   scan-packages: com.example
+#   publisher:
+#     enabled: true
+#     channels:
+#       - name: internal
+#         transports:
+#           - name: local-queue
+#             capacity: 1000
+#   dispatcher:
+#     enabled: true
+#     idempotent:
+#       enabled: true
+#       ttl: 30m
+#       max-size: 50000
+#       warn-on-duplicate: true
+#     transports:
+#       - name: local-queue
+#         capacity: 1000
+#
+# Example 5: Disable auto-configuration and provide custom beans
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: false

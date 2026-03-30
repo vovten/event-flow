@@ -3,7 +3,7 @@ package com.github.vovten.eventflow.autoconfig.config;
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.InTransportFactory;
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
-import com.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
+import com.github.vovten.eventflow.dispatcher.EventDispatcherBuilder;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.InTransport;
 import lombok.extern.slf4j.Slf4j;
@@ -59,12 +59,15 @@ public class DispatcherConfiguration {
     public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
                                            @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
                                            @Qualifier("dispatcherTransports") List<InTransport> inTransports) {
-        log.info("Configuring EventDispatcher with {} transports", inTransports.size());
-        UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
-                dispatcherExecutor,
-                eventHandlerRegistry,
-                inTransports
-        );
+        EventDispatcherBuilder builder = EventDispatcherBuilder.builder()
+                .executor(dispatcherExecutor)
+                .handlerRegistry(eventHandlerRegistry)
+                .transports(inTransports);
+        if (properties.getDispatcher().getIdempotent().isEnabled()) {
+            EventFlowProperties.IdempotentConfig config = properties.getDispatcher().getIdempotent();
+            builder.idempotent(config.getTtl(), config.getMaxSize(), config.isWarnOnDuplicate());
+        }
+        EventDispatcher dispatcher = builder.buildAndLog();
         dispatcher.start();
         return dispatcher;
     }

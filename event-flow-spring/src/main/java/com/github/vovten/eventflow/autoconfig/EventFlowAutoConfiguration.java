@@ -25,6 +25,7 @@ import org.springframework.context.annotation.Import;
  *   <li>Set {@code event-flow.enabled=true} to enable all auto-configuration (disabled by default)</li>
  *   <li>Set {@code event-flow.publisher.enabled=true} to enable publisher (disabled by default)</li>
  *   <li>Set {@code event-flow.dispatcher.enabled=true} to enable dispatcher (disabled by default)</li>
+ *   <li>Set {@code event-flow.dispatcher.idempotent.enabled=true} to enable idempotent event processing</li>
  * </ul>
  * <p>
  * <b>Usage example (application.yml):</b>
@@ -41,6 +42,10 @@ import org.springframework.context.annotation.Import;
  *             capacity: 1000
  *   dispatcher:
  *     enabled: true
+ *     idempotent:
+ *       enabled: true
+ *       ttl: 10m
+ *       max-size: 10000
  *     transports:
  *       - name: local-queue
  *         capacity: 1000
