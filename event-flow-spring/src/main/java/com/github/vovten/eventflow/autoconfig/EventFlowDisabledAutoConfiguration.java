@@ -35,6 +35,7 @@ public class EventFlowDisabledAutoConfiguration {
     public static class EventFlowDisabledLogger implements ApplicationListener<ApplicationReadyEvent> {
 
         private static final String MESSAGE = """
+               
                ╔═══════════════════════════════════════════════════════════╗
                ║ Event Flow is disabled                                    ║
                ║ To enable Event Flow auto-configuration, add:             ║
@@ -54,8 +55,7 @@ public class EventFlowDisabledAutoConfiguration {
                       - name: local-queue
                ╔═══════════════════════════════════════════════════════════╗
                ║ This is a minimal configuration example. For detailed     ║
-               ║ configuration options, see event-flow.yml and default     ║
-               ║ values in EventFlowProperties class.                      ║
+               ║ configuration options see event-flow.yml.                 ║
                ╚═══════════════════════════════════════════════════════════╝
                 """;
 
