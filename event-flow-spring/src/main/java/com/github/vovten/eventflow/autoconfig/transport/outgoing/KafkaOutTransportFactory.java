@@ -2,11 +2,18 @@ package com.github.vovten.eventflow.autoconfig.transport.outgoing;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
+import com.github.vovten.eventflow.serialization.EventSerializer;
+import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
+import com.github.vovten.eventflow.serialization.msgpack.MsgPackEventSerializer;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 
 /**
  * Factory for creating Kafka-based publisher event transports.
+ * <p>
+ * Supports configurable serialization format:
+ * - "json" (default): UTF-8 encoded JSON, readable in Kafka UI tools
+ * - "msgpack": Compact binary format for better performance
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
@@ -21,10 +28,30 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
     @Override
     public OutTransport createPublisher(EventFlowProperties.TransportConfig config) {
         validate(config);
+        EventSerializer serializer = createSerializer(config.getSerialization());
         return new KafkaOutTransport(
             config.getServers(),
-            config.getTopic()
+            config.getTopic(),
+            serializer
         );
+    }
+
+    /**
+     * Create event serializer based on format configuration.
+     *
+     * @param format serialization format ("json" or "msgpack")
+     * @return appropriate EventSerializer instance
+     * @throws IllegalArgumentException if format is unknown
+     */
+    private EventSerializer createSerializer(String format) {
+        if (format == null || "json".equalsIgnoreCase(format)) {
+            return new JsonEventSerializer();
+        } else if ("msgpack".equalsIgnoreCase(format)) {
+            return new MsgPackEventSerializer();
+        } else {
+            throw new IllegalArgumentException(
+                "Unknown serialization format: " + format + ". Supported values: json, msgpack");
+        }
     }
 
     @Override

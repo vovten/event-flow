@@ -164,5 +164,10 @@ public class EventFlowProperties {
         private String topic;
         private String servers;
         private String consumerGroup = "event-flow-group";
+        /**
+         * Serialization format for event transport.
+         * Supported values: "json" (default), "msgpack"
+         */
+        private String serialization = "json";
     }
 }
