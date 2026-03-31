@@ -63,6 +63,10 @@ event-flow:
       #     - name: kafka
       #       topic: events
       #       servers: localhost:9092
+      #       # Serialization format (default: json)
+      #       # - json: UTF-8 encoded JSON, readable in Kafka UI tools
+      #       # - msgpack: Compact binary format for better performance
+      #       serialization: json
 
   # ---------------------------------------------------------------------------
   # Event Dispatcher Configuration
@@ -152,6 +156,7 @@ event-flow:
 #           - name: kafka
 #             topic: events
 #             servers: kafka:9092
+#             serialization: json  # or msgpack for binary format
 #   dispatcher:
 #     enabled: true
 #     thread-pool:
@@ -225,5 +230,42 @@ event-flow:
 #     @Bean
 #     public EventDispatcher eventDispatcher() { ... }
 # }
+#
+# Example 6: Mixed serialization formats (JSON and MessagePack)
+# ---------------------------------------------------------------------------
+# event-flow:
+#   enabled: true
+#   scan-packages: com.example
+#   publisher:
+#     enabled: true
+#     channels:
+#       - name: internal
+#         transports:
+#           - name: local-queue
+#             capacity: 1000
+#       - name: external-json
+#         transports:
+#           - name: kafka
+#             topic: events-json
+#             servers: kafka:9092
+#             serialization: json  # Readable in Kafka UI
+#       - name: external-binary
+#         transports:
+#           - name: kafka
+#             topic: events-binary
+#             servers: kafka:9092
+#             serialization: msgpack  # Compact binary format
+#   dispatcher:
+#     enabled: true
+#     transports:
+#       - name: kafka
+#         topic: events-json
+#         servers: kafka:9092
+#         consumerGroup: group-json
+#       - name: kafka
+#         topic: events-binary
+#         servers: kafka:9092
+#         consumerGroup: group-binary
+#     # Note: Dispatcher auto-detects serialization format from message
 #
 # =============================================================================
