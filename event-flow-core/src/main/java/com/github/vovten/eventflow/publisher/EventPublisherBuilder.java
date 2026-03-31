@@ -16,7 +16,6 @@ import java.util.List;
  *   <li>Retry with exponential backoff</li>
  *   <li>Silent (fire-and-forget) mode</li>
  *   <li>Custom decorators</li>
- *   <li>Extension points for subclasses (e.g., Spring integration)</li>
  * </ul>
  * <p>
  * <b>Usage examples:</b>
@@ -62,13 +61,15 @@ import java.util.List;
  * @since 2026-03-05
  */
 @Slf4j
-@SuppressWarnings("FinalClass")  // Allow subclassing for Spring integration
 public class EventPublisherBuilder {
 
     private boolean silent = false;
     private RetryConfig retryConfig;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
+
+    protected EventPublisherBuilder() {
+    }
 
     /**
      * Start building publisher with the given channels.
@@ -194,23 +195,19 @@ public class EventPublisherBuilder {
             log.debug("Applied retry decorator with maxRetries={}, initialDelay={}, multiplier={}",
                     retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
         }
-
-        // Allow subclasses to add additional decorations (e.g., transactional)
-        publisher = decorate(publisher);
-
-        // Apply silent last (outermost) if configured
+        // Apply silent if configured
         if (silent) {
             publisher = new SilentEventPublisher(publisher);
             log.debug("Applied silent decorator");
         }
-
+        // Allow subclasses to add additional decorations (e.g., transactional)
+        publisher = decorate(publisher);
         return publisher;
     }
 
     /**
      * Hook for subclasses to add additional decorations.
      * <p>
-     * Called after retry decorator but before silent decorator.
      * Default implementation returns the publisher unchanged.
      *
      * @param publisher the current publisher in the chain
@@ -236,8 +233,7 @@ public class EventPublisherBuilder {
         return publisher;
     }
 
-    // Package-private accessors for subclasses
-    int getChannelsSize() {
+    protected int getChannelsSize() {
         return channels.size();
     }
 

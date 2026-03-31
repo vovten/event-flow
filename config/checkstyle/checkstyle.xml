@@ -172,11 +172,7 @@
         <module name="FallThrough">
             <property name="checkLastCaseGroup" value="false"/>
         </module>
-        <!--
-        Проверка, что класс с private конструктором объявлен как final.
-        Отключаем, т.к. EventPublisherBuilder расширяется в Spring-модуле.
         <module name="FinalClass"/>
-        -->
         <module name="IllegalCatch">
             <property name="illegalClassNames" value="java.lang.Throwable "/>
         </module>

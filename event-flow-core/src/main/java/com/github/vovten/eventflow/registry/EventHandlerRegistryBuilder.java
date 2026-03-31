@@ -43,15 +43,15 @@ import java.util.List;
  * @since 2024-12-07
  */
 @Slf4j
-public final class EventHandlerRegistryBuilder {
+public class EventHandlerRegistryBuilder {
 
-    private boolean useInterfaceListeners = false;
-    private boolean useAnnotationListeners = false;
+    protected boolean useInterfaceListeners = false;
+    protected boolean useAnnotationListeners = false;
 
-    private final List<DecoratorFunction> decorators = new ArrayList<>();
-    private final List<EventHandlerRegistry> additionalRegistries = new ArrayList<>();
+    protected final List<DecoratorFunction> decorators = new ArrayList<>();
+    protected final List<EventHandlerRegistry> additionalRegistries = new ArrayList<>();
 
-    private EventHandlerRegistryBuilder() {
+    protected EventHandlerRegistryBuilder() {
     }
 
     /**
@@ -152,7 +152,12 @@ public final class EventHandlerRegistryBuilder {
 
     // ==================== Private methods ====================
 
-    private void validateConfiguration() {
+    /**
+     * Validate the builder configuration.
+     *
+     * @throws IllegalStateException if no handler source is configured
+     */
+    protected void validateConfiguration() {
         // Must have at least one handler source
         if (!useAnnotationListeners && !useInterfaceListeners && additionalRegistries.isEmpty()) {
             throw new IllegalStateException(
@@ -163,7 +168,14 @@ public final class EventHandlerRegistryBuilder {
         }
     }
 
-    private EventHandlerRegistry createRegistry() {
+    /**
+     * Create the registry instance based on the current configuration.
+     * <p>
+     * Subclasses can override this method to provide custom registry implementations.
+     *
+     * @return configured EventHandlerRegistry
+     */
+    protected EventHandlerRegistry createRegistry() {
         List<EventHandlerRegistry> registries = new ArrayList<>();
 
         // Add annotation-based registry if requested
