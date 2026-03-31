@@ -2,6 +2,8 @@ package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.publisher.RetryEventPublisher;
+import com.github.vovten.eventflow.serialization.EventSerializer;
+import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.TransportException;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -42,7 +44,8 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * <pre>{@code
  * Properties props = new Properties();
  * props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
- * PublisherTransport transport = new KafkaPublisherTransport(props, "events");
+ * EventSerializer serializer = new JsonEventSerializer();
+ * KafkaOutTransport transport = new KafkaOutTransport(props, "events", serializer);
  * EventChannel channel = new ExternalEventChannel(List.of(transport));
  * }</pre>
  * <p>
@@ -60,42 +63,68 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  * @see RetryEventPublisher
+ * @see EventSerializer
  */
 public class KafkaOutTransport implements OutTransport {
 
-    protected KafkaProducer<String, String> producer;
+    protected KafkaProducer<String, byte[]> producer;
     protected String topic;
+    protected final EventSerializer serializer;
 
     /**
-     * Create Kafka transport with custom configuration.
+     * Create Kafka transport with custom serializer.
      *
      * @param properties Kafka producer configuration
-     * @param topic Kafka topic name
+     * @param topic      Kafka topic name
+     * @param serializer the event serializer to use
      */
-    public KafkaOutTransport(Properties properties, String topic) {
+    public KafkaOutTransport(Properties properties, String topic, EventSerializer serializer) {
         Properties props = new Properties();
         props.putAll(properties);
+        this.serializer = serializer;
+
         props.putIfAbsent(KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
-        props.putIfAbsent(VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+        props.putIfAbsent(VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
         this.producer = new KafkaProducer<>(props);
         this.topic = topic;
+    }
+
+    /**
+     * Create Kafka transport with default JSON serializer.
+     *
+     * @param properties Kafka producer configuration
+     * @param topic      Kafka topic name
+     */
+    public KafkaOutTransport(Properties properties, String topic) {
+        this(properties, topic, new JsonEventSerializer());
     }
 
     /**
      * Create Kafka transport with bootstrap servers and topic.
      *
      * @param bootstrapServers Kafka bootstrap servers (e.g., "localhost:9092")
-     * @param topic Kafka topic name
+     * @param topic            Kafka topic name
      */
     public KafkaOutTransport(String bootstrapServers, String topic) {
         this(createDefaultProperties(bootstrapServers), topic);
+    }
+
+    /**
+     * Create Kafka transport with bootstrap servers, topic and serializer.
+     *
+     * @param bootstrapServers Kafka bootstrap servers (e.g., "localhost:9092")
+     * @param topic            Kafka topic name
+     * @param serializer       the event serializer to use
+     */
+    public KafkaOutTransport(String bootstrapServers, String topic, EventSerializer serializer) {
+        this(createDefaultProperties(bootstrapServers), topic, serializer);
     }
 
     private static Properties createDefaultProperties(String bootstrapServers) {
         Properties props = new Properties();
         props.setProperty(BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
-        props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+        props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
         props.setProperty(ACKS_CONFIG, "all");
         props.setProperty(ENABLE_IDEMPOTENCE_CONFIG, "true");
         props.setProperty(RETRIES_CONFIG, "3");
@@ -117,7 +146,7 @@ public class KafkaOutTransport implements OutTransport {
      * <p>
      * <b>Reliability guarantees:</b>
      * <ul>
-     *   <li>Event is serialized to JSON with event type as key</li>
+     *   <li>Event is serialized with format header (magic byte)</li>
      *   <li>Waits for acknowledgment from all in-sync replicas</li>
      *   <li>Throws exception on any failure (network, broker, serialization)</li>
      * </ul>
@@ -128,7 +157,7 @@ public class KafkaOutTransport implements OutTransport {
     @Override
     public void send(Event event) {
         String key = event.type().getName();
-        String value = event.asJson();
+        byte[] value = serializer.serialize(event);
         trySend(event, new ProducerRecord<>(topic, key, value));
     }
 
@@ -137,37 +166,37 @@ public class KafkaOutTransport implements OutTransport {
      * <p>
      * This method is protected to allow subclasses to customize send behavior.
      *
-     * @param event the event being sent
+     * @param event  the event being sent
      * @param record the producer record to send
      * @throws TransportException if send fails
      */
-    protected void trySend(Event event, ProducerRecord<String, String> record) {
+    protected void trySend(Event event, ProducerRecord<String, byte[]> record) {
         try {
             // Synchronous send with 10 second timeout
             RecordMetadata metadata = producer.send(record).get(10, TimeUnit.SECONDS);
 
             if (metadata == null || !metadata.hasOffset()) {
                 throw new TransportException(
-                    String.format("Kafka returned null metadata for event %s", event.type().getSimpleName())
+                        String.format("Kafka returned null metadata for event %s", event.type().getSimpleName())
                 );
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new TransportException(
-                String.format("Kafka send interrupted for event %s", event.type().getSimpleName()),
-                e
+                    String.format("Kafka send interrupted for event %s", event.type().getSimpleName()),
+                    e
             );
         } catch (ExecutionException e) {
             throw new TransportException(
-                String.format("Failed to send event %s to Kafka topic %s: %s",
-                    event.type().getSimpleName(), topic, e.getCause().getMessage()),
-                e.getCause()
+                    String.format("Failed to send event %s to Kafka topic %s: %s",
+                            event.type().getSimpleName(), topic, e.getCause().getMessage()),
+                    e.getCause()
             );
         } catch (TimeoutException e) {
             throw new TransportException(
-                String.format("Timeout sending event %s to Kafka topic %s (timeout: 10s)",
-                    event.type().getSimpleName(), topic),
-                e
+                    String.format("Timeout sending event %s to Kafka topic %s (timeout: 10s)",
+                            event.type().getSimpleName(), topic),
+                    e
             );
         }
     }

@@ -15,6 +15,7 @@ import com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -135,16 +136,16 @@ class ExternalPublisherDispatcherIntegrationTest {
         assertEquals("test-id-123", eventListener.getInterfaceResult());
     }
 
-    private KafkaConsumer<String, String> createDispatcherConsumer() {
+    private KafkaConsumer<String, byte[]> createDispatcherConsumer() {
         Map<String, Object> properties = new HashMap<>();
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, uniqueGroupId);
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         properties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 15000);
-        DefaultKafkaConsumerFactory<String, String> factory = new DefaultKafkaConsumerFactory<>(properties);
-        return (KafkaConsumer<String, String>) factory.createConsumer();
+        DefaultKafkaConsumerFactory<String, byte[]> factory = new DefaultKafkaConsumerFactory<>(properties);
+        return (KafkaConsumer<String, byte[]>) factory.createConsumer();
     }
 }

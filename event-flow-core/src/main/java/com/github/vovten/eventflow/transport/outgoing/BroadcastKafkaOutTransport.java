@@ -91,14 +91,14 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
             );
         }
         String key = event.type().getName();
-        String value = event.asJson();
+        byte[] value = serializer.serialize(event);
         List<Integer> successfulPartitions = new ArrayList<>();
         List<PartitionSendResult> failedPartitions = new ArrayList<>();
 
         for (PartitionInfo partition : partitions) {
             int partitionId = partition.partition();
             try {
-                ProducerRecord<String, String> record = new ProducerRecord<>(topic, partitionId, key, value);
+                ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, partitionId, key, value);
                 trySend(event, record);
                 successfulPartitions.add(partitionId);
             } catch (TransportException e) {
