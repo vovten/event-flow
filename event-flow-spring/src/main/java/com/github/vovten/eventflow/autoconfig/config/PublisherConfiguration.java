@@ -4,9 +4,7 @@ import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.publisher.EventPublisher;
-import com.github.vovten.eventflow.publisher.EventPublisherBuilder;
-import com.github.vovten.eventflow.publisher.SilentEventPublisher;
-import com.github.vovten.eventflow.publisher.TransactionalEventPublisher;
+import com.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -53,7 +51,7 @@ public class PublisherConfiguration {
     public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
         if (eventChannels.isEmpty()) {
             log.warn("""
-                   
+
                    ╔═════════════════════════════════════════════════════════════╗
                    ║ Event Flow Publisher enabled but no channels configured     ║
                    ║ To enable event publishing, add at least one channel:       ║
@@ -72,23 +70,27 @@ public class PublisherConfiguration {
         }
         logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
-        EventPublisherBuilder builder = EventPublisherBuilder.channels(eventChannels);
+        
+        // Use Spring-aware builder
+        SpringEventPublisherBuilder builder = SpringEventPublisherBuilder.channels(eventChannels);
+        
         // Apply retry if enabled
         var retry = publisherConfig.getRetry();
         if (retry.isEnabled()) {
             builder.retryable(retry.getMaxAttempts(), retry.getInitialDelay(), retry.getMultiplier());
         }
-        EventPublisher publisher = builder.buildAndLog();
-        // Wrap with transactional decorator if enabled
+        
+        // Apply transactional if enabled
         if (publisherConfig.isTransactional()) {
-            log.info("Wrapping publisher with TransactionalEventPublisher");
-            publisher = new TransactionalEventPublisher(publisher);
+            builder.transactional();
         }
-        // Apply silent mode as the outermost decorator (suppresses all exceptions)
+        
+        // Apply silent mode
         if (publisherConfig.isSilent()) {
-            log.info("Wrapping publisher with SilentEventPublisher");
-            publisher = new SilentEventPublisher(publisher);
+            builder.silent();
         }
+        
+        EventPublisher publisher = builder.buildAndLog();
         return publisher;
     }
 
