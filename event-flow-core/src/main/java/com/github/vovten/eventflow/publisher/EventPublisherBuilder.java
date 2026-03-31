@@ -16,6 +16,7 @@ import java.util.List;
  *   <li>Retry with exponential backoff</li>
  *   <li>Silent (fire-and-forget) mode</li>
  *   <li>Custom decorators</li>
+ *   <li>Extension points for subclasses (e.g., Spring integration)</li>
  * </ul>
  * <p>
  * <b>Usage examples:</b>
@@ -49,26 +50,25 @@ import java.util.List;
  *   <li>Base {@link ChannelEventPublisher}</li>
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
+ *   <li>Subclass decorations via {@link #decorate(EventPublisher)}</li>
  *   <li>{@link SilentEventPublisher} (if enabled) — always outermost</li>
  * </ol>
  * <p>
  * <b>Note:</b> For transactional publishing (defer until after transaction commit),
  * use the Spring integration module (event-flow-spring) which provides
- * {@code TransactionalEventPublisher} and Spring-aware builder.
+ * {@code SpringEventPublisherBuilder} with {@code transactional()} support.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
 @Slf4j
-public final class EventPublisherBuilder {
+@SuppressWarnings("FinalClass")  // Allow subclassing for Spring integration
+public class EventPublisherBuilder {
 
     private boolean silent = false;
     private RetryConfig retryConfig;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
-
-    private EventPublisherBuilder() {
-    }
 
     /**
      * Start building publisher with the given channels.
@@ -195,12 +195,28 @@ public final class EventPublisherBuilder {
                     retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
         }
 
+        // Allow subclasses to add additional decorations (e.g., transactional)
+        publisher = decorate(publisher);
+
         // Apply silent last (outermost) if configured
         if (silent) {
             publisher = new SilentEventPublisher(publisher);
             log.debug("Applied silent decorator");
         }
 
+        return publisher;
+    }
+
+    /**
+     * Hook for subclasses to add additional decorations.
+     * <p>
+     * Called after retry decorator but before silent decorator.
+     * Default implementation returns the publisher unchanged.
+     *
+     * @param publisher the current publisher in the chain
+     * @return decorated publisher (may be the same instance or a new one)
+     */
+    protected EventPublisher decorate(EventPublisher publisher) {
         return publisher;
     }
 
@@ -218,6 +234,19 @@ public final class EventPublisherBuilder {
                 decorators.size()
         );
         return publisher;
+    }
+
+    // Package-private accessors for subclasses
+    int getChannelsSize() {
+        return channels.size();
+    }
+
+    boolean isSilent() {
+        return silent;
+    }
+
+    RetryConfig getRetryConfig() {
+        return retryConfig;
     }
 
     /**
