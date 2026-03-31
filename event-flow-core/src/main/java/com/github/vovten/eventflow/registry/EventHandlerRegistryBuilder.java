@@ -150,8 +150,6 @@ public class EventHandlerRegistryBuilder {
         return registry;
     }
 
-    // ==================== Private methods ====================
-
     /**
      * Validate the builder configuration.
      *
