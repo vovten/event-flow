@@ -1,11 +1,11 @@
 package com.github.vovten.eventflow.autoconfig;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -24,7 +24,7 @@ import org.springframework.context.annotation.Configuration;
 public class EventFlowDisabledAutoConfiguration {
 
     @Bean
-    @ConditionalOnMissingBean
+    @Conditional(NoEventBeansCondition.class)
     public EventFlowDisabledLogger eventFlowDisabledLogger() {
         return new EventFlowDisabledLogger();
     }

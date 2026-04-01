@@ -139,7 +139,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     }
 
     private String buildDispatcherStartedMsg() {
-        String msg = "UnifiedEventDispatcher started with %s transport(s): %s";
+        String msg = "EventDispatcher started with %s transport(s): %s";
         String names = transports.stream().map(InTransport::name).collect(joining(","));
         return String.format(msg, transports.size(), names);
     }
