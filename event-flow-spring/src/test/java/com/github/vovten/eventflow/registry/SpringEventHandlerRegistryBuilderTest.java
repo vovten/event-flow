@@ -6,14 +6,11 @@ import com.github.vovten.eventflow.EventSubscriber;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for SpringEventHandlerRegistryBuilder.
@@ -21,13 +18,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("SpringEventHandlerRegistryBuilder Tests")
 class SpringEventHandlerRegistryBuilderTest {
 
-    private ApplicationContext applicationContext;
+    private GenericApplicationContext applicationContext;
 
     @BeforeEach
     void setUp() {
-        applicationContext = mock(ApplicationContext.class);
-        when(applicationContext.getBeansOfType(EventSubscriber.class)).thenReturn(Map.of());
-        when(applicationContext.getBeanDefinitionNames()).thenReturn(new String[]{});
+        applicationContext = new GenericApplicationContext();
+        applicationContext.refresh();
     }
 
     @Test

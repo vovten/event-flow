@@ -39,11 +39,12 @@ import java.util.List;
  *     .build();
  * </pre>
  *
+ * @param <T> the concrete builder type (CRTP pattern for fluent interface)
  * @author Vladimir Aleshkov
  * @since 2024-12-07
  */
 @Slf4j
-public class EventHandlerRegistryBuilder {
+public class EventHandlerRegistryBuilder<T extends EventHandlerRegistryBuilder<T>> {
 
     protected boolean useInterfaceListeners = false;
     protected boolean useAnnotationListeners = false;
@@ -59,8 +60,8 @@ public class EventHandlerRegistryBuilder {
      *
      * @return new builder instance
      */
-    public static EventHandlerRegistryBuilder create() {
-        return new EventHandlerRegistryBuilder();
+    public static EventHandlerRegistryBuilder<?> create() {
+        return new EventHandlerRegistryBuilder<>();
     }
 
     /**
@@ -71,9 +72,10 @@ public class EventHandlerRegistryBuilder {
      *
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withAnnotationListeners() {
+    @SuppressWarnings("unchecked")
+    public T withAnnotationListeners() {
         this.useAnnotationListeners = true;
-        return this;
+        return (T) this;
     }
 
     /**
@@ -84,9 +86,10 @@ public class EventHandlerRegistryBuilder {
      *
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withInterfaceListeners() {
+    @SuppressWarnings("unchecked")
+    public T withInterfaceListeners() {
         this.useInterfaceListeners = true;
-        return this;
+        return (T) this;
     }
 
     /**
@@ -95,11 +98,12 @@ public class EventHandlerRegistryBuilder {
      * @param registry custom registry to add
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withCustomRegistry(EventHandlerRegistry registry) {
+    @SuppressWarnings("unchecked")
+    public T withCustomRegistry(EventHandlerRegistry registry) {
         if (registry != null) {
             this.additionalRegistries.add(registry);
         }
-        return this;
+        return (T) this;
     }
 
     /**
@@ -108,11 +112,12 @@ public class EventHandlerRegistryBuilder {
      * @param decorator decorator function to apply
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withDecorator(DecoratorFunction decorator) {
+    @SuppressWarnings("unchecked")
+    public T withDecorator(DecoratorFunction decorator) {
         if (decorator != null) {
             this.decorators.add(decorator);
         }
-        return this;
+        return (T) this;
     }
 
     /**

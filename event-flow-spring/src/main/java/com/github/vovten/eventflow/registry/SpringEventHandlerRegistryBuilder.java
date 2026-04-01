@@ -3,9 +3,11 @@ package com.github.vovten.eventflow.registry;
 import com.github.vovten.eventflow.EventSubscriber;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Spring-aware fluent builder for creating configured {@link EventHandlerRegistry} instances.
@@ -51,7 +53,7 @@ import java.util.List;
  * @see SpringEventSubscriberRegistry
  */
 @Slf4j
-public final class SpringEventHandlerRegistryBuilder extends EventHandlerRegistryBuilder {
+public final class SpringEventHandlerRegistryBuilder extends EventHandlerRegistryBuilder<SpringEventHandlerRegistryBuilder> {
 
     private final ApplicationContext applicationContext;
 
@@ -121,25 +123,47 @@ public final class SpringEventHandlerRegistryBuilder extends EventHandlerRegistr
     protected EventHandlerRegistry createRegistry() {
         List<EventHandlerRegistry> registries = new ArrayList<>();
 
-        // Add annotation-based registry if requested
         if (scanPackage != null) {
-            registries.add(new SpringEventListenerRegistry(applicationContext, scanPackage));
+            registries.add(createEventListenerRegistry(scanPackage));
         }
 
-        // Add interface-based registry if requested
         if (useInterfaceListeners) {
-            registries.add(new SpringEventSubscriberRegistry(applicationContext));
+            registries.add(createEventSubscriberRegistry());
         }
 
-        // Add custom registries
         registries.addAll(additionalRegistries);
 
-        // Return single registry or composite
         if (registries.size() == 1) {
             return registries.getFirst();
         }
 
         return new CompositeEventHandlerRegistry(registries);
+    }
+
+    private SpringEventListenerRegistry createEventListenerRegistry(String scanPackage) {
+        return getOrCreateBean(
+                SpringEventListenerRegistry.class,
+                "springEventListenerRegistry",
+                () -> new SpringEventListenerRegistry(applicationContext, scanPackage)
+        );
+    }
+
+    private SpringEventSubscriberRegistry createEventSubscriberRegistry() {
+        return getOrCreateBean(
+                SpringEventSubscriberRegistry.class,
+                "springEventSubscriberRegistry",
+                () -> new SpringEventSubscriberRegistry(applicationContext)
+        );
+    }
+
+    private <T> T getOrCreateBean(Class<T> beanClass, String beanName, Supplier<T> supplier) {
+        if (applicationContext instanceof GenericApplicationContext ctx) {
+            if (!ctx.containsBean(beanName)) {
+                ctx.registerBean(beanName, beanClass, supplier);
+            }
+            return ctx.getBean(beanName, beanClass);
+        }
+        throw new IllegalStateException("Context must be an instance of GenericApplicationContext");
     }
 
     @Override
