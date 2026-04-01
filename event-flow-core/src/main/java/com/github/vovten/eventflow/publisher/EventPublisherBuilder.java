@@ -57,11 +57,12 @@ import java.util.List;
  * use the Spring integration module (event-flow-spring) which provides
  * {@code SpringEventPublisherBuilder} with {@code transactional()} support.
  *
+ * @param <T> the concrete builder type (CRTP pattern for fluent interface)
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
 @Slf4j
-public class EventPublisherBuilder {
+public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 
     private boolean silent = false;
     private RetryConfig retryConfig;
@@ -77,8 +78,8 @@ public class EventPublisherBuilder {
      * @param channels event channels to configure
      * @return builder instance
      */
-    public static EventPublisherBuilder channels(EventChannel... channels) {
-        return new EventPublisherBuilder().addChannels(channels);
+    public static EventPublisherBuilder<?> channels(EventChannel... channels) {
+        return new EventPublisherBuilder<>().addChannels(channels);
     }
 
     /**
@@ -87,8 +88,8 @@ public class EventPublisherBuilder {
      * @param channels list of event channels
      * @return builder instance
      */
-    public static EventPublisherBuilder channels(List<EventChannel> channels) {
-        return new EventPublisherBuilder().addChannels(channels);
+    public static EventPublisherBuilder<?> channels(List<EventChannel> channels) {
+        return new EventPublisherBuilder<>().addChannels(channels);
     }
 
     /**
@@ -97,9 +98,10 @@ public class EventPublisherBuilder {
      * @param channels channels to add
      * @return this builder
      */
-    public EventPublisherBuilder addChannels(EventChannel... channels) {
+    @SuppressWarnings("unchecked")
+    public T addChannels(EventChannel... channels) {
         this.channels.addAll(List.of(channels));
-        return this;
+        return (T) this;
     }
 
     /**
@@ -108,9 +110,10 @@ public class EventPublisherBuilder {
      * @param channels channels to add
      * @return this builder
      */
-    public EventPublisherBuilder addChannels(List<EventChannel> channels) {
+    @SuppressWarnings("unchecked")
+    public T addChannels(List<EventChannel> channels) {
         this.channels.addAll(channels);
-        return this;
+        return (T) this;
     }
 
     /**
@@ -123,9 +126,10 @@ public class EventPublisherBuilder {
      *
      * @return this builder
      */
-    public EventPublisherBuilder retryable() {
+    @SuppressWarnings("unchecked")
+    public T retryable() {
         this.retryConfig = new RetryConfig(3, Duration.ofMillis(100), 2.0);
-        return this;
+        return (T) this;
     }
 
     /**
@@ -136,9 +140,10 @@ public class EventPublisherBuilder {
      * @param multiplier backoff multiplier
      * @return this builder
      */
-    public EventPublisherBuilder retryable(int maxRetries, Duration initialDelay, double multiplier) {
+    @SuppressWarnings("unchecked")
+    public T retryable(int maxRetries, Duration initialDelay, double multiplier) {
         this.retryConfig = new RetryConfig(maxRetries, initialDelay, multiplier);
-        return this;
+        return (T) this;
     }
 
     /**
@@ -147,9 +152,10 @@ public class EventPublisherBuilder {
      *
      * @return this builder
      */
-    public EventPublisherBuilder silent() {
+    @SuppressWarnings("unchecked")
+    public T silent() {
         this.silent = true;
-        return this;
+        return (T) this;
     }
 
     /**
@@ -159,9 +165,10 @@ public class EventPublisherBuilder {
      * @param decorator function that transforms an EventPublisher into a decorated one
      * @return this builder
      */
-    public EventPublisherBuilder withDecorator(DecoratorFunction decorator) {
+    @SuppressWarnings("unchecked")
+    public T withDecorator(DecoratorFunction decorator) {
         this.decorators.add(decorator);
-        return this;
+        return (T) this;
     }
 
     /**

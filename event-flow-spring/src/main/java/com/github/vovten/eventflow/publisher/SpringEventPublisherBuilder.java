@@ -50,7 +50,7 @@ import java.util.List;
  * @see EventPublisherBuilder
  */
 @Slf4j
-public final class SpringEventPublisherBuilder extends EventPublisherBuilder {
+public final class SpringEventPublisherBuilder extends EventPublisherBuilder<SpringEventPublisherBuilder> {
 
     private boolean transactional = false;
 
