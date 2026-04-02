@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -225,7 +226,7 @@ class AbstractEventDispatcherTest {
         }
 
         @Override
-        public void start() {
+        public void start(Consumer<Event> dispatchConsumer) {
             // No-op for tests
         }
 

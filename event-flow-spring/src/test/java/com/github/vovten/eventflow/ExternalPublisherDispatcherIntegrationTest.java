@@ -86,7 +86,7 @@ class ExternalPublisherDispatcherIntegrationTest {
                 createEventHandlerRegistry(),
                 List.of(kafkaInTransport)
         );
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
 
         // Wait for consumer to subscribe
         Thread.sleep(3000);

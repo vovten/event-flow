@@ -68,7 +68,7 @@ public class DispatcherConfiguration {
             builder.idempotent(config.getTtl(), config.getMaxSize(), config.isWarnOnDuplicate());
         }
         EventDispatcher dispatcher = builder.buildAndLog();
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
         return dispatcher;
     }
 

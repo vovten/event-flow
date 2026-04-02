@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static java.util.stream.Collectors.joining;
 
@@ -25,11 +26,12 @@ import static java.util.stream.Collectors.joining;
  *   <li>Support for multiple transports (local-queue, Kafka, etc.)</li>
  *   <li>Thread-safe event delivery to handlers</li>
  *   <li>External handler registry injection</li>
+ *   <li>Support for decorator pattern via external dispatch consumer injection</li>
  * </ul>
  * <p>
  * <b>Architecture:</b>
  * <pre>{@code
- * DispatcherTransport(s) → UnifiedEventDispatcher → EventHandler(s)
+ * DispatcherTransport(s) → [IdempotentEventDispatcher] → UnifiedEventDispatcher → EventHandler(s)
  *      ↓ Kafka
  *      ↓ Local-Queue
  *      ↓ Custom...
@@ -54,7 +56,7 @@ import static java.util.stream.Collectors.joining;
  *     List.of(localQueueTransport, kafkaTransport),
  *     registry
  * );
- * dispatcher.start();
+ * dispatcher.start(dispatcher::dispatch);
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -84,10 +86,10 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void start() {
+    public void start(Consumer<Event> dispatchConsumer) {
         if (started.compareAndSet(false, true)) {
             for (InTransport transport : transports) {
-                transport.start(this::dispatch);
+                transport.start(dispatchConsumer);
             }
             log.info(buildDispatcherStartedMsg());
         } else {

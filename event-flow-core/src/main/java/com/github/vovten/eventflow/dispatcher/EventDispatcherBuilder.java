@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
  *     .handlerRegistry(registry)
  *     .transports(transports)
  *     .build();
+ * dispatcher.start(dispatcher::dispatch);
  *
  * // Dispatcher with idempotent processing (default settings)
  * EventDispatcher dispatcher = EventDispatcherBuilder.create()
@@ -35,6 +36,7 @@ import java.util.concurrent.ExecutorService;
  *     .transports(transports)
  *     .idempotent()
  *     .build();
+ * dispatcher.start(dispatcher::dispatch);
  *
  * // Dispatcher with custom idempotent settings
  * EventDispatcher dispatcher = EventDispatcherBuilder.create()
@@ -43,6 +45,7 @@ import java.util.concurrent.ExecutorService;
  *     .transports(transports)
  *     .idempotent(Duration.ofMinutes(30), 50_000, true)
  *     .build();
+ * dispatcher.start(dispatcher::dispatch);
  *
  * // Dispatcher with custom decorator
  * EventDispatcher dispatcher = EventDispatcherBuilder.create()
@@ -51,6 +54,7 @@ import java.util.concurrent.ExecutorService;
  *     .transports(transports)
  *     .withDecorator(dispatcher -> new MetricsEventDispatcher(dispatcher, metricsRegistry))
  *     .build();
+ * dispatcher.start(dispatcher::dispatch);
  * }</pre>
  * <p>
  * <b>Order of decorators:</b>
@@ -60,6 +64,11 @@ import java.util.concurrent.ExecutorService;
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link IdempotentEventDispatcher} (if enabled)</li>
  * </ol>
+ * <p>
+ * <b>Event flow:</b>
+ * <pre>{@code
+ * Transport → IdempotentEventDispatcher → [CustomDecorators] → UnifiedEventDispatcher → Handlers
+ * }</pre>
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-30

@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Conditional;
 
+import java.util.function.Consumer;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -133,7 +135,7 @@ class NoEventBeansConditionTest {
         }
 
         @Override
-        public void start() {
+        public void start(Consumer<Event> dispatchConsumer) {
         }
 
         @Override

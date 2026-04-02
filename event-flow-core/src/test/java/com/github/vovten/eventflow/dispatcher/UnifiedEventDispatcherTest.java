@@ -52,7 +52,7 @@ class UnifiedEventDispatcherTest {
     @DisplayName("Should start all transports")
     void shouldStartAllTransports() {
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1, transport2));
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
 
         verify(transport1).start(any(Consumer.class));
         verify(transport2).start(any(Consumer.class));
@@ -72,7 +72,7 @@ class UnifiedEventDispatcherTest {
         }).when(transport2).start(any(Consumer.class));
 
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1, transport2));
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
         dispatcher.stop();
 
         verify(transport1).stop();
@@ -89,7 +89,7 @@ class UnifiedEventDispatcherTest {
         doThrow(new RuntimeException("Stop failed")).when(transport1).stop();
 
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1));
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
 
         assertDoesNotThrow(() -> dispatcher.stop());
     }

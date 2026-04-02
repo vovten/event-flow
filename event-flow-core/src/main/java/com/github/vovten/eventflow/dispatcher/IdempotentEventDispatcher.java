@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * Event dispatcher decorator that ensures idempotent event processing using a Caffeine cache.
@@ -15,6 +16,12 @@ import java.util.UUID;
  * This dispatcher wraps another {@link EventDispatcher} and prevents duplicate processing
  * of events that have already been handled. It relies on {@link TraceableEvent} to provide
  * unique identifiers (UID) for event deduplication.
+ * <p>
+ * <b>Decorator chain support:</b>
+ * <pre>{@code
+ * IdempotentEventDispatcher.start(dispatcher::dispatch) → origin.start(this::dispatch)
+ * }</pre>
+ * This ensures events flow through the decorator before reaching the origin dispatcher.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-13
@@ -39,8 +46,8 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void start() {
-        origin.start();
+    public void start(Consumer<Event> dispatchConsumer) {
+        origin.start(this::dispatch);
     }
 
     @Override

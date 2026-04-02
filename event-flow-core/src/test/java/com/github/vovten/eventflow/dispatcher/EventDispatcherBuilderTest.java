@@ -243,7 +243,7 @@ class EventDispatcherBuilderTest {
                 .idempotent(Duration.ofMinutes(1), 100, false)
                 .build();
 
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
         try {
             dispatcher.dispatch(event);
             executorService.shutdown();
@@ -272,7 +272,7 @@ class EventDispatcherBuilderTest {
                 .idempotent(Duration.ofMinutes(1), 100, false)
                 .build();
 
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
         try {
             dispatcher.dispatch(event);
             dispatcher.dispatch(event); // Duplicate
@@ -301,7 +301,7 @@ class EventDispatcherBuilderTest {
                 .idempotent(Duration.ofMinutes(1), 100, false)
                 .build();
 
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
         try {
             dispatcher.dispatch(event);
             dispatcher.dispatch(event); // Same event, but not traceable
