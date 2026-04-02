@@ -1,12 +1,17 @@
 package com.github.vovten.eventflow.serialization.msgpack;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializationException;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 
 /**
@@ -14,6 +19,8 @@ import java.util.Arrays;
  * Simple and efficient binary serialization.
  * <p>
  * Format: [0x02][MessagePack bytes]
+ * <p>
+ * Uses ISO-8601 string format for Instants to preserve nanosecond precision.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-30
@@ -22,7 +29,14 @@ public class MsgPackEventSerializer implements EventSerializer {
 
     private static final byte FORMAT_CODE = 0x02;
 
-    private final ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
+    private final ObjectMapper mapper;
+
+    public MsgPackEventSerializer() {
+        this.mapper = new ObjectMapper(new MessagePackFactory())
+                .registerModule(new JavaTimeModule()
+                        .addSerializer(new InstantAsStringSerializer())
+                );
+    }
 
     @Override
     public byte[] serialize(Event event) {
@@ -75,5 +89,19 @@ public class MsgPackEventSerializer implements EventSerializer {
     @Override
     public String getFormat() {
         return "msgpack";
+    }
+
+    /**
+     * Custom serializer that writes Instant as ISO-8601 string.
+     */
+    static class InstantAsStringSerializer extends StdSerializer<Instant> {
+        InstantAsStringSerializer() {
+            super(Instant.class);
+        }
+
+        @Override
+        public void serialize(Instant value, JsonGenerator gen, SerializerProvider provider) throws IOException {
+            gen.writeString(value.toString());
+        }
     }
 }

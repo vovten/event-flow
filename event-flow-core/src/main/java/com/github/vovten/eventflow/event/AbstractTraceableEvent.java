@@ -1,5 +1,9 @@
 package com.github.vovten.eventflow.event;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -48,22 +52,29 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
      * @param traceId the correlation ID
      * @param occurredAt the event timestamp
      */
-    protected AbstractTraceableEvent(UUID uid, UUID traceId, Instant occurredAt) {
+    @JsonCreator
+    protected AbstractTraceableEvent(
+            @JsonProperty("uid") UUID uid,
+            @JsonProperty("traceId") UUID traceId,
+            @JsonProperty("occurredAt") Instant occurredAt) {
         this.uid = Objects.requireNonNull(uid, "UID must not be null");
         this.traceId = Objects.requireNonNull(traceId, "TraceId must not be null");
         this.occurredAt = Objects.requireNonNull(occurredAt, "OccurredAt must not be null");
     }
 
+    @JsonGetter("uid")
     @Override
     public UUID uid() {
         return uid;
     }
 
+    @JsonGetter("traceId")
     @Override
     public UUID traceId() {
         return traceId;
     }
 
+    @JsonGetter("occurredAt")
     @Override
     public Instant occurredAt() {
         return occurredAt;
