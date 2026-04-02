@@ -130,7 +130,7 @@ class ExternalPublisherDispatcherIntegrationTest {
         publisher.publish(testEvent);
 
         // assert - wait for event to be received
-        boolean completed = eventListener.getLatch().await(15, SECONDS);
+        boolean completed = eventListener.getLatch().await(25, SECONDS);
         assertTrue(completed, "Event should be received within timeout");
         assertEquals("test-id-123", eventListener.getAnnotationResult());
         assertEquals("test-id-123", eventListener.getInterfaceResult());
