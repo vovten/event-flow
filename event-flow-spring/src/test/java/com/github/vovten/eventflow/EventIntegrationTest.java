@@ -6,7 +6,7 @@ import com.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -62,7 +62,7 @@ class EventIntegrationTest {
     @Test
     @DisplayName("Should produce consistent JSON output")
     void shouldProduceConsistentJsonOutput() {
-        LocalDateTime dateTime = LocalDateTime.of(2026, 3, 4, 12, 0, 0);
+        Instant dateTime = Instant.ofEpochSecond(1741089600); // 2026-03-04 12:00:00 UTC
         UUID sameUid = UUID.randomUUID();
         UUID sameTraceId = UUID.randomUUID();
         // given

@@ -1,8 +1,12 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.*;
-import com.github.vovten.eventflow.transport.DefaultQueueProvider;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
+import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,14 +17,14 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Auto-configuration for common components: executor service and in-memory transports.
+ * Auto-configuration for common components: executor service and local-queue transports.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class CommonConfiguration {
 
     private final EventFlowProperties properties;
@@ -53,73 +57,73 @@ public class CommonConfiguration {
     }
 
     /**
-     * Creates queue provider for in-memory transports with configured capacity.
+     * Creates queue provider for local-queue transports with configured capacity.
      * Uses capacity from first configured transport or default value.
-     * Always created to support in-memory transports even when event-flow is disabled.
+     * Always created to support local-queue transports even when event-flow is disabled.
      *
-     * @return queue provider for in-memory transports
+     * @return queue provider for local-queue transports
      */
     @Bean
     @ConditionalOnMissingBean
-    public DefaultQueueProvider queueProvider() {
+    public DefaultLocalQueueProvider queueProvider() {
         int capacity = properties.getDispatcher().getTransports().stream()
-                .filter(config -> "in-memory".equalsIgnoreCase(config.getName()))
+                .filter(config -> "local-queue".equalsIgnoreCase(config.getName()))
                 .findFirst()
                 .map(EventFlowProperties.TransportConfig::getCapacity)
                 .orElse(1000);
         log.info("Creating QueueProvider with capacity: {}", capacity);
-        return new DefaultQueueProvider(capacity);
+        return new DefaultLocalQueueProvider(capacity);
     }
 
     /**
-     * Creates factory for in-memory outgoing event transports.
+     * Creates factory for local-queue publisher transports.
      *
-     * @param queueProvider queue provider for in-memory transports
-     * @return in-memory outgoing transport factory
+     * @param queueProvider queue provider for local-queue transports
+     * @return local-queue publisher transport factory
      */
     @Bean
-    public InMemoryOutgoingTransportFactory inMemoryOutgoingTransportFactory(DefaultQueueProvider queueProvider) {
-        return new InMemoryOutgoingTransportFactory(queueProvider);
+    public LocalQueueOutTransportFactory localQueuePublisherTransportFactory(DefaultLocalQueueProvider queueProvider) {
+        return new LocalQueueOutTransportFactory(queueProvider);
     }
 
     /**
-     * Creates factory for in-memory incoming event transports.
+     * Creates factory for local-queue dispatcher transports.
      *
-     * @param queueProvider queue provider for in-memory transports
-     * @return in-memory incoming transport factory
+     * @param queueProvider queue provider for local-queue transports
+     * @return local-queue dispatcher transport factory
      */
     @Bean
-    public InMemoryIncomingTransportFactory inMemoryIncomingTransportFactory(DefaultQueueProvider queueProvider) {
-        return new InMemoryIncomingTransportFactory(queueProvider);
+    public LocalQueueInTransportFactory localQueueDispatcherTransportFactory(DefaultLocalQueueProvider queueProvider) {
+        return new LocalQueueInTransportFactory(queueProvider);
     }
 
     /**
-     * Creates factory for Kafka outgoing event transports.
+     * Creates factory for Kafka publisher transports.
      *
-     * @return Kafka outgoing transport factory
+     * @return Kafka publisher transport factory
      */
     @Bean
-    public KafkaOutgoingTransportFactory kafkaOutgoingTransportFactory() {
-        return new KafkaOutgoingTransportFactory();
+    public KafkaOutTransportFactory kafkaPublisherTransportFactory() {
+        return new KafkaOutTransportFactory();
     }
 
     /**
-     * Creates factory for Kafka incoming event transports.
+     * Creates factory for Kafka dispatcher transports.
      *
-     * @return Kafka incoming transport factory
+     * @return Kafka dispatcher transport factory
      */
     @Bean
-    public KafkaIncomingTransportFactory kafkaIncomingTransportFactory() {
-        return new KafkaIncomingTransportFactory();
+    public KafkaInTransportFactory kafkaDispatcherTransportFactory() {
+        return new KafkaInTransportFactory();
     }
 
     /**
-     * Creates factory for broadcast Kafka outgoing event transports.
+     * Creates factory for broadcast Kafka publisher transports.
      *
-     * @return broadcast Kafka outgoing transport factory
+     * @return broadcast Kafka publisher transport factory
      */
     @Bean
-    public BroadcastKafkaOutgoingTransportFactory broadcastKafkaOutgoingTransportFactory() {
-        return new BroadcastKafkaOutgoingTransportFactory();
+    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory() {
+        return new BroadcastKafkaOutTransportFactory();
     }
 }

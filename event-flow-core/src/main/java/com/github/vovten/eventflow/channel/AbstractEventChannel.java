@@ -1,7 +1,7 @@
 package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 
 import java.util.List;
 
@@ -22,14 +22,14 @@ import java.util.List;
  */
 public abstract class AbstractEventChannel implements EventChannel {
 
-    private final List<OutgoingEventTransport> transports;
+    private final List<OutTransport> transports;
 
     /**
      * Creates an event channel with multiple transports.
      *
      * @param transports list of transports for this channel
      */
-    protected AbstractEventChannel(List<OutgoingEventTransport> transports) {
+    protected AbstractEventChannel(List<OutTransport> transports) {
         this.transports = transports;
     }
 
@@ -38,18 +38,18 @@ public abstract class AbstractEventChannel implements EventChannel {
      *
      * @param transport the transport for this channel
      */
-    protected AbstractEventChannel(OutgoingEventTransport transport) {
+    protected AbstractEventChannel(OutTransport transport) {
         this.transports = List.of(transport);
     }
 
     @Override
-    public List<OutgoingEventTransport> transports() {
+    public List<OutTransport> transports() {
         return transports;
     }
 
     @Override
     public void send(Event event) {
-        for (OutgoingEventTransport transport : transports()) {
+        for (OutTransport transport : transports()) {
             transport.send(event);
         }
     }

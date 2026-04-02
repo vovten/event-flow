@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 
 import java.util.List;
 
@@ -9,7 +9,7 @@ import java.util.List;
  * <p>
  * This channel is used to deliver events within a single application instance.
  * Events published to this channel are typically consumed by local event listeners
- * using an in-memory queue (e.g., {@code BlockingDeque}).
+ * using a local-queue (e.g., {@code BlockingDeque}).
  * <p>
  * <b>When to use:</b>
  * <ul>
@@ -21,7 +21,7 @@ import java.util.List;
  * <b>Configuration example:</b>
  * <pre>{@code
  * EventChannel internalChannel = new InternalEventChannel(
- *     List.of(new InMemoryOutgoingEventTransport(1000))
+ *     List.of(new LocalQueuePublisherTransport(queue))
  * );
  * }</pre>
  *
@@ -35,7 +35,7 @@ public class InternalEventChannel extends AbstractEventChannel {
      *
      * @param transports list of transports for this channel
      */
-    public InternalEventChannel(List<OutgoingEventTransport> transports) {
+    public InternalEventChannel(List<OutTransport> transports) {
         super(transports);
     }
 
@@ -44,7 +44,7 @@ public class InternalEventChannel extends AbstractEventChannel {
      *
      * @param transport the transport for this channel
      */
-    public InternalEventChannel(OutgoingEventTransport transport) {
+    public InternalEventChannel(OutTransport transport) {
         super(transport);
     }
 

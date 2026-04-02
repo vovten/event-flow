@@ -1,15 +1,16 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.InMemoryOutgoingTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.KafkaOutgoingTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
-import com.github.vovten.eventflow.transport.DefaultQueueProvider;
+import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.test.context.support.TestPropertySourceUtils;
 
 import java.util.List;
 
@@ -26,21 +27,22 @@ class ChannelConfigurationTest {
     void shouldCreateInternalEventChannelForInternalChannelName() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("internal");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
-            DefaultQueueProvider queueProvider = new DefaultQueueProvider(1000);
-            InMemoryOutgoingTransportFactory factory = new InMemoryOutgoingTransportFactory(queueProvider);
+            DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
+            LocalQueueOutTransportFactory factory = new LocalQueueOutTransportFactory(queueProvider);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> queueProvider);
-            context.registerBean("testOutgoingTransportFactory1", InMemoryOutgoingTransportFactory.class, () -> factory);
+            context.registerBean(DefaultLocalQueueProvider.class, () -> queueProvider);
+            context.registerBean("testPublisherTransportFactory1", LocalQueueOutTransportFactory.class, () -> factory);
             context.registerBean(ChannelConfiguration.class, () -> new ChannelConfiguration(properties, List.of(factory)));
             context.refresh();
 
@@ -58,19 +60,20 @@ class ChannelConfigurationTest {
     void shouldCreateExternalEventChannelForExternalChannelName() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("external");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory2", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testPublisherTransportFactory2", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -88,19 +91,20 @@ class ChannelConfigurationTest {
     void shouldCreateGenericChannelForCustomChannelName() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
             channelConfig.setName("custom-channel");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
-            transportConfig.setName("in-memory");
+            transportConfig.setName("local-queue");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory3", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testPublisherTransportFactory3", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -118,28 +122,29 @@ class ChannelConfigurationTest {
     void shouldCreateMultipleChannels() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
 
             EventFlowProperties.ChannelConfig internalChannel = new EventFlowProperties.ChannelConfig();
             internalChannel.setName("internal");
             EventFlowProperties.TransportConfig internalTransport = new EventFlowProperties.TransportConfig();
-            internalTransport.setName("in-memory");
+            internalTransport.setName("local-queue");
             internalChannel.getTransports().add(internalTransport);
 
             EventFlowProperties.ChannelConfig externalChannel = new EventFlowProperties.ChannelConfig();
             externalChannel.setName("external");
             EventFlowProperties.TransportConfig externalTransport = new EventFlowProperties.TransportConfig();
-            externalTransport.setName("in-memory");
+            externalTransport.setName("local-queue");
             externalChannel.getTransports().add(externalTransport);
 
             properties.getPublisher().getChannels().add(internalChannel);
             properties.getPublisher().getChannels().add(externalChannel);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory4", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testPublisherTransportFactory4", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -158,6 +163,7 @@ class ChannelConfigurationTest {
     void shouldThrowExceptionWhenChannelHasNoTransports() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -167,9 +173,9 @@ class ChannelConfigurationTest {
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory5", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testPublisherTransportFactory5", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
 
             // when & then
@@ -184,6 +190,7 @@ class ChannelConfigurationTest {
     void shouldThrowExceptionWhenTransportNotFound() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -194,9 +201,9 @@ class ChannelConfigurationTest {
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory6", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testPublisherTransportFactory6", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
 
             // when & then
@@ -211,6 +218,7 @@ class ChannelConfigurationTest {
     void shouldUseKafkaTransportFromConfiguration() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             EventFlowProperties.ChannelConfig channelConfig = new EventFlowProperties.ChannelConfig();
@@ -218,14 +226,14 @@ class ChannelConfigurationTest {
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
             transportConfig.setTopic("test-topic");
-            transportConfig.setBootstrapServers("localhost:9092");
+            transportConfig.setServers("localhost:9092");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean(KafkaOutgoingTransportFactory.class,
-                    () -> new KafkaOutgoingTransportFactory());
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean(KafkaOutTransportFactory.class,
+                    () -> new KafkaOutTransportFactory());
             context.register(ChannelConfiguration.class);
             context.refresh();
 
@@ -243,14 +251,15 @@ class ChannelConfigurationTest {
     void shouldCreateEmptyChannelsListWhenNoChannelsConfigured() {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
             EventFlowProperties properties = new EventFlowProperties();
             properties.getPublisher().getChannels().clear();
             // No channels configured
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(DefaultQueueProvider.class, () -> new DefaultQueueProvider(1000));
-            context.registerBean("testOutgoingTransportFactory7", InMemoryOutgoingTransportFactory.class,
-                    () -> new InMemoryOutgoingTransportFactory(context.getBean(DefaultQueueProvider.class)));
+            context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean("testPublisherTransportFactory7", LocalQueueOutTransportFactory.class,
+                    () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
             context.register(ChannelConfiguration.class);
             context.refresh();
 

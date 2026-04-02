@@ -21,23 +21,23 @@ import java.util.List;
  * <b>Usage examples:</b>
  * <pre>{@code
  * // Simple publisher with channels only
- * EventPublisher publisher = EventPublisherBuilder.channels(channel1, channel2)
+ * EventPublisher publisher = EventPublisherBuilder.create(channel1, channel2)
  *     .build();
  *
  * // Publisher with retry support
- * EventPublisher publisher = EventPublisherBuilder.channels(channels)
- *     .withRetry(3, Duration.ofMillis(100), 2.0)
+ * EventPublisher publisher = EventPublisherBuilder.create(channels)
+ *     .retryable(3, Duration.ofMillis(100), 2.0)
  *     .build();
  *
  * // Silent publisher with retry for analytics events
- * EventPublisher publisher = EventPublisherBuilder.channels(analyticsChannel)
- *     .withRetry()
+ * EventPublisher publisher = EventPublisherBuilder.create(analyticsChannel)
+ *     .retryable()
  *     .silent()
  *     .build();
  *
  * // Complete configuration with custom decorator
- * EventPublisher publisher = EventPublisherBuilder.channels(channels)
- *     .withRetry(5, Duration.ofSeconds(1), 1.5)
+ * EventPublisher publisher = EventPublisherBuilder.create(channels)
+ *     .retryable(5, Duration.ofSeconds(1), 1.5)
  *     .withDecorator(pub -> new MetricsEventPublisher(pub, metricsRegistry))
  *     .silent()  // silent will be the outermost decorator
  *     .build();
@@ -49,25 +49,36 @@ import java.util.List;
  *   <li>Base {@link ChannelEventPublisher}</li>
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
+ *   <li>Subclass decorations via {@link #decorate(EventPublisher)}</li>
  *   <li>{@link SilentEventPublisher} (if enabled) — always outermost</li>
  * </ol>
  * <p>
  * <b>Note:</b> For transactional publishing (defer until after transaction commit),
  * use the Spring integration module (event-flow-spring) which provides
- * {@code TransactionalEventPublisher} and Spring-aware builder.
+ * {@code SpringEventPublisherBuilder} with {@code transactional()} support.
  *
+ * @param <T> the concrete builder type (CRTP pattern for fluent interface)
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
 @Slf4j
-public final class EventPublisherBuilder {
+public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 
     private boolean silent = false;
     private RetryConfig retryConfig;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
 
-    private EventPublisherBuilder() {
+    protected EventPublisherBuilder() {
+    }
+
+    /**
+     * Start building a new EventPublisher.
+     *
+     * @return builder instance
+     */
+    public static EventPublisherBuilder<?> create() {
+        return new EventPublisherBuilder<>();
     }
 
     /**
@@ -76,8 +87,8 @@ public final class EventPublisherBuilder {
      * @param channels event channels to configure
      * @return builder instance
      */
-    public static EventPublisherBuilder channels(EventChannel... channels) {
-        return new EventPublisherBuilder().addChannels(channels);
+    public static EventPublisherBuilder<?> create(EventChannel... channels) {
+        return new EventPublisherBuilder<>().addChannels(channels);
     }
 
     /**
@@ -86,8 +97,8 @@ public final class EventPublisherBuilder {
      * @param channels list of event channels
      * @return builder instance
      */
-    public static EventPublisherBuilder channels(List<EventChannel> channels) {
-        return new EventPublisherBuilder().addChannels(channels);
+    public static EventPublisherBuilder<?> create(List<EventChannel> channels) {
+        return new EventPublisherBuilder<>().addChannels(channels);
     }
 
     /**
@@ -96,9 +107,10 @@ public final class EventPublisherBuilder {
      * @param channels channels to add
      * @return this builder
      */
-    public EventPublisherBuilder addChannels(EventChannel... channels) {
+    @SuppressWarnings("unchecked")
+    public T addChannels(EventChannel... channels) {
         this.channels.addAll(List.of(channels));
-        return this;
+        return (T) this;
     }
 
     /**
@@ -107,9 +119,10 @@ public final class EventPublisherBuilder {
      * @param channels channels to add
      * @return this builder
      */
-    public EventPublisherBuilder addChannels(List<EventChannel> channels) {
+    @SuppressWarnings("unchecked")
+    public T addChannels(List<EventChannel> channels) {
         this.channels.addAll(channels);
-        return this;
+        return (T) this;
     }
 
     /**
@@ -122,9 +135,10 @@ public final class EventPublisherBuilder {
      *
      * @return this builder
      */
-    public EventPublisherBuilder retryable() {
+    @SuppressWarnings("unchecked")
+    public T retryable() {
         this.retryConfig = new RetryConfig(3, Duration.ofMillis(100), 2.0);
-        return this;
+        return (T) this;
     }
 
     /**
@@ -135,9 +149,10 @@ public final class EventPublisherBuilder {
      * @param multiplier backoff multiplier
      * @return this builder
      */
-    public EventPublisherBuilder retryable(int maxRetries, Duration initialDelay, double multiplier) {
+    @SuppressWarnings("unchecked")
+    public T retryable(int maxRetries, Duration initialDelay, double multiplier) {
         this.retryConfig = new RetryConfig(maxRetries, initialDelay, multiplier);
-        return this;
+        return (T) this;
     }
 
     /**
@@ -146,9 +161,10 @@ public final class EventPublisherBuilder {
      *
      * @return this builder
      */
-    public EventPublisherBuilder silent() {
+    @SuppressWarnings("unchecked")
+    public T silent() {
         this.silent = true;
-        return this;
+        return (T) this;
     }
 
     /**
@@ -158,9 +174,10 @@ public final class EventPublisherBuilder {
      * @param decorator function that transforms an EventPublisher into a decorated one
      * @return this builder
      */
-    public EventPublisherBuilder withDecorator(DecoratorFunction decorator) {
+    @SuppressWarnings("unchecked")
+    public T withDecorator(DecoratorFunction decorator) {
         this.decorators.add(decorator);
-        return this;
+        return (T) this;
     }
 
     /**
@@ -194,13 +211,25 @@ public final class EventPublisherBuilder {
             log.debug("Applied retry decorator with maxRetries={}, initialDelay={}, multiplier={}",
                     retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
         }
-
-        // Apply silent last (outermost) if configured
+        // Apply silent if configured
         if (silent) {
             publisher = new SilentEventPublisher(publisher);
             log.debug("Applied silent decorator");
         }
+        // Allow subclasses to add additional decorations (e.g., transactional)
+        publisher = decorate(publisher);
+        return publisher;
+    }
 
+    /**
+     * Hook for subclasses to add additional decorations.
+     * <p>
+     * Default implementation returns the publisher unchanged.
+     *
+     * @param publisher the current publisher in the chain
+     * @return decorated publisher (may be the same instance or a new one)
+     */
+    protected EventPublisher decorate(EventPublisher publisher) {
         return publisher;
     }
 
@@ -218,6 +247,18 @@ public final class EventPublisherBuilder {
                 decorators.size()
         );
         return publisher;
+    }
+
+    protected int getChannelsSize() {
+        return channels.size();
+    }
+
+    boolean isSilent() {
+        return silent;
+    }
+
+    RetryConfig getRetryConfig() {
+        return retryConfig;
     }
 
     /**

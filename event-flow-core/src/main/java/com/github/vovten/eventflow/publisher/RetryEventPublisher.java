@@ -101,34 +101,32 @@ public class RetryEventPublisher implements EventPublisher {
     @Override
     public void publish(Event event) {
         Exception lastException = null;
+        String eventTypeName = event.type().getSimpleName();
         for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
             try {
                 origin.publish(event);
                 if (attempt > 1) {
-                    log.debug("Event {} published successfully after {} attempts",
-                            event.type().getSimpleName(), attempt);
+                    log.debug("Event {} published successfully after {} attempts", eventTypeName, attempt);
                 }
                 return;
             } catch (Exception e) {
                 lastException = e;
                 if (!shouldRetry(e)) {
-                    log.warn("Non-retryable error publishing event {}: {}",
-                            event.type().getSimpleName(), e.getMessage());
+                    log.warn("Non-retryable error publishing event {}: {}", eventTypeName, e.getMessage());
                     throw e;
                 }
                 if (attempt <= maxRetries) {
                     long delayMs = calculateDelay(attempt);
                     log.warn("Failed to publish event {} (attempt {}/{}). Retrying in {}ms: {}",
-                            event.type().getSimpleName(), attempt, maxRetries + 1, delayMs, e.getMessage());
+                            eventTypeName, attempt, maxRetries + 1, delayMs, e.getMessage());
                     sleep(delayMs);
                 } else {
-                    log.error("Failed to publish event {} after {} attempts",
-                            event.type().getSimpleName(), maxRetries + 1, e);
+                    log.error("Failed to publish event {} after {} attempts", eventTypeName, maxRetries + 1, e);
                 }
             }
         }
         String text = "Failed to publish event %s after %d attempts";
-        String msg = String.format(text, event.type().getSimpleName(), maxRetries + 1);
+        String msg = String.format(text, eventTypeName, maxRetries + 1);
         throw new EventPublisherException(msg, lastException);
     }
 

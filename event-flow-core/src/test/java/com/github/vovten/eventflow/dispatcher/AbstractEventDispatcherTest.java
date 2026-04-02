@@ -8,12 +8,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -120,12 +121,12 @@ class AbstractEventDispatcherTest {
      */
     private static final class TestEvent extends AbstractTraceableEvent {
         private final String data;
-        private final LocalDateTime timestamp;
+        private final Instant timestamp;
 
         TestEvent(String data) {
             super();
             this.data = data;
-            this.timestamp = LocalDateTime.now();
+            this.timestamp = Instant.now();
         }
 
         @Override
@@ -225,7 +226,7 @@ class AbstractEventDispatcherTest {
         }
 
         @Override
-        public void start() {
+        public void start(Consumer<Event> dispatchConsumer) {
             // No-op for tests
         }
 

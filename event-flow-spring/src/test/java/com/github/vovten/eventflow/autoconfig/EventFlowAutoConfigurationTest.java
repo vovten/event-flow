@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,15 +14,21 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for {@link EventFlowAutoConfiguration}.
  * Verifies that auto-configuration properly loads all beans into Spring context.
  */
-@SpringBootTest
+@SpringBootTest(classes = EventFlowAutoConfiguration.class)
 @TestPropertySource(properties = {
     "event-flow.enabled=true",
     "event-flow.scan-packages=com.github.vovten.eventflow",
+    "event-flow.publisher.enabled=true",
+    "event-flow.publisher.channels[0].name=internal",
+    "event-flow.publisher.channels[0].transports[0].name=local-queue",
+    "event-flow.publisher.channels[0].transports[0].capacity=1000",
+    "event-flow.dispatcher.enabled=true",
+    "event-flow.dispatcher.transports[0].name=local-queue",
+    "event-flow.dispatcher.transports[0].capacity=1000",
     "event-flow.dispatcher.thread-pool.core-size=2",
     "event-flow.dispatcher.thread-pool.max-size=4",
     "event-flow.dispatcher.thread-pool.queue-capacity=100"
 })
-@Import(EventFlowAutoConfiguration.class)
 class EventFlowAutoConfigurationTest {
 
     @Autowired

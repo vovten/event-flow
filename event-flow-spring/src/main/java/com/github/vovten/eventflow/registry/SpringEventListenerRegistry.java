@@ -173,6 +173,15 @@ public class SpringEventListenerRegistry extends EventListenerRegistry
     }
 
     /**
+     * Get the package name used for scanning handler beans.
+     *
+     * @return the scan package name
+     */
+    public String getScanPackage() {
+        return scanPackage;
+    }
+
+    /**
      * Get all eligible beans from the application context.
      * <p>
      * Beans are filtered by the configured scan package.

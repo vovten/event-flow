@@ -3,12 +3,13 @@ package com.github.vovten.eventflow.dispatcher;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
-import com.github.vovten.eventflow.transport.IncomingEventTransport;
+import com.github.vovten.eventflow.transport.InTransport;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static java.util.stream.Collectors.joining;
 
@@ -16,30 +17,31 @@ import static java.util.stream.Collectors.joining;
  * Unified event dispatcher that listens to events from multiple transport sources.
  * <p>
  * This dispatcher can listen to multiple
- * {@link IncomingEventTransport} instances simultaneously, delivering events from all
+ * {@link InTransport} instances simultaneously, delivering events from all
  * sources to the registered handlers.
  * <p>
  * <b>Key features:</b>
  * <ul>
  *   <li>Single dispatcher implementation for all transport types</li>
- *   <li>Support for multiple transports (in-memory, Kafka, etc.)</li>
+ *   <li>Support for multiple transports (local-queue, Kafka, etc.)</li>
  *   <li>Thread-safe event delivery to handlers</li>
  *   <li>External handler registry injection</li>
+ *   <li>Support for decorator pattern via external dispatch consumer injection</li>
  * </ul>
  * <p>
  * <b>Architecture:</b>
  * <pre>{@code
- * IncomingEventTransport(s) → UnifiedEventDispatcher → EventHandler(s)
+ * DispatcherTransport(s) → [IdempotentEventDispatcher] → UnifiedEventDispatcher → EventHandler(s)
  *      ↓ Kafka
- *      ↓ In-Memory
+ *      ↓ Local-Queue
  *      ↓ Custom...
  * }</pre>
  * <p>
  * <b>Usage example:</b>
  * <pre>{@code
  * // Create transports
- * IncomingEventTransport memoryTransport = new InMemoryIncomingEventTransport(1000);
- * IncomingEventTransport kafkaTransport = new KafkaIncomingEventTransport(
+ * DispatcherTransport localQueueTransport = new LocalQueueDispatcherTransport(queue);
+ * DispatcherTransport kafkaTransport = new KafkaDispatcherTransport(
  *     "localhost:9092", "events", "my-group"
  * );
  *
@@ -51,10 +53,10 @@ import static java.util.stream.Collectors.joining;
  * // Create dispatcher with multiple transports
  * UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
  *     executorService,
- *     List.of(memoryTransport, kafkaTransport),
+ *     List.of(localQueueTransport, kafkaTransport),
  *     registry
  * );
- * dispatcher.start();
+ * dispatcher.start(dispatcher::dispatch);
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -65,7 +67,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     private final ExecutorService executorService;
     private final EventHandlerRegistry handlerRegistry;
-    private final List<IncomingEventTransport> transports;
+    private final List<InTransport> transports;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
@@ -77,17 +79,17 @@ public class UnifiedEventDispatcher implements EventDispatcher {
      */
     public UnifiedEventDispatcher(ExecutorService executorService,
                                   EventHandlerRegistry handlerRegistry,
-                                  List<IncomingEventTransport> transports) {
+                                  List<InTransport> transports) {
         this.transports = transports;
         this.executorService = executorService;
         this.handlerRegistry = handlerRegistry;
     }
 
     @Override
-    public void start() {
+    public void start(Consumer<Event> dispatchConsumer) {
         if (started.compareAndSet(false, true)) {
-            for (IncomingEventTransport transport : transports) {
-                transport.start(this::dispatch);
+            for (InTransport transport : transports) {
+                transport.start(dispatchConsumer);
             }
             log.info(buildDispatcherStartedMsg());
         } else {
@@ -99,7 +101,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     public void stop() {
         if (started.compareAndSet(true, false)) {
             log.info("Stopping UnifiedEventDispatcher...");
-            for (IncomingEventTransport transport : transports) {
+            for (InTransport transport : transports) {
                 tryStop(transport);
             }
             log.info("UnifiedEventDispatcher stopped");
@@ -130,7 +132,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         return handlerRegistry.isRegistered(handler);
     }
 
-    private void tryStop(IncomingEventTransport transport) {
+    private void tryStop(InTransport transport) {
         try {
             transport.stop();
         } catch (Exception e) {
@@ -139,8 +141,8 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     }
 
     private String buildDispatcherStartedMsg() {
-        String msg = "UnifiedEventDispatcher started with %s transport(s): %s";
-        String names = transports.stream().map(IncomingEventTransport::name).collect(joining(","));
+        String msg = "EventDispatcher started with %s transport(s): %s";
+        String names = transports.stream().map(InTransport::name).collect(joining(","));
         return String.format(msg, transports.size(), names);
     }
 }

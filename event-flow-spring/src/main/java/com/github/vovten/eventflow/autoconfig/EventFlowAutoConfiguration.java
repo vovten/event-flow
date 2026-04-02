@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Import;
  * This is a facade that imports modular configuration classes:
  * <ul>
  *   <li>{@link RegistryConfiguration} - event listener registries</li>
- *   <li>{@link CommonConfiguration} - executor service and in-memory transports</li>
+ *   <li>{@link CommonConfiguration} - executor service and local-queue transports</li>
  *   <li>{@link ChannelConfiguration} - event channels</li>
  *   <li>{@link PublisherConfiguration} - event publisher</li>
  *   <li>{@link DispatcherConfiguration} - event dispatcher</li>
@@ -22,24 +22,33 @@ import org.springframework.context.annotation.Import;
  * <p>
  * <b>Configuration options:</b>
  * <ul>
- *   <li>Set {@code event-flow.enabled=false} to disable all auto-configuration</li>
- *   <li>Set {@code event-flow.publisher.enabled=false} to disable publisher only</li>
- *   <li>Set {@code event-flow.dispatcher.enabled=false} to disable dispatcher only</li>
+ *   <li>Set {@code event-flow.enabled=true} to enable all auto-configuration (disabled by default)</li>
+ *   <li>Set {@code event-flow.publisher.enabled=true} to enable publisher (disabled by default)</li>
+ *   <li>Set {@code event-flow.dispatcher.enabled=true} to enable dispatcher (disabled by default)</li>
+ *   <li>Set {@code event-flow.dispatcher.idempotent.enabled=true} to enable idempotent event processing</li>
  * </ul>
  * <p>
  * <b>Usage example (application.yml):</b>
  * <pre>{@code
  * event-flow:
+ *   enabled: true
  *   scan-packages: com.example.listener
  *   publisher:
- *     transactional: true
- *     retry:
- *       enabled: true
- *       max-attempts: 3
+ *     enabled: true
+ *     channels:
+ *       - name: internal
+ *         transports:
+ *           - name: local-queue
+ *             capacity: 1000
  *   dispatcher:
- *     thread-pool:
- *       core-size: 4
- *       max-size: 16
+ *     enabled: true
+ *     idempotent:
+ *       enabled: true
+ *       ttl: 10m
+ *       max-size: 10000
+ *     transports:
+ *       - name: local-queue
+ *         capacity: 1000
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -48,7 +57,7 @@ import org.springframework.context.annotation.Import;
 @AutoConfiguration
 @ConditionalOnClass(EventPublisher.class)
 @EnableConfigurationProperties(EventFlowProperties.class)
-@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 @Import({
     RegistryConfiguration.class,
     CommonConfiguration.class,

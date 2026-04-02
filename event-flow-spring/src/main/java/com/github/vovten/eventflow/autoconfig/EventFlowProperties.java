@@ -29,26 +29,31 @@ import java.util.List;
  *     channels:
  *       - name: internal
  *         transports:
- *           - name: in-memory
+ *           - name: local-queue
  *             capacity: 1000
  *       - name: external
  *         transports:
  *           - name: kafka
  *             topic: events-topic
- *             bootstrapServers: localhost:9092
+ *             servers: localhost:9092
  *   dispatcher:
  *     enabled: true
+ *     idempotent:
+ *       enabled: true
+ *       ttl: 10m
+ *       max-size: 10000
+ *       warn-on-duplicate: true
  *     thread-pool:
  *       core-size: 4
  *       max-size: 16
  *       queue-capacity: 100
  *       keep-alive-seconds: 60
  *     transports:
- *       - name: in-memory
+ *       - name: local-queue
  *         capacity: 1000
  *       - name: kafka
  *         topic: events-topic
- *         bootstrapServers: localhost:9092
+ *         servers: localhost:9092
  *         consumerGroup: event-flow-group
  * }</pre>
  *
@@ -62,7 +67,7 @@ public class EventFlowProperties {
     /**
      * Enable or disable Event Flow auto-configuration completely.
      */
-    private boolean enabled = true;
+    private boolean enabled = false;
 
     /**
      * Package(s) to scan for @EventListener annotated beans.
@@ -84,21 +89,11 @@ public class EventFlowProperties {
      */
     @Data
     public static class PublisherConfig {
-        private boolean enabled = true;
+        private boolean enabled = false;
         private boolean transactional = true;
         private boolean silent = false;
         private RetryConfig retry = new RetryConfig();
-        private List<ChannelConfig> channels = new ArrayList<>(List.of(createDefaultChannel()));
-
-        private static ChannelConfig createDefaultChannel() {
-            ChannelConfig config = new ChannelConfig();
-            config.setName("internal");
-            TransportConfig transport = new TransportConfig();
-            transport.setName("in-memory");
-            transport.setCapacity(1000);
-            config.setTransports(List.of(transport));
-            return config;
-        }
+        private List<ChannelConfig> channels = new ArrayList<>();
     }
 
     /**
@@ -120,7 +115,7 @@ public class EventFlowProperties {
         private String name = "internal";
         /**
          * List of transport configurations.
-         * Transport name identifies the type (e.g., "in-memory", "kafka").
+         * Transport name identifies the type (e.g., "local-queue", "kafka").
          */
         private List<TransportConfig> transports = new ArrayList<>();
     }
@@ -130,16 +125,21 @@ public class EventFlowProperties {
      */
     @Data
     public static class DispatcherConfig {
-        private boolean enabled = true;
+        private boolean enabled = false;
         private ThreadPoolConfig threadPool = new ThreadPoolConfig();
-        private List<TransportConfig> transports = new ArrayList<>(List.of(createDefaultTransport()));
+        private List<TransportConfig> transports = new ArrayList<>();
+        private IdempotentConfig idempotent = new IdempotentConfig();
+    }
 
-        private static TransportConfig createDefaultTransport() {
-            TransportConfig config = new TransportConfig();
-            config.setName("in-memory");
-            config.setCapacity(1000);
-            return config;
-        }
+    /**
+     * Idempotent configuration for dispatcher.
+     */
+    @Data
+    public static class IdempotentConfig {
+        private boolean enabled = false;
+        private Duration ttl = Duration.ofMinutes(10);
+        private long maxSize = 10_000;
+        private boolean warnOnDuplicate = true;
     }
 
     /**
@@ -155,14 +155,19 @@ public class EventFlowProperties {
 
     /**
      * Transport configuration.
-     * Name identifies the transport type (e.g., "in-memory", "kafka").
+     * Name identifies the transport type (e.g., "local-queue", "kafka").
      */
     @Data
     public static class TransportConfig {
-        private String name = "in-memory";
+        private String name = "local-queue";
         private int capacity = 1000;
         private String topic;
-        private String bootstrapServers;
+        private String servers;
         private String consumerGroup = "event-flow-group";
+        /**
+         * Serialization format for event transport.
+         * Supported values: "json" (default), "msgpack"
+         */
+        private String serialization = "json";
     }
 }

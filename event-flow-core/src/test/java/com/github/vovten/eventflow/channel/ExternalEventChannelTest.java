@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,7 @@ class ExternalEventChannelTest {
     @Test
     @DisplayName("Should create channel with single transport")
     void shouldCreateChannelWithSingleTransport() {
-        OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
+        OutTransport transport = mock(OutTransport.class);
         ExternalEventChannel channel = new ExternalEventChannel(transport);
 
         assertEquals("external", channel.name());
@@ -28,9 +28,9 @@ class ExternalEventChannelTest {
     @Test
     @DisplayName("Should create channel with multiple transports")
     void shouldCreateChannelWithMultipleTransports() {
-        OutgoingEventTransport transport1 = mock(OutgoingEventTransport.class);
-        OutgoingEventTransport transport2 = mock(OutgoingEventTransport.class);
-        List<OutgoingEventTransport> transports = List.of(transport1, transport2);
+        OutTransport transport1 = mock(OutTransport.class);
+        OutTransport transport2 = mock(OutTransport.class);
+        List<OutTransport> transports = List.of(transport1, transport2);
 
         ExternalEventChannel channel = new ExternalEventChannel(transports);
 
@@ -43,9 +43,9 @@ class ExternalEventChannelTest {
     @Test
     @DisplayName("Should return immutable transports list")
     void shouldReturnImmutableTransportsList() {
-        OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
+        OutTransport transport = mock(OutTransport.class);
         ExternalEventChannel channel = new ExternalEventChannel(transport);
 
-        assertThrows(UnsupportedOperationException.class, () -> channel.transports().add(mock(OutgoingEventTransport.class)));
+        assertThrows(UnsupportedOperationException.class, () -> channel.transports().add(mock(OutTransport.class)));
     }
 }

@@ -9,16 +9,18 @@ import com.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
 import com.github.vovten.eventflow.test.ExternalTestEvent;
-import com.github.vovten.eventflow.transport.incoming.KafkaIncomingEventTransport;
-import com.github.vovten.eventflow.transport.outgoing.InMemoryOutgoingEventTransport;
-import com.github.vovten.eventflow.transport.outgoing.KafkaOutgoingEventTransport;
+import com.github.vovten.eventflow.transport.incoming.KafkaInTransport;
+import com.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
+import com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -35,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(properties = "event-flow.enabled=false")
+@ImportAutoConfiguration(exclude = com.github.vovten.eventflow.autoconfig.EventFlowDisabledAutoConfiguration.class)
 @EmbeddedKafka(
         partitions = 1,
         brokerProperties = {
@@ -66,14 +69,14 @@ class ExternalPublisherDispatcherIntegrationTest {
 
         Properties kafkaProps = new Properties();
         kafkaProps.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
-        var kafkaTransport = new KafkaOutgoingEventTransport(kafkaProps, "test-events");
+        var kafkaTransport = new KafkaOutTransport(kafkaProps, "test-events");
         var externalChannel = new ExternalEventChannel(List.of(kafkaTransport));
-        var transport = new InMemoryOutgoingEventTransport(new LinkedBlockingDeque<>(1000));
+        var transport = new LocalQueueOutTransport(new LinkedBlockingDeque<>(1000));
         var internalChannel = new InternalEventChannel(List.of(transport));
 
         publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
         dispatcherExecutor = Executors.newFixedThreadPool(2);
-        KafkaIncomingEventTransport kafkaInTransport = new KafkaIncomingEventTransport(
+        KafkaInTransport kafkaInTransport = new KafkaInTransport(
                 createDispatcherConsumer(),
                 List.of("test-events"),
                 dispatcherExecutor
@@ -83,7 +86,7 @@ class ExternalPublisherDispatcherIntegrationTest {
                 createEventHandlerRegistry(),
                 List.of(kafkaInTransport)
         );
-        dispatcher.start();
+        dispatcher.start(dispatcher::dispatch);
 
         // Wait for consumer to subscribe
         Thread.sleep(3000);
@@ -133,16 +136,16 @@ class ExternalPublisherDispatcherIntegrationTest {
         assertEquals("test-id-123", eventListener.getInterfaceResult());
     }
 
-    private KafkaConsumer<String, String> createDispatcherConsumer() {
+    private KafkaConsumer<String, byte[]> createDispatcherConsumer() {
         Map<String, Object> properties = new HashMap<>();
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaBrokers);
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, uniqueGroupId);
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         properties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 15000);
-        DefaultKafkaConsumerFactory<String, String> factory = new DefaultKafkaConsumerFactory<>(properties);
-        return (KafkaConsumer<String, String>) factory.createConsumer();
+        DefaultKafkaConsumerFactory<String, byte[]> factory = new DefaultKafkaConsumerFactory<>(properties);
+        return (KafkaConsumer<String, byte[]>) factory.createConsumer();
     }
 }

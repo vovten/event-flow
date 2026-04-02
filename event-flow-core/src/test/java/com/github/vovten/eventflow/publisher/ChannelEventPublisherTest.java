@@ -4,7 +4,7 @@ import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +44,7 @@ class ChannelEventPublisherTest {
     @Test
     @DisplayName("Should send event to configured channel")
     void shouldSendEventToConfiguredChannel() {
-        OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
+        OutTransport transport = mock(OutTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
 
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
@@ -58,7 +58,7 @@ class ChannelEventPublisherTest {
     @Test
     @DisplayName("Should throw exception when channel not configured")
     void shouldThrowExceptionWhenChannelNotConfigured() {
-        OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
+        OutTransport transport = mock(OutTransport.class);
         EventChannel internalChannel = new InternalEventChannel(transport);
 
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(internalChannel));
@@ -75,7 +75,7 @@ class ChannelEventPublisherTest {
     @Test
     @DisplayName("Should wrap send exception in EventPublisherException")
     void shouldWrapSendExceptionInEventPublisherException() {
-        OutgoingEventTransport transport = mock(OutgoingEventTransport.class);
+        OutTransport transport = mock(OutTransport.class);
         doThrow(new RuntimeException("Send failed")).when(transport).send(any());
         EventChannel channel = new InternalEventChannel(transport);
 
@@ -121,7 +121,7 @@ class ChannelEventPublisherTest {
         }
 
         @Override
-        public List<OutgoingEventTransport> transports() {
+        public List<OutTransport> transports() {
             return List.of();
         }
     }

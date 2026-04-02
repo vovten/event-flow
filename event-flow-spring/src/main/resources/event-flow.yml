@@ -13,8 +13,8 @@
 
 event-flow:
   # Enable or disable all Event Flow auto-configuration
-  # Set to false to completely disable auto-configuration and provide your own beans
-  enabled: true
+  # Set to true to enable auto-configuration (disabled by default)
+  enabled: false
 
   # Package(s) to scan for @EventListener annotated beans
   # Multiple packages can be specified as comma-separated values
@@ -26,7 +26,7 @@ event-flow:
   # ---------------------------------------------------------------------------
   publisher:
     # Enable or disable publisher auto-configuration
-    enabled: true
+    enabled: false
 
     # Enable transactional publishing (defer until after transaction commit)
     # When true, events are published only after the current transaction commits
@@ -48,27 +48,32 @@ event-flow:
 
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
-    # Transport name identifies the type (e.g., "in-memory", "kafka")
+    # Transport name identifies the type (e.g., "local-queue", "kafka")
+    # Note: No default channel is configured. You must explicitly define at least one channel.
     channels:
-      # Default internal channel with in-memory transport
-      - name: internal
-        transports:
-          - name: in-memory
-            capacity: 1000
+      # Example: Internal channel with local-queue transport
+      # - name: internal
+      #   transports:
+      #     - name: local-queue
+      #       capacity: 1000
 
       # Example: External channel with Kafka transport
       # - name: external
       #   transports:
       #     - name: kafka
       #       topic: events
-      #       bootstrapServers: localhost:9092
+      #       servers: localhost:9092
+      #       # Serialization format (default: json)
+      #       # - json: UTF-8 encoded JSON, readable in Kafka UI tools
+      #       # - msgpack: Compact binary format for better performance
+      #       serialization: json
 
   # ---------------------------------------------------------------------------
   # Event Dispatcher Configuration
   # ---------------------------------------------------------------------------
   dispatcher:
     # Enable or disable dispatcher auto-configuration
-    enabled: true
+    enabled: false
 
     # Thread pool configuration for async event delivery
     thread-pool:
@@ -82,32 +87,59 @@ event-flow:
       keep-alive-seconds: 60
 
     # Incoming event transports to listen to
-    # Default: in-memory transport if not specified
+    # Note: No default transport is configured. You must explicitly define at least one transport.
     transports:
-      # Default in-memory transport
-      - name: in-memory
-        capacity: 1000
+      # Example: Local-queue transport
+      # - name: local-queue
+      #   capacity: 1000
 
       # Example: Kafka transport
       # - name: kafka
       #   topic: events
-      #   bootstrapServers: localhost:9092
+      #   servers: localhost:9092
       #   consumerGroup: event-flow-group
+
+    # Idempotent event processing configuration
+    # Prevents duplicate event processing using a Caffeine cache
+    idempotent:
+      # Enable or disable idempotent processing
+      enabled: false
+      # Time-to-live for cached event UIDs (use ms, s, m, h suffixes)
+      ttl: 10m
+      # Maximum number of entries in the cache
+      max-size: 10000
+      # Log warnings when duplicate events are received
+      warn-on-duplicate: true
 
 # =============================================================================
 # Configuration Examples
 # =============================================================================
 #
-# Example 1: Minimal configuration (uses all defaults)
+# Example 1: Minimal configuration with local-queue
 # ---------------------------------------------------------------------------
 # event-flow:
+#   enabled: true
 #   scan-packages: com.example
+#   publisher:
+#     enabled: true
+#     channels:
+#       - name: internal
+#         transports:
+#           - name: local-queue
+#             capacity: 1000
+#   dispatcher:
+#     enabled: true
+#     transports:
+#       - name: local-queue
+#         capacity: 1000
 #
 # Example 2: Production configuration with Kafka
 # ---------------------------------------------------------------------------
 # event-flow:
+#   enabled: true
 #   scan-packages: com.example.listener
 #   publisher:
+#     enabled: true
 #     transactional: true
 #     retry:
 #       enabled: true
@@ -117,38 +149,74 @@ event-flow:
 #     channels:
 #       - name: internal
 #         transports:
-#           - name: in-memory
+#           - name: local-queue
 #             capacity: 1000
 #       - name: external
 #         transports:
 #           - name: kafka
 #             topic: events
-#             bootstrapServers: kafka:9092
+#             servers: kafka:9092
+#             serialization: json  # or msgpack for binary format
 #   dispatcher:
+#     enabled: true
 #     thread-pool:
 #       core-size: 8
 #       max-size: 32
 #       queue-capacity: 500
 #     transports:
-#       - name: in-memory
+#       - name: local-queue
 #         capacity: 1000
 #       - name: kafka
 #         topic: events
-#         bootstrapServers: kafka:9092
+#         servers: kafka:9092
 #         consumerGroup: my-service-group
 #
-# Example 3: Development configuration (in-memory only)
+# Example 3: Development configuration (local-queue only)
 # ---------------------------------------------------------------------------
 # event-flow:
+#   enabled: true
 #   scan-packages: com.example
 #   publisher:
+#     enabled: true
 #     transactional: false
+#     channels:
+#       - name: internal
+#         transports:
+#           - name: local-queue
+#             capacity: 500
 #   dispatcher:
+#     enabled: true
 #     thread-pool:
 #       core-size: 2
 #       max-size: 4
+#     transports:
+#       - name: local-queue
+#         capacity: 500
 #
-# Example 4: Disable auto-configuration and provide custom beans
+# Example 4: Configuration with idempotent event processing
+# ---------------------------------------------------------------------------
+# event-flow:
+#   enabled: true
+#   scan-packages: com.example
+#   publisher:
+#     enabled: true
+#     channels:
+#       - name: internal
+#         transports:
+#           - name: local-queue
+#             capacity: 1000
+#   dispatcher:
+#     enabled: true
+#     idempotent:
+#       enabled: true
+#       ttl: 30m
+#       max-size: 50000
+#       warn-on-duplicate: true
+#     transports:
+#       - name: local-queue
+#         capacity: 1000
+#
+# Example 5: Disable auto-configuration and provide custom beans
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: false
@@ -158,9 +226,46 @@ event-flow:
 # public class CustomEventFlowConfig {
 #     @Bean
 #     public EventPublisher eventPublisher() { ... }
-#     
+#
 #     @Bean
 #     public EventDispatcher eventDispatcher() { ... }
 # }
+#
+# Example 6: Mixed serialization formats (JSON and MessagePack)
+# ---------------------------------------------------------------------------
+# event-flow:
+#   enabled: true
+#   scan-packages: com.example
+#   publisher:
+#     enabled: true
+#     channels:
+#       - name: internal
+#         transports:
+#           - name: local-queue
+#             capacity: 1000
+#       - name: external-json
+#         transports:
+#           - name: kafka
+#             topic: events-json
+#             servers: kafka:9092
+#             serialization: json  # Readable in Kafka UI
+#       - name: external-binary
+#         transports:
+#           - name: kafka
+#             topic: events-binary
+#             servers: kafka:9092
+#             serialization: msgpack  # Compact binary format
+#   dispatcher:
+#     enabled: true
+#     transports:
+#       - name: kafka
+#         topic: events-json
+#         servers: kafka:9092
+#         consumerGroup: group-json
+#       - name: kafka
+#         topic: events-binary
+#         servers: kafka:9092
+#         consumerGroup: group-binary
+#     # Note: Dispatcher auto-detects serialization format from message
 #
 # =============================================================================

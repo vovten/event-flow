@@ -21,7 +21,7 @@
 
 - **Event Model** — Type-safe events with JSON serialization
 - **Flexible Routing** — Event channels with configurable transports
-- **Multiple Transports** — In-Memory and Apache Kafka support out of the box
+- **Multiple Transports** — Local-Queue and Apache Kafka support out of the box
 - **Annotation-Based** — Event handling via `@EventListener`
 - **Interface-Based** — Event handling via `EventListener` interface implementation
 - **Spring Integration** — Automatic listener discovery in Spring Context
@@ -41,7 +41,7 @@
 │  │   Publisher  │────────▶│           Event Channels                │  │
 │  │   (Builder)  │         │  ┌─────────────┐  ┌─────────────────┐   │  │
 │  └──────────────┘         │  │   Internal  │  │    External     │   │  │
-│                           │  │  (In-Memory)│  │    (Kafka)      │   │  │
+│                           │  │  (Local-Queue)│  │    (Kafka)      │   │  │
 │                           │  └──────┬──────┘  └────────┬────────┘   │  │
 │                           │         │                 │                │
 │                           └─────────┼─────────────────┼────────────┘   │
@@ -49,7 +49,7 @@
 │                           ┌─────────▼─────────────────▼────────────┐   │
 │                           │     Outgoing Event Transports           │  │
 │                           │  ┌─────────────┐  ┌─────────────────┐  │  │
-│                           │  │  In-Memory  │  │      Kafka      │  │  │
+│                           │  │  Local-Queue  │  │      Kafka      │  │  │
 │                           │  │   Queue     │  │    Producer     │  │  │
 │                           │  └─────────────┘  └─────────────────┘  │  │
 │                           └─────────────────────────────────────────┘  │
@@ -66,7 +66,7 @@
 │                           ┌─────────────────────────────────────────┐  │
 │                           │      Incoming Event Transports          │  │
 │                           │  ┌─────────────┐  ┌─────────────────┐  │  │
-│                           │  │  In-Memory  │  │      Kafka      │  │  │
+│                           │  │  Local-Queue  │  │      Kafka      │  │  │
 │                           │  │   Queue     │  │    Consumer     │  │  │
 │                           │  └─────────────┘  └─────────────────┘  │  │
 │                           └─────────┬─────────────────┬────────────┘  │
@@ -142,15 +142,15 @@
 │                           Single Application                                │
 │                                                                             │
 │   ┌──────────┐    ┌───────────┐    ┌──────────┐    ┌──────────────────┐     │
-│   │ Service  │───▶│ Publisher │───▶│ Channel  │───▶│ InMemory         │     │
-│   │          │    │           │    │          │    │ OutgoingTransport│     │
+│   │ Service  │───▶│ Publisher │───▶│ Channel  │───▶│ LocalQueue       │     │
+│   │          │    │           │    │          │    │ OutTransport     │     │
 │   └──────────┘    └───────────┘    └──────────┘    └─────────┬────────┘     │
 │                                                              │              │
 │                                                              │ queue        │
 │                                                              ▼              │
 │   ┌──────────────────┐    ┌───────────┐    ┌──────────────┐                 │
-│   │ InMemory         │◀───│ Dispatcher│◀───│  Registry    │                 │
-│   │ IncomingTransport│    │           │    │              │                 │
+│   │ LocalQueue       │◀───│ Dispatcher│◀───│  Registry    │                 │
+│   │ InTransport      │    │           │    │              │                 │
 │   └──────────────────┘    └─────┬─────┘    └──────┬───────┘                 │
 │                                 │                  │                        │
 │                                 │           ┌──────▼───────┐                │
@@ -198,7 +198,7 @@ public class EventFlowConfig {
     @Bean
     public EventChannel internalChannel() {
         return new InternalEventChannel(
-            List.of(new InMemoryOutgoingEventTransport(1000))
+            List.of(new LocalQueueOutTransport(queueProvider.getQueue("internal")))
         );
     }
 
@@ -219,14 +219,14 @@ public class EventFlowConfig {
     @Bean
     public EventDispatcher eventDispatcher(
             EventListenerRegistry registry,
-            List<IncomingEventTransport> transports) {
+            List<InTransport> transports) {
         ExecutorService executor = Executors.newFixedThreadPool(10);
         return new UnifiedEventDispatcher(executor, registry, transports);
     }
 
     @Bean
-    public IncomingEventTransport incomingTransport() {
-        return new InMemoryIncomingEventTransport(1000);
+    public InTransport incomingTransport() {
+        return new LocalQueueInTransport(queueProvider.getQueue("internal"));
     }
 }
 ```
@@ -300,7 +300,7 @@ A channel defines event delivery routes through transports.
 ```java
 public interface EventChannel {
     String name();
-    List<OutgoingEventTransport> transports();
+    List<OutTransport> transports();
     void send(Event event);
 }
 ```
@@ -442,13 +442,14 @@ Registry for discovering and managing listeners.
 
 Transports for event delivery.
 
-**Incoming Transports:**
-- `InMemoryIncomingEventTransport` — receive from in-memory queue
-- `KafkaIncomingEventTransport` — receive from Kafka topics
+**Incoming Transports (`InTransport`):**
+- `LocalQueueInTransport` — receive from local-queue
+- `KafkaInTransport` — receive from Kafka topics
 
-**Outgoing Transports:**
-- `InMemoryOutgoingEventTransport` — send to in-memory queue
-- `KafkaOutgoingEventTransport` — send to Kafka topic
+**Outgoing Transports (`OutTransport`):**
+- `LocalQueueOutTransport` — send to local-queue
+- `KafkaOutTransport` — send to Kafka topic
+- `BroadcastKafkaOutTransport` — send to all Kafka topic partitions
 
 ## 📝 Usage Examples
 
@@ -505,14 +506,14 @@ public class EventFlowConfig {
     @Bean
     public EventChannel internalChannel() {
         return new InternalEventChannel(
-            List.of(new InMemoryOutgoingEventTransport(1000))
+            List.of(new LocalQueueOutTransport(queueProvider.getQueue("internal")))
         );
     }
 
     @Bean
     public EventChannel externalChannel() {
         return new ExternalEventChannel(
-            List.of(new KafkaOutgoingEventTransport(bootstrapServers, "events"))
+            List.of(new KafkaOutTransport(bootstrapServers, "events"))
         );
     }
 
@@ -535,17 +536,17 @@ public class EventFlowConfig {
     @Bean
     public EventDispatcher eventDispatcher(
             EventListenerRegistry registry,
-            List<IncomingEventTransport> transports) {
+            List<InTransport> transports) {
         ExecutorService executor = Executors.newFixedThreadPool(10);
         return new UnifiedEventDispatcher(executor, registry, transports);
     }
 
     @Bean
-    public IncomingEventTransport kafkaIncomingTransport(
+    public InTransport kafkaIncomingTransport(
             @Value("${spring.kafka.bootstrap-servers}") String servers,
             @Value("${event.external.dispatcher.topics}") String topics,
             @Value("${event.external.dispatcher.group.id}") String groupId) {
-        return new KafkaIncomingEventTransport(servers, topics, groupId);
+        return new KafkaInTransport(servers, topics, groupId);
     }
 }
 ```
@@ -598,7 +599,7 @@ event.listener.scan.package=com.example
 # Unified dispatcher
 event.dispatcher.enabled=true
 
-# Internal event bus (in-memory)
+# Internal event bus (local-queue)
 event.internal.enabled=true
 
 # External event bus (Kafka)
@@ -746,16 +747,16 @@ event.transactional.publishing.enabled=true
 ### Creating a Custom Transport
 
 ```java
-public class RabbitMQOutgoingEventTransport implements OutgoingEventTransport {
-    
+public class RabbitMQOutTransport implements OutTransport {
+
     private final Channel channel;
     private final String exchange;
-    
+
     @Override
     public String name() {
         return "rabbitmq";
     }
-    
+
     @Override
     public void send(Event event) {
         // RabbitMQ sending logic
@@ -767,16 +768,16 @@ public class RabbitMQOutgoingEventTransport implements OutgoingEventTransport {
 
 ```java
 public class PriorityEventChannel implements EventChannel {
-    
-    private final List<OutgoingEventTransport> transports;
-    
+
+    private final List<OutTransport> transports;
+
     @Override
     public String name() {
         return "priority";
     }
-    
+
     @Override
-    public List<OutgoingEventTransport> transports() {
+    public List<OutTransport> transports() {
         return transports;
     }
 }

@@ -39,19 +39,20 @@ import java.util.List;
  *     .build();
  * </pre>
  *
+ * @param <T> the concrete builder type (CRTP pattern for fluent interface)
  * @author Vladimir Aleshkov
  * @since 2024-12-07
  */
 @Slf4j
-public final class EventHandlerRegistryBuilder {
+public class EventHandlerRegistryBuilder<T extends EventHandlerRegistryBuilder<T>> {
 
-    private boolean useInterfaceListeners = false;
-    private boolean useAnnotationListeners = false;
+    protected boolean useInterfaceListeners = false;
+    protected boolean useAnnotationListeners = false;
 
-    private final List<DecoratorFunction> decorators = new ArrayList<>();
-    private final List<EventHandlerRegistry> additionalRegistries = new ArrayList<>();
+    protected final List<DecoratorFunction> decorators = new ArrayList<>();
+    protected final List<EventHandlerRegistry> additionalRegistries = new ArrayList<>();
 
-    private EventHandlerRegistryBuilder() {
+    protected EventHandlerRegistryBuilder() {
     }
 
     /**
@@ -59,8 +60,8 @@ public final class EventHandlerRegistryBuilder {
      *
      * @return new builder instance
      */
-    public static EventHandlerRegistryBuilder create() {
-        return new EventHandlerRegistryBuilder();
+    public static EventHandlerRegistryBuilder<?> create() {
+        return new EventHandlerRegistryBuilder<>();
     }
 
     /**
@@ -71,9 +72,10 @@ public final class EventHandlerRegistryBuilder {
      *
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withAnnotationListeners() {
+    @SuppressWarnings("unchecked")
+    public T withAnnotationListeners() {
         this.useAnnotationListeners = true;
-        return this;
+        return (T) this;
     }
 
     /**
@@ -84,9 +86,10 @@ public final class EventHandlerRegistryBuilder {
      *
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withInterfaceListeners() {
+    @SuppressWarnings("unchecked")
+    public T withInterfaceListeners() {
         this.useInterfaceListeners = true;
-        return this;
+        return (T) this;
     }
 
     /**
@@ -95,11 +98,12 @@ public final class EventHandlerRegistryBuilder {
      * @param registry custom registry to add
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withCustomRegistry(EventHandlerRegistry registry) {
+    @SuppressWarnings("unchecked")
+    public T withCustomRegistry(EventHandlerRegistry registry) {
         if (registry != null) {
             this.additionalRegistries.add(registry);
         }
-        return this;
+        return (T) this;
     }
 
     /**
@@ -108,11 +112,12 @@ public final class EventHandlerRegistryBuilder {
      * @param decorator decorator function to apply
      * @return this builder
      */
-    public EventHandlerRegistryBuilder withDecorator(DecoratorFunction decorator) {
+    @SuppressWarnings("unchecked")
+    public T withDecorator(DecoratorFunction decorator) {
         if (decorator != null) {
             this.decorators.add(decorator);
         }
-        return this;
+        return (T) this;
     }
 
     /**
@@ -150,9 +155,12 @@ public final class EventHandlerRegistryBuilder {
         return registry;
     }
 
-    // ==================== Private methods ====================
-
-    private void validateConfiguration() {
+    /**
+     * Validate the builder configuration.
+     *
+     * @throws IllegalStateException if no handler source is configured
+     */
+    protected void validateConfiguration() {
         // Must have at least one handler source
         if (!useAnnotationListeners && !useInterfaceListeners && additionalRegistries.isEmpty()) {
             throw new IllegalStateException(
@@ -163,7 +171,14 @@ public final class EventHandlerRegistryBuilder {
         }
     }
 
-    private EventHandlerRegistry createRegistry() {
+    /**
+     * Create the registry instance based on the current configuration.
+     * <p>
+     * Subclasses can override this method to provide custom registry implementations.
+     *
+     * @return configured EventHandlerRegistry
+     */
+    protected EventHandlerRegistry createRegistry() {
         List<EventHandlerRegistry> registries = new ArrayList<>();
 
         // Add annotation-based registry if requested

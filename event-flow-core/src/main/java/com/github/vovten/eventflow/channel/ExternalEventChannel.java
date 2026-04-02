@@ -1,6 +1,6 @@
 package com.github.vovten.eventflow.channel;
 
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 
 import java.util.List;
 
@@ -22,7 +22,7 @@ import java.util.List;
  * <b>Configuration example:</b>
  * <pre>{@code
  * EventChannel externalChannel = new ExternalEventChannel(
- *     List.of(new KafkaOutgoingEventTransport(bootstrapServers, "events"))
+ *     List.of(new KafkaPublisherTransport(bootstrapServers, "events"))
  * );
  * }</pre>
  *
@@ -36,7 +36,7 @@ public class ExternalEventChannel extends AbstractEventChannel {
      *
      * @param transports list of transports for this channel
      */
-    public ExternalEventChannel(List<OutgoingEventTransport> transports) {
+    public ExternalEventChannel(List<OutTransport> transports) {
         super(transports);
     }
 
@@ -45,7 +45,7 @@ public class ExternalEventChannel extends AbstractEventChannel {
      *
      * @param transport the transport for this channel
      */
-    public ExternalEventChannel(OutgoingEventTransport transport) {
+    public ExternalEventChannel(OutTransport transport) {
         super(transport);
     }
 

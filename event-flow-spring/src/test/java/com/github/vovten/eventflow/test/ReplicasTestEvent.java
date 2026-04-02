@@ -5,7 +5,7 @@ import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.event.Event;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -28,13 +28,13 @@ public class ReplicasTestEvent extends AbstractTraceableEvent {
         this.data = data;
     }
 
-    public ReplicasTestEvent(String id, String data, java.time.LocalDateTime timestamp) {
+    public ReplicasTestEvent(String id, String data, Instant timestamp) {
         super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
         this.id = id;
         this.data = data;
     }
 
-    public ReplicasTestEvent(UUID uid, UUID traceId, String id, String data, LocalDateTime timestamp) {
+    public ReplicasTestEvent(UUID uid, UUID traceId, String id, String data, Instant timestamp) {
         super(uid, traceId, timestamp);
         this.id = id;
         this.data = data;

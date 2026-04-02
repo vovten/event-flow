@@ -2,6 +2,8 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.event.Event;
 
+import java.util.function.Consumer;
+
 /**
  * <p>Event dispatcher.
  * <p>Receives an event from the bus and delivers it to listeners.
@@ -37,9 +39,12 @@ public interface EventDispatcher {
      * Start the dispatcher and all configured transports.
      * <p>
      * This method activates all transports and begins delivering events to
-     * registered handlers.
+     * registered handlers. The provided {@code dispatchConsumer} is used to
+     * dispatch events from transports, enabling decorator pattern support.
+     *
+     * @param dispatchConsumer the consumer to dispatch events to
      */
-    void start();
+    void start(Consumer<Event> dispatchConsumer);
 
 
     /**

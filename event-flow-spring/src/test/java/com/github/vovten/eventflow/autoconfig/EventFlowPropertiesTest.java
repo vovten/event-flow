@@ -29,20 +29,22 @@ class EventFlowPropertiesTest {
                 .orElseGet(EventFlowProperties::new);
 
         // then
-        assertThat(eventFlowProperties.isEnabled()).isTrue();
+        assertThat(eventFlowProperties.isEnabled()).isFalse();
         assertThat(eventFlowProperties.getScanPackages()).isEmpty();
-        assertThat(eventFlowProperties.getPublisher().isEnabled()).isTrue();
+        assertThat(eventFlowProperties.getPublisher().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getPublisher().isTransactional()).isTrue();
         assertThat(eventFlowProperties.getPublisher().isSilent()).isFalse();
         assertThat(eventFlowProperties.getPublisher().getRetry().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getPublisher().getRetry().getMaxAttempts()).isEqualTo(3);
         assertThat(eventFlowProperties.getPublisher().getRetry().getInitialDelay()).isEqualTo(Duration.ofMillis(100));
         assertThat(eventFlowProperties.getPublisher().getRetry().getMultiplier()).isEqualTo(2.0);
-        assertThat(eventFlowProperties.getDispatcher().isEnabled()).isTrue();
+        assertThat(eventFlowProperties.getPublisher().getChannels()).isEmpty();
+        assertThat(eventFlowProperties.getDispatcher().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getDispatcher().getThreadPool().getCoreSize()).isEqualTo(4);
         assertThat(eventFlowProperties.getDispatcher().getThreadPool().getMaxSize()).isEqualTo(16);
         assertThat(eventFlowProperties.getDispatcher().getThreadPool().getQueueCapacity()).isEqualTo(100);
         assertThat(eventFlowProperties.getDispatcher().getThreadPool().getKeepAliveSeconds()).isEqualTo(60);
+        assertThat(eventFlowProperties.getDispatcher().getTransports()).isEmpty();
     }
 
     @Test
@@ -107,12 +109,12 @@ class EventFlowPropertiesTest {
         // given
         Map<String, String> properties = Map.of(
                 "event-flow.publisher.channels[0].name", "internal",
-                "event-flow.publisher.channels[0].transports[0].name", "in-memory",
+                "event-flow.publisher.channels[0].transports[0].name", "local-queue",
                 "event-flow.publisher.channels[0].transports[0].capacity", "500",
                 "event-flow.publisher.channels[1].name", "external",
                 "event-flow.publisher.channels[1].transports[0].name", "kafka",
                 "event-flow.publisher.channels[1].transports[0].topic", "events-topic",
-                "event-flow.publisher.channels[1].transports[0].bootstrapServers", "localhost:9092"
+                "event-flow.publisher.channels[1].transports[0].servers", "localhost:9092"
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
         Binder binder = new Binder(source);
@@ -127,7 +129,7 @@ class EventFlowPropertiesTest {
         var internalChannel = eventFlowProperties.getPublisher().getChannels().get(0);
         assertThat(internalChannel.getName()).isEqualTo("internal");
         assertThat(internalChannel.getTransports()).hasSize(1);
-        assertThat(internalChannel.getTransports().get(0).getName()).isEqualTo("in-memory");
+        assertThat(internalChannel.getTransports().get(0).getName()).isEqualTo("local-queue");
         assertThat(internalChannel.getTransports().get(0).getCapacity()).isEqualTo(500);
 
         var externalChannel = eventFlowProperties.getPublisher().getChannels().get(1);
@@ -136,7 +138,7 @@ class EventFlowPropertiesTest {
         var kafkaTransport = externalChannel.getTransports().get(0);
         assertThat(kafkaTransport.getName()).isEqualTo("kafka");
         assertThat(kafkaTransport.getTopic()).isEqualTo("events-topic");
-        assertThat(kafkaTransport.getBootstrapServers()).isEqualTo("localhost:9092");
+        assertThat(kafkaTransport.getServers()).isEqualTo("localhost:9092");
     }
 
     @Test
@@ -144,11 +146,11 @@ class EventFlowPropertiesTest {
     void shouldBindCustomDispatcherTransportsConfiguration() {
         // given
         Map<String, String> properties = Map.of(
-                "event-flow.dispatcher.transports[0].name", "in-memory",
+                "event-flow.dispatcher.transports[0].name", "local-queue",
                 "event-flow.dispatcher.transports[0].capacity", "500",
                 "event-flow.dispatcher.transports[1].name", "kafka",
                 "event-flow.dispatcher.transports[1].topic", "events-topic",
-                "event-flow.dispatcher.transports[1].bootstrapServers", "localhost:9092",
+                "event-flow.dispatcher.transports[1].servers", "localhost:9092",
                 "event-flow.dispatcher.transports[1].consumerGroup", "custom-group"
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
@@ -161,14 +163,14 @@ class EventFlowPropertiesTest {
         // then
         assertThat(eventFlowProperties.getDispatcher().getTransports()).hasSize(2);
 
-        var inMemoryTransport = eventFlowProperties.getDispatcher().getTransports().get(0);
-        assertThat(inMemoryTransport.getName()).isEqualTo("in-memory");
-        assertThat(inMemoryTransport.getCapacity()).isEqualTo(500);
+        var localQueueTransport = eventFlowProperties.getDispatcher().getTransports().get(0);
+        assertThat(localQueueTransport.getName()).isEqualTo("local-queue");
+        assertThat(localQueueTransport.getCapacity()).isEqualTo(500);
 
         var kafkaTransport = eventFlowProperties.getDispatcher().getTransports().get(1);
         assertThat(kafkaTransport.getName()).isEqualTo("kafka");
         assertThat(kafkaTransport.getTopic()).isEqualTo("events-topic");
-        assertThat(kafkaTransport.getBootstrapServers()).isEqualTo("localhost:9092");
+        assertThat(kafkaTransport.getServers()).isEqualTo("localhost:9092");
         assertThat(kafkaTransport.getConsumerGroup()).isEqualTo("custom-group");
     }
 
@@ -221,11 +223,11 @@ class EventFlowPropertiesTest {
                 Map.entry("event-flow.publisher.retry.enabled", "true"),
                 Map.entry("event-flow.publisher.retry.max-attempts", "3"),
                 Map.entry("event-flow.publisher.channels[0].name", "internal"),
-                Map.entry("event-flow.publisher.channels[0].transports[0].name", "in-memory"),
+                Map.entry("event-flow.publisher.channels[0].transports[0].name", "local-queue"),
                 Map.entry("event-flow.dispatcher.enabled", "true"),
                 Map.entry("event-flow.dispatcher.thread-pool.core-size", "4"),
                 Map.entry("event-flow.dispatcher.thread-pool.max-size", "16"),
-                Map.entry("event-flow.dispatcher.transports[0].name", "in-memory"),
+                Map.entry("event-flow.dispatcher.transports[0].name", "local-queue"),
                 Map.entry("event-flow.dispatcher.transports[0].capacity", "1000")
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);

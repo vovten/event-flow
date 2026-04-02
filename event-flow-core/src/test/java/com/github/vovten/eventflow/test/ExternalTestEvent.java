@@ -5,7 +5,7 @@ import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -28,13 +28,13 @@ public class ExternalTestEvent extends AbstractTraceableEvent {
         this.payload = payload;
     }
 
-    public ExternalTestEvent(UUID uid, UUID traceId, String id, String payload, LocalDateTime timestamp) {
+    public ExternalTestEvent(UUID uid, UUID traceId, String id, String payload, Instant timestamp) {
         super(uid, traceId, timestamp);
         this.id = id;
         this.payload = payload;
     }
 
-    public ExternalTestEvent(String id, String payload, LocalDateTime timestamp) {
+    public ExternalTestEvent(String id, String payload, Instant timestamp) {
         super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
         this.id = id;
         this.payload = payload;

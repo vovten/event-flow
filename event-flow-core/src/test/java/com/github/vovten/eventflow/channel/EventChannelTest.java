@@ -2,7 +2,7 @@ package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.OutgoingEventTransport;
+import com.github.vovten.eventflow.transport.OutTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,15 +18,15 @@ import static org.mockito.Mockito.*;
 @DisplayName("EventChannel Tests")
 class EventChannelTest {
 
-    private OutgoingEventTransport transport1;
-    private OutgoingEventTransport transport2;
+    private OutTransport transport1;
+    private OutTransport transport2;
     private TestEventChannel channel;
     private TestEvent testEvent;
 
     @BeforeEach
     void setUp() {
-        transport1 = mock(OutgoingEventTransport.class);
-        transport2 = mock(OutgoingEventTransport.class);
+        transport1 = mock(OutTransport.class);
+        transport2 = mock(OutTransport.class);
         channel = new TestEventChannel(List.of(transport1, transport2));
         testEvent = new TestEvent();
     }
@@ -58,7 +58,7 @@ class EventChannelTest {
     @Test
     @DisplayName("Should return configured transports")
     void shouldReturnConfiguredTransports() {
-        List<OutgoingEventTransport> transports = channel.transports();
+        List<OutTransport> transports = channel.transports();
 
         assertEquals(2, transports.size());
         assertTrue(transports.contains(transport1));
@@ -66,9 +66,9 @@ class EventChannelTest {
     }
 
     static class TestEventChannel implements EventChannel {
-        private final List<OutgoingEventTransport> transports;
+        private final List<OutTransport> transports;
 
-        TestEventChannel(List<OutgoingEventTransport> transports) {
+        TestEventChannel(List<OutTransport> transports) {
             this.transports = transports;
         }
 
@@ -78,7 +78,7 @@ class EventChannelTest {
         }
 
         @Override
-        public List<OutgoingEventTransport> transports() {
+        public List<OutTransport> transports() {
             return transports;
         }
     }

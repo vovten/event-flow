@@ -6,7 +6,7 @@ import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -29,13 +29,13 @@ public class CompositeTestEvent extends AbstractTraceableEvent {
         this.content = content;
     }
 
-    public CompositeTestEvent(UUID uid, UUID traceId, String id, String content, LocalDateTime timestamp) {
+    public CompositeTestEvent(UUID uid, UUID traceId, String id, String content, Instant timestamp) {
         super(uid, traceId, timestamp);
         this.id = id;
         this.content = content;
     }
 
-    public CompositeTestEvent(String id, String content, LocalDateTime timestamp) {
+    public CompositeTestEvent(String id, String content, Instant timestamp) {
         super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
         this.id = id;
         this.content = content;
