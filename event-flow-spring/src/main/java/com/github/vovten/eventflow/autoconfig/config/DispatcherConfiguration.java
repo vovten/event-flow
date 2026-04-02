@@ -59,7 +59,7 @@ public class DispatcherConfiguration {
     public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
                                            @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
                                            @Qualifier("dispatcherTransports") List<InTransport> inTransports) {
-        EventDispatcherBuilder builder = EventDispatcherBuilder.builder()
+        EventDispatcherBuilder builder = EventDispatcherBuilder.create()
                 .executor(dispatcherExecutor)
                 .handlerRegistry(eventHandlerRegistry)
                 .transports(inTransports);

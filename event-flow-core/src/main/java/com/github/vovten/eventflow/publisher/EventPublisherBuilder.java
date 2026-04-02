@@ -21,23 +21,23 @@ import java.util.List;
  * <b>Usage examples:</b>
  * <pre>{@code
  * // Simple publisher with channels only
- * EventPublisher publisher = EventPublisherBuilder.channels(channel1, channel2)
+ * EventPublisher publisher = EventPublisherBuilder.create(channel1, channel2)
  *     .build();
  *
  * // Publisher with retry support
- * EventPublisher publisher = EventPublisherBuilder.channels(channels)
- *     .withRetry(3, Duration.ofMillis(100), 2.0)
+ * EventPublisher publisher = EventPublisherBuilder.create(channels)
+ *     .retryable(3, Duration.ofMillis(100), 2.0)
  *     .build();
  *
  * // Silent publisher with retry for analytics events
- * EventPublisher publisher = EventPublisherBuilder.channels(analyticsChannel)
- *     .withRetry()
+ * EventPublisher publisher = EventPublisherBuilder.create(analyticsChannel)
+ *     .retryable()
  *     .silent()
  *     .build();
  *
  * // Complete configuration with custom decorator
- * EventPublisher publisher = EventPublisherBuilder.channels(channels)
- *     .withRetry(5, Duration.ofSeconds(1), 1.5)
+ * EventPublisher publisher = EventPublisherBuilder.create(channels)
+ *     .retryable(5, Duration.ofSeconds(1), 1.5)
  *     .withDecorator(pub -> new MetricsEventPublisher(pub, metricsRegistry))
  *     .silent()  // silent will be the outermost decorator
  *     .build();
@@ -73,12 +73,21 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     }
 
     /**
+     * Start building a new EventPublisher.
+     *
+     * @return builder instance
+     */
+    public static EventPublisherBuilder<?> create() {
+        return new EventPublisherBuilder<>();
+    }
+
+    /**
      * Start building publisher with the given channels.
      *
      * @param channels event channels to configure
      * @return builder instance
      */
-    public static EventPublisherBuilder<?> channels(EventChannel... channels) {
+    public static EventPublisherBuilder<?> create(EventChannel... channels) {
         return new EventPublisherBuilder<>().addChannels(channels);
     }
 
@@ -88,7 +97,7 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      * @param channels list of event channels
      * @return builder instance
      */
-    public static EventPublisherBuilder<?> channels(List<EventChannel> channels) {
+    public static EventPublisherBuilder<?> create(List<EventChannel> channels) {
         return new EventPublisherBuilder<>().addChannels(channels);
     }
 

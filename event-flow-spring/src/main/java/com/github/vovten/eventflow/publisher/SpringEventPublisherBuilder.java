@@ -17,20 +17,20 @@ import java.util.List;
  * <b>Usage examples:</b>
  * <pre>{@code
  * // Simple transactional publisher
- * EventPublisher publisher = SpringEventPublisherBuilder.channels(channel1, channel2)
+ * EventPublisher publisher = SpringEventPublisherBuilder.create(channel1, channel2)
  *     .transactional()
  *     .build();
  *
  * // Transactional publisher with retry
- * EventPublisher publisher = SpringEventPublisherBuilder.channels(channels)
+ * EventPublisher publisher = SpringEventPublisherBuilder.create(channels)
  *     .transactional()
- *     .withRetry(3, Duration.ofMillis(100), 2.0)
+ *     .retryable(3, Duration.ofMillis(100), 2.0)
  *     .build();
  *
  * // Transactional publisher with silent mode
- * EventPublisher publisher = SpringEventPublisherBuilder.channels(channels)
+ * EventPublisher publisher = SpringEventPublisherBuilder.create(channels)
  *     .transactional()
- *     .withRetry()
+ *     .retryable()
  *     .silent()
  *     .build();
  * }</pre>
@@ -55,12 +55,21 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     private boolean transactional = false;
 
     /**
+     * Start building a new SpringEventPublisher.
+     *
+     * @return builder instance
+     */
+    public static SpringEventPublisherBuilder create() {
+        return new SpringEventPublisherBuilder();
+    }
+
+    /**
      * Start building publisher with the given channels.
      *
      * @param channels event channels to configure
      * @return builder instance
      */
-    public static SpringEventPublisherBuilder channels(EventChannel... channels) {
+    public static SpringEventPublisherBuilder create(EventChannel... channels) {
         return new SpringEventPublisherBuilder().addChannels(channels);
     }
 
@@ -70,7 +79,7 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
      * @param channels list of event channels
      * @return builder instance
      */
-    public static SpringEventPublisherBuilder channels(List<EventChannel> channels) {
+    public static SpringEventPublisherBuilder create(List<EventChannel> channels) {
         return new SpringEventPublisherBuilder().addChannels(channels);
     }
 

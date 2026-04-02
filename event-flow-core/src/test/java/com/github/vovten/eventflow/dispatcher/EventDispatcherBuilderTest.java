@@ -44,7 +44,7 @@ class EventDispatcherBuilderTest {
     @Test
     @DisplayName("Should build dispatcher with required parameters")
     void shouldBuildDispatcherWithRequiredParameters() {
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -57,7 +57,7 @@ class EventDispatcherBuilderTest {
     @Test
     @DisplayName("Should build and log dispatcher")
     void shouldBuildAndLogDispatcher() {
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -71,7 +71,7 @@ class EventDispatcherBuilderTest {
     void shouldThrowExceptionWhenExecutorIsNotSet() {
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
-                () -> EventDispatcherBuilder.builder()
+                () -> EventDispatcherBuilder.create()
                         .handlerRegistry(handlerRegistry)
                         .transports(List.of(transport))
                         .build()
@@ -84,7 +84,7 @@ class EventDispatcherBuilderTest {
     void shouldThrowExceptionWhenHandlerRegistryIsNotSet() {
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
-                () -> EventDispatcherBuilder.builder()
+                () -> EventDispatcherBuilder.create()
                         .executor(executorService)
                         .transports(List.of(transport))
                         .build()
@@ -95,7 +95,7 @@ class EventDispatcherBuilderTest {
     @Test
     @DisplayName("Should build dispatcher with empty transports list")
     void shouldBuildDispatcherWithEmptyTransportsList() {
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of())
@@ -107,7 +107,7 @@ class EventDispatcherBuilderTest {
     @Test
     @DisplayName("Should build dispatcher with idempotent processing enabled (default settings)")
     void shouldBuildDispatcherWithIdempotentEnabled() {
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -125,7 +125,7 @@ class EventDispatcherBuilderTest {
         long maxSize = 50_000L;
         boolean warnOnDuplicate = false;
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -141,7 +141,7 @@ class EventDispatcherBuilderTest {
     void shouldApplyCustomDecorator() {
         AtomicBoolean decoratorApplied = new AtomicBoolean(false);
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -159,7 +159,7 @@ class EventDispatcherBuilderTest {
     void shouldApplyMultipleCustomDecorators() {
         AtomicInteger decoratorCount = new AtomicInteger(0);
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -182,7 +182,7 @@ class EventDispatcherBuilderTest {
         AtomicInteger decoratorOrder = new AtomicInteger(0);
         final int[] order = new int[2];
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -205,7 +205,7 @@ class EventDispatcherBuilderTest {
         InTransport transport2 = mock(InTransport.class);
         when(transport2.name()).thenReturn("test-transport-2");
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .addTransports(List.of(transport, transport2))
@@ -220,7 +220,7 @@ class EventDispatcherBuilderTest {
         InTransport transport2 = mock(InTransport.class);
         when(transport2.name()).thenReturn("test-transport-2");
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .addTransports(transport, transport2)
@@ -236,7 +236,7 @@ class EventDispatcherBuilderTest {
         TestEventHandler handler = new TestEventHandler();
         when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -265,7 +265,7 @@ class EventDispatcherBuilderTest {
         EventHandler handler = e -> handlerCallCount.incrementAndGet();
         when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))
@@ -294,7 +294,7 @@ class EventDispatcherBuilderTest {
         EventHandler handler = e -> handlerCallCount.incrementAndGet();
         when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
 
-        EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
                 .transports(List.of(transport))

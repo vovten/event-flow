@@ -33,7 +33,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build simple publisher with channels")
     void shouldBuildSimplePublisherWithChannels() {
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel).build();
+        EventPublisher publisher = EventPublisherBuilder.create(channel).build();
 
         // Assert
         assertNotNull(publisher);
@@ -47,7 +47,7 @@ class EventPublisherBuilderTest {
         EventChannel channel2 = new InternalEventChannel(new LocalQueueOutTransport(new LinkedBlockingDeque<>(100)));
 
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel, channel2).build();
+        EventPublisher publisher = EventPublisherBuilder.create(channel, channel2).build();
 
         // Assert
         assertNotNull(publisher);
@@ -61,7 +61,7 @@ class EventPublisherBuilderTest {
         List<EventChannel> channels = List.of(channel, new InternalEventChannel(new LocalQueueOutTransport(new LinkedBlockingDeque<>(100))));
 
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channels).build();
+        EventPublisher publisher = EventPublisherBuilder.create(channels).build();
 
         // Assert
         assertNotNull(publisher);
@@ -74,7 +74,7 @@ class EventPublisherBuilderTest {
         EventChannel channel2 = new InternalEventChannel(new LocalQueueOutTransport(new LinkedBlockingDeque<>(100)));
 
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .addChannels(channel2)
                 .build();
 
@@ -90,7 +90,7 @@ class EventPublisherBuilderTest {
                 new InternalEventChannel(new LocalQueueOutTransport(new LinkedBlockingDeque<>(100))));
 
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .addChannels(channels)
                 .build();
 
@@ -102,7 +102,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with default retry")
     void shouldBuildPublisherWithDefaultRetry() {
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .retryable()
                 .build();
 
@@ -115,7 +115,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with custom retry")
     void shouldBuildPublisherWithCustomRetry() {
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .retryable(5, Duration.ofMillis(200), 1.5)
                 .build();
 
@@ -128,7 +128,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build silent publisher")
     void shouldBuildSilentPublisher() {
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .silent()
                 .build();
 
@@ -141,7 +141,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with retry and silent")
     void shouldBuildPublisherWithRetryAndSilent() {
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .retryable()
                 .silent()
                 .build();
@@ -158,7 +158,7 @@ class EventPublisherBuilderTest {
         EventPublisherBuilder.DecoratorFunction decorator = pub -> event -> {};
 
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .withDecorator(decorator)
                 .build();
 
@@ -174,7 +174,7 @@ class EventPublisherBuilderTest {
         EventPublisherBuilder.DecoratorFunction decorator2 = pub -> event -> {};
 
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .withDecorator(decorator1)
                 .withDecorator(decorator2)
                 .retryable()
@@ -190,7 +190,7 @@ class EventPublisherBuilderTest {
     void shouldThrowExceptionWhenBuildingWithoutChannels() {
         // Assert
         IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                EventPublisherBuilder.channels().build()
+                EventPublisherBuilder.create().build()
         );
         assertEquals("At least one channel must be configured", exception.getMessage());
     }
@@ -199,7 +199,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build and log publisher")
     void shouldBuildAndLogPublisher() {
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .retryable()
                 .silent()
                 .buildAndLog();
@@ -215,7 +215,7 @@ class EventPublisherBuilderTest {
         EventPublisherBuilder.DecoratorFunction decorator = pub -> new SilentEventPublisher(pub, false);
 
         // Act
-        EventPublisher publisher = EventPublisherBuilder.channels(channel)
+        EventPublisher publisher = EventPublisherBuilder.create(channel)
                 .retryable(3, Duration.ofMillis(100), 2.0)
                 .withDecorator(decorator)
                 .silent()

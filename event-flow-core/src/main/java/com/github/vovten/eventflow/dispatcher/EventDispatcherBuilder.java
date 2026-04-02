@@ -22,14 +22,14 @@ import java.util.concurrent.ExecutorService;
  * <b>Usage examples:</b>
  * <pre>{@code
  * // Simple dispatcher without decorators
- * EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+ * EventDispatcher dispatcher = EventDispatcherBuilder.create()
  *     .executor(executorService)
  *     .handlerRegistry(registry)
  *     .transports(transports)
  *     .build();
  *
  * // Dispatcher with idempotent processing (default settings)
- * EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+ * EventDispatcher dispatcher = EventDispatcherBuilder.create()
  *     .executor(executorService)
  *     .handlerRegistry(registry)
  *     .transports(transports)
@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutorService;
  *     .build();
  *
  * // Dispatcher with custom idempotent settings
- * EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+ * EventDispatcher dispatcher = EventDispatcherBuilder.create()
  *     .executor(executorService)
  *     .handlerRegistry(registry)
  *     .transports(transports)
@@ -45,7 +45,7 @@ import java.util.concurrent.ExecutorService;
  *     .build();
  *
  * // Dispatcher with custom decorator
- * EventDispatcher dispatcher = EventDispatcherBuilder.builder()
+ * EventDispatcher dispatcher = EventDispatcherBuilder.create()
  *     .executor(executorService)
  *     .handlerRegistry(registry)
  *     .transports(transports)
@@ -80,11 +80,11 @@ public final class EventDispatcherBuilder {
     }
 
     /**
-     * Start building a dispatcher.
+     * Start building a new EventDispatcher.
      *
      * @return builder instance
      */
-    public static EventDispatcherBuilder builder() {
+    public static EventDispatcherBuilder create() {
         return new EventDispatcherBuilder();
     }
 

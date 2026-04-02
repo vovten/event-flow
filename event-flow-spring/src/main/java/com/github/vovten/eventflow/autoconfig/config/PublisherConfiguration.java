@@ -72,7 +72,7 @@ public class PublisherConfiguration {
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
         
         // Use Spring-aware builder
-        SpringEventPublisherBuilder builder = SpringEventPublisherBuilder.channels(eventChannels);
+        SpringEventPublisherBuilder builder = SpringEventPublisherBuilder.create(eventChannels);
         
         // Apply retry if enabled
         var retry = publisherConfig.getRetry();
