@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
  * <p>
  * This is a facade that imports modular configuration classes:
  * <ul>
+ *   <li>{@link SerializerConfiguration} - custom event serializers (registered in constructor for early initialization)</li>
  *   <li>{@link RegistryConfiguration} - event listener registries</li>
  *   <li>{@link CommonConfiguration} - executor service and local-queue transports</li>
  *   <li>{@link ChannelConfiguration} - event channels</li>
@@ -59,6 +60,7 @@ import org.springframework.context.annotation.Import;
 @EnableConfigurationProperties(EventFlowProperties.class)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 @Import({
+    SerializerConfiguration.class,
     RegistryConfiguration.class,
     CommonConfiguration.class,
     ChannelConfiguration.class,

@@ -224,6 +224,42 @@ public class RabbitMqTransportFactory implements OutTransportFactory, InTranspor
 }
 ```
 
+### Custom Event Serializers
+
+Implement `EventSerializer` and annotate with `@Component` to auto-register it in `EventSerializerFactory`:
+
+```java
+@Component
+public class ProtobufEventSerializer implements EventSerializer {
+
+    @Override
+    public byte getFormatCode() {
+        return 0x03;  // Unique format code (0x01=JSON, 0x02=MsgPack are reserved)
+    }
+
+    @Override
+    public String getFormat() {
+        return "protobuf";
+    }
+
+    @Override
+    public byte[] serialize(Event event) {
+        // Serialize event using Protocol Buffers
+        // First byte must be the format code (0x03)
+        byte[] data = serializeToProtobuf(event);
+        return Bytes.concat(new byte[]{getFormatCode()}, data);
+    }
+
+    @Override
+    public <T extends Event> T deserialize(byte[] data, Class<T> eventType) {
+        // Skip first byte (format code) and deserialize
+        return deserializeFromProtobuf(Arrays.copyOfRange(data, 1, data.length), eventType);
+    }
+}
+```
+
+The serializer will be automatically discovered and registered when `event-flow.enabled=true`.
+
 ---
 
 ## Features
@@ -314,6 +350,7 @@ New transport types can be added by implementing `OutTransportFactory` or `InTra
 | `eventDispatcher` | Main dispatcher | Provide `EventDispatcher` bean |
 | `incomingEventTransports` | Additional incoming transports | Provide custom beans |
 | `OutTransportFactory` / `InTransportFactory` implementations | Create transports from config | Provide custom factory |
+| `EventSerializer` beans | Custom serializers auto-registered in `EventSerializerFactory` | Implement `EventSerializer` + `@Component` |
 
 ### Channel Configuration
 

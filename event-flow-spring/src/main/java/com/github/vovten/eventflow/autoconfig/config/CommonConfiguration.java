@@ -1,17 +1,18 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ExecutorService;
@@ -24,6 +25,7 @@ import java.util.concurrent.ExecutorService;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
+@DependsOn("serializerRegistrationComplete")
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class CommonConfiguration {
 

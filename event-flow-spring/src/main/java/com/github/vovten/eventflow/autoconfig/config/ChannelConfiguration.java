@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +33,7 @@ import static java.util.stream.Collectors.toMap;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
+@DependsOn("serializerRegistrationComplete")
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class ChannelConfiguration {
 
