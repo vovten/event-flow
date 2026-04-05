@@ -5,9 +5,10 @@ import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.EventSubscriber;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Registry that discovers and manages event subscribers implementing the {@link EventSubscriber} interface.
@@ -88,14 +89,17 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      * Map of event types to subscribers.
      * Key: Event class
      * Value: List of EventSubscriber instances
+     * <p>
+     * Thread-safe: uses ConcurrentHashMap + CopyOnWriteArrayList for read-heavy workload.
      */
     private final Map<Class<? extends Event>, List<EventSubscriber>> eventSubscribers;
 
     /**
      * Creates a new interface-based event subscriber registry.
+     * Thread-safe for concurrent register/unregister/dispatch operations.
      */
     public EventSubscriberRegistry() {
-        this.eventSubscribers = new HashMap<>();
+        this.eventSubscribers = new ConcurrentHashMap<>();
     }
 
     /**
@@ -112,12 +116,20 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      */
     @Override
     public List<EventHandler> getHandlers(Event event) {
-        List<EventHandler> handlers = new ArrayList<>(eventSubscribers.getOrDefault(event.getClass(), List.of()));
+        List<EventHandler> handlers = new ArrayList<>();
 
-        // Also add subscribers for generic Event.class
-        if (eventSubscribers.containsKey(Event.class)) {
-            handlers.addAll(eventSubscribers.get(Event.class));
+        // Get subscribers for specific event type (thread-safe snapshot)
+        List<EventSubscriber> specific = eventSubscribers.get(event.getClass());
+        if (specific != null) {
+            handlers.addAll(new ArrayList<>(specific));
         }
+
+        // Get subscribers for generic Event.class (thread-safe snapshot)
+        List<EventSubscriber> generic = eventSubscribers.get(Event.class);
+        if (generic != null) {
+            handlers.addAll(new ArrayList<>(generic));
+        }
+
         return handlers;
     }
 
@@ -204,8 +216,11 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      * @param subscriber the subscriber to register
      */
     protected void registerSubscriber(EventSubscriber subscriber) {
-        for (Class<? extends Event> event : subscriber.events()) {
-            var subscribers = eventSubscribers.computeIfAbsent(event, k -> new ArrayList<>());
+        // Defensive copy to prevent external modification of subscriber.events()
+        List<Class<? extends Event>> eventTypes = List.copyOf(subscriber.events());
+
+        for (Class<? extends Event> event : eventTypes) {
+            var subscribers = eventSubscribers.computeIfAbsent(event, k -> new CopyOnWriteArrayList<>());
             if (!subscribers.contains(subscriber)) {
                 subscribers.add(subscriber);
             }

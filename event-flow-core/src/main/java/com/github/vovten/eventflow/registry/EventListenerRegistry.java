@@ -9,9 +9,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Registry that discovers and manages event listeners based on the {@code @EventListener} annotation.
@@ -84,14 +85,17 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * Map of event types to listener-method pairs.
      * Key: Event class
      * Value: List of (listener object, method) pairs
+     * <p>
+     * Thread-safe: uses ConcurrentHashMap + CopyOnWriteArrayList for read-heavy workload.
      */
     private final Map<Class<? extends Event>, List<Pair<Object, Method>>> eventListeners;
 
     /**
      * Creates a new annotation-based event listener registry.
+     * Thread-safe for concurrent register/unregister/dispatch operations.
      */
     public EventListenerRegistry() {
-        this.eventListeners = new HashMap<>();
+        this.eventListeners = new ConcurrentHashMap<>();
     }
 
     /**
@@ -109,14 +113,19 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     @Override
     public List<EventHandler> getHandlers(Event event) {
         List<EventHandler> listeners = new ArrayList<>();
-        List<Pair<Object, Method>> methods = eventListeners.getOrDefault(event.getClass(), List.of());
 
-        // Also add listeners for generic Event.class
-        if (eventListeners.containsKey(Event.class)) {
-            listeners.addAll(createEventListeners(eventListeners.get(Event.class)));
+        // Get handlers for generic Event.class (thread-safe snapshot from CopyOnWriteArrayList)
+        List<Pair<Object, Method>> genericHandlers = eventListeners.get(Event.class);
+        if (genericHandlers != null) {
+            listeners.addAll(createEventListeners(new ArrayList<>(genericHandlers)));
         }
 
-        listeners.addAll(createEventListeners(methods));
+        // Get handlers for specific event type (thread-safe snapshot from CopyOnWriteArrayList)
+        List<Pair<Object, Method>> specificHandlers = eventListeners.get(event.getClass());
+        if (specificHandlers != null) {
+            listeners.addAll(createEventListeners(new ArrayList<>(specificHandlers)));
+        }
+
         return listeners;
     }
 
@@ -215,7 +224,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     protected void registerListener(Object bean, Method method) {
         var eventType = (Class<? extends Event>) method.getParameterTypes()[0];
-        var listeners = eventListeners.computeIfAbsent(eventType, k -> new ArrayList<>());
+        var listeners = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
         var newPair = new ImmutablePair<>(bean, method);
         // Check for duplicate (same bean and method)
         boolean exists = listeners.stream()

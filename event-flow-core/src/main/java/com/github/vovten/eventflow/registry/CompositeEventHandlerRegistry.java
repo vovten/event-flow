@@ -4,6 +4,7 @@ import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Composite registry that combines multiple {@link EventHandlerRegistry} implementations.
@@ -71,6 +72,9 @@ import java.util.List;
  */
 public class CompositeEventHandlerRegistry implements EventHandlerRegistry {
 
+    /**
+     * List of child registries. Thread-safe for concurrent access and modification.
+     */
     private final List<EventHandlerRegistry> registries;
 
     /**
@@ -78,6 +82,8 @@ public class CompositeEventHandlerRegistry implements EventHandlerRegistry {
      * <p>
      * The registries are queried in order when retrieving handlers.
      * Registration operations are propagated to all registries.
+     * <p>
+     * Thread-safe: creates a defensive copy using CopyOnWriteArrayList.
      *
      * @param registries list of child registries to combine
      * @throws IllegalArgumentException if registries is null or empty
@@ -86,7 +92,7 @@ public class CompositeEventHandlerRegistry implements EventHandlerRegistry {
         if (registries == null || registries.isEmpty()) {
             throw new IllegalArgumentException("At least one registry must be provided");
         }
-        this.registries = registries;
+        this.registries = new CopyOnWriteArrayList<>(registries);
     }
 
     /**
