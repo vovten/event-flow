@@ -2,6 +2,8 @@ package com.github.vovten.eventflow.autoconfig.transport.outgoing;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
+import com.github.vovten.eventflow.serialization.EventSerializer;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutTransport;
 
@@ -25,10 +27,17 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
     @Override
     public OutTransport createPublisher(EventFlowProperties.TransportConfig config) {
         validate(config);
+        EventSerializer serializer = createSerializer(config.getSerialization());
         return new BroadcastKafkaOutTransport(
             config.getServers(),
-            config.getTopic()
+            config.getTopic(),
+            serializer
         );
+    }
+
+    private EventSerializer createSerializer(String format) {
+        String name = (format == null || format.isBlank()) ? "json" : format;
+        return EventSerializerFactory.getByName(name);
     }
 
     @Override
