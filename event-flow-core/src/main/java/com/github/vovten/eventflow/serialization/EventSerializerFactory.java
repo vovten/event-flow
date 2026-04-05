@@ -2,6 +2,8 @@ package com.github.vovten.eventflow.serialization;
 
 import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import com.github.vovten.eventflow.serialization.msgpack.MsgPackEventSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Map;
@@ -9,29 +11,37 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Factory for obtaining event serializers by format code.
+ * Factory for obtaining event serializers by name or code.
+ * <p>
+ * Maintains two indexes for efficient lookups:
+ * <ul>
+ *   <li><b>By name</b> — used during serialization (configuration-driven)</li>
+ *   <li><b>By code</b> — used during deserialization (magic byte detection)</li>
+ * </ul>
  * <p>
  * Automatically detects serializer format from data bytes:
  * - 0x7B ('{'): JSON (backward compatible, no magic byte)
  * - 0x01: JSON (new format with magic byte)
  * - 0x02: MessagePack
  * <p>
- * Custom serializers can be registered using {@link #register(byte, EventSerializer)}.
+ * Custom serializers can be registered using {@link #register(EventSerializer)}.
+ * The name and code are taken automatically from the serializer itself.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-30
  */
 public final class EventSerializerFactory {
 
-    private static final byte JSON_START_BYTE = 0x7B;
-    private static final byte JSON_FORMAT_CODE = 0x01;
-    private static final byte MSGPACK_FORMAT_CODE = 0x02;
+    private static final Logger log = LoggerFactory.getLogger(EventSerializerFactory.class);
 
-    private static final Map<Byte, EventSerializer> SERIALIZERS = new ConcurrentHashMap<>();
+    private static final byte JSON_START_BYTE = 0x7B;
+
+    private static final Map<String, EventSerializer> BY_NAME = new ConcurrentHashMap<>();
+    private static final Map<Byte, EventSerializer> BY_CODE = new ConcurrentHashMap<>();
 
     static {
-        SERIALIZERS.put(JSON_FORMAT_CODE, new JsonEventSerializer());
-        SERIALIZERS.put(MSGPACK_FORMAT_CODE, new MsgPackEventSerializer());
+        register(new JsonEventSerializer());
+        register(new MsgPackEventSerializer());
     }
 
     private EventSerializerFactory() {
@@ -39,41 +49,68 @@ public final class EventSerializerFactory {
     }
 
     /**
-     * Register a custom serializer for the specified format code.
+     * Register a custom serializer.
      * <p>
-     * This method allows overriding default serializers or registering new ones.
+     * The serializer's {@link EventSerializer#getName()} and {@link EventSerializer#getCode()}
+     * are used to populate both name and code indexes automatically.
      * <p>
      * <b>Examples:</b>
      * <pre>{@code
      * // Override default MessagePack serializer
-     * EventSerializerFactory.register((byte) 0x02, new CustomMsgPackSerializer());
+     * EventSerializerFactory.register(new CustomMsgPackSerializer());
      *
      * // Register a new Protobuf serializer
-     * EventSerializerFactory.register((byte) 0x03, new ProtobufEventSerializer());
+     * EventSerializerFactory.register(new ProtobufEventSerializer());
      * }</pre>
      *
-     * @param formatCode the format code (magic byte)
      * @param serializer the serializer instance
      * @throws IllegalArgumentException if serializer is null
      */
-    public static void register(byte formatCode, EventSerializer serializer) {
+    public static void register(EventSerializer serializer) {
         if (serializer == null) {
             throw new IllegalArgumentException("Serializer must not be null");
         }
-        SERIALIZERS.put(formatCode, serializer);
+        String name = serializer.getName();
+        byte code = serializer.getCode();
+
+        if (BY_NAME.containsKey(name) || BY_CODE.containsKey(code)) {
+            log.warn("Overwriting existing serializer: name='{}', code=0x{}",
+                    name, Integer.toHexString(code & 0xFF));
+        }
+        BY_NAME.put(name, serializer);
+        BY_CODE.put(code, serializer);
     }
 
     /**
-     * Get serializer by format code.
+     * Get serializer by name.
+     * <p>
+     * Used during serialization when format is specified in configuration.
      *
-     * @param formatCode the format code (magic byte)
+     * @param name the serializer name (e.g., "json", "msgpack", "protobuf")
      * @return the serializer
-     * @throws EventSerializationException if format code is unknown
+     * @throws EventSerializationException if name is unknown
      */
-    public static EventSerializer getByFormatCode(byte formatCode) {
-        EventSerializer serializer = SERIALIZERS.get(formatCode);
+    public static EventSerializer getByName(String name) {
+        EventSerializer serializer = BY_NAME.get(name);
         if (serializer == null) {
-            throw new EventSerializationException("Unknown format code: " + formatCode);
+            throw new EventSerializationException("Unknown serializer name: " + name);
+        }
+        return serializer;
+    }
+
+    /**
+     * Get serializer by code.
+     * <p>
+     * Used during deserialization to resolve serializer from the magic byte.
+     *
+     * @param code the serializer code (magic byte)
+     * @return the serializer
+     * @throws EventSerializationException if code is unknown
+     */
+    public static EventSerializer getByCode(byte code) {
+        EventSerializer serializer = BY_CODE.get(code);
+        if (serializer == null) {
+            throw new EventSerializationException("Unknown serializer code: " + code);
         }
         return serializer;
     }
@@ -94,16 +131,13 @@ public final class EventSerializerFactory {
         if (data == null || data.length == 0) {
             throw new EventSerializationException("Empty data");
         }
-
         byte firstByte = data[0];
-
         // Backward compatibility: old JSON format without magic byte
         if (firstByte == JSON_START_BYTE) {
-            return SERIALIZERS.get(JSON_FORMAT_CODE);
+            return BY_NAME.get("json");
         }
-
         // New format with magic byte
-        return getByFormatCode(firstByte);
+        return getByCode(firstByte);
     }
 
     /**
@@ -112,7 +146,7 @@ public final class EventSerializerFactory {
      * @return JSON serializer
      */
     public static EventSerializer getDefault() {
-        return SERIALIZERS.get(JSON_FORMAT_CODE);
+        return BY_NAME.get("json");
     }
 
     /**
@@ -121,7 +155,7 @@ public final class EventSerializerFactory {
      * @return JSON serializer
      */
     public static EventSerializer getJson() {
-        return SERIALIZERS.get(JSON_FORMAT_CODE);
+        return BY_NAME.get("json");
     }
 
     /**
@@ -130,18 +164,29 @@ public final class EventSerializerFactory {
      * @return MessagePack serializer
      */
     public static EventSerializer getMsgPack() {
-        return SERIALIZERS.get(MSGPACK_FORMAT_CODE);
+        return BY_NAME.get("msgpack");
     }
 
     /**
-     * Get a set of all registered format codes.
+     * Get a set of all registered serializer names.
      * <p>
      * Useful for debugging and inspection.
      *
-     * @return unmodifiable set of registered format codes
+     * @return unmodifiable set of registered serializer names
      */
-    public static Set<Byte> getRegisteredFormatCodes() {
-        return Collections.unmodifiableSet(SERIALIZERS.keySet());
+    public static Set<String> getRegisteredNames() {
+        return Collections.unmodifiableSet(BY_NAME.keySet());
+    }
+
+    /**
+     * Get a set of all registered serializer codes.
+     * <p>
+     * Useful for debugging and inspection.
+     *
+     * @return unmodifiable set of registered serializer codes
+     */
+    public static Set<Byte> getRegisteredCodes() {
+        return Collections.unmodifiableSet(BY_CODE.keySet());
     }
 
     /**
@@ -151,8 +196,9 @@ public final class EventSerializerFactory {
      * Use with caution as it affects global state.
      */
     static void clear() {
-        SERIALIZERS.clear();
-        SERIALIZERS.put(JSON_FORMAT_CODE, new JsonEventSerializer());
-        SERIALIZERS.put(MSGPACK_FORMAT_CODE, new MsgPackEventSerializer());
+        BY_NAME.clear();
+        BY_CODE.clear();
+        register(new JsonEventSerializer());
+        register(new MsgPackEventSerializer());
     }
 }

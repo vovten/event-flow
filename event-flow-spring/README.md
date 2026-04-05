@@ -233,26 +233,26 @@ Implement `EventSerializer` and annotate with `@Component` to auto-register it i
 public class ProtobufEventSerializer implements EventSerializer {
 
     @Override
-    public byte getFormatCode() {
-        return 0x03;  // Unique format code (0x01=JSON, 0x02=MsgPack are reserved)
+    public byte getCode() {
+        return 0x03;  // Unique code (0x01=json, 0x02=msgpack are reserved)
     }
 
     @Override
-    public String getFormat() {
+    public String getName() {
         return "protobuf";
     }
 
     @Override
     public byte[] serialize(Event event) {
         // Serialize event using Protocol Buffers
-        // First byte must be the format code (0x03)
+        // First byte must be the code (0x03)
         byte[] data = serializeToProtobuf(event);
-        return Bytes.concat(new byte[]{getFormatCode()}, data);
+        return Bytes.concat(new byte[]{getCode()}, data);
     }
 
     @Override
     public <T extends Event> T deserialize(byte[] data, Class<T> eventType) {
-        // Skip first byte (format code) and deserialize
+        // Skip first byte (code) and deserialize
         return deserializeFromProtobuf(Arrays.copyOfRange(data, 1, data.length), eventType);
     }
 }

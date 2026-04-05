@@ -23,30 +23,30 @@ class EventSerializerFactoryTest {
     }
 
     @Test
-    @DisplayName("Should get JSON serializer by format code")
-    void shouldGetJsonSerializerByFormatCode() {
-        EventSerializer serializer = EventSerializerFactory.getByFormatCode((byte) 0x01);
+    @DisplayName("Should get JSON serializer by code")
+    void shouldGetJsonSerializerByCode() {
+        EventSerializer serializer = EventSerializerFactory.getByCode((byte) 0x01);
 
         assertNotNull(serializer);
         assertTrue(serializer instanceof JsonEventSerializer);
-        assertEquals("json", serializer.getFormat());
+        assertEquals("json", serializer.getName());
     }
 
     @Test
-    @DisplayName("Should get MessagePack serializer by format code")
-    void shouldGetMsgPackSerializerByFormatCode() {
-        EventSerializer serializer = EventSerializerFactory.getByFormatCode((byte) 0x02);
+    @DisplayName("Should get MessagePack serializer by code")
+    void shouldGetMsgPackSerializerByCode() {
+        EventSerializer serializer = EventSerializerFactory.getByCode((byte) 0x02);
 
         assertNotNull(serializer);
         assertTrue(serializer instanceof MsgPackEventSerializer);
-        assertEquals("msgpack", serializer.getFormat());
+        assertEquals("msgpack", serializer.getName());
     }
 
     @Test
-    @DisplayName("Should throw exception for unknown format code")
-    void shouldThrowExceptionForUnknownFormatCode() {
+    @DisplayName("Should throw exception for unknown code")
+    void shouldThrowExceptionForUnknownCode() {
         assertThrows(EventSerializationException.class, () ->
-                EventSerializerFactory.getByFormatCode((byte) 0xFF));
+                EventSerializerFactory.getByCode((byte) 0xFF));
     }
 
     @Test
@@ -134,68 +134,96 @@ class EventSerializerFactoryTest {
     void shouldRegisterCustomSerializer() {
         CustomEventSerializer customSerializer = new CustomEventSerializer();
 
-        EventSerializerFactory.register((byte) 0x03, customSerializer);
+        EventSerializerFactory.register(customSerializer);
 
-        EventSerializer retrieved = EventSerializerFactory.getByFormatCode((byte) 0x03);
-        assertSame(customSerializer, retrieved);
+        EventSerializer retrievedByName = EventSerializerFactory.getByName("custom");
+        assertSame(customSerializer, retrievedByName);
+        EventSerializer retrievedByCode = EventSerializerFactory.getByCode((byte) 0x03);
+        assertSame(customSerializer, retrievedByCode);
     }
 
     @Test
     @DisplayName("Should override existing serializer")
     void shouldOverrideExistingSerializer() {
-        CustomEventSerializer customSerializer = new CustomEventSerializer();
+        JsonEventSerializer overrideSerializer = new JsonEventSerializer() {
+            @Override
+            public String getName() {
+                return "json-override";
+            }
 
-        EventSerializerFactory.register((byte) 0x01, customSerializer);
+            @Override
+            public byte getCode() {
+                return 0x01; // Same code as JSON
+            }
+        };
 
-        EventSerializer retrieved = EventSerializerFactory.getByFormatCode((byte) 0x01);
-        assertSame(customSerializer, retrieved);
-        assertFalse(retrieved instanceof JsonEventSerializer);
+        EventSerializerFactory.register(overrideSerializer);
+
+        EventSerializer retrieved = EventSerializerFactory.getByName("json-override");
+        assertSame(overrideSerializer, retrieved);
+        EventSerializer byCode = EventSerializerFactory.getByCode((byte) 0x01);
+        assertSame(overrideSerializer, byCode);
     }
 
     @Test
     @DisplayName("Should throw exception when registering null serializer")
     void shouldThrowExceptionWhenRegisteringNullSerializer() {
         assertThrows(IllegalArgumentException.class, () ->
-                EventSerializerFactory.register((byte) 0x04, null));
+                EventSerializerFactory.register(null));
     }
 
     @Test
-    @DisplayName("Should return registered format codes")
-    void shouldReturnRegisteredFormatCodes() {
-        var formatCodes = EventSerializerFactory.getRegisteredFormatCodes();
+    @DisplayName("Should return registered serializer names")
+    void shouldReturnRegisteredSerializerNames() {
+        var names = EventSerializerFactory.getRegisteredNames();
 
-        assertNotNull(formatCodes);
-        assertTrue(formatCodes.contains((byte) 0x01)); // JSON
-        assertTrue(formatCodes.contains((byte) 0x02)); // MessagePack
-        assertEquals(2, formatCodes.size());
+        assertNotNull(names);
+        assertTrue(names.contains("json"));
+        assertTrue(names.contains("msgpack"));
+        assertEquals(2, names.size());
     }
 
     @Test
-    @DisplayName("Should return unmodifiable set of format codes")
-    void shouldReturnUnmodifiableSetOfFormatCodes() {
-        var formatCodes = EventSerializerFactory.getRegisteredFormatCodes();
+    @DisplayName("Should return unmodifiable set of registered names")
+    void shouldReturnUnmodifiableSetOfRegisteredNames() {
+        var names = EventSerializerFactory.getRegisteredNames();
 
         assertThrows(UnsupportedOperationException.class, () ->
-                formatCodes.add((byte) 0x05));
+                names.add("custom"));
     }
 
     @Test
-    @DisplayName("Should include custom serializer in registered format codes")
-    void shouldIncludeCustomSerializerInRegisteredFormatCodes() {
-        EventSerializerFactory.register((byte) 0x03, new CustomEventSerializer());
+    @DisplayName("Should include custom serializer in registered names")
+    void shouldIncludeCustomSerializerInRegisteredNames() {
+        EventSerializerFactory.register(new CustomEventSerializer());
 
-        var formatCodes = EventSerializerFactory.getRegisteredFormatCodes();
+        var names = EventSerializerFactory.getRegisteredNames();
 
-        assertTrue(formatCodes.contains((byte) 0x03));
-        assertEquals(3, formatCodes.size());
+        assertTrue(names.contains("custom"));
+        assertEquals(3, names.size());
+    }
+
+    @Test
+    @DisplayName("Should get serializer by name")
+    void shouldGetSerializerByName() {
+        EventSerializer serializer = EventSerializerFactory.getByName("json");
+
+        assertNotNull(serializer);
+        assertTrue(serializer instanceof JsonEventSerializer);
+    }
+
+    @Test
+    @DisplayName("Should throw exception for unknown serializer name")
+    void shouldThrowExceptionForUnknownSerializerName() {
+        assertThrows(EventSerializationException.class, () ->
+                EventSerializerFactory.getByName("unknown"));
     }
 
     @Test
     @DisplayName("Should clear and reset serializers to defaults")
     void shouldClearAndResetSerializersToDefaults() {
         // Register custom serializer
-        EventSerializerFactory.register((byte) 0x03, new CustomEventSerializer());
-        EventSerializerFactory.register((byte) 0x01, new CustomEventSerializer());
+        EventSerializerFactory.register(new CustomEventSerializer());
 
         // Clear and reset
         EventSerializerFactory.clear();
@@ -203,7 +231,7 @@ class EventSerializerFactoryTest {
         // Verify defaults are restored
         assertTrue(EventSerializerFactory.getJson() instanceof JsonEventSerializer);
         assertTrue(EventSerializerFactory.getMsgPack() instanceof MsgPackEventSerializer);
-        assertEquals(2, EventSerializerFactory.getRegisteredFormatCodes().size());
+        assertEquals(2, EventSerializerFactory.getRegisteredNames().size());
     }
 
     /**
@@ -221,12 +249,12 @@ class EventSerializerFactoryTest {
         }
 
         @Override
-        public byte getFormatCode() {
-            return 0;
+        public byte getCode() {
+            return 0x03;
         }
 
         @Override
-        public String getFormat() {
+        public String getName() {
             return "custom";
         }
     }

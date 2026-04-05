@@ -82,12 +82,12 @@ public class MsgPackEventSerializer implements EventSerializer {
     }
 
     @Override
-    public byte getFormatCode() {
+    public byte getCode() {
         return FORMAT_CODE;
     }
 
     @Override
-    public String getFormat() {
+    public String getName() {
         return "msgpack";
     }
 

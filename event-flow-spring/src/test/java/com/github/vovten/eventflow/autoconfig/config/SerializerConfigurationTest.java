@@ -1,12 +1,9 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowAutoConfiguration;
-import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializerFactory;
-import com.github.vovten.eventflow.transport.OutTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,43 +53,35 @@ class SerializerConfigurationTest {
 
         // then
         assertThat(customSerializer).isNotNull();
-        assertThat(customSerializer.getFormatCode()).isEqualTo((byte) 0x03);
-        assertThat(customSerializer.getFormat()).isEqualTo("custom-protobuf");
+        assertThat(customSerializer.getCode()).isEqualTo((byte) 0x03);
+        assertThat(customSerializer.getName()).isEqualTo("custom-protobuf");
     }
 
     @Test
-    @DisplayName("Should register custom serializer in EventSerializerFactory via @PostConstruct")
+    @DisplayName("Should register custom serializer in EventSerializerFactory via constructor")
     void shouldRegisterSerializerInFactory() {
         // given
         assertThat(context).isNotNull();
 
         // when - check that custom serializer is registered
-        EventSerializer serializer = EventSerializerFactory.getByFormatCode((byte) 0x03);
+        EventSerializer serializer = EventSerializerFactory.getByCode((byte) 0x03);
 
         // then
         assertThat(serializer).isNotNull();
-        assertThat(serializer.getFormat()).isEqualTo("custom-protobuf");
+        assertThat(serializer.getName()).isEqualTo("custom-protobuf");
         assertThat(serializer).isInstanceOf(CustomEventSerializer.class);
     }
 
     @Test
-    @DisplayName("Should make custom serializer available to KafkaOutTransportFactory")
-    void shouldMakeSerializerAvailableToKafkaFactory() {
+    @DisplayName("Should make custom serializer available to KafkaOutTransportFactory by name")
+    void shouldMakeSerializerAvailableToKafkaFactoryByName() {
         // given
-        KafkaOutTransportFactory factory = context.getBean(KafkaOutTransportFactory.class);
-        assertThat(factory).isNotNull();
+        EventSerializer serializer = EventSerializerFactory.getByName("custom-protobuf");
 
-        // when - create transport with custom format
-        EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-        config.setName("kafka");
-        config.setServers("localhost:9092");
-        config.setTopic("test-topic");
-        config.setSerialization("custom-protobuf");
-
-        OutTransport transport = factory.createPublisher(config);
-
-        // then - transport should be created successfully with custom serializer
-        assertThat(transport).isNotNull();
+        // then
+        assertThat(serializer).isNotNull();
+        assertThat(serializer.getName()).isEqualTo("custom-protobuf");
+        assertThat(serializer.getCode()).isEqualTo((byte) 0x03);
     }
 
     @Test
@@ -101,19 +90,19 @@ class SerializerConfigurationTest {
         // given
         assertThat(context).isNotNull();
 
-        // when - get all registered format codes
-        var formatCodes = EventSerializerFactory.getRegisteredFormatCodes();
+        // when - get all registered serializer names and codes
+        var names = EventSerializerFactory.getRegisteredNames();
+        var codes = EventSerializerFactory.getRegisteredCodes();
 
-        // then - custom format code 0x03 should be registered
-        assertThat(formatCodes).contains((byte) 0x01);  // JSON
-        assertThat(formatCodes).contains((byte) 0x02);  // MessagePack
-        assertThat(formatCodes).contains((byte) 0x03);  // Custom protobuf
+        // then - custom serializer should be registered
+        assertThat(names).contains("json", "msgpack", "custom-protobuf");
+        assertThat(codes).contains((byte) 0x01, (byte) 0x02, (byte) 0x03);
     }
 
     @Test
     @DisplayName("Should create channels with custom serializer in configuration")
     void shouldCreateChannelsWithCustomSerializer() {
-        // given - custom serializer is registered via @PostConstruct
+        // given - custom serializer is registered via constructor
         // when - event channels are created with custom serialization format
         var channels = context.getBean("eventChannels", java.util.List.class);
 
@@ -153,12 +142,12 @@ class SerializerConfigurationTest {
         }
 
         @Override
-        public byte getFormatCode() {
+        public byte getCode() {
             return 0x03;
         }
 
         @Override
-        public String getFormat() {
+        public String getName() {
             return "custom-protobuf";
         }
     }

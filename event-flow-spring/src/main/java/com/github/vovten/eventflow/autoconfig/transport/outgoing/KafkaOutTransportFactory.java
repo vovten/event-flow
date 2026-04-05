@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.autoconfig.transport.outgoing;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
+import com.github.vovten.eventflow.serialization.EventSerializationException;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.OutTransport;
@@ -38,29 +39,16 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
     /**
      * Create event serializer based on format configuration.
      * <p>
-     * Uses {@link EventSerializerFactory} to look up the serializer by format name,
-     * supporting both built-in formats (json, msgpack) and custom serializers
-     * registered via Spring auto-configuration.
+     * Uses {@link EventSerializerFactory#getByName(String)} to look up the serializer
+     * by name, supporting both built-in formats (json, msgpack) and custom serializers.
      *
      * @param format serialization format name (e.g., "json", "msgpack", or custom)
      * @return appropriate EventSerializer instance
-     * @throws IllegalArgumentException if format is unknown
+     * @throws EventSerializationException if format is unknown
      */
     private EventSerializer createSerializer(String format) {
-        if (format == null || "json".equalsIgnoreCase(format)) {
-            return EventSerializerFactory.getJson();
-        } else if ("msgpack".equalsIgnoreCase(format)) {
-            return EventSerializerFactory.getMsgPack();
-        }
-
-        // Try to find custom serializer by format name
-        return EventSerializerFactory.getRegisteredFormatCodes().stream()
-                .map(EventSerializerFactory::getByFormatCode)
-                .filter(s -> s.getFormat().equalsIgnoreCase(format))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                    "Unknown serialization format: " + format
-                ));
+        String name = (format == null || format.isBlank()) ? "json" : format;
+        return EventSerializerFactory.getByName(name);
     }
 
     @Override

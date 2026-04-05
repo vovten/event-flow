@@ -12,7 +12,7 @@ import java.util.Map;
  * Auto-configuration for custom event serializers.
  * <p>
  * Automatically discovers all {@link EventSerializer} beans in the Spring context
- * and registers them in {@link EventSerializerFactory} using their format codes.
+ * and registers them in {@link EventSerializerFactory} by name and code.
  * <p>
  * <b>Usage:</b> Create a class implementing {@link EventSerializer}, annotate it
  * with {@code @Component}, and it will be automatically registered:
@@ -20,10 +20,10 @@ import java.util.Map;
  * @Component
  * public class ProtobufEventSerializer implements EventSerializer {
  *     @Override
- *     public byte getFormatCode() { return 0x03; }
+ *     public byte getCode() { return 0x03; }
  *
  *     @Override
- *     public String getFormat() { return "protobuf"; }
+ *     public String getName() { return "protobuf"; }
  *
  *     // ... serialize/deserialize implementations
  * }
@@ -71,8 +71,8 @@ public class SerializerConfiguration {
     /**
      * Registers all discovered EventSerializer beans into EventSerializerFactory.
      * <p>
-     * Each serializer is registered using its {@link EventSerializer#getFormatCode()}.
-     * If a format code is already registered, the new serializer will override it.
+     * Each serializer is registered by name and code (both indexes populated automatically).
+     * If a serializer with the same name or code already exists, it will be overridden.
      */
     private void registerSerializers() {
         if (serializers.isEmpty()) {
@@ -83,12 +83,10 @@ public class SerializerConfiguration {
         for (Map.Entry<String, EventSerializer> entry : serializers.entrySet()) {
             String beanName = entry.getKey();
             EventSerializer serializer = entry.getValue();
-            byte formatCode = serializer.getFormatCode();
-            String format = serializer.getFormat();
 
-            EventSerializerFactory.register(formatCode, serializer);
-            log.info("Registered serializer '{}' [code=0x{}, format={}]",
-                    beanName, Integer.toHexString(formatCode & 0xFF), format);
+            EventSerializerFactory.register(serializer);
+            log.info("Registered serializer '{}' [code=0x{}, name={}]",
+                    beanName, Integer.toHexString(serializer.getCode() & 0xFF), serializer.getName());
         }
     }
 }

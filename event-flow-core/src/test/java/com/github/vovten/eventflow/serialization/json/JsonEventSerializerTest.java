@@ -81,15 +81,15 @@ class JsonEventSerializerTest {
     }
 
     @Test
-    @DisplayName("Should return json format code")
-    void shouldReturnJsonFormatCode() {
-        assertEquals(0x01, serializer.getFormatCode());
+    @DisplayName("Should return json code")
+    void shouldReturnJsonCode() {
+        assertEquals(0x01, serializer.getCode());
     }
 
     @Test
-    @DisplayName("Should return json format name")
-    void shouldReturnJsonFormatName() {
-        assertEquals("json", serializer.getFormat());
+    @DisplayName("Should return json name")
+    void shouldReturnJsonName() {
+        assertEquals("json", serializer.getName());
     }
 
     @Test
