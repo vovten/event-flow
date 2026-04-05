@@ -6,6 +6,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Configuration properties for Event Flow auto-configuration.
@@ -26,6 +32,11 @@ import java.util.List;
  *       max-attempts: 3
  *       initial-delay: 100ms
  *       multiplier: 2.0
+ *     async:
+ *       enabled: true
+ *       core-size: 2
+ *       max-size: 8
+ *       queue-capacity: 256
  *     channels:
  *       - name: internal
  *         transports:
@@ -93,6 +104,7 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private boolean silent = false;
         private RetryConfig retry = new RetryConfig();
+        private AsyncConfig async = new AsyncConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
     }
 
@@ -105,6 +117,55 @@ public class EventFlowProperties {
         private int maxAttempts = 3;
         private Duration initialDelay = Duration.ofMillis(100);
         private double multiplier = 2.0;
+    }
+
+    /**
+     * Async publishing configuration.
+     */
+    @Data
+    public static class AsyncConfig {
+        private boolean enabled = false;
+        private int coreSize = 2;
+        private int maxSize = 10;
+        private int queueCapacity = 1000;
+        private int keepAliveSeconds = 60;
+        private String threadNamePrefix = "event-flow-async-publisher";
+
+        /**
+         * Create an Executor based on this configuration.
+         *
+         * @return configured executor
+         */
+        public Executor createExecutor() {
+            return new ThreadPoolExecutor(
+                    coreSize,
+                    maxSize,
+                    keepAliveSeconds,
+                    TimeUnit.SECONDS,
+                    new LinkedBlockingQueue<>(queueCapacity),
+                    new EventFlowThreadFactory(threadNamePrefix),
+                    new ThreadPoolExecutor.CallerRunsPolicy()
+            );
+        }
+    }
+
+    /**
+     * Thread factory for event-flow async executors.
+     */
+    private static class EventFlowThreadFactory implements ThreadFactory {
+        private final String namePrefix;
+        private final AtomicInteger threadNumber = new AtomicInteger(1);
+
+        EventFlowThreadFactory(String namePrefix) {
+            this.namePrefix = namePrefix;
+        }
+
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, namePrefix + threadNumber.getAndIncrement());
+            t.setDaemon(false);
+            return t;
+        }
     }
 
     /**
