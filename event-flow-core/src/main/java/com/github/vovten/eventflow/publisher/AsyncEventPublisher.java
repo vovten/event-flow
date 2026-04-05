@@ -110,7 +110,6 @@ public class AsyncEventPublisher implements EventPublisher {
         String eventTypeName = event.type().getSimpleName();
         executor.execute(() -> {
             try {
-                log.debug("Async publishing event: {}", eventTypeName);
                 origin.publish(event);
                 log.debug("Async event {} published successfully", eventTypeName);
             } catch (Exception e) {

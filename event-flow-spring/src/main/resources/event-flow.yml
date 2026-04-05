@@ -42,9 +42,26 @@ event-flow:
       initial-delay: 100ms
       # Backoff multiplier for exponential backoff
       multiplier: 2.0
-      # Enable silent mode (catch and log all exceptions without rethrowing)
-      # When true, the publisher will never throw exceptions
-      silent: false
+
+    # Async publishing configuration
+    # Publish events asynchronously using a dedicated thread pool
+    async:
+      # Enable or disable async publishing
+      enabled: false
+      # Core pool size (minimum number of threads)
+      core-size: 2
+      # Maximum pool size (maximum number of threads)
+      max-size: 10
+      # Task queue capacity (max events waiting to be published)
+      queue-capacity: 1000
+      # Keep-alive time for idle threads in seconds
+      keep-alive-seconds: 60
+      # Thread name prefix for async publisher threads
+      thread-name-prefix: "event-flow-async-publisher"
+
+    # Enable silent mode (catch and log all exceptions without rethrowing)
+    # When true, the publisher will never throw exceptions
+    silent: false
 
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
@@ -267,5 +284,46 @@ event-flow:
 #         servers: kafka:9092
 #         consumerGroup: group-binary
 #     # Note: Dispatcher auto-detects serialization format from message
+#
+# Example 7: Async publisher for non-blocking event publishing
+# ---------------------------------------------------------------------------
+# event-flow:
+#   enabled: true
+#   scan-packages: com.example
+#   publisher:
+#     enabled: true
+#     transactional: true
+#     retry:
+#       enabled: true
+#       max-attempts: 3
+#       initial-delay: 100ms
+#       multiplier: 2.0
+#     async:
+#       enabled: true
+#       core-size: 4
+#       max-size: 16
+#       queue-capacity: 512
+#     channels:
+#       - name: internal
+#         transports:
+#           - name: local-queue
+#             capacity: 1000
+#       - name: analytics
+#         transports:
+#           - name: kafka
+#             topic: analytics-events
+#             servers: kafka:9092
+#             serialization: json
+#   dispatcher:
+#     enabled: true
+#     transports:
+#       - name: local-queue
+#         capacity: 1000
+#
+# Note: With async enabled, the publish() method returns immediately and
+# events are processed in the background. The decorator order is:
+#   ChannelEventPublisher → Retry → Silent → Async → Transactional
+# Use async for non-critical events (analytics, metrics, notifications)
+# where the caller should not block waiting for network I/O.
 #
 # =============================================================================
