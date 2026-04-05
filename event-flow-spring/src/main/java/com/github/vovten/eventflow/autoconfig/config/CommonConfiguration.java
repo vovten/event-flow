@@ -16,6 +16,7 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Auto-configuration for common components: executor service and local-queue transports.
@@ -44,7 +45,7 @@ public class CommonConfiguration {
     @Bean("dispatcherExecutor")
     public ExecutorService dispatcherExecutor() {
         var tp = properties.getDispatcher().getThreadPool();
-        var msg = "Creating dispatcher executor: core={}, max={}, queue={}";
+        var msg = "Creating dispatcher executor: core={}, max={}, queue={}, rejection-policy=caller-runs";
         log.info(msg, tp.getCoreSize(), tp.getMaxSize(), tp.getQueueCapacity());
 
         var taskExecutor = new ThreadPoolTaskExecutor();
@@ -53,6 +54,7 @@ public class CommonConfiguration {
         taskExecutor.setQueueCapacity(tp.getQueueCapacity());
         taskExecutor.setKeepAliveSeconds(tp.getKeepAliveSeconds());
         taskExecutor.setThreadNamePrefix("event-flow-dispatcher-");
+        taskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         taskExecutor.initialize();
 
         return taskExecutor.getThreadPoolExecutor();

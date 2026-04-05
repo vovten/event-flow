@@ -27,7 +27,13 @@ import static java.util.stream.Collectors.joining;
  *   <li>Thread-safe event delivery to handlers</li>
  *   <li>External handler registry injection</li>
  *   <li>Support for decorator pattern via external dispatch consumer injection</li>
+ *   <li>Backpressure support via CallerRunsPolicy on executor (slows down transport consumers)</li>
  * </ul>
+ * <p>
+ * <b>Backpressure behavior:</b>
+ * When the executor thread pool is saturated, the CallerRunsPolicy causes the transport
+ * consumer thread to execute the handler directly. This naturally slows down event polling
+ * from transports, providing backpressure without event loss.
  * <p>
  * <b>Architecture:</b>
  * <pre>{@code
@@ -115,8 +121,25 @@ public class UnifiedEventDispatcher implements EventDispatcher {
             log.debug("No handlers found for event: {}", event);
             return;
         }
+        int totalHandlers = handlers.size();
+        int submittedHandlers = 0;
+        
         for (EventHandler handler : handlers) {
-            executorService.execute(() -> handler.onEvent(event));
+            try {
+                executorService.execute(() -> handler.onEvent(event));
+                submittedHandlers++;
+            } catch (Exception e) {
+                log.error("Failed to submit handler for event {} (handler {}/{}): {}",
+                        event.type().getSimpleName(), 
+                        submittedHandlers + 1, 
+                        totalHandlers,
+                        handler.getClass().getSimpleName(), 
+                        e);
+            }
+        }
+        if (submittedHandlers < totalHandlers) {
+            log.warn("Partial handler submission for event {}: {}/{} handlers submitted", 
+                    event.type().getSimpleName(), submittedHandlers, totalHandlers);
         }
     }
 
