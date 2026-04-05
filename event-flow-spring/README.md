@@ -17,7 +17,7 @@
 ```yaml
 event-flow:
   enabled: true
-  scan-packages: com.example.listener
+  dispatcher.listener-packages: com.example.listener
   publisher:
     enabled: true
     channels:
@@ -75,7 +75,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `event-flow.enabled` | `false` | Enable/disable all auto-configuration |
-| `event-flow.scan-packages` | `""` | **Required!** Packages to scan for listeners |
+| `event-flow.dispatcher.listener-packages` | `""` | **Required!** Packages to scan for listeners |
 | `event-flow.publisher.enabled` | `false` | Enable/disable publisher |
 | `event-flow.dispatcher.enabled` | `false` | Enable/disable dispatcher |
 | `event-flow.publisher.transactional` | `true` | Defer publishing until after transaction commit |
@@ -87,6 +87,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 | `event-flow.dispatcher.thread-pool.core-size` | `4` | Thread pool core size |
 | `event-flow.dispatcher.thread-pool.max-size` | `16` | Thread pool max size |
 | `event-flow.dispatcher.thread-pool.queue-capacity` | `100` | Event queue capacity |
+| `event-flow.dispatcher.deserialization.allowed-event-packages` | `["com.github.vovten.eventflow"]` | Allowed packages for secure deserialization |
 
 ---
 
@@ -97,7 +98,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 ```yaml
 event-flow:
   enabled: true
-  scan-packages: com.example
+  dispatcher.listener-packages: com.example
   publisher:
     enabled: true
     channels:
@@ -118,7 +119,7 @@ event-flow:
 
 ```yaml
 event-flow:
-  scan-packages: com.example.listener
+  dispatcher.listener-packages: com.example.listener
   publisher:
     enabled: true
     transactional: true
@@ -155,7 +156,7 @@ event-flow:
 
 ```yaml
 event-flow:
-  scan-packages: com.example
+  dispatcher.listener-packages: com.example
   publisher:
     enabled: true
     channels:

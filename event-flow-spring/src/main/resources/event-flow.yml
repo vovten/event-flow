@@ -16,11 +16,6 @@ event-flow:
   # Set to true to enable auto-configuration (disabled by default)
   enabled: false
 
-  # Package(s) to scan for @EventListener annotated beans
-  # Multiple packages can be specified as comma-separated values
-  # Example: "com.example.listener,com.example.handler"
-  scan-packages: ""
-
   # ---------------------------------------------------------------------------
   # Event Publisher Configuration
   # ---------------------------------------------------------------------------
@@ -92,6 +87,19 @@ event-flow:
     # Enable or disable dispatcher auto-configuration
     enabled: false
 
+    # Package(s) to scan for @EventListener annotated beans
+    # Multiple packages can be specified as comma-separated values
+    # Example: "com.example.listener,com.example.handler"
+    listener-packages: ""
+
+    # Deserialization security configuration
+    deserialization:
+      # List of allowed event packages for secure deserialization
+      # Events from these packages can be safely deserialized
+      # Default: com.github.vovten.eventflow
+      allowed-event-packages:
+        - com.github.vovten.eventflow
+
     # Thread pool configuration for async event delivery
     thread-pool:
       # Core pool size (minimum number of threads)
@@ -136,7 +144,7 @@ event-flow:
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: true
-#   scan-packages: com.example
+#   dispatcher.listener-packages: com.example
 #   publisher:
 #     enabled: true
 #     channels:
@@ -154,7 +162,7 @@ event-flow:
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: true
-#   scan-packages: com.example.listener
+#   dispatcher.listener-packages: com.example.listener
 #   publisher:
 #     enabled: true
 #     transactional: true
@@ -192,7 +200,7 @@ event-flow:
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: true
-#   scan-packages: com.example
+#   dispatcher.listener-packages: com.example
 #   publisher:
 #     enabled: true
 #     transactional: false
@@ -214,7 +222,7 @@ event-flow:
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: true
-#   scan-packages: com.example
+#   dispatcher.listener-packages: com.example
 #   publisher:
 #     enabled: true
 #     channels:
@@ -252,7 +260,7 @@ event-flow:
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: true
-#   scan-packages: com.example
+#   dispatcher.listener-packages: com.example
 #   publisher:
 #     enabled: true
 #     channels:
@@ -289,7 +297,7 @@ event-flow:
 # ---------------------------------------------------------------------------
 # event-flow:
 #   enabled: true
-#   scan-packages: com.example
+#   dispatcher.listener-packages: com.example
 #   publisher:
 #     enabled: true
 #     transactional: true

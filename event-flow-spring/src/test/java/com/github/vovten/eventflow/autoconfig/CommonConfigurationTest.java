@@ -35,7 +35,7 @@ class CommonConfigurationTest {
             properties.getDispatcher().getThreadPool().setKeepAliveSeconds(30);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -57,7 +57,7 @@ class CommonConfigurationTest {
 
             EventFlowProperties properties = new EventFlowProperties();
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -83,7 +83,7 @@ class CommonConfigurationTest {
             properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -105,7 +105,7 @@ class CommonConfigurationTest {
             properties.setEnabled(false);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -126,7 +126,7 @@ class CommonConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -168,7 +168,7 @@ class CommonConfigurationTest {
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CustomQueueProviderConfig.class);
             context.register(CommonConfiguration.class);
             context.refresh();

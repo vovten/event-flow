@@ -81,11 +81,6 @@ public class EventFlowProperties {
     private boolean enabled = false;
 
     /**
-     * Package(s) to scan for @EventListener annotated beans.
-     */
-    private String scanPackages = "";
-
-    /**
      * Publisher configuration.
      */
     private PublisherConfig publisher = new PublisherConfig();
@@ -187,9 +182,14 @@ public class EventFlowProperties {
     @Data
     public static class DispatcherConfig {
         private boolean enabled = false;
+        /**
+         * Package(s) to scan for @EventListener annotated beans.
+         */
+        private String listenerPackages = "";
         private ThreadPoolConfig threadPool = new ThreadPoolConfig();
         private List<TransportConfig> transports = new ArrayList<>();
         private IdempotentConfig idempotent = new IdempotentConfig();
+        private DeserializationConfig deserialization = new DeserializationConfig();
     }
 
     /**
@@ -230,5 +230,18 @@ public class EventFlowProperties {
          * Supported values: "json" (default), "msgpack"
          */
         private String serialization = "json";
+    }
+
+    /**
+     * Deserialization configuration for event security.
+     */
+    @Data
+    public static class DeserializationConfig {
+        /**
+         * List of allowed event packages for deserialization.
+         * Events from these packages can be safely deserialized.
+         * Default: com.github.vovten.eventflow
+         */
+        private List<String> allowedEventPackages = new ArrayList<>(List.of("com.github.vovten.eventflow"));
     }
 }

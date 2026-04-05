@@ -1,7 +1,9 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
+import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializerFactory;
+import com.github.vovten.eventflow.serialization.EventTypeRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,10 +11,13 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Map;
 
 /**
- * Auto-configuration for custom event serializers.
+ * Auto-configuration for custom event serializers and type security.
  * <p>
  * Automatically discovers all {@link EventSerializer} beans in the Spring context
  * and registers them in {@link EventSerializerFactory} by name and code.
+ * <p>
+ * Also registers allowed event packages in {@link EventTypeRegistry} for secure
+ * deserialization.
  * <p>
  * <b>Usage:</b> Create a class implementing {@link EventSerializer}, annotate it
  * with {@code @Component}, and it will be automatically registered:
@@ -36,12 +41,14 @@ import java.util.Map;
  * @since 2026-04-03
  * @see EventSerializer
  * @see EventSerializerFactory
+ * @see EventTypeRegistry
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 public class SerializerConfiguration {
 
     private final Map<String, EventSerializer> serializers;
+    private final EventFlowProperties properties;
 
     /**
      * Constructs SerializerConfiguration and immediately registers all discovered
@@ -51,10 +58,13 @@ public class SerializerConfiguration {
      * before any transport factory creates transports that depend on them.
      *
      * @param serializers map of EventSerializer beans discovered by Spring
+     * @param properties event flow configuration properties
      */
-    public SerializerConfiguration(Map<String, EventSerializer> serializers) {
+    public SerializerConfiguration(Map<String, EventSerializer> serializers, EventFlowProperties properties) {
         this.serializers = serializers;
+        this.properties = properties;
         registerSerializers();
+        registerAllowedEventPackages();
     }
 
     /**
@@ -87,6 +97,30 @@ public class SerializerConfiguration {
             EventSerializerFactory.register(serializer);
             log.info("Registered serializer '{}' [code=0x{}, name={}]",
                     beanName, Integer.toHexString(serializer.getCode() & 0xFF), serializer.getName());
+        }
+    }
+
+    /**
+     * Registers allowed event packages in EventTypeRegistry for secure deserialization.
+     * <p>
+     * Packages are taken from {@code event-flow.dispatcher.deserialization.allowed-event-packages}.
+     * If not explicitly configured, defaults to {@code com.github.vovten.eventflow}.
+     */
+    private void registerAllowedEventPackages() {
+        var allowedPackages = properties.getDispatcher()
+                .getDeserialization()
+                .getAllowedEventPackages();
+
+        if (allowedPackages == null || allowedPackages.isEmpty()) {
+            log.warn("No allowed event packages configured. Using default: com.github.vovten.eventflow");
+            EventTypeRegistry.allowPackage("com.github.vovten.eventflow");
+            return;
+        }
+
+        log.info("Registering {} allowed event package(s) for secure deserialization", allowedPackages.size());
+        for (String packageName : allowedPackages) {
+            EventTypeRegistry.allowPackage(packageName);
+            log.info("Registered allowed event package: {}", packageName);
         }
     }
 }

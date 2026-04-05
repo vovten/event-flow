@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.serialization.EventPolymorphicTypeValidator;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializationException;
 
@@ -21,6 +22,9 @@ import java.util.Arrays;
  * Format: [0x02][MessagePack bytes]
  * <p>
  * Uses ISO-8601 string format for Instants to preserve nanosecond precision.
+ * <p>
+ * Uses {@link EventPolymorphicTypeValidator} to prevent deserialization attacks
+ * by validating class names against a whitelist of allowed packages/classes.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-30
@@ -34,8 +38,9 @@ public class MsgPackEventSerializer implements EventSerializer {
     public MsgPackEventSerializer() {
         this.mapper = new ObjectMapper(new MessagePackFactory())
                 .registerModule(new JavaTimeModule()
-                        .addSerializer(new InstantAsStringSerializer())
-                );
+                        .addSerializer(new InstantAsStringSerializer()))
+                .setPolymorphicTypeValidator(new EventPolymorphicTypeValidator())
+                .deactivateDefaultTyping();
     }
 
     @Override

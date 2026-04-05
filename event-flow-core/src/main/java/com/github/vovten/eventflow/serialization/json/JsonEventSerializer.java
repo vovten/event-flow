@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.serialization.EventPolymorphicTypeValidator;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializationException;
 
@@ -25,6 +26,9 @@ import java.util.Arrays;
  * <p>
  * Supports backward compatibility: can deserialize old JSON format without magic byte
  * (detects by first byte = 0x7B = '{').
+ * <p>
+ * Uses {@link EventPolymorphicTypeValidator} to prevent deserialization attacks
+ * by validating class names against a whitelist of allowed packages/classes.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-30
@@ -42,7 +46,9 @@ public class JsonEventSerializer implements EventSerializer {
                 .registerModule(new JavaTimeModule())
                 .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+                .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+                .setPolymorphicTypeValidator(new EventPolymorphicTypeValidator())
+                .deactivateDefaultTyping();
     }
 
     @Override

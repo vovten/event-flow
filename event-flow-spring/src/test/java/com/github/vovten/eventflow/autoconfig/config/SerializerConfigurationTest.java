@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 )
 @TestPropertySource(properties = {
     "event-flow.enabled=true",
-    "event-flow.scan-packages=com.github.vovten.eventflow",
+    "event-flow.dispatcher.listener-packages=com.github.vovten.eventflow",
     "event-flow.publisher.enabled=true",
     "event-flow.publisher.channels[0].name=test-channel",
     "event-flow.publisher.channels[0].transports[0].name=kafka",

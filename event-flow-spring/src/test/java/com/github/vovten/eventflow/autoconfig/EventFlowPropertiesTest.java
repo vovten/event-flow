@@ -30,7 +30,7 @@ class EventFlowPropertiesTest {
 
         // then
         assertThat(eventFlowProperties.isEnabled()).isFalse();
-        assertThat(eventFlowProperties.getScanPackages()).isEmpty();
+        assertThat(eventFlowProperties.getDispatcher().getListenerPackages()).isEmpty();
         assertThat(eventFlowProperties.getPublisher().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getPublisher().isTransactional()).isTrue();
         assertThat(eventFlowProperties.getPublisher().isSilent()).isFalse();
@@ -175,11 +175,11 @@ class EventFlowPropertiesTest {
     }
 
     @Test
-    @DisplayName("Should bind scan-packages property")
-    void shouldBindScanPackagesProperty() {
+    @DisplayName("Should bind listener-packages property")
+    void shouldBindListenerPackagesProperty() {
         // given
         Map<String, String> properties = Map.of(
-                "event-flow.scan-packages", "com.example.listener"
+                "event-flow.dispatcher.listener-packages", "com.example.listener"
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
         Binder binder = new Binder(source);
@@ -189,7 +189,7 @@ class EventFlowPropertiesTest {
                 .orElseGet(EventFlowProperties::new);
 
         // then
-        assertThat(eventFlowProperties.getScanPackages()).isEqualTo("com.example.listener");
+        assertThat(eventFlowProperties.getDispatcher().getListenerPackages()).isEqualTo("com.example.listener");
     }
 
     @Test
@@ -216,7 +216,7 @@ class EventFlowPropertiesTest {
         // given
         Map<String, String> properties = Map.ofEntries(
                 Map.entry("event-flow.enabled", "true"),
-                Map.entry("event-flow.scan-packages", "com.example.listener"),
+                Map.entry("event-flow.dispatcher.listener-packages", "com.example.listener"),
                 Map.entry("event-flow.publisher.enabled", "true"),
                 Map.entry("event-flow.publisher.transactional", "true"),
                 Map.entry("event-flow.publisher.silent", "false"),
@@ -239,7 +239,7 @@ class EventFlowPropertiesTest {
 
         // then
         assertThat(eventFlowProperties.isEnabled()).isTrue();
-        assertThat(eventFlowProperties.getScanPackages()).isEqualTo("com.example.listener");
+        assertThat(eventFlowProperties.getDispatcher().getListenerPackages()).isEqualTo("com.example.listener");
         assertThat(eventFlowProperties.getPublisher().isEnabled()).isTrue();
         assertThat(eventFlowProperties.getPublisher().isTransactional()).isTrue();
         assertThat(eventFlowProperties.getPublisher().isSilent()).isFalse();

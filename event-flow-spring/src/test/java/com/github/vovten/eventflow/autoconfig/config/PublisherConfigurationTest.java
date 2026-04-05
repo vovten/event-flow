@@ -40,7 +40,7 @@ class PublisherConfigurationTest {
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
                     () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -74,7 +74,7 @@ class PublisherConfigurationTest {
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
                     () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -108,7 +108,7 @@ class PublisherConfigurationTest {
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
                     () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -150,7 +150,7 @@ class PublisherConfigurationTest {
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
                     () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
@@ -184,7 +184,7 @@ class PublisherConfigurationTest {
             context.register(CustomPublisherConfig.class);
             context.registerBean("testOutgoingTransportFactory", LocalQueueOutTransportFactory.class,
                     () -> new LocalQueueOutTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
-            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of()));
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(ChannelConfiguration.class);
             context.register(PublisherConfiguration.class);
             context.refresh();
