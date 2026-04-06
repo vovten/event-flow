@@ -25,9 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * Custom serializers can be registered using {@link #register(EventSerializer)}.
  * The name and code are taken automatically from the serializer itself.
- * <p>
- * This is an instance-based registry (not static), designed for dependency injection
- * and multi-context deployments.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-30
@@ -62,9 +59,6 @@ public class EventSerializerFactory {
 
     /**
      * Register a custom serializer.
-     * <p>
-     * The serializer's {@link EventSerializer#getName()} and {@link EventSerializer#getCode()}
-     * are used to populate both name and code indexes automatically.
      * <p>
      * <b>Examples:</b>
      * <pre>{@code

@@ -65,7 +65,8 @@ public class KafkaInTransport implements InTransport {
      * @param groupId          consumer group ID
      */
     public KafkaInTransport(String bootstrapServers, String topicsConfig, String groupId) {
-        this(createConsumer(bootstrapServers, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor(), new EventSerializerFactory());
+        this(createConsumer(bootstrapServers, groupId), parseTopics(topicsConfig),
+                Executors.newSingleThreadExecutor(), new EventSerializerFactory());
     }
 
     /**
@@ -77,7 +78,8 @@ public class KafkaInTransport implements InTransport {
      * @param groupId      consumer group ID
      */
     public KafkaInTransport(Properties properties, String topicsConfig, String groupId) {
-        this(createConsumer(properties, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor(), new EventSerializerFactory());
+        this(createConsumer(properties, groupId), parseTopics(topicsConfig),
+                Executors.newSingleThreadExecutor(), new EventSerializerFactory());
     }
 
     /**
