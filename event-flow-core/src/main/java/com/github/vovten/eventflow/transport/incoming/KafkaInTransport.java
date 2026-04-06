@@ -74,8 +74,21 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
      * @param groupId          consumer group ID
      */
     public KafkaInTransport(String bootstrapServers, String topicsConfig, String groupId) {
+        this(bootstrapServers, topicsConfig, groupId, new EventSerializerFactory());
+    }
+
+    /**
+     * Create Kafka transport with bootstrap servers, topics, group ID, and custom serializer factory.
+     *
+     * @param bootstrapServers  Kafka bootstrap servers (e.g., "localhost:9092")
+     * @param topicsConfig      comma-separated list of topics to subscribe to
+     * @param groupId           consumer group ID
+     * @param serializerFactory serializer factory for event deserialization
+     */
+    public KafkaInTransport(String bootstrapServers, String topicsConfig, String groupId,
+                            EventSerializerFactory serializerFactory) {
         this(createConsumer(bootstrapServers, groupId), parseTopics(topicsConfig),
-                Executors.newSingleThreadExecutor(), new EventSerializerFactory());
+                Executors.newSingleThreadExecutor(), serializerFactory);
     }
 
     /**
@@ -87,8 +100,21 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
      * @param groupId      consumer group ID
      */
     public KafkaInTransport(Properties properties, String topicsConfig, String groupId) {
+        this(properties, topicsConfig, groupId, new EventSerializerFactory());
+    }
+
+    /**
+     * Create Kafka transport with custom properties, topics, group ID, and serializer factory.
+     *
+     * @param properties        Kafka consumer properties
+     * @param topicsConfig      comma-separated list of topics to subscribe to
+     * @param groupId           consumer group ID
+     * @param serializerFactory serializer factory for event deserialization
+     */
+    public KafkaInTransport(Properties properties, String topicsConfig, String groupId,
+                            EventSerializerFactory serializerFactory) {
         this(createConsumer(properties, groupId), parseTopics(topicsConfig),
-                Executors.newSingleThreadExecutor(), new EventSerializerFactory());
+                Executors.newSingleThreadExecutor(), serializerFactory);
     }
 
     /**
