@@ -45,15 +45,15 @@ class MsgPackEventSerializerTest {
     }
 
     @Test
-    @DisplayName("Should return msgpack format code")
-    void shouldReturnMsgpackFormatCode() {
-        assertEquals(0x02, serializer.getFormatCode());
+    @DisplayName("Should return msgpack code")
+    void shouldReturnMsgpackCode() {
+        assertEquals(0x02, serializer.getCode());
     }
 
     @Test
-    @DisplayName("Should return msgpack format name")
-    void shouldReturnMsgpackFormatName() {
-        assertEquals("msgpack", serializer.getFormat());
+    @DisplayName("Should return msgpack name")
+    void shouldReturnMsgpackName() {
+        assertEquals("msgpack", serializer.getName());
     }
 
     @Test

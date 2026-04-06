@@ -2,9 +2,9 @@ package com.github.vovten.eventflow.autoconfig.transport.outgoing;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
+import com.github.vovten.eventflow.serialization.EventSerializationException;
 import com.github.vovten.eventflow.serialization.EventSerializer;
-import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
-import com.github.vovten.eventflow.serialization.msgpack.MsgPackEventSerializer;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 
@@ -38,20 +38,17 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
 
     /**
      * Create event serializer based on format configuration.
+     * <p>
+     * Uses {@link EventSerializerFactory#getByName(String)} to look up the serializer
+     * by name, supporting both built-in formats (json, msgpack) and custom serializers.
      *
-     * @param format serialization format ("json" or "msgpack")
+     * @param format serialization format name (e.g., "json", "msgpack", or custom)
      * @return appropriate EventSerializer instance
-     * @throws IllegalArgumentException if format is unknown
+     * @throws EventSerializationException if format is unknown
      */
     private EventSerializer createSerializer(String format) {
-        if (format == null || "json".equalsIgnoreCase(format)) {
-            return new JsonEventSerializer();
-        } else if ("msgpack".equalsIgnoreCase(format)) {
-            return new MsgPackEventSerializer();
-        } else {
-            throw new IllegalArgumentException(
-                "Unknown serialization format: " + format + ". Supported values: json, msgpack");
-        }
+        String name = (format == null || format.isBlank()) ? "json" : format;
+        return EventSerializerFactory.getByName(name);
     }
 
     @Override

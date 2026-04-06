@@ -4,6 +4,7 @@ import com.github.vovten.eventflow.channel.EventChannel;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.concurrent.Executor;
 
 /**
  * Spring-aware fluent builder for creating configured {@link EventPublisher} instances.
@@ -33,6 +34,12 @@ import java.util.List;
  *     .retryable()
  *     .silent()
  *     .build();
+ *
+ * // Async transactional publisher for non-blocking fire-and-forget
+ * EventPublisher publisher = SpringEventPublisherBuilder.create(channels)
+ *     .transactional()
+ *     .async(Executors.newCachedThreadPool())
+ *     .build();
  * }</pre>
  * <p>
  * <b>Order of decorators:</b>
@@ -41,8 +48,9 @@ import java.util.List;
  *   <li>Base {@link ChannelEventPublisher}</li>
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
- *   <li>{@link TransactionalEventPublisher} (if enabled)</li>
- *   <li>{@link SilentEventPublisher} (if enabled) — always outermost</li>
+ *   <li>{@link SilentEventPublisher} (if enabled)</li>
+ *   <li>{@link AsyncEventPublisher} (if enabled)</li>
+ *   <li>{@link TransactionalEventPublisher} (if enabled) — always outermost</li>
  * </ol>
  *
  * @author Vladimir Aleshkov
@@ -117,6 +125,23 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
         return this;
     }
 
+    /**
+     * Enable async publishing with the given executor.
+     * Events will be published asynchronously using the provided executor,
+     * so the {@code publish()} method returns immediately.
+     * <p>
+     * The caller is responsible for managing the executor lifecycle
+     * (e.g., shutting it down when no longer needed).
+     *
+     * @param executor the executor to use for async publishing
+     * @return this builder
+     */
+    @Override
+    public SpringEventPublisherBuilder async(Executor executor) {
+        super.async(executor);
+        return this;
+    }
+
     @Override
     protected EventPublisher decorate(EventPublisher publisher) {
         if (transactional) {
@@ -134,11 +159,12 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     @Override
     public EventPublisher buildAndLog() {
         EventPublisher publisher = build();
-        log.info("Built SpringEventPublisher with configuration: channels={}, transactional={}, retry={}, silent={}",
+        log.info("Built SpringEventPublisher with configuration: channels={}, transactional={}, retry={}, silent={}, async={}",
                 getChannelsSize(),
                 transactional,
                 getRetryConfig() != null ? "enabled" : "disabled",
-                isSilent()
+                isSilent() ? "enabled" : "disabled",
+                isAsync() ? "enabled" : "disabled"
         );
         return publisher;
     }

@@ -3,15 +3,14 @@ package com.github.vovten.eventflow.registry;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.EventListener;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Registry that discovers and manages event listeners based on the {@code @EventListener} annotation.
@@ -81,17 +80,21 @@ import java.util.Map;
 public class EventListenerRegistry implements EventHandlerRegistry {
 
     /**
-     * Map of event types to listener-method pairs.
+     * Map of event types to event handlers.
      * Key: Event class
-     * Value: List of (listener object, method) pairs
+     * Value: List of EventHandler instances
+     * <p>
+     * Thread-safe: uses ConcurrentHashMap + CopyOnWriteArrayList for read-heavy workload.
+     * EventHandler wrappers are created once during registration and reused.
      */
-    private final Map<Class<? extends Event>, List<Pair<Object, Method>>> eventListeners;
+    private final Map<Class<? extends Event>, List<EventHandler>> eventListeners;
 
     /**
      * Creates a new annotation-based event listener registry.
+     * Thread-safe for concurrent register/unregister/dispatch operations.
      */
     public EventListenerRegistry() {
-        this.eventListeners = new HashMap<>();
+        this.eventListeners = new ConcurrentHashMap<>();
     }
 
     /**
@@ -109,14 +112,19 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     @Override
     public List<EventHandler> getHandlers(Event event) {
         List<EventHandler> listeners = new ArrayList<>();
-        List<Pair<Object, Method>> methods = eventListeners.getOrDefault(event.getClass(), List.of());
 
-        // Also add listeners for generic Event.class
-        if (eventListeners.containsKey(Event.class)) {
-            listeners.addAll(createEventListeners(eventListeners.get(Event.class)));
+        // Get handlers for generic Event.class (thread-safe snapshot from CopyOnWriteArrayList)
+        List<EventHandler> genericHandlers = eventListeners.get(Event.class);
+        if (genericHandlers != null) {
+            listeners.addAll(new ArrayList<>(genericHandlers));
         }
 
-        listeners.addAll(createEventListeners(methods));
+        // Get handlers for specific event type (thread-safe snapshot from CopyOnWriteArrayList)
+        List<EventHandler> specificHandlers = eventListeners.get(event.getClass());
+        if (specificHandlers != null) {
+            listeners.addAll(new ArrayList<>(specificHandlers));
+        }
+
         return listeners;
     }
 
@@ -154,10 +162,24 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     @Override
     public boolean unregister(Object eventListener) {
-        for (List<Pair<Object, Method>> pairs : eventListeners.values()) {
-            if (pairs.removeIf(pair -> pair.getLeft().equals(eventListener))) {
+        for (List<EventHandler> handlers : eventListeners.values()) {
+            if (handlers.removeIf(handler -> isHandlerForBean(handler, eventListener))) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    /**
+     * Check if an EventHandler wraps the given bean.
+     *
+     * @param handler the event handler to check
+     * @param bean the bean to compare against
+     * @return true if the handler wraps the given bean, false otherwise
+     */
+    private boolean isHandlerForBean(EventHandler handler, Object bean) {
+        if (handler instanceof MethodInvokingEventHandler mih) {
+            return mih.object().equals(bean);
         }
         return false;
     }
@@ -172,7 +194,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     public boolean isRegistered(Object eventListener) {
         return eventListeners.values().stream()
                 .flatMap(List::stream)
-                .anyMatch(pair -> pair.getLeft().equals(eventListener));
+                .anyMatch(handler -> isHandlerForBean(handler, eventListener));
     }
 
     /**
@@ -215,13 +237,17 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     protected void registerListener(Object bean, Method method) {
         var eventType = (Class<? extends Event>) method.getParameterTypes()[0];
-        var listeners = eventListeners.computeIfAbsent(eventType, k -> new ArrayList<>());
-        var newPair = new ImmutablePair<>(bean, method);
+        var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
+        var newHandler = new MethodInvokingEventHandler(bean, method);
         // Check for duplicate (same bean and method)
-        boolean exists = listeners.stream()
-                .anyMatch(pair -> pair.getLeft().equals(bean) && pair.getRight().equals(method));
+        boolean exists = handlers.stream()
+                .filter(h -> h instanceof MethodInvokingEventHandler mih)
+                .anyMatch(h -> {
+                    MethodInvokingEventHandler mih = (MethodInvokingEventHandler) h;
+                    return mih.object().equals(bean) && mih.method().equals(method);
+                });
         if (!exists) {
-            listeners.add(newPair);
+            handlers.add(newHandler);
         }
     }
 
@@ -245,19 +271,6 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         }
     }
 
-    /**
-     * Create EventHandler wrappers for the given listener-method pairs.
-     *
-     * @param pairs list of (listener, method) pairs
-     * @return list of EventHandler wrappers
-     */
-    private List<EventHandler> createEventListeners(List<Pair<Object, Method>> pairs) {
-        return pairs.stream()
-                .<EventHandler>map(pair ->
-                        new MethodInvokingEventHandler(pair.getLeft(), pair.getRight()))
-                .toList();
-    }
-
     @Override
     public String name() {
         return "annotation";
@@ -267,11 +280,12 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * Wrapper that invokes a method on an object when an event is received.
      * <p>
      * This internal class adapts annotated methods to the EventHandler interface.
+     * Created once during registration and reused, avoiding allocation overhead.
      *
      * @param object the listener object
      * @param method the method to invoke
      */
-    private record MethodInvokingEventHandler(Object object, Method method) implements EventHandler {
+    public record MethodInvokingEventHandler(Object object, Method method) implements EventHandler {
 
         @Override
         public void onEvent(Event event) {

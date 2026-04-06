@@ -27,7 +27,7 @@ class RegistryConfigurationTest {
     void registryConfigurationShouldBeInstantiableWithProperties() {
         // given
         EventFlowProperties properties = new EventFlowProperties();
-        properties.setScanPackages("com.example.listener");
+        properties.getDispatcher().setListenerPackages("com.example.listener");
 
         // when
         RegistryConfiguration config = new RegistryConfiguration(properties);
@@ -37,11 +37,11 @@ class RegistryConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when scan-packages is empty in properties")
-    void shouldThrowExceptionWhenScanPackagesIsEmptyInProperties() {
+    @DisplayName("Should throw exception when listener-packages is empty in properties")
+    void shouldThrowExceptionWhenListenerPackagesIsEmptyInProperties() {
         // given
         EventFlowProperties properties = new EventFlowProperties();
-        properties.setScanPackages("");
+        properties.getDispatcher().setListenerPackages("");
         RegistryConfiguration config = new RegistryConfiguration(properties);
         var context = new AnnotationConfigApplicationContext();
         TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
@@ -50,7 +50,7 @@ class RegistryConfigurationTest {
         // when & then
         assertThatThrownBy(() -> config.springEventListenerRegistry(context))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("event-flow.scan-packages must be configured");
+                .hasMessageContaining("event-flow.dispatcher.listener-packages must be configured");
     }
 
     @Test
@@ -58,7 +58,7 @@ class RegistryConfigurationTest {
     void shouldCreateInterfaceSubscriberRegistry() {
         // given
         EventFlowProperties properties = new EventFlowProperties();
-        properties.setScanPackages("com.example.listener");
+        properties.getDispatcher().setListenerPackages("com.example.listener");
         RegistryConfiguration config = new RegistryConfiguration(properties);
         var context = new AnnotationConfigApplicationContext();
         TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
@@ -78,7 +78,7 @@ class RegistryConfigurationTest {
     void shouldCreateCompositeRegistryFromMultipleRegistries() {
         // given
         EventFlowProperties properties = new EventFlowProperties();
-        properties.setScanPackages("com.example.listener");
+        properties.getDispatcher().setListenerPackages("com.example.listener");
         RegistryConfiguration config = new RegistryConfiguration(properties);
 
         var context1 = new AnnotationConfigApplicationContext();
@@ -107,7 +107,7 @@ class RegistryConfigurationTest {
     void shouldThrowExceptionWhenCreatingCompositeWithEmptyRegistriesList() {
         // given
         EventFlowProperties properties = new EventFlowProperties();
-        properties.setScanPackages("com.example.listener");
+        properties.getDispatcher().setListenerPackages("com.example.listener");
         RegistryConfiguration config = new RegistryConfiguration(properties);
 
         // when & then
@@ -121,7 +121,7 @@ class RegistryConfigurationTest {
     void shouldCreateCompositeRegistryFromSingleRegistry() {
         // given
         EventFlowProperties properties = new EventFlowProperties();
-        properties.setScanPackages("com.example.listener");
+        properties.getDispatcher().setListenerPackages("com.example.listener");
         RegistryConfiguration config = new RegistryConfiguration(properties);
 
         var context = new AnnotationConfigApplicationContext();

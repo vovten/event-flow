@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.transport.TransportException;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.PartitionInfo;
@@ -67,6 +68,17 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
      */
     public BroadcastKafkaOutTransport(String bootstrapServers, String topic) {
         super(bootstrapServers, topic);
+    }
+
+    /**
+     * Create broadcast Kafka transport with bootstrap servers, topic, and custom serializer.
+     *
+     * @param bootstrapServers Kafka bootstrap servers (e.g., "localhost:9092")
+     * @param topic            Kafka topic name
+     * @param serializer       custom event serializer
+     */
+    public BroadcastKafkaOutTransport(String bootstrapServers, String topic, EventSerializer serializer) {
+        super(bootstrapServers, topic, serializer);
     }
 
     /**

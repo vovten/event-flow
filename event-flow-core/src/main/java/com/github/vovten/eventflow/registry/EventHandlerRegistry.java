@@ -1,5 +1,6 @@
 package com.github.vovten.eventflow.registry;
 
+import com.github.vovten.eventflow.EventSubscriber;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 

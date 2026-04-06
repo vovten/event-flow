@@ -43,16 +43,18 @@ public interface EventSerializer {
     <T extends Event> T deserialize(byte[] data, Class<T> eventType);
 
     /**
-     * Get the format code (magic byte) of this serializer.
+     * Get the unique code (magic byte) of this serializer.
+     * <p>
+     * Used during deserialization to detect format from the first byte of data.
      *
-     * @return format code (1 byte)
+     * @return serializer code (1 byte)
      */
-    byte getFormatCode();
+    byte getCode();
 
     /**
-     * Get the format name for logging/configuration.
+     * Get the unique name of this serializer for configuration.
      *
-     * @return format name (e.g., "json", "msgpack")
+     * @return serializer name (e.g., "json", "msgpack", "protobuf")
      */
-    String getFormat();
+    String getName();
 }

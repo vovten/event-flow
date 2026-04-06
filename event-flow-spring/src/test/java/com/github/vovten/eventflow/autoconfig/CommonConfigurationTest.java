@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.autoconfig;
 
 import com.github.vovten.eventflow.autoconfig.config.CommonConfiguration;
+import com.github.vovten.eventflow.autoconfig.config.SerializerConfiguration;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.support.TestPropertySourceUtils;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,7 +27,7 @@ class CommonConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
-            
+
             EventFlowProperties properties = new EventFlowProperties();
             properties.getDispatcher().getThreadPool().setCoreSize(2);
             properties.getDispatcher().getThreadPool().setMaxSize(8);
@@ -33,6 +35,7 @@ class CommonConfigurationTest {
             properties.getDispatcher().getThreadPool().setKeepAliveSeconds(30);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -51,9 +54,10 @@ class CommonConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
-            
+
             EventFlowProperties properties = new EventFlowProperties();
             context.registerBean(EventFlowProperties.class, () -> properties);
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -71,7 +75,7 @@ class CommonConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
-            
+
             EventFlowProperties properties = new EventFlowProperties();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("local-queue");
@@ -79,6 +83,7 @@ class CommonConfigurationTest {
             properties.getDispatcher().getTransports().add(transportConfig);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -100,6 +105,7 @@ class CommonConfigurationTest {
             properties.setEnabled(false);
 
             context.registerBean(EventFlowProperties.class, () -> properties);
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -116,10 +122,11 @@ class CommonConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=false");
-            
+
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CommonConfiguration.class);
             context.refresh();
 
@@ -157,10 +164,11 @@ class CommonConfigurationTest {
         // given
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, "event-flow.enabled=true");
-            
+
             EventFlowProperties properties = new EventFlowProperties();
 
             context.registerBean(EventFlowProperties.class, () -> properties);
+            context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(CustomQueueProviderConfig.class);
             context.register(CommonConfiguration.class);
             context.refresh();

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 /**
  * Fluent builder for creating configured {@link EventPublisher} instances.
@@ -35,11 +36,16 @@ import java.util.List;
  *     .silent()
  *     .build();
  *
+ * // Async publisher for non-blocking fire-and-forget
+ * EventPublisher publisher = EventPublisherBuilder.create(channels)
+ *     .async(Executors.newCachedThreadPool())
+ *     .build();
+ *
  * // Complete configuration with custom decorator
  * EventPublisher publisher = EventPublisherBuilder.create(channels)
  *     .retryable(5, Duration.ofSeconds(1), 1.5)
  *     .withDecorator(pub -> new MetricsEventPublisher(pub, metricsRegistry))
- *     .silent()  // silent will be the outermost decorator
+ *     .silent()  // silent will be the outermost decorator (before async)
  *     .build();
  * }</pre>
  * <p>
@@ -49,8 +55,9 @@ import java.util.List;
  *   <li>Base {@link ChannelEventPublisher}</li>
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
- *   <li>Subclass decorations via {@link #decorate(EventPublisher)}</li>
- *   <li>{@link SilentEventPublisher} (if enabled) — always outermost</li>
+ *   <li>{@link SilentEventPublisher} (if enabled)</li>
+ *   <li>{@link AsyncEventPublisher} (if enabled)</li>
+ *   <li>Subclass decorations via {@link #decorate(EventPublisher)} — always outermost</li>
  * </ol>
  * <p>
  * <b>Note:</b> For transactional publishing (defer until after transaction commit),
@@ -65,7 +72,9 @@ import java.util.List;
 public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 
     private boolean silent = false;
+    private boolean async = false;
     private RetryConfig retryConfig;
+    private Executor executor;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
 
@@ -168,6 +177,24 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     }
 
     /**
+     * Enable async publishing with the given executor.
+     * Events will be published asynchronously using the provided executor,
+     * so the {@code publish()} method returns immediately.
+     * <p>
+     * The caller is responsible for managing the executor lifecycle
+     * (e.g., shutting it down when no longer needed).
+     *
+     * @param executor the executor to use for async publishing
+     * @return this builder
+     */
+    @SuppressWarnings("unchecked")
+    public T async(Executor executor) {
+        this.async = true;
+        this.executor = executor;
+        return (T) this;
+    }
+
+    /**
      * Add a custom decorator to the publisher chain.
      * Decorators are applied in the order they are added.
      *
@@ -216,7 +243,12 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
             publisher = new SilentEventPublisher(publisher);
             log.debug("Applied silent decorator");
         }
-        // Allow subclasses to add additional decorations (e.g., transactional)
+        // Apply async if enabled (before subclass decorations so transactional stays outermost)
+        if (async) {
+            publisher = new AsyncEventPublisher(publisher, executor);
+            log.debug("Applied async decorator");
+        }
+        // Allow subclasses to add additional decorations (e.g., transactional) — always outermost
         publisher = decorate(publisher);
         return publisher;
     }
@@ -240,10 +272,11 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      */
     public EventPublisher buildAndLog() {
         EventPublisher publisher = build();
-        log.info("Built EventPublisher with configuration: channels={}, retry={}, silent={}, customDecorators={}",
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, silent={}, async={}, customDecorators={}",
                 channels.size(),
                 retryConfig != null ? "enabled" : "disabled",
                 silent,
+                async ? "enabled" : "disabled",
                 decorators.size()
         );
         return publisher;
@@ -259,6 +292,14 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 
     RetryConfig getRetryConfig() {
         return retryConfig;
+    }
+
+    Executor getExecutor() {
+        return executor;
+    }
+
+    boolean isAsync() {
+        return async;
     }
 
     /**

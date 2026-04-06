@@ -17,7 +17,7 @@
 ```yaml
 event-flow:
   enabled: true
-  scan-packages: com.example.listener
+  dispatcher.listener-packages: com.example.listener
   publisher:
     enabled: true
     channels:
@@ -75,7 +75,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `event-flow.enabled` | `false` | Enable/disable all auto-configuration |
-| `event-flow.scan-packages` | `""` | **Required!** Packages to scan for listeners |
+| `event-flow.dispatcher.listener-packages` | `""` | **Required!** Packages to scan for listeners |
 | `event-flow.publisher.enabled` | `false` | Enable/disable publisher |
 | `event-flow.dispatcher.enabled` | `false` | Enable/disable dispatcher |
 | `event-flow.publisher.transactional` | `true` | Defer publishing until after transaction commit |
@@ -87,6 +87,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 | `event-flow.dispatcher.thread-pool.core-size` | `4` | Thread pool core size |
 | `event-flow.dispatcher.thread-pool.max-size` | `16` | Thread pool max size |
 | `event-flow.dispatcher.thread-pool.queue-capacity` | `100` | Event queue capacity |
+| `event-flow.dispatcher.deserialization.allowed-event-packages` | `["com.github.vovten.eventflow"]` | Allowed packages for secure deserialization |
 
 ---
 
@@ -97,7 +98,7 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 ```yaml
 event-flow:
   enabled: true
-  scan-packages: com.example
+  dispatcher.listener-packages: com.example
   publisher:
     enabled: true
     channels:
@@ -118,7 +119,7 @@ event-flow:
 
 ```yaml
 event-flow:
-  scan-packages: com.example.listener
+  dispatcher.listener-packages: com.example.listener
   publisher:
     enabled: true
     transactional: true
@@ -155,7 +156,7 @@ event-flow:
 
 ```yaml
 event-flow:
-  scan-packages: com.example
+  dispatcher.listener-packages: com.example
   publisher:
     enabled: true
     channels:
@@ -223,6 +224,42 @@ public class RabbitMqTransportFactory implements OutTransportFactory, InTranspor
     }
 }
 ```
+
+### Custom Event Serializers
+
+Implement `EventSerializer` and annotate with `@Component` to auto-register it in `EventSerializerFactory`:
+
+```java
+@Component
+public class ProtobufEventSerializer implements EventSerializer {
+
+    @Override
+    public byte getCode() {
+        return 0x03;  // Unique code (0x01=json, 0x02=msgpack are reserved)
+    }
+
+    @Override
+    public String getName() {
+        return "protobuf";
+    }
+
+    @Override
+    public byte[] serialize(Event event) {
+        // Serialize event using Protocol Buffers
+        // First byte must be the code (0x03)
+        byte[] data = serializeToProtobuf(event);
+        return Bytes.concat(new byte[]{getCode()}, data);
+    }
+
+    @Override
+    public <T extends Event> T deserialize(byte[] data, Class<T> eventType) {
+        // Skip first byte (code) and deserialize
+        return deserializeFromProtobuf(Arrays.copyOfRange(data, 1, data.length), eventType);
+    }
+}
+```
+
+The serializer will be automatically discovered and registered when `event-flow.enabled=true`.
 
 ---
 
@@ -314,6 +351,7 @@ New transport types can be added by implementing `OutTransportFactory` or `InTra
 | `eventDispatcher` | Main dispatcher | Provide `EventDispatcher` bean |
 | `incomingEventTransports` | Additional incoming transports | Provide custom beans |
 | `OutTransportFactory` / `InTransportFactory` implementations | Create transports from config | Provide custom factory |
+| `EventSerializer` beans | Custom serializers auto-registered in `EventSerializerFactory` | Implement `EventSerializer` + `@Component` |
 
 ### Channel Configuration
 

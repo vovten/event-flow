@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 
 import static java.util.stream.Collectors.joining;
@@ -89,9 +90,17 @@ public class PublisherConfiguration {
         if (publisherConfig.isSilent()) {
             builder.silent();
         }
-        
-        EventPublisher publisher = builder.buildAndLog();
-        return publisher;
+
+        // Apply async if enabled
+        if (publisherConfig.getAsync().isEnabled()) {
+            Executor executor = publisherConfig.getAsync().createExecutor();
+            builder.async(executor);
+            log.debug("Async publishing enabled with executor: coreSize={}, maxSize={}, queueCapacity={}",
+                    publisherConfig.getAsync().getCoreSize(),
+                    publisherConfig.getAsync().getMaxSize(),
+                    publisherConfig.getAsync().getQueueCapacity());
+        }
+        return builder.buildAndLog();
     }
 
     private static void logInfo(List<EventChannel> eventChannels) {

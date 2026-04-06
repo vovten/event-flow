@@ -1,20 +1,22 @@
 package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
-import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
+import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Auto-configuration for common components: executor service and local-queue transports.
@@ -24,6 +26,7 @@ import java.util.concurrent.ExecutorService;
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
+@DependsOn("serializerRegistrationComplete")
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class CommonConfiguration {
 
@@ -42,7 +45,7 @@ public class CommonConfiguration {
     @Bean("dispatcherExecutor")
     public ExecutorService dispatcherExecutor() {
         var tp = properties.getDispatcher().getThreadPool();
-        var msg = "Creating dispatcher executor: core={}, max={}, queue={}";
+        var msg = "Creating dispatcher executor: core={}, max={}, queue={}, rejection-policy=caller-runs";
         log.info(msg, tp.getCoreSize(), tp.getMaxSize(), tp.getQueueCapacity());
 
         var taskExecutor = new ThreadPoolTaskExecutor();
@@ -51,6 +54,7 @@ public class CommonConfiguration {
         taskExecutor.setQueueCapacity(tp.getQueueCapacity());
         taskExecutor.setKeepAliveSeconds(tp.getKeepAliveSeconds());
         taskExecutor.setThreadNamePrefix("event-flow-dispatcher-");
+        taskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         taskExecutor.initialize();
 
         return taskExecutor.getThreadPoolExecutor();

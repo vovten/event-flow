@@ -45,17 +45,17 @@ public class RegistryConfiguration {
      *
      * @param appContext Spring application context
      * @return annotation-based event listener registry
-     * @throws IllegalStateException if scan-packages is not configured
+     * @throws IllegalStateException if listener-packages is not configured
      */
     @Bean
     @ConditionalOnMissingBean(name = "springEventListenerRegistry")
     public EventHandlerRegistry springEventListenerRegistry(ApplicationContext appContext) {
-        String scanPackage = properties.getScanPackages();
-        if (scanPackage == null || scanPackage.isEmpty()) {
-            throw new IllegalStateException("event-flow.scan-packages must be configured");
+        String listenerPackage = properties.getDispatcher().getListenerPackages();
+        if (listenerPackage == null || listenerPackage.isEmpty()) {
+            throw new IllegalStateException("event-flow.dispatcher.listener-packages must be configured");
         }
-        log.info("Creating SpringEventListenerRegistry with scan package: {}", scanPackage);
-        return new SpringEventListenerRegistry(appContext, scanPackage);
+        log.info("Creating SpringEventListenerRegistry with listener package: {}", listenerPackage);
+        return new SpringEventListenerRegistry(appContext, listenerPackage);
     }
 
     /**
