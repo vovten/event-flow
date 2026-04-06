@@ -12,6 +12,7 @@ import com.github.vovten.eventflow.serialization.EventPolymorphicTypeValidator;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializationException;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -70,7 +71,7 @@ public class JsonEventSerializer implements EventSerializer {
         try {
             byte[] payload = unwrapFormat(data);
             return objectMapper.readValue(payload, eventType);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             throw new EventSerializationException(
                     "Error deserializing JSON to event " + eventType.getSimpleName(), e);
         }

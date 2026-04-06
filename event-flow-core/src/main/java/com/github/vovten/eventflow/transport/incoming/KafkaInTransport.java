@@ -70,24 +70,24 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
      * Uses default EventSerializerFactory with JSON and MessagePack serializers.
      *
      * @param bootstrapServers Kafka bootstrap servers (e.g., "localhost:9092")
-     * @param topicsConfig     comma-separated list of topics to subscribe to
+     * @param topics           comma-separated list of topics to subscribe to
      * @param groupId          consumer group ID
      */
-    public KafkaInTransport(String bootstrapServers, String topicsConfig, String groupId) {
-        this(bootstrapServers, topicsConfig, groupId, new EventSerializerFactory());
+    public KafkaInTransport(String bootstrapServers, String topics, String groupId) {
+        this(bootstrapServers, topics, groupId, new EventSerializerFactory());
     }
 
     /**
      * Create Kafka transport with bootstrap servers, topics, group ID, and custom serializer factory.
      *
      * @param bootstrapServers  Kafka bootstrap servers (e.g., "localhost:9092")
-     * @param topicsConfig      comma-separated list of topics to subscribe to
+     * @param topics            comma-separated list of topics to subscribe to
      * @param groupId           consumer group ID
      * @param serializerFactory serializer factory for event deserialization
      */
-    public KafkaInTransport(String bootstrapServers, String topicsConfig, String groupId,
+    public KafkaInTransport(String bootstrapServers, String topics, String groupId,
                             EventSerializerFactory serializerFactory) {
-        this(createConsumer(bootstrapServers, groupId), parseTopics(topicsConfig),
+        this(createConsumer(bootstrapServers, groupId), parseTopics(topics),
                 Executors.newSingleThreadExecutor(), serializerFactory);
     }
 
@@ -96,24 +96,24 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
      * Uses default EventSerializerFactory with JSON and MessagePack serializers.
      *
      * @param properties   Kafka consumer properties
-     * @param topicsConfig comma-separated list of topics to subscribe to
+     * @param topics       comma-separated list of topics to subscribe to
      * @param groupId      consumer group ID
      */
-    public KafkaInTransport(Properties properties, String topicsConfig, String groupId) {
-        this(properties, topicsConfig, groupId, new EventSerializerFactory());
+    public KafkaInTransport(Properties properties, String topics, String groupId) {
+        this(properties, topics, groupId, new EventSerializerFactory());
     }
 
     /**
      * Create Kafka transport with custom properties, topics, group ID, and serializer factory.
      *
      * @param properties        Kafka consumer properties
-     * @param topicsConfig      comma-separated list of topics to subscribe to
+     * @param topics            comma-separated list of topics to subscribe to
      * @param groupId           consumer group ID
      * @param serializerFactory serializer factory for event deserialization
      */
-    public KafkaInTransport(Properties properties, String topicsConfig, String groupId,
+    public KafkaInTransport(Properties properties, String topics, String groupId,
                             EventSerializerFactory serializerFactory) {
-        this(createConsumer(properties, groupId), parseTopics(topicsConfig),
+        this(createConsumer(properties, groupId), parseTopics(topics),
                 Executors.newSingleThreadExecutor(), serializerFactory);
     }
 
@@ -272,7 +272,7 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
         return new KafkaConsumer<>(props);
     }
 
-    private static List<String> parseTopics(String topicsConfig) {
-        return List.of(topicsConfig.split(","));
+    private static List<String> parseTopics(String topics) {
+        return List.of(topics.split(","));
     }
 }

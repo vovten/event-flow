@@ -53,7 +53,7 @@ class KafkaInTransportTest {
 
     @Test
     @DisplayName("Should receive and deserialize event with JSON format")
-    void shouldReceiveAndDeserializeEventWithJsonFormat() throws Exception {
+    void shouldReceiveAndDeserializeEventWithJsonFormat() {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         TestEvent event = TestEvent.create("test-id", "test-message");
         JsonEventSerializer serializer = new JsonEventSerializer();
@@ -79,20 +79,19 @@ class KafkaInTransportTest {
 
         transport.start(consumer);
 
-        await().atMost(java.time.Duration.ofSeconds(5))
-                .until(() -> consumer.getEvents().size() > 0);
+        await().atMost(java.time.Duration.ofSeconds(5)).until(() -> !consumer.getEvents().isEmpty());
 
         transport.stop();
         executorService.shutdownNow();
 
         assertEquals(1, consumer.getEvents().size());
-        Event receivedEvent = consumer.getEvents().get(0);
+        Event receivedEvent = consumer.getEvents().getFirst();
         assertEquals(TestEvent.class, receivedEvent.type());
     }
 
     @Test
     @DisplayName("Should receive and deserialize event with MessagePack format")
-    void shouldReceiveAndDeserializeEventWithMsgPackFormat() throws Exception {
+    void shouldReceiveAndDeserializeEventWithMsgPackFormat() {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         TestEvent event = TestEvent.create("test-id", "test-message");
         MsgPackEventSerializer serializer = new MsgPackEventSerializer();
@@ -118,20 +117,19 @@ class KafkaInTransportTest {
 
         transport.start(consumer);
 
-        await().atMost(java.time.Duration.ofSeconds(5))
-                .until(() -> consumer.getEvents().size() > 0);
+        await().atMost(java.time.Duration.ofSeconds(5)).until(() -> !consumer.getEvents().isEmpty());
 
         transport.stop();
         executorService.shutdownNow();
 
         assertEquals(1, consumer.getEvents().size());
-        Event receivedEvent = consumer.getEvents().get(0);
+        Event receivedEvent = consumer.getEvents().getFirst();
         assertEquals(TestEvent.class, receivedEvent.type());
     }
 
     @Test
     @DisplayName("Should handle multiple events")
-    void shouldHandleMultipleEvents() throws Exception {
+    void shouldHandleMultipleEvents() {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
 
         TestEvent event1 = TestEvent.create("id-1", "message-1");
@@ -172,7 +170,7 @@ class KafkaInTransportTest {
 
     @Test
     @DisplayName("Should handle old JSON format (backward compatibility)")
-    void shouldHandleOldJsonFormat() throws Exception {
+    void shouldHandleOldJsonFormat() {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
 
         // Old format: JSON string as bytes without magic byte
@@ -200,7 +198,7 @@ class KafkaInTransportTest {
         transport.start(consumer);
 
         await().atMost(java.time.Duration.ofSeconds(5))
-                .until(() -> consumer.getEvents().size() > 0);
+                .until(() -> !consumer.getEvents().isEmpty());
 
         transport.stop();
         executorService.shutdownNow();
@@ -210,7 +208,7 @@ class KafkaInTransportTest {
 
     @Test
     @DisplayName("Should handle malformed event gracefully")
-    void shouldHandleMalformedEventGracefully() throws Exception {
+    void shouldHandleMalformedEventGracefully() {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
 
         // Malformed JSON
