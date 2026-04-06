@@ -78,8 +78,27 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     /**
      * Create unified dispatcher with custom handler registry.
+     * <p>
+     * <b>Resource ownership:</b> This dispatcher does NOT close the provided
+     * {@code executorService}. The caller is responsible for shutting down the executor
+     * when it is no longer needed. This follows the standard dependency injection principle
+     * where the component that creates a resource is responsible for its lifecycle.
+     * <p>
+     * <b>Usage example:</b>
+     * <pre>{@code
+     * ExecutorService executor = Executors.newFixedThreadPool(10);
+     * EventDispatcher dispatcher = new UnifiedEventDispatcher(executor, registry, transports);
+     * 
+     * try {
+     *     dispatcher.start(consumer);
+     *     // ... application work ...
+     * } finally {
+     *     dispatcher.stop();
+     *     executor.shutdownNow(); // Caller must close executor
+     * }
+     * }</pre>
      *
-     * @param executorService  executor service for async handler execution
+     * @param executorService  executor service for async handler execution (NOT closed by dispatcher)
      * @param handlerRegistry  custom handler registry
      * @param transports       list of transports to listen to
      */

@@ -20,6 +20,14 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
 /**
  * Kafka publisher transport for external event delivery.
  * <p>
+ * This transport implements {@link AutoCloseable} to ensure proper resource cleanup.
+ * Always close the transport when it's no longer needed:
+ * <pre>{@code
+ * try (KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "events")) {
+ *     transport.send(event);
+ * }
+ * }</pre>
+ * <p>
  * This transport sends events to an Apache Kafka topic using <b>synchronous</b> delivery.
  * Each event is sent and the transport waits for acknowledgment from Kafka brokers.
  * This ensures reliable delivery — if the send fails, an exception is thrown immediately.
@@ -31,41 +39,13 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  *   <li>Idempotent producer enabled (no duplicates)</li>
  *   <li>Automatic retries on transient failures (3 retries)</li>
  * </ul>
- * <p>
- * <b>When to use:</b>
- * <ul>
- *   <li>Cross-application event communication</li>
- *   <li>Event-driven microservices architecture</li>
- *   <li>Critical events that must be delivered</li>
- *   <li>Event sourcing and CQRS patterns</li>
- * </ul>
- * <p>
- * <b>Configuration example:</b>
- * <pre>{@code
- * Properties props = new Properties();
- * props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
- * EventSerializer serializer = new JsonEventSerializer();
- * KafkaOutTransport transport = new KafkaOutTransport(props, "events", serializer);
- * EventChannel channel = new ExternalEventChannel(List.of(transport));
- * }</pre>
- * <p>
- * <b>Retry integration:</b>
- * For additional reliability, wrap with {@code RetryEventPublisherDecorator}:
- * <pre>{@code
- * EventPublisher publisher = new RetryEventPublisher(
- *     new ChannelEventPublisher(channels),
- *     3,                              // 3 retries
- *     Duration.ofMillis(100),         // exponential backoff
- *     2.0
- * );
- * }</pre>
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  * @see RetryEventPublisher
  * @see EventSerializer
  */
-public class KafkaOutTransport implements OutTransport {
+public class KafkaOutTransport implements OutTransport, AutoCloseable {
 
     protected KafkaProducer<String, byte[]> producer;
     protected String topic;
@@ -202,9 +182,15 @@ public class KafkaOutTransport implements OutTransport {
     }
 
     /**
-     * Close the Kafka producer.
+     * Close the Kafka producer and release all resources.
+     * <p>
+     * This method is idempotent and safe to call multiple times.
+     * After closing, the transport cannot be used again.
      */
+    @Override
     public void close() {
-        producer.close();
+        if (producer != null) {
+            producer.close();
+        }
     }
 }

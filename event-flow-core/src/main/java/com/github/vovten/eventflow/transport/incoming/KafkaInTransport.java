@@ -22,6 +22,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Kafka incoming transport for receiving external events.
  * <p>
+ * This transport implements {@link AutoCloseable} to ensure proper resource cleanup.
+ * Always close the transport when it's no longer needed:
+ * <pre>{@code
+ * try (KafkaInTransport transport = new KafkaInTransport("localhost:9092", "events", "group")) {
+ *     transport.start(eventConsumer);
+ *     // ... work ...
+ * } // automatically stops and closes resources
+ * }</pre>
+ * <p>
  * This transport listens to one or more Kafka topics and delivers events
  * to the registered consumer. It uses synchronous polling with configurable
  * timeout and supports graceful shutdown.
@@ -43,7 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @see EventSerializerFactory
  */
 @Slf4j
-public class KafkaInTransport implements InTransport {
+public class KafkaInTransport implements InTransport, AutoCloseable {
 
     private final Consumer<String, byte[]> kafkaConsumer;
     private final List<String> topics;
@@ -149,6 +158,17 @@ public class KafkaInTransport implements InTransport {
             executorService.shutdownNow();
             log.info("KafkaDispatcherTransport stopped");
         }
+    }
+
+    /**
+     * Close the transport and release all resources (consumer and executor).
+     * <p>
+     * This method is idempotent and safe to call multiple times.
+     * It delegates to {@link #stop()} if the transport is still running.
+     */
+    @Override
+    public void close() {
+        stop();
     }
 
     private void consumeLoop(java.util.function.Consumer<Event> eventConsumer) {
