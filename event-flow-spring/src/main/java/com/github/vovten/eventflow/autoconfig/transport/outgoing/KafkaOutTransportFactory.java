@@ -20,6 +20,12 @@ import com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
  */
 public class KafkaOutTransportFactory implements OutTransportFactory {
 
+    private final EventSerializerFactory serializerFactory;
+
+    public KafkaOutTransportFactory(EventSerializerFactory serializerFactory) {
+        this.serializerFactory = serializerFactory;
+    }
+
     @Override
     public String getName() {
         return "kafka";
@@ -48,7 +54,7 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
      */
     private EventSerializer createSerializer(String format) {
         String name = (format == null || format.isBlank()) ? "json" : format;
-        return EventSerializerFactory.getByName(name);
+        return serializerFactory.getByName(name);
     }
 
     @Override

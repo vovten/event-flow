@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.autoconfig.transport.incoming;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.InTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,11 +14,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class KafkaInTransportFactoryTest {
 
+    private final EventSerializerFactory serializerFactory = new EventSerializerFactory();
+
     @Test
     @DisplayName("KafkaDispatcherTransportFactory should have correct type")
     void kafkaDispatcherTransportFactoryShouldHaveCorrectType() {
         // given
-        KafkaInTransportFactory factory = new KafkaInTransportFactory();
+        KafkaInTransportFactory factory = new KafkaInTransportFactory(serializerFactory);
 
         // when
         String type = factory.getType();
@@ -30,7 +33,7 @@ class KafkaInTransportFactoryTest {
     @DisplayName("KafkaDispatcherTransportFactory should create dispatcher transport")
     void kafkaDispatcherTransportFactoryShouldCreateDispatcherTransport() {
         // given
-        KafkaInTransportFactory factory = new KafkaInTransportFactory();
+        KafkaInTransportFactory factory = new KafkaInTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("kafka-dispatcher");
@@ -49,7 +52,7 @@ class KafkaInTransportFactoryTest {
     @DisplayName("KafkaDispatcherTransportFactory should throw exception when servers is missing")
     void kafkaDispatcherTransportFactoryShouldThrowExceptionWhenServersIsMissing() {
         // given
-        KafkaInTransportFactory factory = new KafkaInTransportFactory();
+        KafkaInTransportFactory factory = new KafkaInTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setTopic("test-topic");
@@ -64,7 +67,7 @@ class KafkaInTransportFactoryTest {
     @DisplayName("KafkaDispatcherTransportFactory should throw exception when topic is missing")
     void kafkaDispatcherTransportFactoryShouldThrowExceptionWhenTopicIsMissing() {
         // given
-        KafkaInTransportFactory factory = new KafkaInTransportFactory();
+        KafkaInTransportFactory factory = new KafkaInTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setServers("localhost:9092");

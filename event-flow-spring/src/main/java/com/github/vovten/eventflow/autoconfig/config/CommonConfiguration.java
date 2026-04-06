@@ -6,6 +6,7 @@ import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTra
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -104,30 +105,33 @@ public class CommonConfiguration {
     /**
      * Creates factory for Kafka publisher transports.
      *
+     * @param serializerFactory serializer factory for creating event serializers
      * @return Kafka publisher transport factory
      */
     @Bean
-    public KafkaOutTransportFactory kafkaPublisherTransportFactory() {
-        return new KafkaOutTransportFactory();
+    public KafkaOutTransportFactory kafkaPublisherTransportFactory(EventSerializerFactory serializerFactory) {
+        return new KafkaOutTransportFactory(serializerFactory);
     }
 
     /**
      * Creates factory for Kafka dispatcher transports.
      *
+     * @param serializerFactory serializer factory for creating event serializers
      * @return Kafka dispatcher transport factory
      */
     @Bean
-    public KafkaInTransportFactory kafkaDispatcherTransportFactory() {
-        return new KafkaInTransportFactory();
+    public KafkaInTransportFactory kafkaDispatcherTransportFactory(EventSerializerFactory serializerFactory) {
+        return new KafkaInTransportFactory(serializerFactory);
     }
 
     /**
      * Creates factory for broadcast Kafka publisher transports.
      *
+     * @param serializerFactory serializer factory for creating event serializers
      * @return broadcast Kafka publisher transport factory
      */
     @Bean
-    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory() {
-        return new BroadcastKafkaOutTransportFactory();
+    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory(EventSerializerFactory serializerFactory) {
+        return new BroadcastKafkaOutTransportFactory(serializerFactory);
     }
 }

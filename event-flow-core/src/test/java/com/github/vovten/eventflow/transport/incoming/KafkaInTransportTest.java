@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.transport.incoming;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import com.github.vovten.eventflow.serialization.msgpack.MsgPackEventSerializer;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -73,7 +74,7 @@ class KafkaInTransportTest {
         TestEventConsumer consumer = new TestEventConsumer();
 
         KafkaInTransport transport = new KafkaInTransport(
-                mockConsumer, List.of("test-topic"), executorService
+                mockConsumer, List.of("test-topic"), executorService, new EventSerializerFactory()
         );
 
         transport.start(consumer);
@@ -112,7 +113,7 @@ class KafkaInTransportTest {
         TestEventConsumer consumer = new TestEventConsumer();
 
         KafkaInTransport transport = new KafkaInTransport(
-                mockConsumer, List.of("test-topic"), executorService
+                mockConsumer, List.of("test-topic"), executorService, new EventSerializerFactory()
         );
 
         transport.start(consumer);
@@ -155,7 +156,7 @@ class KafkaInTransportTest {
         TestEventConsumer consumer = new TestEventConsumer();
 
         KafkaInTransport transport = new KafkaInTransport(
-                mockConsumer, List.of("test-topic"), executorService
+                mockConsumer, List.of("test-topic"), executorService, new EventSerializerFactory()
         );
 
         transport.start(consumer);
@@ -193,7 +194,7 @@ class KafkaInTransportTest {
         TestEventConsumer consumer = new TestEventConsumer();
 
         KafkaInTransport transport = new KafkaInTransport(
-                mockConsumer, List.of("test-topic"), executorService
+                mockConsumer, List.of("test-topic"), executorService, new EventSerializerFactory()
         );
 
         transport.start(consumer);
@@ -227,7 +228,7 @@ class KafkaInTransportTest {
         TestEventConsumer consumer = new TestEventConsumer();
 
         KafkaInTransport transport = new KafkaInTransport(
-                mockConsumer, List.of("test-topic"), executorService
+                mockConsumer, List.of("test-topic"), executorService, new EventSerializerFactory()
         );
 
         transport.start(consumer);

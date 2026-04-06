@@ -42,6 +42,9 @@ class SerializerConfigurationTest {
     @Autowired
     private ApplicationContext context;
 
+    @Autowired
+    private EventSerializerFactory serializerFactory;
+
     @Test
     @DisplayName("Should register custom EventSerializer beans during configuration")
     void shouldRegisterCustomSerializerBeans() {
@@ -64,7 +67,7 @@ class SerializerConfigurationTest {
         assertThat(context).isNotNull();
 
         // when - check that custom serializer is registered
-        EventSerializer serializer = EventSerializerFactory.getByCode((byte) 0x03);
+        EventSerializer serializer = serializerFactory.getByCode((byte) 0x03);
 
         // then
         assertThat(serializer).isNotNull();
@@ -76,7 +79,7 @@ class SerializerConfigurationTest {
     @DisplayName("Should make custom serializer available to KafkaOutTransportFactory by name")
     void shouldMakeSerializerAvailableToKafkaFactoryByName() {
         // given
-        EventSerializer serializer = EventSerializerFactory.getByName("custom-protobuf");
+        EventSerializer serializer = serializerFactory.getByName("custom-protobuf");
 
         // then
         assertThat(serializer).isNotNull();
@@ -91,8 +94,8 @@ class SerializerConfigurationTest {
         assertThat(context).isNotNull();
 
         // when - get all registered serializer names and codes
-        var names = EventSerializerFactory.getRegisteredNames();
-        var codes = EventSerializerFactory.getRegisteredCodes();
+        var names = serializerFactory.getRegisteredNames();
+        var codes = serializerFactory.getRegisteredCodes();
 
         // then - custom serializer should be registered
         assertThat(names).contains("json", "msgpack", "custom-protobuf");

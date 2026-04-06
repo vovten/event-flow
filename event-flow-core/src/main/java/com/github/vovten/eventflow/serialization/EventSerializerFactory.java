@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Factory for obtaining event serializers by name or code.
+ * Registry for obtaining event serializers by name or code.
  * <p>
  * Maintains two indexes for efficient lookups:
  * <ul>
@@ -25,25 +25,39 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * Custom serializers can be registered using {@link #register(EventSerializer)}.
  * The name and code are taken automatically from the serializer itself.
+ * <p>
+ * This is an instance-based registry (not static), designed for dependency injection
+ * and multi-context deployments.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-30
  */
 @Slf4j
-public final class EventSerializerFactory {
+public class EventSerializerFactory {
 
     private static final byte JSON_START_BYTE = 0x7B;
 
-    private static final Map<String, EventSerializer> BY_NAME = new ConcurrentHashMap<>();
-    private static final Map<Byte, EventSerializer> BY_CODE = new ConcurrentHashMap<>();
+    private final Map<String, EventSerializer> byName = new ConcurrentHashMap<>();
+    private final Map<Byte, EventSerializer> byCode = new ConcurrentHashMap<>();
 
-    static {
+    /**
+     * Creates a new registry with default serializers (JSON and MessagePack).
+     */
+    public EventSerializerFactory() {
         register(new JsonEventSerializer());
         register(new MsgPackEventSerializer());
     }
 
-    private EventSerializerFactory() {
-        // Utility class
+    /**
+     * Creates a new empty registry (for tests or custom setup).
+     *
+     * @param withDefaults if true, registers JSON and MessagePack serializers
+     */
+    public EventSerializerFactory(boolean withDefaults) {
+        if (withDefaults) {
+            register(new JsonEventSerializer());
+            register(new MsgPackEventSerializer());
+        }
     }
 
     /**
@@ -55,28 +69,28 @@ public final class EventSerializerFactory {
      * <b>Examples:</b>
      * <pre>{@code
      * // Override default MessagePack serializer
-     * EventSerializerFactory.register(new CustomMsgPackSerializer());
+     * registry.register(new CustomMsgPackSerializer());
      *
      * // Register a new Protobuf serializer
-     * EventSerializerFactory.register(new ProtobufEventSerializer());
+     * registry.register(new ProtobufEventSerializer());
      * }</pre>
      *
      * @param serializer the serializer instance
      * @throws IllegalArgumentException if serializer is null
      */
-    public static void register(EventSerializer serializer) {
+    public void register(EventSerializer serializer) {
         if (serializer == null) {
             throw new IllegalArgumentException("Serializer must not be null");
         }
         String name = serializer.getName();
         byte code = serializer.getCode();
 
-        if (BY_NAME.containsKey(name) || BY_CODE.containsKey(code)) {
+        if (byName.containsKey(name) || byCode.containsKey(code)) {
             log.warn("Overwriting existing serializer: name='{}', code=0x{}",
                     name, Integer.toHexString(code & 0xFF));
         }
-        BY_NAME.put(name, serializer);
-        BY_CODE.put(code, serializer);
+        byName.put(name, serializer);
+        byCode.put(code, serializer);
     }
 
     /**
@@ -88,8 +102,8 @@ public final class EventSerializerFactory {
      * @return the serializer
      * @throws EventSerializationException if name is unknown
      */
-    public static EventSerializer getByName(String name) {
-        EventSerializer serializer = BY_NAME.get(name);
+    public EventSerializer getByName(String name) {
+        EventSerializer serializer = byName.get(name);
         if (serializer == null) {
             throw new EventSerializationException("Unknown serializer name: " + name);
         }
@@ -105,8 +119,8 @@ public final class EventSerializerFactory {
      * @return the serializer
      * @throws EventSerializationException if code is unknown
      */
-    public static EventSerializer getByCode(byte code) {
-        EventSerializer serializer = BY_CODE.get(code);
+    public EventSerializer getByCode(byte code) {
+        EventSerializer serializer = byCode.get(code);
         if (serializer == null) {
             throw new EventSerializationException("Unknown serializer code: " + code);
         }
@@ -125,14 +139,14 @@ public final class EventSerializerFactory {
      * @return the appropriate serializer
      * @throws EventSerializationException if data is empty or format is unknown
      */
-    public static EventSerializer getByData(byte[] data) {
+    public EventSerializer getByData(byte[] data) {
         if (data == null || data.length == 0) {
             throw new EventSerializationException("Empty data");
         }
         byte firstByte = data[0];
         // Backward compatibility: old JSON format without magic byte
         if (firstByte == JSON_START_BYTE) {
-            return BY_NAME.get("json");
+            return byName.get("json");
         }
         // New format with magic byte
         return getByCode(firstByte);
@@ -143,8 +157,8 @@ public final class EventSerializerFactory {
      *
      * @return JSON serializer
      */
-    public static EventSerializer getDefault() {
-        return BY_NAME.get("json");
+    public EventSerializer getDefault() {
+        return byName.get("json");
     }
 
     /**
@@ -152,8 +166,8 @@ public final class EventSerializerFactory {
      *
      * @return JSON serializer
      */
-    public static EventSerializer getJson() {
-        return BY_NAME.get("json");
+    public EventSerializer getJson() {
+        return byName.get("json");
     }
 
     /**
@@ -161,8 +175,8 @@ public final class EventSerializerFactory {
      *
      * @return MessagePack serializer
      */
-    public static EventSerializer getMsgPack() {
-        return BY_NAME.get("msgpack");
+    public EventSerializer getMsgPack() {
+        return byName.get("msgpack");
     }
 
     /**
@@ -172,8 +186,8 @@ public final class EventSerializerFactory {
      *
      * @return unmodifiable set of registered serializer names
      */
-    public static Set<String> getRegisteredNames() {
-        return Collections.unmodifiableSet(BY_NAME.keySet());
+    public Set<String> getRegisteredNames() {
+        return Collections.unmodifiableSet(byName.keySet());
     }
 
     /**
@@ -183,20 +197,7 @@ public final class EventSerializerFactory {
      *
      * @return unmodifiable set of registered serializer codes
      */
-    public static Set<Byte> getRegisteredCodes() {
-        return Collections.unmodifiableSet(BY_CODE.keySet());
-    }
-
-    /**
-     * Clear all registered serializers and reset to defaults.
-     * <p>
-     * Package-private method intended for testing purposes only.
-     * Use with caution as it affects global state.
-     */
-    static void clear() {
-        BY_NAME.clear();
-        BY_CODE.clear();
-        register(new JsonEventSerializer());
-        register(new MsgPackEventSerializer());
+    public Set<Byte> getRegisteredCodes() {
+        return Collections.unmodifiableSet(byCode.keySet());
     }
 }

@@ -49,6 +49,7 @@ public class KafkaInTransport implements InTransport {
     private final List<String> topics;
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final EventSerializerFactory serializerFactory;
 
     /**
      * Poll timeout in milliseconds.
@@ -57,49 +58,68 @@ public class KafkaInTransport implements InTransport {
 
     /**
      * Create Kafka transport with bootstrap servers, topics, and group ID.
+     * Uses default EventSerializerFactory with JSON and MessagePack serializers.
      *
      * @param bootstrapServers Kafka bootstrap servers (e.g., "localhost:9092")
      * @param topicsConfig     comma-separated list of topics to subscribe to
      * @param groupId          consumer group ID
      */
     public KafkaInTransport(String bootstrapServers, String topicsConfig, String groupId) {
-        this(createConsumer(bootstrapServers, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor());
+        this(createConsumer(bootstrapServers, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor(), new EventSerializerFactory());
     }
 
     /**
      * Create Kafka transport with custom properties, topics, and group ID.
+     * Uses default EventSerializerFactory with JSON and MessagePack serializers.
      *
      * @param properties   Kafka consumer properties
      * @param topicsConfig comma-separated list of topics to subscribe to
      * @param groupId      consumer group ID
      */
     public KafkaInTransport(Properties properties, String topicsConfig, String groupId) {
-        this(createConsumer(properties, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor());
+        this(createConsumer(properties, groupId), parseTopics(topicsConfig), Executors.newSingleThreadExecutor(), new EventSerializerFactory());
     }
 
     /**
      * Create Kafka transport with custom consumer (for tests).
+     * Uses default EventSerializerFactory with JSON and MessagePack serializers.
      *
      * @param kafkaConsumer Kafka consumer instance
      * @param topics        list of topics to subscribe to
      */
     public KafkaInTransport(Consumer<String, byte[]> kafkaConsumer, List<String> topics) {
-        this(kafkaConsumer, topics, Executors.newSingleThreadExecutor());
+        this(kafkaConsumer, topics, Executors.newSingleThreadExecutor(), new EventSerializerFactory());
     }
 
     /**
-     * Create Kafka transport with custom consumer and executor (for tests).
+     * Create Kafka transport with custom consumer and serializer factory.
      *
-     * @param kafkaConsumer   Kafka consumer instance
-     * @param topics          list of topics to subscribe to
-     * @param executorService executor service for running the consumer loop
+     * @param kafkaConsumer      Kafka consumer instance
+     * @param topics             list of topics to subscribe to
+     * @param serializerFactory  serializer factory for event deserialization
      */
     public KafkaInTransport(Consumer<String, byte[]> kafkaConsumer,
                             List<String> topics,
-                            ExecutorService executorService) {
+                            EventSerializerFactory serializerFactory) {
+        this(kafkaConsumer, topics, Executors.newSingleThreadExecutor(), serializerFactory);
+    }
+
+    /**
+     * Create Kafka transport with custom consumer, executor, and serializer factory.
+     *
+     * @param kafkaConsumer      Kafka consumer instance
+     * @param topics             list of topics to subscribe to
+     * @param executorService    executor service for running the consumer loop
+     * @param serializerFactory  serializer factory for event deserialization
+     */
+    public KafkaInTransport(Consumer<String, byte[]> kafkaConsumer,
+                            List<String> topics,
+                            ExecutorService executorService,
+                            EventSerializerFactory serializerFactory) {
         this.topics = topics;
         this.kafkaConsumer = kafkaConsumer;
         this.executorService = executorService;
+        this.serializerFactory = serializerFactory;
     }
 
     @Override
@@ -160,7 +180,7 @@ public class KafkaInTransport implements InTransport {
                                  java.util.function.Consumer<Event> eventConsumer) {
         try {
             byte[] data = record.value();
-            EventSerializer serializer = EventSerializerFactory.getByData(data);
+            EventSerializer serializer = serializerFactory.getByData(data);
             Event event = serializer.deserialize(data, Event.class);
             eventConsumer.accept(event);
             log.debug("Event delivered from Kafka topic: {}, key: {}, event type: {}",

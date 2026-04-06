@@ -19,6 +19,12 @@ import com.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutTransport
  */
 public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
 
+    private final EventSerializerFactory serializerFactory;
+
+    public BroadcastKafkaOutTransportFactory(EventSerializerFactory serializerFactory) {
+        this.serializerFactory = serializerFactory;
+    }
+
     @Override
     public String getName() {
         return "broadcast-kafka";
@@ -37,7 +43,7 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
 
     private EventSerializer createSerializer(String format) {
         String name = (format == null || format.isBlank()) ? "json" : format;
-        return EventSerializerFactory.getByName(name);
+        return serializerFactory.getByName(name);
     }
 
     @Override
