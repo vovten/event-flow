@@ -7,11 +7,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Executors;
 
 /**
  * Configuration properties for Event Flow auto-configuration.
@@ -59,6 +55,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       max-size: 16
  *       queue-capacity: 100
  *       keep-alive-seconds: 60
+ *       concurrency-limit: 50
  *     transports:
  *       - name: local-queue
  *         capacity: 1000
@@ -128,38 +125,16 @@ public class EventFlowProperties {
 
         /**
          * Create an Executor based on this configuration.
+         * <p>
+         * Uses virtual threads by default for optimal I/O-bound performance.
+         * Falls back to platform thread pool if virtual threads are not available
+         * (Java < 21).
          *
          * @return configured executor
          */
         public Executor createExecutor() {
-            return new ThreadPoolExecutor(
-                    coreSize,
-                    maxSize,
-                    keepAliveSeconds,
-                    TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<>(queueCapacity),
-                    new EventFlowThreadFactory(threadNamePrefix),
-                    new ThreadPoolExecutor.CallerRunsPolicy()
-            );
-        }
-    }
-
-    /**
-     * Thread factory for event-flow async executors.
-     */
-    private static class EventFlowThreadFactory implements ThreadFactory {
-        private final String namePrefix;
-        private final AtomicInteger threadNumber = new AtomicInteger(1);
-
-        EventFlowThreadFactory(String namePrefix) {
-            this.namePrefix = namePrefix;
-        }
-
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread t = new Thread(r, namePrefix + threadNumber.getAndIncrement());
-            t.setDaemon(false);
-            return t;
+            // Use virtual threads by default (Java 21+)
+            return Executors.newVirtualThreadPerTaskExecutor();
         }
     }
 
@@ -212,6 +187,19 @@ public class EventFlowProperties {
         private int maxSize = 16;
         private int queueCapacity = 100;
         private int keepAliveSeconds = 60;
+        /**
+         * Maximum number of concurrent handler executions.
+         * Provides backpressure when using virtual thread executors.
+         * When 0 (default), no limit is applied.
+         * <p>
+         * <b>Recommended values:</b>
+         * <ul>
+         *   <li>I/O-bound handlers (DB, HTTP): 20-100</li>
+         *   <li>CPU-bound handlers: number of CPU cores</li>
+         *   <li>Mixed workload: 50-200</li>
+         * </ul>
+         */
+        private int concurrencyLimit = 0;
     }
 
     /**

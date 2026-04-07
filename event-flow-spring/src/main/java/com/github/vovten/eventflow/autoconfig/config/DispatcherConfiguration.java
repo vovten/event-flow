@@ -63,6 +63,10 @@ public class DispatcherConfiguration {
                 .executor(dispatcherExecutor)
                 .handlerRegistry(eventHandlerRegistry)
                 .transports(inTransports);
+        int concurrencyLimit = properties.getDispatcher().getThreadPool().getConcurrencyLimit();
+        if (concurrencyLimit > 0) {
+            builder.concurrencyLimit(concurrencyLimit);
+        }
         if (properties.getDispatcher().getIdempotent().isEnabled()) {
             EventFlowProperties.IdempotentConfig config = properties.getDispatcher().getIdempotent();
             builder.idempotent(config.getTtl(), config.getMaxSize(), config.isWarnOnDuplicate());

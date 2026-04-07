@@ -43,12 +43,15 @@ public class LocalQueueInTransport implements InTransport {
 
     /**
      * Create local-queue transport with existing queue and newSingleThreadExecutor service.
+     * <p>
+     * Uses a virtual thread for the consumer loop, which is optimal for I/O-bound
+     * event processing as it doesn't block a platform thread.
      *
      * @param eventQueue        the event queue to listen to
      */
     public LocalQueueInTransport(BlockingDeque<Event> eventQueue) {
         this.eventQueue = eventQueue;
-        this.executorService = Executors.newSingleThreadExecutor();
+        this.executorService = Executors.newVirtualThreadPerTaskExecutor();
     }
 
     /**

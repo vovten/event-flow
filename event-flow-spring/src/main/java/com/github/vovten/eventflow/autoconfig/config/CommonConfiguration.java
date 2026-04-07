@@ -14,10 +14,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.Executors;
 
 /**
  * Auto-configuration for common components: executor service and local-queue transports.
@@ -39,26 +38,15 @@ public class CommonConfiguration {
 
     /**
      * Creates executor service for async event delivery.
-     * Only created when event-flow is enabled.
+     * <p>
+     * Uses virtual threads by default for optimal I/O-bound performance.
      *
      * @return executor service for dispatcher
      */
     @Bean("dispatcherExecutor")
     public ExecutorService dispatcherExecutor() {
-        var tp = properties.getDispatcher().getThreadPool();
-        var msg = "Creating dispatcher executor: core={}, max={}, queue={}, rejection-policy=caller-runs";
-        log.info(msg, tp.getCoreSize(), tp.getMaxSize(), tp.getQueueCapacity());
-
-        var taskExecutor = new ThreadPoolTaskExecutor();
-        taskExecutor.setCorePoolSize(tp.getCoreSize());
-        taskExecutor.setMaxPoolSize(tp.getMaxSize());
-        taskExecutor.setQueueCapacity(tp.getQueueCapacity());
-        taskExecutor.setKeepAliveSeconds(tp.getKeepAliveSeconds());
-        taskExecutor.setThreadNamePrefix("event-flow-dispatcher-");
-        taskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        taskExecutor.initialize();
-
-        return taskExecutor.getThreadPoolExecutor();
+        log.info("Creating dispatcher executor with virtual threads");
+        return Executors.newVirtualThreadPerTaskExecutor();
     }
 
     /**

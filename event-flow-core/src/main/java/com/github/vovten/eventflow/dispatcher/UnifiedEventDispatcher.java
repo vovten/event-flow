@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -27,13 +28,20 @@ import static java.util.stream.Collectors.joining;
  *   <li>Thread-safe event delivery to handlers</li>
  *   <li>External handler registry injection</li>
  *   <li>Support for decorator pattern via external dispatch consumer injection</li>
- *   <li>Backpressure support via CallerRunsPolicy on executor (slows down transport consumers)</li>
+ *   <li>Backpressure support via concurrency semaphore (for virtual threads)
+ *       or CallerRunsPolicy (for platform thread pools)</li>
  * </ul>
  * <p>
  * <b>Backpressure behavior:</b>
- * When the executor thread pool is saturated, the CallerRunsPolicy causes the transport
- * consumer thread to execute the handler directly. This naturally slows down event polling
- * from transports, providing backpressure without event loss.
+ * <ul>
+ *   <li><b>With platform threads + CallerRunsPolicy:</b> When the executor thread pool
+ *       is saturated, the transport consumer thread executes the handler directly.
+ *       This naturally slows down event polling from transports.</li>
+ *   <li><b>With virtual threads + Semaphore:</b> A concurrency semaphore limits the
+ *       number of concurrent handler executions. When the semaphore is exhausted,
+ *       handler submission blocks until a slot is released, providing controlled
+ *       backpressure without overwhelming downstream systems.</li>
+ * </ul>
  * <p>
  * <b>Architecture:</b>
  * <pre>{@code
@@ -41,28 +49,6 @@ import static java.util.stream.Collectors.joining;
  *      ↓ Kafka
  *      ↓ Local-Queue
  *      ↓ Custom...
- * }</pre>
- * <p>
- * <b>Usage example:</b>
- * <pre>{@code
- * // Create transports
- * DispatcherTransport localQueueTransport = new LocalQueueDispatcherTransport(queue);
- * DispatcherTransport kafkaTransport = new KafkaDispatcherTransport(
- *     "localhost:9092", "events", "my-group"
- * );
- *
- * // Create handler registry
- * EventHandlerRegistry registry = new CompositeEventHandlerRegistry(
- *     List.of(annotationRegistry, subscriberRegistry)
- * );
- *
- * // Create dispatcher with multiple transports
- * UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
- *     executorService,
- *     List.of(localQueueTransport, kafkaTransport),
- *     registry
- * );
- * dispatcher.start(dispatcher::dispatch);
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -74,6 +60,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     private final ExecutorService executorService;
     private final EventHandlerRegistry handlerRegistry;
     private final List<InTransport> transports;
+    private final Semaphore concurrencySemaphore;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
@@ -86,9 +73,9 @@ public class UnifiedEventDispatcher implements EventDispatcher {
      * <p>
      * <b>Usage example:</b>
      * <pre>{@code
-     * ExecutorService executor = Executors.newFixedThreadPool(10);
+     * ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
      * EventDispatcher dispatcher = new UnifiedEventDispatcher(executor, registry, transports);
-     * 
+     *
      * try {
      *     dispatcher.start(consumer);
      *     // ... application work ...
@@ -105,9 +92,37 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     public UnifiedEventDispatcher(ExecutorService executorService,
                                   EventHandlerRegistry handlerRegistry,
                                   List<InTransport> transports) {
+        this(executorService, handlerRegistry, transports, null);
+    }
+
+    /**
+     * Create unified dispatcher with concurrency limiting for backpressure support.
+     * <p>
+     * When using virtual threads ({@code Executors.newVirtualThreadPerTaskExecutor()}),
+     * the executor never rejects tasks. Without a concurrency limit, a burst of events
+     * can spawn thousands of concurrent handler executions, potentially overwhelming
+     * downstream systems (databases, HTTP services).
+     * <p>
+     * The {@code concurrencySemaphore} limits the number of handler executions running
+     * simultaneously. When the semaphore is exhausted, handler submissions block until
+     * a slot becomes available, providing backpressure without rejecting events.
+     * <p>
+     * <b>Resource ownership:</b> This dispatcher does NOT close the provided
+     * {@code executorService}. The caller is responsible for shutting down the executor.
+     *
+     * @param executorService       executor service for async handler execution (NOT closed by dispatcher)
+     * @param handlerRegistry       custom handler registry
+     * @param transports            list of transports to listen to
+     * @param concurrencySemaphore  semaphore for limiting concurrent handler executions (null = unlimited)
+     */
+    public UnifiedEventDispatcher(ExecutorService executorService,
+                                  EventHandlerRegistry handlerRegistry,
+                                  List<InTransport> transports,
+                                  Semaphore concurrencySemaphore) {
         this.transports = transports;
         this.executorService = executorService;
         this.handlerRegistry = handlerRegistry;
+        this.concurrencySemaphore = concurrencySemaphore;
     }
 
     @Override
@@ -142,22 +157,42 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         }
         int totalHandlers = handlers.size();
         int submittedHandlers = 0;
-        
+
         for (EventHandler handler : handlers) {
             try {
-                executorService.execute(() -> handler.onEvent(event));
+                if (concurrencySemaphore != null) {
+                    concurrencySemaphore.acquire();
+                }
+                executorService.execute(() -> {
+                    try {
+                        handler.onEvent(event);
+                    } finally {
+                        if (concurrencySemaphore != null) {
+                            concurrencySemaphore.release();
+                        }
+                    }
+                });
                 submittedHandlers++;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Handler submission interrupted for event {} (handler {}/{}): {}",
+                        event.type().getSimpleName(),
+                        submittedHandlers + 1,
+                        totalHandlers,
+                        handler.getClass().getSimpleName(),
+                        e);
+                break;
             } catch (Exception e) {
                 log.error("Failed to submit handler for event {} (handler {}/{}): {}",
-                        event.type().getSimpleName(), 
-                        submittedHandlers + 1, 
+                        event.type().getSimpleName(),
+                        submittedHandlers + 1,
                         totalHandlers,
-                        handler.getClass().getSimpleName(), 
+                        handler.getClass().getSimpleName(),
                         e);
             }
         }
         if (submittedHandlers < totalHandlers) {
-            log.warn("Partial handler submission for event {}: {}/{} handlers submitted", 
+            log.warn("Partial handler submission for event {}: {}/{} handlers submitted",
                     event.type().getSimpleName(), submittedHandlers, totalHandlers);
         }
     }

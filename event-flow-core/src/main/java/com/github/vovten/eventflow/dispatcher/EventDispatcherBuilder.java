@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 
 /**
  * Fluent builder for creating configured {@link EventDispatcher} instances.
@@ -26,6 +27,15 @@ import java.util.concurrent.ExecutorService;
  *     .executor(executorService)
  *     .handlerRegistry(registry)
  *     .transports(transports)
+ *     .build();
+ * dispatcher.start(dispatcher::dispatch);
+ *
+ * // Dispatcher with concurrency limit (for virtual threads)
+ * EventDispatcher dispatcher = EventDispatcherBuilder.create()
+ *     .executor(Executors.newVirtualThreadPerTaskExecutor())
+ *     .handlerRegistry(registry)
+ *     .transports(transports)
+ *     .concurrencyLimit(50)
  *     .build();
  * dispatcher.start(dispatcher::dispatch);
  *
@@ -79,6 +89,7 @@ public final class EventDispatcherBuilder {
     private ExecutorService executorService;
     private EventHandlerRegistry handlerRegistry;
     private final List<InTransport> transports = new ArrayList<>();
+    private Integer concurrencyLimit = null;
     private boolean idempotent = false;
     private Duration idempotentTtl = Duration.ofMinutes(10);
     private long idempotentMaxSize = 10_000;
@@ -154,6 +165,43 @@ public final class EventDispatcherBuilder {
     }
 
     /**
+     * Set concurrency limit for handler execution.
+     * <p>
+     * When using virtual threads, the executor never rejects tasks. Without a limit,
+     * a burst of events can spawn thousands of concurrent handler executions,
+     * potentially overwhelming downstream systems (databases, HTTP services).
+     * <p>
+     * The concurrency limit acts as a semaphore: when all slots are occupied,
+     * handler submission blocks until a slot is released. This provides
+     * backpressure similar to CallerRunsPolicy but works with virtual threads.
+     * <p>
+     * <b>When to use:</b>
+     * <ul>
+     *   <li>Virtual thread executors with I/O-bound handlers</li>
+     *   <li>Protecting downstream systems from overload</li>
+     *   <li>Controlling memory usage during event bursts</li>
+     * </ul>
+     * <p>
+     * <b>Recommended values:</b>
+     * <ul>
+     *   <li>I/O-bound handlers (DB, HTTP): 20-100</li>
+     *   <li>CPU-bound handlers: number of CPU cores</li>
+     *   <li>Mixed workload: 50-200</li>
+     * </ul>
+     *
+     * @param maxConcurrent maximum number of concurrent handler executions
+     * @return this builder
+     * @throws IllegalArgumentException if maxConcurrent &lt;= 0
+     */
+    public EventDispatcherBuilder concurrencyLimit(int maxConcurrent) {
+        if (maxConcurrent <= 0) {
+            throw new IllegalArgumentException("Concurrency limit must be positive: " + maxConcurrent);
+        }
+        this.concurrencyLimit = maxConcurrent;
+        return this;
+    }
+
+    /**
      * Enable idempotent event processing with default settings:
      * <ul>
      *   <li>TTL: 10 minutes</li>
@@ -209,17 +257,15 @@ public final class EventDispatcherBuilder {
         if (handlerRegistry == null) {
             throw new IllegalStateException("EventHandlerRegistry must be configured");
         }
-
-        // Start with base dispatcher
-        EventDispatcher dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, transports);
-
-        // Apply custom decorators (innermost first)
+        Semaphore semaphore = concurrencyLimit != null ? new Semaphore(concurrencyLimit) : null;
+        EventDispatcher dispatcher = new UnifiedEventDispatcher(
+                executorService, handlerRegistry, transports, semaphore
+        );
+        // Apply custom decorators
         for (DecoratorFunction decorator : decorators) {
             dispatcher = decorator.apply(dispatcher);
             log.debug("Applied custom decorator: {}", decorator.getClass().getSimpleName());
         }
-
-        // Apply idempotent decorator if configured
         if (idempotent) {
             dispatcher = new IdempotentEventDispatcher(
                     dispatcher,
@@ -230,7 +276,9 @@ public final class EventDispatcherBuilder {
             log.debug("Applied idempotent decorator with ttl={}, maxSize={}, warnOnDuplicate={}",
                     idempotentTtl, idempotentMaxSize, idempotentWarnOnDuplicate);
         }
-
+        if (concurrencyLimit != null) {
+            log.info("Concurrency limit applied: max {} concurrent handler executions", concurrencyLimit);
+        }
         return dispatcher;
     }
 
@@ -241,10 +289,12 @@ public final class EventDispatcherBuilder {
      */
     public EventDispatcher buildAndLog() {
         EventDispatcher dispatcher = build();
-        log.info("Built EventDispatcher with configuration: transports={}, idempotent={}, customDecorators={}",
+        String concurrencyInfo = concurrencyLimit != null ? "limit=" + concurrencyLimit : "unlimited";
+        log.info("Built EventDispatcher with configuration: transports={}, idempotent={}, customDecorators={}, concurrency={}",
                 transports.size(),
                 idempotent ? "enabled" : "disabled",
-                decorators.size()
+                decorators.size(),
+                concurrencyInfo
         );
         return dispatcher;
     }
