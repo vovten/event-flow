@@ -5,7 +5,8 @@ import com.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
@@ -29,10 +30,11 @@ import static java.util.stream.Collectors.joining;
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-@Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class RegistryConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(RegistryConfiguration.class);
 
     private final EventFlowProperties properties;
 

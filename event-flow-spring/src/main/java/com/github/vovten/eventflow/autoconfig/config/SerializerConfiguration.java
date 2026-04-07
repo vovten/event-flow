@@ -4,7 +4,8 @@ import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.serialization.EventTypeRegistry;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -43,9 +44,10 @@ import java.util.Map;
  * @see EventSerializerFactory
  * @see EventTypeRegistry
  */
-@Slf4j
 @Configuration(proxyBeanMethods = false)
 public class SerializerConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(SerializerConfiguration.class);
 
     private final Map<String, EventSerializer> serializers;
     private final EventFlowProperties properties;

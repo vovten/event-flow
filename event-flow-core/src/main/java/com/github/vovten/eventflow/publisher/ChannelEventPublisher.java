@@ -2,7 +2,8 @@ package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -86,8 +87,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see RetryEventPublisher
  * @see SilentEventPublisher
  */
-@Slf4j
 public class ChannelEventPublisher implements EventPublisher {
+
+    private static final Logger log = LoggerFactory.getLogger(ChannelEventPublisher.class);
 
     private final Map<Class<? extends EventChannel>, EventChannel> channels;
 

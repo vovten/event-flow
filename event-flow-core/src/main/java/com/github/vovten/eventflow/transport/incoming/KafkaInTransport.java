@@ -4,7 +4,8 @@ import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.InTransport;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -51,8 +52,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 2026-03-06
  * @see EventSerializerFactory
  */
-@Slf4j
 public class KafkaInTransport implements InTransport, AutoCloseable {
+
+    private static final Logger log = LoggerFactory.getLogger(KafkaInTransport.class);
 
     private final Consumer<String, byte[]> kafkaConsumer;
     private final List<String> topics;

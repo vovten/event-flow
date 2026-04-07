@@ -2,7 +2,8 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.InTransport;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -83,8 +84,9 @@ import java.util.concurrent.Semaphore;
  * @author Vladimir Aleshkov
  * @since 2026-03-30
  */
-@Slf4j
 public final class EventDispatcherBuilder {
+
+    private static final Logger log = LoggerFactory.getLogger(EventDispatcherBuilder.class);
 
     private ExecutorService executorService;
     private EventHandlerRegistry handlerRegistry;

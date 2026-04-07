@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.github.vovten.eventflow.event.Event;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Polymorphic type validator for secure event deserialization.
@@ -21,8 +22,9 @@ import lombok.extern.slf4j.Slf4j;
  * @author Vladimir Aleshkov
  * @since 2026-04-05
  */
-@Slf4j
 public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base {
+
+    private static final Logger log = LoggerFactory.getLogger(EventPolymorphicTypeValidator.class);
 
     /**
      * Validate the base type (the type passed to readValue).

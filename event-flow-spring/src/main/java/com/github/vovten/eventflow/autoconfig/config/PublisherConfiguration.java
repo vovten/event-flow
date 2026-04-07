@@ -5,7 +5,8 @@ import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -25,10 +26,11 @@ import static java.util.stream.Collectors.toMap;
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-@Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class PublisherConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(PublisherConfiguration.class);
 
     private final EventFlowProperties properties;
     private final Map<String, OutTransportFactory> publisherTransportFactories;

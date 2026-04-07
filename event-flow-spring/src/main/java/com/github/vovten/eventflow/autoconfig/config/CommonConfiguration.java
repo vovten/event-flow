@@ -8,7 +8,8 @@ import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTranspo
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
 import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -24,11 +25,12 @@ import java.util.concurrent.Executors;
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-@Slf4j
 @Configuration(proxyBeanMethods = false)
 @DependsOn("serializerRegistrationComplete")
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class CommonConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(CommonConfiguration.class);
 
     private final EventFlowProperties properties;
 

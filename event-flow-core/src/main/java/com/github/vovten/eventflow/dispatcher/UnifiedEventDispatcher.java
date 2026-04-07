@@ -4,7 +4,8 @@ import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.InTransport;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -54,8 +55,9 @@ import static java.util.stream.Collectors.joining;
  * @author Vladimir Aleshkov
  * @since 2026-03-06
  */
-@Slf4j
 public class UnifiedEventDispatcher implements EventDispatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(UnifiedEventDispatcher.class);
 
     private final ExecutorService executorService;
     private final EventHandlerRegistry handlerRegistry;

@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.EventSubscriber;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
 
@@ -52,8 +53,9 @@ import java.util.function.Supplier;
  * @see SpringEventListenerRegistry
  * @see SpringEventSubscriberRegistry
  */
-@Slf4j
 public final class SpringEventHandlerRegistryBuilder extends EventHandlerRegistryBuilder<SpringEventHandlerRegistryBuilder> {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringEventHandlerRegistryBuilder.class);
 
     private final ApplicationContext applicationContext;
 

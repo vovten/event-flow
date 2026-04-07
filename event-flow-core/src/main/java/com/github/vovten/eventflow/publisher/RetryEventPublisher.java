@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -51,8 +52,9 @@ import java.util.concurrent.TimeUnit;
  * @see ChannelEventPublisher
  * @since 2026-03-05
  */
-@Slf4j
 public class RetryEventPublisher implements EventPublisher {
+
+    private static final Logger log = LoggerFactory.getLogger(RetryEventPublisher.class);
 
     private final EventPublisher origin;
     private final int maxRetries;

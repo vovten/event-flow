@@ -2,7 +2,8 @@ package com.github.vovten.eventflow.serialization;
 
 import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import com.github.vovten.eventflow.serialization.msgpack.MsgPackEventSerializer;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Map;
@@ -29,8 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Vladimir Aleshkov
  * @since 2026-03-30
  */
-@Slf4j
 public class EventSerializerFactory {
+
+    private static final Logger log = LoggerFactory.getLogger(EventSerializerFactory.class);
 
     private static final byte JSON_START_BYTE = 0x7B;
 
