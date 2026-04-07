@@ -41,10 +41,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ImportAutoConfiguration(exclude = com.github.vovten.eventflow.autoconfig.EventFlowDisabledAutoConfiguration.class)
 @EmbeddedKafka(
         partitions = 1,
-        brokerProperties = {
-                "listeners=PLAINTEXT://localhost:9092",
-                "port=9092"
-        },
         topics = {"test-events"}
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
