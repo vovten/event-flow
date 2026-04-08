@@ -2,11 +2,11 @@ package com.github.vovten.eventflow.autoconfig;
 
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 import com.github.vovten.eventflow.publisher.EventPublisher;
-import org.checkerframework.checker.nullness.qual.NonNull;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.type.AnnotatedTypeMetadata;
+import org.springframework.lang.NonNull;
 
 import java.util.Objects;
 
