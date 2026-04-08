@@ -55,12 +55,12 @@ public class KafkaInTransportFactory implements InTransportFactory {
     public void validate(EventFlowProperties.TransportConfig config) {
         if (config.getServers() == null) {
             throw new IllegalStateException(
-                "Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
+                    "Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
         if (config.getTopic() == null) {
             throw new IllegalStateException(
-                "Kafka transport requires topic configuration"
+                    "Kafka transport requires topic configuration"
             );
         }
     }

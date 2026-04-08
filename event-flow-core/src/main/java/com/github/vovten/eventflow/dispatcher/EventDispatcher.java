@@ -46,7 +46,6 @@ public interface EventDispatcher {
      */
     void start(Consumer<Event> dispatchConsumer);
 
-
     /**
      * Stop the dispatcher and all configured transports.
      * <p>

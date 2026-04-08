@@ -50,12 +50,12 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
     public void validate(EventFlowProperties.TransportConfig config) {
         if (config.getServers() == null) {
             throw new IllegalStateException(
-                "Broadcast Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
+                    "Broadcast Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
         if (config.getTopic() == null) {
             throw new IllegalStateException(
-                "Broadcast Kafka transport requires topic configuration"
+                    "Broadcast Kafka transport requires topic configuration"
             );
         }
     }
