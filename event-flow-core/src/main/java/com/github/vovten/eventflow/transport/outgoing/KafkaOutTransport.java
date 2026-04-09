@@ -1,55 +1,58 @@
 package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.publisher.RetryEventPublisher;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import com.github.vovten.eventflow.transport.OutTransport;
-import com.github.vovten.eventflow.transport.TransportException;
+import com.github.vovten.eventflow.transport.SendResult;
+import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CompletableFuture;
 
 import static org.apache.kafka.clients.producer.ProducerConfig.*;
 
 /**
- * Kafka publisher transport for external event delivery.
+ * Kafka transport for sending events asynchronously.
  * <p>
- * This transport implements {@link AutoCloseable} to ensure proper resource cleanup.
- * Always close the transport when it's no longer needed:
- * <pre>{@code
- * try (KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "events")) {
- *     transport.send(event);
- * }
- * }</pre>
+ * Uses Kafka's async API with callback-based delivery. The caller receives
+ * a {@link CompletableFuture} that completes when Kafka acknowledges the send.
  * <p>
- * This transport sends events to an Apache Kafka topic using <b>synchronous</b> delivery.
- * Each event is sent and the transport waits for acknowledgment from Kafka brokers.
- * This ensures reliable delivery — if the send fails, an exception is thrown immediately.
- * <p>
- * <b>Reliability features:</b>
- * <ul>
- *   <li>Synchronous send with timeout (10 seconds)</li>
- *   <li>Waits for acknowledgment from all in-sync replicas (acks=all)</li>
- *   <li>Idempotent producer enabled (no duplicates)</li>
- *   <li>Automatic retries on transient failures (3 retries)</li>
- * </ul>
+ * <b>Configuration:</b>
+ * Sets acks=all, idempotent producer, 3 retries, 30s delivery timeout by default.
+ * Buffer memory (32MB) and max block time (5s) provide backpressure support.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
- * @see RetryEventPublisher
- * @see EventSerializer
  */
 public class KafkaOutTransport implements OutTransport, AutoCloseable {
+
+    private static final Logger log = LoggerFactory.getLogger(KafkaOutTransport.class);
+
+    private static final long DEFAULT_BUFFER_MEMORY = 33_554_432;
+    private static final long DEFAULT_MAX_BLOCK_MS = 5000;
 
     protected KafkaProducer<String, byte[]> producer;
     protected String topic;
     protected final EventSerializer serializer;
+    protected volatile boolean closed = false;
+
+    /**
+     * Create Kafka transport with default JSON serializer.
+     *
+     * @param properties Kafka producer configuration
+     * @param topic      Kafka topic name
+     */
+    public KafkaOutTransport(Properties properties, String topic) {
+        this(properties, topic, new JsonEventSerializer());
+    }
 
     /**
      * Create Kafka transport with custom serializer.
@@ -61,22 +64,19 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
     public KafkaOutTransport(Properties properties, String topic, EventSerializer serializer) {
         Properties props = new Properties();
         props.putAll(properties);
-        this.serializer = serializer;
+        this.serializer = Objects.requireNonNull(serializer, "Serializer must not be null");
 
         props.putIfAbsent(KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
         props.putIfAbsent(VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
-        this.producer = new KafkaProducer<>(props);
-        this.topic = topic;
-    }
+        props.putIfAbsent(ACKS_CONFIG, "all");
+        props.putIfAbsent(ENABLE_IDEMPOTENCE_CONFIG, "true");
+        props.putIfAbsent(RETRIES_CONFIG, "3");
+        props.putIfAbsent(DELIVERY_TIMEOUT_MS_CONFIG, "30000");
+        props.putIfAbsent(BUFFER_MEMORY_CONFIG, String.valueOf(DEFAULT_BUFFER_MEMORY));
+        props.putIfAbsent(MAX_BLOCK_MS_CONFIG, String.valueOf(DEFAULT_MAX_BLOCK_MS));
 
-    /**
-     * Create Kafka transport with default JSON serializer.
-     *
-     * @param properties Kafka producer configuration
-     * @param topic      Kafka topic name
-     */
-    public KafkaOutTransport(Properties properties, String topic) {
-        this(properties, topic, new JsonEventSerializer());
+        this.producer = new KafkaProducer<>(props);
+        this.topic = Objects.requireNonNull(topic, "Topic must not be null");
     }
 
     /**
@@ -103,12 +103,6 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
     private static Properties createDefaultProperties(String bootstrapServers) {
         Properties props = new Properties();
         props.setProperty(BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.setProperty(KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
-        props.setProperty(VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
-        props.setProperty(ACKS_CONFIG, "all");
-        props.setProperty(ENABLE_IDEMPOTENCE_CONFIG, "true");
-        props.setProperty(RETRIES_CONFIG, "3");
-        props.setProperty(DELIVERY_TIMEOUT_MS_CONFIG, "30000");
         return props;
     }
 
@@ -118,79 +112,76 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
     }
 
     /**
-     * Send event to Kafka topic synchronously.
+     * Send event to Kafka asynchronously. Returns immediately with a CompletableFuture
+     * that completes when Kafka acknowledges the send.
      * <p>
-     * This method sends the event and waits for acknowledgment from Kafka brokers.
-     * The send operation has a timeout of 10 seconds. If the send fails, an
-     * {@link TransportException} is thrown.
-     * <p>
-     * <b>Reliability guarantees:</b>
-     * <ul>
-     *   <li>Event is serialized with format header (magic byte)</li>
-     *   <li>Waits for acknowledgment from all in-sync replicas</li>
-     *   <li>Throws exception on any failure (network, broker, serialization)</li>
-     * </ul>
+     * Example:
+     * <pre>{@code
+     * transport.send(event)
+     *     .thenAccept(result -> log.info("Sent to {}", result.destination()))
+     *     .exceptionally(ex -> { log.error("Failed", ex); return null; });
+     * }</pre>
      *
      * @param event the event to send
-     * @throws TransportException if send fails (network error, timeout, etc.)
+     * @return CompletableFuture with SendResult
+     * @throws IllegalStateException if transport is closed
      */
     @Override
-    public void send(Event event) {
-        String key = event.type().getName();
-        byte[] value = serializer.serialize(event);
-        trySend(event, new ProducerRecord<>(topic, key, value));
+    public CompletableFuture<SendResult> send(Event event) {
+        if (closed) {
+            throw new IllegalStateException("KafkaOutTransport is already closed");
+        }
+        CompletableFuture<SendResult> future = new CompletableFuture<>();
+        try {
+            String key = event.type().getName();
+            byte[] value = serializer.serialize(event);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
+            producer.send(record, createSendCallback(future, topic));
+        } catch (Exception e) {
+            future.completeExceptionally(e);
+        }
+        return future;
     }
 
     /**
-     * Send a producer record with synchronous delivery.
-     * <p>
-     * This method is protected to allow subclasses to customize send behavior.
+     * Create a Kafka callback that completes the future with success or failure result.
      *
-     * @param event  the event being sent
-     * @param record the producer record to send
-     * @throws TransportException if send fails
+     * @param future        the CompletableFuture to complete
+     * @param topic         the Kafka topic name
+     * @return Kafka Callback implementation
      */
-    protected void trySend(Event event, ProducerRecord<String, byte[]> record) {
-        try {
-            // Synchronous send with 10 second timeout
-            RecordMetadata metadata = producer.send(record).get(10, TimeUnit.SECONDS);
-
-            if (metadata == null || !metadata.hasOffset()) {
-                throw new TransportException(
-                        String.format("Kafka returned null metadata for event %s", event.type().getSimpleName())
-                );
+    protected Callback createSendCallback(CompletableFuture<SendResult> future, String topic) {
+        return (metadata, exception) -> {
+            String destination = topic + (metadata != null ? "-p" + metadata.partition() : "");
+            if (exception != null) {
+                future.complete(SendResult.failure(destination, exception, buildMetaData(metadata)));
+            } else {
+                future.complete(SendResult.success(destination, buildMetaData(metadata)));
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new TransportException(
-                    String.format("Kafka send interrupted for event %s", event.type().getSimpleName()),
-                    e
-            );
-        } catch (ExecutionException e) {
-            throw new TransportException(
-                    String.format("Failed to send event %s to Kafka topic %s: %s",
-                            event.type().getSimpleName(), topic, e.getCause().getMessage()),
-                    e.getCause()
-            );
-        } catch (TimeoutException e) {
-            throw new TransportException(
-                    String.format("Timeout sending event %s to Kafka topic %s (timeout: 10s)",
-                            event.type().getSimpleName(), topic),
-                    e
-            );
-        }
+        };
+    }
+
+    private Map<String, Object> buildMetaData(RecordMetadata metadata) {
+        return metadata != null
+                ? Map.of(
+                "partition", metadata.partition(),
+                "offset", metadata.offset(),
+                "topic", metadata.topic())
+                : Map.of();
     }
 
     /**
      * Close the Kafka producer and release all resources.
-     * <p>
-     * This method is idempotent and safe to call multiple times.
-     * After closing, the transport cannot be used again.
+     * Safe to call multiple times.
      */
     @Override
     public void close() {
-        if (producer != null) {
+        if (!closed && producer != null) {
+            closed = true;
             producer.close();
+            if (log.isDebugEnabled()) {
+                log.debug("KafkaOutTransport closed for topic '{}'", topic);
+            }
         }
     }
 }

@@ -2,30 +2,15 @@ package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
-import com.github.vovten.eventflow.transport.TransportException;
+import com.github.vovten.eventflow.transport.SendResult;
 
+import java.util.Map;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Local-queue publisher transport for internal event delivery.
- * <p>
- * This transport uses a bounded {@link BlockingDeque} to queue events
- * for consumption by local event dispatchers. It provides backpressure support
- * by rejecting events when the queue is full.
- * <p>
- * <b>When to use:</b>
- * <ul>
- *   <li>In-application event communication</li>
- *   <li>Asynchronous processing within a single JVM</li>
- *   <li>Lightweight event queuing without external dependencies</li>
- * </ul>
- * <p>
- * <b>Configuration example:</b>
- * <pre>{@code
- * BlockingDeque<Event> queue = new LinkedBlockingDeque<>(1000);
- * PublisherTransport transport = new LocalQueuePublisherTransport(queue);
- * EventChannel channel = new InternalEventChannel(List.of(transport));
- * }</pre>
+ * In-JVM transport that queues events using a bounded {@link BlockingDeque}.
+ * Provides backpressure by returning a failed SendResult when the queue is full.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
@@ -35,7 +20,7 @@ public class LocalQueueOutTransport implements OutTransport {
     private final BlockingDeque<Event> eventQueue;
 
     /**
-     * Create local-queue transport with existing queue.
+     * Create local-queue transport with an existing queue.
      *
      * @param eventQueue the event queue to use
      */
@@ -49,9 +34,13 @@ public class LocalQueueOutTransport implements OutTransport {
     }
 
     @Override
-    public void send(Event event) {
+    public CompletableFuture<SendResult> send(Event event) {
         if (!eventQueue.offer(event)) {
-            throw new TransportException("Queue is full, event rejected: " + event);
+            return CompletableFuture.completedFuture(
+                    SendResult.failure("local-queue", null, "Queue is full, event rejected")
+            );
         }
+        Map<String, Object> metadata = Map.of("queueSize", eventQueue.size());
+        return CompletableFuture.completedFuture(SendResult.success("local-queue", metadata));
     }
 }

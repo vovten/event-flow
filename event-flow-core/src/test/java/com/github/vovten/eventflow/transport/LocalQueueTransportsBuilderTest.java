@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -146,8 +147,8 @@ class LocalQueueTransportsBuilderTest {
     }
 
     @Test
-    @DisplayName("Should reject events when shared queue is full")
-    void shouldRejectEventsWhenSharedQueueIsFull() {
+    @DisplayName("Should return failed result when shared queue is full")
+    void shouldReturnFailedResultWhenSharedQueueIsFull() {
         // Arrange
         LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queueSize(2)
@@ -156,11 +157,12 @@ class LocalQueueTransportsBuilderTest {
         // Act
         transports.publisher().send(new TestEvent(1));
         transports.publisher().send(new TestEvent(2));
+        CompletableFuture<SendResult> future = transports.publisher().send(new TestEvent(3));
 
         // Assert
-        assertThrows(TransportException.class, () ->
-                transports.publisher().send(new TestEvent(3))
-        );
+        SendResult result = future.join();
+        assertFalse(result.success());
+        assertTrue(result.errorDetails().contains("Queue is full"));
     }
 
     @Test

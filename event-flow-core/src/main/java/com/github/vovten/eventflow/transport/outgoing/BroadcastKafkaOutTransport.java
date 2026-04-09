@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.serialization.EventSerializer;
+import com.github.vovten.eventflow.transport.SendResult;
 import com.github.vovten.eventflow.transport.TransportException;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.PartitionInfo;
@@ -11,44 +12,20 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Broadcast Kafka publisher transport for event delivery to all topic partitions.
+ * Kafka transport that sends events to all topic partitions.
  * <p>
- * This transport extends {@link KafkaOutTransport} to provide
- * broadcast functionality — it sends each event to <b>all partitions</b> of the topic.
- * This is useful when you need to ensure that all consumers across all partitions
- * receive the event.
- * <p>
- * <b>Error handling behavior:</b>
- * <ul>
- *   <li>If sending fails for all partitions — throws {@link TransportException}</li>
- *   <li>If sending fails for some partitions — logs a WARN message with details</li>
- *   <li>If sending succeeds for all partitions — event is delivered successfully</li>
- * </ul>
- * <p>
- * <b>When to use:</b>
- * <ul>
- *   <li>Broadcast events that must be received by all consumers</li>
- *   <li>Configuration updates across microservices</li>
- *   <li>System-wide announcements</li>
- *   <li>Cache invalidation signals</li>
- * </ul>
- * <p>
- * <b>Configuration example:</b>
- * <pre>{@code
- * Properties props = new Properties();
- * props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
- * PublisherTransport transport = new BroadcastKafkaPublisherTransport(props, "events");
- * }</pre>
+ * If all partitions fail, the result contains the error.
+ * If some partitions fail, a warning is logged and the first successful result is returned.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-13
- * @see KafkaOutTransport
  */
 public class BroadcastKafkaOutTransport extends KafkaOutTransport {
 
-    private static final Logger logger = LoggerFactory.getLogger(BroadcastKafkaOutTransport.class);
+    private static final Logger log = LoggerFactory.getLogger(BroadcastKafkaOutTransport.class);
 
     /**
      * Create broadcast Kafka transport with custom configuration.
@@ -91,11 +68,11 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
      *   <li>If some sends fail — logs a warning with partition details</li>
      * </ul>
      *
-     * @param event                           the event to send
-     * @throws TransportException if sending fails for all partitions
+     * @param event the event to send
+     * @return CompletableFuture with SendResult from the first successful partition
      */
     @Override
-    public void send(Event event) {
+    public CompletableFuture<SendResult> send(Event event) {
         List<PartitionInfo> partitions = producer.partitionsFor(topic);
         if (partitions.isEmpty()) {
             throw new TransportException(
@@ -104,65 +81,77 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
         }
         String key = event.type().getName();
         byte[] value = serializer.serialize(event);
-        List<Integer> successfulPartitions = new ArrayList<>();
-        List<PartitionSendResult> failedPartitions = new ArrayList<>();
+        List<CompletableFuture<PartitionSendResult>> futures = new ArrayList<>();
 
         for (PartitionInfo partition : partitions) {
             int partitionId = partition.partition();
-            try {
-                ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, partitionId, key, value);
-                trySend(event, record);
-                successfulPartitions.add(partitionId);
-            } catch (TransportException e) {
-                failedPartitions.add(new PartitionSendResult(partitionId, e));
-            }
+            CompletableFuture<SendResult> sendFuture = new CompletableFuture<>();
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, partitionId, key, value);
+            producer.send(record, createSendCallback(sendFuture, topic + "-p" + partitionId));
+            CompletableFuture<PartitionSendResult> partitionFuture = sendFuture
+                    .thenApply(result -> new PartitionSendResult(partitionId, result, null))
+                    .exceptionally(ex -> new PartitionSendResult(partitionId, null, ex));
+            futures.add(partitionFuture);
         }
-        handleSendResults(event, partitions.size(), successfulPartitions, failedPartitions);
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> applyBroadcastStrategy(collectResults(futures), event, partitions.size()));
     }
 
-    /**
-     * Get partition information for the topic.
-     *
-     * @return list of partition info
-     */
-    protected List<PartitionInfo> getPartitions() {
-        return producer.partitionsFor(topic);
-    }
-
-    /**
-     * Handle send results and apply error handling logic.
-     *
-     * @param event                the event that was sent
-     * @param totalPartitions      total number of partitions
-     * @param successfulPartitions list of successfully sent partition IDs
-     * @param failedPartitions     list of failed partition send results
-     * @throws TransportException if all sends failed
-     */
-    protected void handleSendResults(
+    private SendResult applyBroadcastStrategy(
+            List<PartitionSendResult> results,
             Event event,
-            int totalPartitions,
-            List<Integer> successfulPartitions,
-            List<PartitionSendResult> failedPartitions
+            int totalPartitions
     ) {
-        int successCount = successfulPartitions.size();
-        int failCount = failedPartitions.size();
+        List<Integer> successfulPartitions = extractSuccessfulPartitions(results);
+        List<PartitionSendResult> failedPartitions = extractFailedPartitions(results);
 
-        if (successCount == 0) {
+        if (successfulPartitions.isEmpty()) {
             String errorMessage = buildErrorMessage(event, totalPartitions, failedPartitions);
-            Throwable cause = failedPartitions.getFirst().exception();
-            throw new TransportException(errorMessage, cause);
+            PartitionSendResult firstFailure = failedPartitions.getFirst();
+            Throwable cause = firstFailure.exception() != null
+                    ? firstFailure.exception()
+                    : firstFailure.sendResult().error();
+            return SendResult.failure(topic, cause, errorMessage);
         }
-
-        if (failCount > 0) {
-            logger.warn(buildWarningMessage(event, totalPartitions, successfulPartitions, failedPartitions));
+        if (!failedPartitions.isEmpty()) {
+            log.warn(buildWarningMessage(event, totalPartitions, successfulPartitions, failedPartitions));
         }
-
-        if (logger.isDebugEnabled() && successCount == totalPartitions) {
-            logger.debug(
+        if (log.isDebugEnabled() && successfulPartitions.size() == totalPartitions) {
+            log.debug(
                     "Successfully broadcast event {} to all {} partitions of topic '{}'",
                     event.type().getSimpleName(), totalPartitions, topic
             );
         }
+        return findFirstSuccessfulResult(results, topic);
+    }
+
+    private List<PartitionSendResult> collectResults(
+            List<CompletableFuture<PartitionSendResult>> futures
+    ) {
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .toList();
+    }
+
+    private List<Integer> extractSuccessfulPartitions(List<PartitionSendResult> results) {
+        return results.stream()
+                .filter(r -> r.sendResult() != null && r.sendResult().success())
+                .map(PartitionSendResult::partitionId)
+                .toList();
+    }
+
+    private List<PartitionSendResult> extractFailedPartitions(List<PartitionSendResult> results) {
+        return results.stream()
+                .filter(r -> r.exception() != null || (r.sendResult() != null && !r.sendResult().success()))
+                .toList();
+    }
+
+    private SendResult findFirstSuccessfulResult(List<PartitionSendResult> results, String topic) {
+        return results.stream()
+                .map(PartitionSendResult::sendResult)
+                .filter(r -> r != null && r.success())
+                .findFirst()
+                .orElse(SendResult.failure(topic, "All partitions failed"));
     }
 
     private String buildErrorMessage(
@@ -175,14 +164,13 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
                 "Failed to broadcast event %s to any partition of topic '%s' (0/%d successful)",
                 event.type().getSimpleName(), topic, totalPartitions
         ));
-
         if (!failedPartitions.isEmpty()) {
             sb.append(". Failures:");
             for (PartitionSendResult result : failedPartitions) {
                 sb.append(String.format(
                         " [partition=%d: %s]",
                         result.partitionId(),
-                        result.exception().getMessage()
+                        result.exception() != null ? result.exception().getMessage() : result.sendResult().errorDetails()
                 ));
             }
         }
@@ -207,19 +195,15 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
             sb.append(String.format(
                     " [partition=%d: %s]",
                     result.partitionId(),
-                    result.exception().getMessage()
+                    result.exception() != null ? result.exception().getMessage() : result.sendResult().errorDetails()
             ));
         }
-
         return sb.toString();
     }
 
     /**
-     * Record holding partition send failure information.
-     *
-     * @param partitionId the partition ID that failed
-     * @param exception   the exception that occurred
+     * Holds the result of sending an event to a single partition.
      */
-    protected record PartitionSendResult(int partitionId, TransportException exception) {
+    protected record PartitionSendResult(int partitionId, SendResult sendResult, Throwable exception) {
     }
 }

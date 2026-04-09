@@ -2,6 +2,8 @@ package com.github.vovten.eventflow.transport;
 
 import com.github.vovten.eventflow.event.Event;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Outgoing transport — a mechanism for sending events to external destinations.
  * <p>
@@ -32,12 +34,10 @@ public interface OutTransport {
     String name();
 
     /**
-     * Send an event.
-     * <p>
-     * Implementations should handle the actual delivery of the event.
-     * Any exceptions during delivery will propagate to the caller.
+     * Send an event asynchronously.
      *
      * @param event the event to send
+     * @return CompletableFuture that completes with SendResult
      */
-    void send(Event event);
+    CompletableFuture<SendResult> send(Event event);
 }

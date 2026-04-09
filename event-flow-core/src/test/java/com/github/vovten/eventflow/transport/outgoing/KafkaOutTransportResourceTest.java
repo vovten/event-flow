@@ -1,8 +1,9 @@
 package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.test.TestEvent;
+import com.github.vovten.eventflow.transport.SendResult;
+import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,7 +14,10 @@ import org.mockito.MockitoAnnotations;
 import java.lang.reflect.Field;
 import java.util.concurrent.CompletableFuture;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -30,10 +34,12 @@ class KafkaOutTransportResourceTest {
     @BeforeEach
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
-        var mockMetadata = mock(RecordMetadata.class);
-        when(mockMetadata.hasOffset()).thenReturn(true);
-        when(mockMetadata.offset()).thenReturn(0L);
-        when(mockProducer.send(any())).thenReturn(CompletableFuture.completedFuture(mockMetadata));
+        // Mock async send with immediate success callback
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata(), null);
+            return null;
+        }).when(mockProducer).send(any(), any(Callback.class));
     }
 
     @AfterEach
@@ -66,11 +72,26 @@ class KafkaOutTransportResourceTest {
         TestEvent event = new TestEvent("test-1", "Test message");
 
         try (KafkaOutTransport transport = createTransportWithMockProducer()) {
-            transport.send(event);
+            CompletableFuture<SendResult> future = transport.send(event);
+            SendResult result = future.join();
+            assertThat(result.success()).isTrue();
         }
-        
+
         // Verify producer was closed via try-with-resources
         verify(mockProducer).close();
+    }
+
+    @Test
+    @DisplayName("Should throw exception when sending after close")
+    void shouldThrowWhenSendingAfterClose() throws Exception {
+        TestEvent event = new TestEvent("test-1", "Test message");
+
+        KafkaOutTransport transport = createTransportWithMockProducer();
+        transport.close();
+
+        assertThatThrownBy(() -> transport.send(event))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("KafkaOutTransport is already closed");
     }
 
     private KafkaOutTransport createTransportWithMockProducer() throws Exception {
@@ -79,5 +100,14 @@ class KafkaOutTransportResourceTest {
         producerField.setAccessible(true);
         producerField.set(transport, mockProducer);
         return transport;
+    }
+
+    private org.apache.kafka.clients.producer.RecordMetadata mockMetadata() {
+        var metadata = mock(org.apache.kafka.clients.producer.RecordMetadata.class);
+        when(metadata.hasOffset()).thenReturn(true);
+        when(metadata.offset()).thenReturn(0L);
+        when(metadata.partition()).thenReturn(0);
+        when(metadata.topic()).thenReturn("test-topic");
+        return metadata;
     }
 }
