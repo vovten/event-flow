@@ -125,7 +125,7 @@ class ExternalPublisherDispatcherIntegrationTest {
         eventListener.setLatch(new CountDownLatch(1));
 
         // act
-        publisher.publish(testEvent);
+        publisher.publish(testEvent).join();
 
         // assert - wait for event to be received
         boolean completed = eventListener.getLatch().await(25, SECONDS);
