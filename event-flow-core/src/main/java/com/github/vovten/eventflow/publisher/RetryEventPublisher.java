@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -117,7 +118,7 @@ public class RetryEventPublisher implements EventPublisher {
         origin.publish(event)
                 .thenAccept(resultFuture::complete)
                 .exceptionally(ex -> {
-                    Throwable cause = ex instanceof java.util.concurrent.CompletionException && ex.getCause() != null
+                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null
                             ? ex.getCause()
                             : ex;
                     if (!shouldRetry(cause)) {
@@ -140,24 +141,8 @@ public class RetryEventPublisher implements EventPublisher {
     }
 
     private void scheduleRetry(Event event, int attempt, long delayMs, CompletableFuture<List<SendResult>> resultFuture) {
-        try {
-            sleep(delayMs);
-            retryPublish(event, attempt + 1, resultFuture);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            resultFuture.completeExceptionally(new EventPublisherException("Retry interrupted", e));
-        }
-    }
-
-    /**
-     * Sleep for the specified duration.
-     * Package-private for testing.
-     *
-     * @param millis the duration to sleep in milliseconds
-     * @throws InterruptedException if sleep is interrupted
-     */
-    void sleep(long millis) throws InterruptedException {
-        TimeUnit.MILLISECONDS.sleep(millis);
+        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS)
+                .execute(() -> retryPublish(event, attempt + 1, resultFuture));
     }
 
     /**

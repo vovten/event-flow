@@ -201,15 +201,17 @@ class RetryEventPublisherTest {
                 return CompletableFuture.completedFuture(List.of(SendResult.success("dest")));
             }
         };
-        TestRetryEventPublisher publisher = new TestRetryEventPublisher(origin, 2, Duration.ofMillis(10), 2.0);
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 2, Duration.ofMillis(50), 2.0);
 
         // Act
+        long startTime = System.currentTimeMillis();
         CompletableFuture<List<SendResult>> future = publisher.publish(event);
         future.join();
+        long elapsed = System.currentTimeMillis() - startTime;
 
         // Assert
-        assertTrue(publisher.lastSleepTime >= 10);
         assertEquals(2, callCount.get());
+        assertTrue(elapsed >= 50, "Should have waited at least 50ms between retries, but waited " + elapsed + "ms");
     }
 
     @Test
@@ -254,19 +256,11 @@ class RetryEventPublisherTest {
     }
 
     /**
-     * Test RetryEventPublisher that exposes sleep time.
+     * Test RetryEventPublisher.
      */
     private static final class TestRetryEventPublisher extends RetryEventPublisher {
-        long lastSleepTime = 0;
-
         TestRetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
             super(origin, maxRetries, initialDelay, multiplier);
-        }
-
-        @Override
-        void sleep(long millis) {
-            lastSleepTime = millis;
-            // Don't actually sleep in tests
         }
     }
 }
