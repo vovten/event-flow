@@ -2,11 +2,14 @@ package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -22,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Thread-safe channel registry using {@code ConcurrentHashMap}</li>
  *   <li>Strict validation — throws exception if required channel is not configured</li>
  *   <li>Supports multiple channels per event</li>
+ *   <li>Asynchronous publishing with CompletableFuture</li>
  * </ul>
  * <p>
  * <b>Architecture:</b>
@@ -42,12 +46,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * );
  *
  * // Create publisher with configured channels
- * EventPublisher publisher = new ChannelEventPublisher(
- *     List.of(internalChannel, externalChannel)
- * );
+ * EventPublisher publisher = new ChannelEventPublisher(channels);
  *
  * // Publish event
- * publisher.publish(new OrderCreatedEvent("order-123"));
+ * publisher.publish(new OrderCreatedEvent("order-123"))
+ *     .thenAccept(results -> log.info("Published to {} destinations", results.size()))
+ *     .exceptionally(ex -> { log.error("Failed", ex); return null; });
  * }</pre>
  * <p>
  * <b>Usage example (with Spring):</b>
@@ -58,8 +62,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  *     @Bean
  *     public EventPublisher eventPublisher(List<EventChannel> channels) {
- *         EventPublisher basePublisher = new ChannelEventPublisher(channels);
- *         return new RetryEventPublisher(basePublisher, 3, Duration.ofMillis(100), 2.0);
+ *         return new ChannelEventPublisher(channels);
  *     }
  * }
  * }</pre>
@@ -78,7 +81,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * <b>Error handling:</b>
  * If an event specifies a channel that is not configured in the system,
- * {@code EventTransportException} is thrown with a detailed error message.
+ * {@code EventPublisherException} is thrown with a detailed error message.
  * This ensures that misconfigurations are detected early.
  *
  * @author Vladimir Aleshkov
@@ -119,19 +122,27 @@ public class ChannelEventPublisher implements EventPublisher {
      *   <li>Delegates to {@code channel.send(event)} for delivery</li>
      * </ol>
      * <p>
-     * Events are published sequentially to each channel. If a channel fails,
-     * the exception propagates to the caller and remaining channels are not processed.
+     * Events are published sequentially to each channel. All sends are asynchronous.
      *
      * @param event the event to publish
+     * @return CompletableFuture that completes with list of SendResults from all channels
      * @throws EventPublisherConfigException if required channel is not configured
-     * @throws EventPublisherException if channel send fails
      */
     @Override
-    public void publish(Event event) {
-        for (Class<? extends EventChannel> channelType : event.channels()) {
-            EventChannel channel = channels.get(channelType);
-            checkChannel(event, channelType, channel);
-            trySend(event, channel);
+    public CompletableFuture<List<SendResult>> publish(Event event) {
+        try {
+            List<CompletableFuture<List<SendResult>>> channelFutures = new ArrayList<>();
+            for (Class<? extends EventChannel> channelType : event.channels()) {
+                EventChannel channel = channels.get(channelType);
+                checkChannel(event, channelType, channel);
+                channelFutures.add(channel.send(event));
+            }
+            return CompletableFuture.allOf(channelFutures.toArray(new CompletableFuture[0]))
+                    .thenApply(v -> channelFutures.stream()
+                            .flatMap(future -> future.join().stream())
+                            .toList());
+        } catch (EventPublisherConfigException ex) {
+            return CompletableFuture.failedFuture(ex);
         }
     }
 
@@ -142,15 +153,6 @@ public class ChannelEventPublisher implements EventPublisher {
                     Check that the channel bean is created and registered.""";
             String msg = String.format(text, channelType.getSimpleName(), event.type().getSimpleName());
             throw new EventPublisherConfigException(msg);
-        }
-    }
-
-    private void trySend(Event event, EventChannel channel) {
-        try {
-            channel.send(event);
-        } catch (Exception e) {
-            String msg = "Failed to send event '%s' to channel '%s'";
-            throw new EventPublisherException(String.format(msg, event.type().getSimpleName(), channel.name()), e);
         }
     }
 }

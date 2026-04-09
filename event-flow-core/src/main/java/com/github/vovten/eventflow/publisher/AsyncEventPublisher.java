@@ -1,9 +1,12 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 /**
@@ -16,8 +19,7 @@ import java.util.concurrent.Executor;
  * <p>
  * <b>Key features:</b>
  * <ul>
- *   <li>Non-blocking — {@code publish()} returns immediately</li>
- *   <li>Fire-and-forget semantics — exceptions are caught and logged</li>
+ *   <li>Non-blocking — {@code publish()} returns immediately with a CompletableFuture</li>
  *   <li>Caller-provided {@link Executor} — full control over thread pool lifecycle</li>
  *   <li>Compatible with other decorators (Retry, Transactional, Silent)</li>
  * </ul>
@@ -33,7 +35,7 @@ import java.util.concurrent.Executor;
  * <b>When NOT to use:</b>
  * <ul>
  *   <li>Critical business events that must be confirmed delivered</li>
- *   <li>When the caller must handle publishing failures</li>
+ *   <li>When the caller must handle publishing failures synchronously</li>
  *   <li>When event ordering guarantees are required</li>
  * </ul>
  * <p>
@@ -51,7 +53,9 @@ import java.util.concurrent.Executor;
  *     ),
  *     executor
  * );
- * asyncPublisher.publish(new UserVisitedPageEvent());  // Returns immediately
+ * asyncPublisher.publish(new UserVisitedPageEvent())
+ *     .thenAccept(results -> log.info("Published to {} destinations", results.size()))
+ *     .exceptionally(ex -> { log.error("Failed", ex); return null; });
  * }</pre>
  * <p>
  * <b>Combination with TransactionalEventPublisher:</b>
@@ -82,7 +86,6 @@ public class AsyncEventPublisher implements EventPublisher {
     /**
      * Create async publisher with the given executor.
      * <p>
-     * Exceptions during publishing are caught and logged at WARN level.
      *
      * @param origin   the delegate publisher to wrap
      * @param executor the executor to use for async publishing
@@ -103,20 +106,27 @@ public class AsyncEventPublisher implements EventPublisher {
      * Publish event asynchronously.
      * <p>
      * The actual publishing is submitted to the configured executor and this method
-     * returns immediately. Any exceptions during publishing are caught and logged.
+     * returns immediately with a CompletableFuture.
      *
      * @param event the event to publish
+     * @return CompletableFuture that completes with list of SendResults
      */
     @Override
-    public void publish(Event event) {
+    public CompletableFuture<List<SendResult>> publish(Event event) {
+        CompletableFuture<List<SendResult>> resultFuture = new CompletableFuture<>();
         String eventTypeName = event.type().getSimpleName();
-        executor.execute(() -> {
-            try {
-                origin.publish(event);
-                log.debug("Async event {} published successfully", eventTypeName);
-            } catch (Exception e) {
-                log.warn("Failed to async publish event '{}': {}", eventTypeName, e.getMessage(), e);
-            }
-        });
+        executor.execute(() ->
+                origin.publish(event)
+                        .thenAccept(results -> {
+                            log.debug("Async event {} published successfully", eventTypeName);
+                            resultFuture.complete(results);
+                        })
+                        .exceptionally(ex -> {
+                            log.warn("Failed to async publish event '{}': {}", eventTypeName, ex.getMessage(), ex);
+                            resultFuture.completeExceptionally(ex);
+                            return null;
+                        })
+        );
+        return resultFuture;
     }
 }

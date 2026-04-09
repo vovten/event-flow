@@ -2,13 +2,18 @@ package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -31,7 +36,7 @@ class RetryEventPublisherTest {
     @DisplayName("Should create with default constructor")
     void shouldCreateWithDefaultConstructor() {
         // Arrange & Act
-        EventPublisher publisher = new RetryEventPublisher(e -> {});
+        EventPublisher publisher = new RetryEventPublisher(e -> CompletableFuture.completedFuture(List.of(SendResult.success("dest"))));
 
         // Assert
         assertNotNull(publisher);
@@ -41,40 +46,40 @@ class RetryEventPublisherTest {
     @DisplayName("Should throw exception when maxRetries is negative")
     void shouldThrowExceptionWhenMaxRetriesIsNegative() {
         // Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                new RetryEventPublisher(e -> {}, -1, Duration.ofMillis(100), 2.0)
-        );
-        assertEquals("Max retries must be >= 0", exception.getMessage());
+        assertThatThrownBy(() ->
+                new RetryEventPublisher(e -> CompletableFuture.completedFuture(List.of()), -1, Duration.ofMillis(100), 2.0)
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Max retries must be >= 0");
     }
 
     @Test
     @DisplayName("Should throw exception when initialDelay is zero")
     void shouldThrowExceptionWhenInitialDelayIsZero() {
         // Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                new RetryEventPublisher(e -> {}, 3, Duration.ZERO, 2.0)
-        );
-        assertEquals("Initial delay must be positive", exception.getMessage());
+        assertThatThrownBy(() ->
+                new RetryEventPublisher(e -> CompletableFuture.completedFuture(List.of()), 3, Duration.ZERO, 2.0)
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Initial delay must be positive");
     }
 
     @Test
     @DisplayName("Should throw exception when initialDelay is negative")
     void shouldThrowExceptionWhenInitialDelayIsNegative() {
         // Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                new RetryEventPublisher(e -> {}, 3, Duration.ofMillis(-100), 2.0)
-        );
-        assertEquals("Initial delay must be positive", exception.getMessage());
+        assertThatThrownBy(() ->
+                new RetryEventPublisher(e -> CompletableFuture.completedFuture(List.of()), 3, Duration.ofMillis(-100), 2.0)
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Initial delay must be positive");
     }
 
     @Test
     @DisplayName("Should throw exception when multiplier is less than 1")
     void shouldThrowExceptionWhenMultiplierIsLessThanOne() {
         // Assert
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                new RetryEventPublisher(e -> {}, 3, Duration.ofMillis(100), 0.5)
-        );
-        assertEquals("Multiplier must be >= 1.0", exception.getMessage());
+        assertThatThrownBy(() ->
+                new RetryEventPublisher(e -> CompletableFuture.completedFuture(List.of()), 3, Duration.ofMillis(100), 0.5)
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Multiplier must be >= 1.0");
     }
 
     @Test
@@ -82,13 +87,18 @@ class RetryEventPublisherTest {
     void shouldPublishSuccessfullyOnFirstAttempt() {
         // Arrange
         AtomicInteger callCount = new AtomicInteger(0);
-        EventPublisher publisher = new RetryEventPublisher(e -> callCount.incrementAndGet());
+        EventPublisher publisher = new RetryEventPublisher(e -> {
+            callCount.incrementAndGet();
+            return CompletableFuture.completedFuture(List.of(SendResult.success("dest")));
+        });
 
         // Act
-        publisher.publish(event);
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        List<SendResult> results = future.join();
 
         // Assert
         assertEquals(1, callCount.get());
+        assertThat(results).hasSize(1);
     }
 
     @Test
@@ -96,32 +106,43 @@ class RetryEventPublisherTest {
     void shouldRetryOnFailureAndSucceed() {
         // Arrange
         AtomicInteger callCount = new AtomicInteger(0);
-        EventPublisher publisher = new TestRetryEventPublisher(e -> {
-            if (callCount.incrementAndGet() < 3) {
-                throw new RuntimeException("Temporary failure");
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<List<SendResult>> publish(Event event) {
+                if (callCount.incrementAndGet() < 3) {
+                    return CompletableFuture.failedFuture(new RuntimeException("Temporary failure"));
+                }
+                return CompletableFuture.completedFuture(List.of(SendResult.success("dest")));
             }
-        }, 3, Duration.ofMillis(10), 2.0);
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0);
 
         // Act
-        publisher.publish(event);
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        List<SendResult> results = future.join();
 
         // Assert
         assertEquals(3, callCount.get());
+        assertThat(results).hasSize(1);
     }
 
     @Test
-    @DisplayName("Should throw exception after all retries exhausted")
-    void shouldThrowExceptionAfterAllRetriesExhausted() {
+    @DisplayName("Should complete exceptionally after all retries exhausted")
+    void shouldCompleteExceptionallyAfterAllRetriesExhausted() {
         // Arrange
-        EventPublisher publisher = new TestRetryEventPublisher(e -> {
-            throw new RuntimeException("Permanent failure");
-        }, 2, Duration.ofMillis(10), 2.0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<List<SendResult>> publish(Event event) {
+                return CompletableFuture.failedFuture(new RuntimeException("Permanent failure"));
+            }
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 2, Duration.ofMillis(10), 2.0);
 
         // Assert
-        EventPublisherException exception = assertThrows(EventPublisherException.class, () ->
-                publisher.publish(event)
-        );
-        assertTrue(exception.getMessage().contains("after 3 attempts"));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(EventPublisherException.class)
+                .hasStackTraceContaining("after 3 attempts");
     }
 
     @Test
@@ -129,13 +150,19 @@ class RetryEventPublisherTest {
     void shouldNotRetryOnEventPublisherConfigException() {
         // Arrange
         AtomicInteger callCount = new AtomicInteger(0);
-        EventPublisher publisher = new TestRetryEventPublisher(e -> {
-            callCount.incrementAndGet();
-            throw new EventPublisherConfigException("Config error");
-        }, 3, Duration.ofMillis(10), 2.0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<List<SendResult>> publish(Event event) {
+                callCount.incrementAndGet();
+                return CompletableFuture.failedFuture(new EventPublisherConfigException("Config error"));
+            }
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0);
 
         // Assert
-        assertThrows(EventPublisherConfigException.class, () -> publisher.publish(event));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(EventPublisherConfigException.class);
         assertEquals(1, callCount.get());
     }
 
@@ -144,13 +171,19 @@ class RetryEventPublisherTest {
     void shouldNotRetryOnIllegalArgumentException() {
         // Arrange
         AtomicInteger callCount = new AtomicInteger(0);
-        EventPublisher publisher = new TestRetryEventPublisher(e -> {
-            callCount.incrementAndGet();
-            throw new IllegalArgumentException("Invalid argument");
-        }, 3, Duration.ofMillis(10), 2.0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<List<SendResult>> publish(Event event) {
+                callCount.incrementAndGet();
+                return CompletableFuture.failedFuture(new IllegalArgumentException("Invalid argument"));
+            }
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0);
 
         // Assert
-        assertThrows(IllegalArgumentException.class, () -> publisher.publish(event));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(IllegalArgumentException.class);
         assertEquals(1, callCount.get());
     }
 
@@ -159,14 +192,20 @@ class RetryEventPublisherTest {
     void shouldSleepBetweenRetries() {
         // Arrange
         AtomicInteger callCount = new AtomicInteger(0);
-        TestRetryEventPublisher publisher = new TestRetryEventPublisher(e -> {
-            if (callCount.incrementAndGet() < 2) {
-                throw new RuntimeException("Temporary failure");
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<List<SendResult>> publish(Event event) {
+                if (callCount.incrementAndGet() < 2) {
+                    return CompletableFuture.failedFuture(new RuntimeException("Temporary failure"));
+                }
+                return CompletableFuture.completedFuture(List.of(SendResult.success("dest")));
             }
-        }, 2, Duration.ofMillis(10), 2.0);
+        };
+        TestRetryEventPublisher publisher = new TestRetryEventPublisher(origin, 2, Duration.ofMillis(10), 2.0);
 
         // Act
-        publisher.publish(event);
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        future.join();
 
         // Assert
         assertTrue(publisher.lastSleepTime >= 10);
@@ -177,15 +216,19 @@ class RetryEventPublisherTest {
     @DisplayName("Should handle zero retries")
     void shouldHandleZeroRetries() {
         // Arrange
-        EventPublisher publisher = new TestRetryEventPublisher(e -> {
-            throw new RuntimeException("Failure");
-        }, 0, Duration.ofMillis(10), 2.0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<List<SendResult>> publish(Event event) {
+                return CompletableFuture.failedFuture(new RuntimeException("Failure"));
+            }
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 0, Duration.ofMillis(10), 2.0);
 
         // Assert
-        EventPublisherException exception = assertThrows(EventPublisherException.class, () ->
-                publisher.publish(event)
-        );
-        assertTrue(exception.getMessage().contains("after 1 attempts"));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(EventPublisherException.class)
+                .hasStackTraceContaining("after 1 attempts");
     }
 
     /**

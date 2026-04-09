@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -155,7 +156,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with custom decorator")
     void shouldBuildPublisherWithCustomDecorator() {
         // Arrange
-        EventPublisherBuilder.DecoratorFunction decorator = pub -> event -> {};
+        EventPublisherBuilder.DecoratorFunction decorator = pub -> event -> CompletableFuture.completedFuture(List.of());
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.create(channel)
@@ -170,8 +171,8 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with multiple decorators")
     void shouldBuildPublisherWithMultipleDecorators() {
         // Arrange
-        EventPublisherBuilder.DecoratorFunction decorator1 = pub -> event -> {};
-        EventPublisherBuilder.DecoratorFunction decorator2 = pub -> event -> {};
+        EventPublisherBuilder.DecoratorFunction decorator1 = pub -> event -> CompletableFuture.completedFuture(List.of());
+        EventPublisherBuilder.DecoratorFunction decorator2 = pub -> event -> CompletableFuture.completedFuture(List.of());
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.create(channel)

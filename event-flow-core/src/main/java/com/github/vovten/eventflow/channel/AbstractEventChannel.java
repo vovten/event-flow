@@ -2,8 +2,10 @@ package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
+import com.github.vovten.eventflow.transport.SendResult;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Abstract base class for event channels providing common functionality.
@@ -48,9 +50,13 @@ public abstract class AbstractEventChannel implements EventChannel {
     }
 
     @Override
-    public void send(Event event) {
-        for (OutTransport transport : transports()) {
-            transport.send(event);
-        }
+    public CompletableFuture<List<SendResult>> send(Event event) {
+        List<CompletableFuture<SendResult>> futures = transports().stream()
+                .map(transport -> transport.send(event))
+                .toList();
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> futures.stream()
+                        .map(CompletableFuture::join)
+                        .toList());
     }
 }

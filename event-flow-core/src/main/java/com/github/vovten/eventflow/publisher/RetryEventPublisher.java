@@ -1,10 +1,13 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,7 +22,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>Uses exponential backoff: delay = initialDelay * (multiplier ^ (attempt - 1))</li>
  *   <li>Only retries transient exceptions (network, timeout), not configuration errors</li>
  *   <li>Logs each retry attempt with delay information</li>
- *   <li>After all retries exhausted, throws the last exception</li>
+ *   <li>After all retries exhausted, completes the future exceptionally</li>
  * </ul>
  * <p>
  * <b>Usage example:</b>
@@ -31,7 +34,9 @@ import java.util.concurrent.TimeUnit;
  *     Duration.ofMillis(100),         // initial delay 100ms
  *     2                               // multiplier 2x (100ms → 200ms → 400ms)
  * );
- * retryPublisher.publish(event);
+ * retryPublisher.publish(event)
+ *     .thenAccept(results -> log.info("Published to {} destinations", results.size()))
+ *     .exceptionally(ex -> { log.error("Failed after retries", ex); return null; });
  * }</pre>
  * <p>
  * <b>When to use:</b>
@@ -101,35 +106,58 @@ public class RetryEventPublisher implements EventPublisher {
     }
 
     @Override
-    public void publish(Event event) {
-        Exception lastException = null;
+    public CompletableFuture<List<SendResult>> publish(Event event) {
+        CompletableFuture<List<SendResult>> resultFuture = new CompletableFuture<>();
+        retryPublish(event, 1, resultFuture);
+        return resultFuture;
+    }
+
+    private void retryPublish(Event event, int attempt, CompletableFuture<List<SendResult>> resultFuture) {
         String eventTypeName = event.type().getSimpleName();
-        for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
-            try {
-                origin.publish(event);
-                if (attempt > 1) {
-                    log.debug("Event {} published successfully after {} attempts", eventTypeName, attempt);
-                }
-                return;
-            } catch (Exception e) {
-                lastException = e;
-                if (!shouldRetry(e)) {
-                    log.warn("Non-retryable error publishing event {}: {}", eventTypeName, e.getMessage());
-                    throw e;
-                }
-                if (attempt <= maxRetries) {
-                    long delayMs = calculateDelay(attempt);
-                    log.warn("Failed to publish event {} (attempt {}/{}). Retrying in {}ms: {}",
-                            eventTypeName, attempt, maxRetries + 1, delayMs, e.getMessage());
-                    sleep(delayMs);
-                } else {
-                    log.error("Failed to publish event {} after {} attempts", eventTypeName, maxRetries + 1, e);
-                }
-            }
+        origin.publish(event)
+                .thenAccept(resultFuture::complete)
+                .exceptionally(ex -> {
+                    Throwable cause = ex instanceof java.util.concurrent.CompletionException && ex.getCause() != null
+                            ? ex.getCause()
+                            : ex;
+                    if (!shouldRetry(cause)) {
+                        log.warn("Non-retryable error publishing event {}: {}", eventTypeName, cause.getMessage());
+                        resultFuture.completeExceptionally(ex);
+                        return null;
+                    }
+                    if (attempt <= maxRetries) {
+                        long delayMs = calculateDelay(attempt);
+                        log.warn("Failed to publish event {} (attempt {}/{}). Retrying in {}ms: {}",
+                                eventTypeName, attempt, maxRetries + 1, delayMs, cause.getMessage());
+                        scheduleRetry(event, attempt, delayMs, resultFuture);
+                    } else {
+                        log.error("Failed to publish event {} after {} attempts", eventTypeName, maxRetries + 1, cause);
+                        String msg = String.format("Failed to publish event %s after %d attempts", eventTypeName, maxRetries + 1);
+                        resultFuture.completeExceptionally(new EventPublisherException(msg, cause));
+                    }
+                    return null;
+                });
+    }
+
+    private void scheduleRetry(Event event, int attempt, long delayMs, CompletableFuture<List<SendResult>> resultFuture) {
+        try {
+            sleep(delayMs);
+            retryPublish(event, attempt + 1, resultFuture);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            resultFuture.completeExceptionally(new EventPublisherException("Retry interrupted", e));
         }
-        String text = "Failed to publish event %s after %d attempts";
-        String msg = String.format(text, eventTypeName, maxRetries + 1);
-        throw new EventPublisherException(msg, lastException);
+    }
+
+    /**
+     * Sleep for the specified duration.
+     * Package-private for testing.
+     *
+     * @param millis the duration to sleep in milliseconds
+     * @throws InterruptedException if sleep is interrupted
+     */
+    void sleep(long millis) throws InterruptedException {
+        TimeUnit.MILLISECONDS.sleep(millis);
     }
 
     /**
@@ -159,32 +187,16 @@ public class RetryEventPublisher implements EventPublisher {
      *   <li>{@link IllegalArgumentException} - invalid arguments</li>
      * </ul>
      *
-     * @param e the exception to check
+     * @param ex the exception to check
      * @return true if the exception should trigger a retry
      */
-    private boolean shouldRetry(Exception e) {
-        if (e instanceof EventPublisherConfigException) {
+    private boolean shouldRetry(Throwable ex) {
+        if (ex instanceof EventPublisherConfigException) {
             return false;
         }
-        if (e instanceof IllegalArgumentException) {
+        if (ex instanceof IllegalArgumentException) {
             return false;
         }
         return true;
-    }
-
-    /**
-     * Sleep for the specified duration.
-     * Package-private for testing.
-     *
-     * @param millis the duration to sleep in milliseconds
-     * @throws EventPublisherException if sleep is interrupted
-     */
-    void sleep(long millis) {
-        try {
-            TimeUnit.MILLISECONDS.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new EventPublisherException("Retry interrupted", e);
-        }
     }
 }
