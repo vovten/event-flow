@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.channel.EventChannel;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -57,8 +58,9 @@ import java.util.concurrent.Executor;
  * @since 2026-03-31
  * @see EventPublisherBuilder
  */
-@Slf4j
 public final class SpringEventPublisherBuilder extends EventPublisherBuilder<SpringEventPublisherBuilder> {
+
+    private static final Logger log = LoggerFactory.getLogger(SpringEventPublisherBuilder.class);
 
     private boolean transactional = false;
 

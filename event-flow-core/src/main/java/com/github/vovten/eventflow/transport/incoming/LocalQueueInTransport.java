@@ -2,7 +2,8 @@ package com.github.vovten.eventflow.transport.incoming;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.InTransport;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
@@ -34,8 +35,9 @@ import java.util.function.Consumer;
  * @author Vladimir Aleshkov
  * @since 2026-03-06
  */
-@Slf4j
 public class LocalQueueInTransport implements InTransport {
+
+    private static final Logger log = LoggerFactory.getLogger(LocalQueueInTransport.class);
 
     private final BlockingDeque<Event> eventQueue;
     private final ExecutorService executorService;
@@ -43,12 +45,15 @@ public class LocalQueueInTransport implements InTransport {
 
     /**
      * Create local-queue transport with existing queue and newSingleThreadExecutor service.
+     * <p>
+     * Uses a virtual thread for the consumer loop, which is optimal for I/O-bound
+     * event processing as it doesn't block a platform thread.
      *
      * @param eventQueue        the event queue to listen to
      */
     public LocalQueueInTransport(BlockingDeque<Event> eventQueue) {
         this.eventQueue = eventQueue;
-        this.executorService = Executors.newSingleThreadExecutor();
+        this.executorService = Executors.newVirtualThreadPerTaskExecutor();
     }
 
     /**

@@ -6,6 +6,7 @@ import com.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTranspor
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import com.github.vovten.eventflow.transport.InTransport;
 import com.github.vovten.eventflow.transport.incoming.LocalQueueInTransport;
@@ -186,7 +187,8 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
-            context.registerBean(KafkaInTransportFactory.class, () -> new KafkaInTransportFactory());
+            context.registerBean(EventSerializerFactory.class, () -> new EventSerializerFactory());
+            context.registerBean(KafkaInTransportFactory.class, () -> new KafkaInTransportFactory(context.getBean(EventSerializerFactory.class)));
             context.register(DispatcherConfiguration.class);
             context.refresh();
 

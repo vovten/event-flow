@@ -8,6 +8,7 @@ import com.github.vovten.eventflow.publisher.EventPublisher;
 import com.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import com.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.test.ExternalTestEvent;
 import com.github.vovten.eventflow.transport.incoming.KafkaInTransport;
 import com.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
@@ -40,10 +41,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ImportAutoConfiguration(exclude = com.github.vovten.eventflow.autoconfig.EventFlowDisabledAutoConfiguration.class)
 @EmbeddedKafka(
         partitions = 1,
-        brokerProperties = {
-                "listeners=PLAINTEXT://localhost:9092",
-                "port=9092"
-        },
         topics = {"test-events"}
 )
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -79,7 +76,8 @@ class ExternalPublisherDispatcherIntegrationTest {
         KafkaInTransport kafkaInTransport = new KafkaInTransport(
                 createDispatcherConsumer(),
                 List.of("test-events"),
-                dispatcherExecutor
+                dispatcherExecutor,
+                new EventSerializerFactory()
         );
         dispatcher = new UnifiedEventDispatcher(
                 dispatcherExecutor,

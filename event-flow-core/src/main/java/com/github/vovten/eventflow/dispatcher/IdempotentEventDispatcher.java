@@ -4,7 +4,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.event.TraceableEvent;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -26,8 +27,9 @@ import java.util.function.Consumer;
  * @author Vladimir Aleshkov
  * @since 2026-03-13
  */
-@Slf4j
 public final class IdempotentEventDispatcher implements EventDispatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(IdempotentEventDispatcher.class);
 
     private final EventDispatcher origin;
     private final Cache<UUID, Boolean> cache;

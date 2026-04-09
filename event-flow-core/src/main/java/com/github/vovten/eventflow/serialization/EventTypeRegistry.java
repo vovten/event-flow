@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.serialization;
 
 import com.github.vovten.eventflow.event.Event;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Set;
@@ -21,8 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Vladimir Aleshkov
  * @since 2026-04-05
  */
-@Slf4j
 public final class EventTypeRegistry {
+
+    private static final Logger log = LoggerFactory.getLogger(EventTypeRegistry.class);
 
     private static final Set<String> ALLOWED_PACKAGES = ConcurrentHashMap.newKeySet();
     private static final Set<Class<? extends Event>> ALLOWED_CLASSES = ConcurrentHashMap.newKeySet();

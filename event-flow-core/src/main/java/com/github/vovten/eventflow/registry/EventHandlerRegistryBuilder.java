@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.registry;
 
 import com.github.vovten.eventflow.EventSubscriber;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,8 +44,9 @@ import java.util.List;
  * @author Vladimir Aleshkov
  * @since 2024-12-07
  */
-@Slf4j
 public class EventHandlerRegistryBuilder<T extends EventHandlerRegistryBuilder<T>> {
+
+    private static final Logger log = LoggerFactory.getLogger(EventHandlerRegistryBuilder.class);
 
     protected boolean useInterfaceListeners = false;
     protected boolean useAnnotationListeners = false;

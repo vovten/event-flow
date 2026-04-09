@@ -103,13 +103,26 @@ event-flow:
     # Thread pool configuration for async event delivery
     thread-pool:
       # Core pool size (minimum number of threads)
+      # Note: When using virtual threads (default), this setting is ignored
       core-size: 4
       # Maximum pool size (maximum number of threads)
+      # Note: When using virtual threads (default), this setting is ignored
       max-size: 16
       # Task queue capacity (max events waiting to be processed)
+      # Note: When using virtual threads (default), this setting is ignored
       queue-capacity: 100
       # Keep-alive time for idle threads in seconds
+      # Note: When using virtual threads (default), this setting is ignored
       keep-alive-seconds: 60
+      # Maximum number of concurrent handler executions.
+      # Provides backpressure when using virtual thread executors.
+      # When 0 (default), no limit is applied.
+      #
+      # Recommended values:
+      #   - I/O-bound handlers (DB, HTTP): 20-100
+      #   - CPU-bound handlers: number of CPU cores
+      #   - Mixed workload: 50-200
+      concurrency-limit: 0
 
     # Incoming event transports to listen to
     # Note: No default transport is configured. You must explicitly define at least one transport.
@@ -188,6 +201,8 @@ event-flow:
 #       core-size: 8
 #       max-size: 32
 #       queue-capacity: 500
+#       # Backpressure for virtual threads: max 50 concurrent handlers
+#       concurrency-limit: 50
 #     transports:
 #       - name: local-queue
 #         capacity: 1000

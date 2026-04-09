@@ -6,6 +6,7 @@ import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTranspo
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -239,8 +240,9 @@ class ChannelConfigurationTest {
 
             context.registerBean(EventFlowProperties.class, () -> properties);
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
+            context.registerBean(EventSerializerFactory.class, () -> new EventSerializerFactory());
             context.registerBean(KafkaOutTransportFactory.class,
-                    () -> new KafkaOutTransportFactory());
+                    () -> new KafkaOutTransportFactory(context.getBean(EventSerializerFactory.class)));
             context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(ChannelConfiguration.class);
             context.refresh();

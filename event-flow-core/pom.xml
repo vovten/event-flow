@@ -14,20 +14,13 @@
     <packaging>jar</packaging>
 
     <name>Event Flow Core</name>
-    <description>Event-driven architecture library - Core module (no Spring dependencies)</description>
+    <description>Event-driven architecture library - Core module</description>
 
     <dependencies>
         <!-- SLF4J API (logging) -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-        <!-- Lombok -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <scope>provided</scope>
         </dependency>
 
         <!-- Jackson -->
@@ -44,7 +37,6 @@
         <dependency>
             <groupId>org.msgpack</groupId>
             <artifactId>jackson-dataformat-msgpack</artifactId>
-            <version>0.9.8</version>
         </dependency>
 
         <!-- Apache Commons Lang3 -->
@@ -69,8 +61,6 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
-            <version>3.2.3</version>
-            <scope>compile</scope>
         </dependency>
 
         <!-- Testing -->
@@ -97,7 +87,6 @@
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
-            <version>4.2.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>

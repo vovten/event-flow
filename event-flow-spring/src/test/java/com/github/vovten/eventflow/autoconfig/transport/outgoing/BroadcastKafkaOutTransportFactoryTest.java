@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.autoconfig.transport.outgoing;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutTransport;
 import org.junit.jupiter.api.DisplayName;
@@ -18,11 +19,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("BroadcastKafkaPublisherTransportFactory Tests")
 class BroadcastKafkaOutTransportFactoryTest {
 
+    private final EventSerializerFactory serializerFactory = new EventSerializerFactory();
+
     @Test
     @DisplayName("BroadcastKafkaPublisherTransportFactory should have correct name")
     void broadcastKafkaPublisherTransportFactoryShouldHaveCorrectName() {
         // given
-        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory();
+        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory(serializerFactory);
 
         // when
         String name = factory.getName();
@@ -35,7 +38,7 @@ class BroadcastKafkaOutTransportFactoryTest {
     @DisplayName("BroadcastKafkaPublisherTransportFactory should create publisher transport")
     void broadcastKafkaPublisherTransportFactoryShouldCreatePublisherTransport() {
         // given
-        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory();
+        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("broadcast-kafka-publisher");
@@ -54,7 +57,7 @@ class BroadcastKafkaOutTransportFactoryTest {
     @DisplayName("BroadcastKafkaPublisherTransportFactory should throw exception when servers is missing")
     void broadcastKafkaPublisherTransportFactoryShouldThrowExceptionWhenServersIsMissing() {
         // given
-        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory();
+        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setTopic("test-topic");
@@ -69,7 +72,7 @@ class BroadcastKafkaOutTransportFactoryTest {
     @DisplayName("BroadcastKafkaPublisherTransportFactory should throw exception when topic is missing")
     void broadcastKafkaPublisherTransportFactoryShouldThrowExceptionWhenTopicIsMissing() {
         // given
-        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory();
+        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setServers("localhost:9092");
@@ -84,7 +87,7 @@ class BroadcastKafkaOutTransportFactoryTest {
     @DisplayName("BroadcastKafkaPublisherTransportFactory should validate successfully with all required config")
     void broadcastKafkaPublisherTransportFactoryShouldValidateSuccessfullyWithAllRequiredConfig() {
         // given
-        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory();
+        BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("broadcast-kafka");

@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.github.vovten.eventflow.event.Event;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Polymorphic type validator for secure event deserialization.
@@ -21,8 +22,9 @@ import lombok.extern.slf4j.Slf4j;
  * @author Vladimir Aleshkov
  * @since 2026-04-05
  */
-@Slf4j
 public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base {
+
+    private static final Logger log = LoggerFactory.getLogger(EventPolymorphicTypeValidator.class);
 
     /**
      * Validate the base type (the type passed to readValue).
@@ -55,7 +57,11 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
 
         // 1. Verify it's actually an Event (defense-in-depth)
         if (!Event.class.isAssignableFrom(rawClass)) {
-            log.warn("Blocked deserialization of non-Event class: {}", className);
+            log.error(
+                    "Blocked deserialization of non-Event class: {}. "
+                    + "This class does not implement the Event interface and cannot be deserialized for security reasons.",
+                    className
+            );
             return Validity.DENIED;
         }
 
@@ -65,8 +71,41 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
             return Validity.ALLOWED;
         }
 
-        // 3. Block everything else
-        log.warn("Blocked deserialization of unauthorized event class: {}", className);
+        // 3. Block everything else with helpful message
+        String packageName = getPackageName(className);
+        log.error(
+                "Blocked deserialization of unauthorized event class: '{}'.\n"
+                + "To fix this, allow the class or its package using one of the methods below:\n"
+                + "\n"
+                + "  For Spring Boot applications, add to application.yml:\n"
+                + "    event-flow:\n"
+                + "      dispatcher:\n"
+                + "        deserialization:\n"
+                + "          allowed-event-packages:\n"
+                + "            - {}\n"
+                + "\n"
+                + "  Or programmatically:\n"
+                + "    EventTypeRegistry.allowPackage(\"{}\");\n"
+                + "    EventTypeRegistry.allowClass({}.class);\n"
+                + "\n"
+                + "Currently allowed packages: {}",
+                className,
+                packageName,
+                packageName,
+                className,
+                EventTypeRegistry.getAllowedPackages()
+        );
         return Validity.DENIED;
+    }
+
+    /**
+     * Extract package name from fully qualified class name.
+     *
+     * @param className fully qualified class name
+     * @return package name
+     */
+    private String getPackageName(String className) {
+        int lastDot = className.lastIndexOf('.');
+        return lastDot > 0 ? className.substring(0, lastDot) : "";
     }
 }

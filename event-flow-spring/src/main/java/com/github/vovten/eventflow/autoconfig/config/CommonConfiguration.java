@@ -6,17 +6,18 @@ import com.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTra
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
 import com.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
+import com.github.vovten.eventflow.serialization.EventSerializerFactory;
 import com.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.Executors;
 
 /**
  * Auto-configuration for common components: executor service and local-queue transports.
@@ -24,11 +25,12 @@ import java.util.concurrent.ThreadPoolExecutor;
  * @author Vladimir Aleshkov
  * @since 2026-03-10
  */
-@Slf4j
 @Configuration(proxyBeanMethods = false)
 @DependsOn("serializerRegistrationComplete")
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 public class CommonConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(CommonConfiguration.class);
 
     private final EventFlowProperties properties;
 
@@ -38,26 +40,15 @@ public class CommonConfiguration {
 
     /**
      * Creates executor service for async event delivery.
-     * Only created when event-flow is enabled.
+     * <p>
+     * Uses virtual threads by default for optimal I/O-bound performance.
      *
      * @return executor service for dispatcher
      */
     @Bean("dispatcherExecutor")
     public ExecutorService dispatcherExecutor() {
-        var tp = properties.getDispatcher().getThreadPool();
-        var msg = "Creating dispatcher executor: core={}, max={}, queue={}, rejection-policy=caller-runs";
-        log.info(msg, tp.getCoreSize(), tp.getMaxSize(), tp.getQueueCapacity());
-
-        var taskExecutor = new ThreadPoolTaskExecutor();
-        taskExecutor.setCorePoolSize(tp.getCoreSize());
-        taskExecutor.setMaxPoolSize(tp.getMaxSize());
-        taskExecutor.setQueueCapacity(tp.getQueueCapacity());
-        taskExecutor.setKeepAliveSeconds(tp.getKeepAliveSeconds());
-        taskExecutor.setThreadNamePrefix("event-flow-dispatcher-");
-        taskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        taskExecutor.initialize();
-
-        return taskExecutor.getThreadPoolExecutor();
+        log.info("Creating dispatcher executor with virtual threads");
+        return Executors.newVirtualThreadPerTaskExecutor();
     }
 
     /**
@@ -104,30 +95,33 @@ public class CommonConfiguration {
     /**
      * Creates factory for Kafka publisher transports.
      *
+     * @param serializerFactory serializer factory for creating event serializers
      * @return Kafka publisher transport factory
      */
     @Bean
-    public KafkaOutTransportFactory kafkaPublisherTransportFactory() {
-        return new KafkaOutTransportFactory();
+    public KafkaOutTransportFactory kafkaPublisherTransportFactory(EventSerializerFactory serializerFactory) {
+        return new KafkaOutTransportFactory(serializerFactory);
     }
 
     /**
      * Creates factory for Kafka dispatcher transports.
      *
+     * @param serializerFactory serializer factory for creating event serializers
      * @return Kafka dispatcher transport factory
      */
     @Bean
-    public KafkaInTransportFactory kafkaDispatcherTransportFactory() {
-        return new KafkaInTransportFactory();
+    public KafkaInTransportFactory kafkaDispatcherTransportFactory(EventSerializerFactory serializerFactory) {
+        return new KafkaInTransportFactory(serializerFactory);
     }
 
     /**
      * Creates factory for broadcast Kafka publisher transports.
      *
+     * @param serializerFactory serializer factory for creating event serializers
      * @return broadcast Kafka publisher transport factory
      */
     @Bean
-    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory() {
-        return new BroadcastKafkaOutTransportFactory();
+    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory(EventSerializerFactory serializerFactory) {
+        return new BroadcastKafkaOutTransportFactory(serializerFactory);
     }
 }

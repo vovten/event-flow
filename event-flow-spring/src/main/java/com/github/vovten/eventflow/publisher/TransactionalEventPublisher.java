@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -31,8 +32,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * @see ChannelEventPublisher
  * @see TransactionSynchronizationManager
  */
-@Slf4j
 public class TransactionalEventPublisher implements EventPublisher {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionalEventPublisher.class);
 
     private final EventPublisher origin;
 

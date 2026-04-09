@@ -1,6 +1,7 @@
 package com.github.vovten.eventflow.autoconfig;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
@@ -18,10 +19,11 @@ import org.springframework.context.annotation.Configuration;
  * @author Vladimir Aleshkov
  * @since 2026-03-29
  */
-@Slf4j
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class EventFlowDisabledAutoConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(EventFlowDisabledAutoConfiguration.class);
 
     @Bean
     @Conditional(NoEventBeansCondition.class)

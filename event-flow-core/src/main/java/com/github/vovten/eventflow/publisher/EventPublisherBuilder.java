@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.channel.EventChannel;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -68,8 +69,9 @@ import java.util.concurrent.Executor;
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  */
-@Slf4j
 public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
+
+    private static final Logger log = LoggerFactory.getLogger(EventPublisherBuilder.class);
 
     private boolean silent = false;
     private boolean async = false;

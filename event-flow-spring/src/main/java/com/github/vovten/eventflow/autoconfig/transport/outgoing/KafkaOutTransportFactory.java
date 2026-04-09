@@ -20,6 +20,12 @@ import com.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
  */
 public class KafkaOutTransportFactory implements OutTransportFactory {
 
+    private final EventSerializerFactory serializerFactory;
+
+    public KafkaOutTransportFactory(EventSerializerFactory serializerFactory) {
+        this.serializerFactory = serializerFactory;
+    }
+
     @Override
     public String getName() {
         return "kafka";
@@ -48,19 +54,19 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
      */
     private EventSerializer createSerializer(String format) {
         String name = (format == null || format.isBlank()) ? "json" : format;
-        return EventSerializerFactory.getByName(name);
+        return serializerFactory.getByName(name);
     }
 
     @Override
     public void validate(EventFlowProperties.TransportConfig config) {
         if (config.getServers() == null) {
             throw new IllegalStateException(
-                "Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
+                    "Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
         if (config.getTopic() == null) {
             throw new IllegalStateException(
-                "Kafka transport requires topic configuration"
+                    "Kafka transport requires topic configuration"
             );
         }
     }

@@ -3,7 +3,8 @@ package com.github.vovten.eventflow.dispatcher;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -14,8 +15,9 @@ import java.util.concurrent.ExecutorService;
  * @author Vladimir Aleshkov
  * @since 2024-11-21
  */
-@Slf4j
 public abstract class AbstractEventDispatcher implements EventDispatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(AbstractEventDispatcher.class);
 
     private final ExecutorService executorService;
     private final EventHandlerRegistry handlerRegistry;

@@ -1,7 +1,8 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Event publisher decorator that silently catches and logs all publishing errors.
@@ -61,8 +62,9 @@ import lombok.extern.slf4j.Slf4j;
  * @see RetryEventPublisher
  * @see ChannelEventPublisher
  */
-@Slf4j
 public class SilentEventPublisher implements EventPublisher {
+
+    private static final Logger log = LoggerFactory.getLogger(SilentEventPublisher.class);
 
     private final EventPublisher origin;
     private final boolean logWarnings;
