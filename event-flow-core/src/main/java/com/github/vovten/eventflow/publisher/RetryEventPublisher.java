@@ -62,10 +62,13 @@ public class RetryEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(RetryEventPublisher.class);
 
+    private static final Duration DEFAULT_MAX_DELAY = Duration.ofSeconds(10);
+
     private final EventPublisher origin;
     private final int maxRetries;
     private final Duration initialDelay;
     private final double multiplier;
+    private final Duration maxDelay;
 
     /**
      * Create retry decorator with default settings.
@@ -73,12 +76,13 @@ public class RetryEventPublisher implements EventPublisher {
      *   <li>Max retries: 3</li>
      *   <li>Initial delay: 100ms</li>
      *   <li>Multiplier: 2.0 (exponential backoff)</li>
+     *   <li>Max delay: 10s</li>
      * </ul>
      *
      * @param origin the delegate publisher to wrap
      */
     public RetryEventPublisher(EventPublisher origin) {
-        this(origin, 3, Duration.ofMillis(100), 2.0);
+        this(origin, 3, Duration.ofMillis(100), 2.0, DEFAULT_MAX_DELAY);
     }
 
     /**
@@ -91,6 +95,21 @@ public class RetryEventPublisher implements EventPublisher {
      * @throws IllegalArgumentException if maxRetries < 0 or multiplier < 1.0
      */
     public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
+        this(origin, maxRetries, initialDelay, multiplier, DEFAULT_MAX_DELAY);
+    }
+
+    /**
+     * Create retry decorator with custom settings.
+     *
+     * @param origin       the origin publisher to wrap
+     * @param maxRetries   maximum number of retry attempts (must be >= 0)
+     * @param initialDelay initial delay between retries
+     * @param multiplier   backoff multiplier (must be >= 1.0)
+     * @param maxDelay     maximum delay between retries (caps exponential backoff)
+     * @throws IllegalArgumentException if maxRetries < 0, multiplier < 1.0, or maxDelay is not positive
+     */
+    public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay,
+                               double multiplier, Duration maxDelay) {
         if (maxRetries < 0) {
             throw new IllegalArgumentException("Max retries must be >= 0");
         }
@@ -100,10 +119,14 @@ public class RetryEventPublisher implements EventPublisher {
         if (multiplier < 1.0) {
             throw new IllegalArgumentException("Multiplier must be >= 1.0");
         }
+        if (maxDelay.isNegative() || maxDelay.isZero()) {
+            throw new IllegalArgumentException("Max delay must be positive");
+        }
         this.origin = origin;
         this.maxRetries = maxRetries;
         this.initialDelay = initialDelay;
         this.multiplier = multiplier;
+        this.maxDelay = maxDelay;
     }
 
     @Override
@@ -153,7 +176,7 @@ public class RetryEventPublisher implements EventPublisher {
      */
     private long calculateDelay(int attempt) {
         double delay = initialDelay.toMillis() * Math.pow(multiplier, attempt - 1);
-        return (long) Math.min(delay, 10000); // Cap at 10 seconds
+        return (long) Math.min(delay, maxDelay.toMillis());
     }
 
     /**

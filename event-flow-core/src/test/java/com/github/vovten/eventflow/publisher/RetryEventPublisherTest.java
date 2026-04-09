@@ -83,6 +83,55 @@ class RetryEventPublisherTest {
     }
 
     @Test
+    @DisplayName("Should throw exception when maxDelay is zero")
+    void shouldThrowExceptionWhenMaxDelayIsZero() {
+        // Assert
+        assertThatThrownBy(() ->
+                new RetryEventPublisher(e -> CompletableFuture.completedFuture(List.of()), 3, Duration.ofMillis(100), 2.0, Duration.ZERO)
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Max delay must be positive");
+    }
+
+    @Test
+    @DisplayName("Should throw exception when maxDelay is negative")
+    void shouldThrowExceptionWhenMaxDelayIsNegative() {
+        // Assert
+        assertThatThrownBy(() ->
+                new RetryEventPublisher(e -> CompletableFuture.completedFuture(List.of()), 3, Duration.ofMillis(100), 2.0, Duration.ofMillis(-100))
+        ).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Max delay must be positive");
+    }
+
+    @Test
+    @DisplayName("Should cap delay at maxDelay")
+    void shouldCapDelayAtMaxDelay() {
+        // Arrange
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<List<SendResult>> publish(Event event) {
+                if (callCount.incrementAndGet() < 2) {
+                    return CompletableFuture.failedFuture(new RuntimeException("Temporary failure"));
+                }
+                return CompletableFuture.completedFuture(List.of(SendResult.success("dest")));
+            }
+        };
+        // Initial delay 10ms, multiplier 2, so attempt 2 would be 20ms, but maxDelay is 15ms
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 2, Duration.ofMillis(10), 2.0, Duration.ofMillis(15));
+
+        // Act
+        long startTime = System.currentTimeMillis();
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        future.join();
+        long elapsed = System.currentTimeMillis() - startTime;
+
+        // Assert
+        assertEquals(2, callCount.get());
+        // Delay is capped at 15ms, allow some margin for execution overhead
+        assertTrue(elapsed >= 10, "Should have waited at least 10ms, but waited " + elapsed + "ms");
+    }
+
+    @Test
     @DisplayName("Should publish successfully on first attempt")
     void shouldPublishSuccessfullyOnFirstAttempt() {
         // Arrange
@@ -261,6 +310,10 @@ class RetryEventPublisherTest {
     private static final class TestRetryEventPublisher extends RetryEventPublisher {
         TestRetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
             super(origin, maxRetries, initialDelay, multiplier);
+        }
+
+        TestRetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier, Duration maxDelay) {
+            super(origin, maxRetries, initialDelay, multiplier, maxDelay);
         }
     }
 }
