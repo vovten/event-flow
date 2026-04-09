@@ -11,7 +11,9 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.context.support.TestPropertySourceUtils.addInlinedPropertiesToEnvironment;
@@ -199,7 +201,7 @@ class PublisherConfigurationTest {
     static class CustomPublisherConfig {
         @Bean(name = "eventPublisher")
         public EventPublisher customPublisher() {
-            return event -> {};
+            return event -> CompletableFuture.completedFuture(List.of());
         }
     }
 }

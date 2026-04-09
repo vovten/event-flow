@@ -2,12 +2,15 @@ package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -44,15 +47,15 @@ class SilentEventPublisherTest {
     void shouldPublishEventSuccessfully() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        AtomicBoolean called = new AtomicBoolean(false);
-        EventPublisher delegate = e -> called.set(true);
+        EventPublisher delegate = e -> CompletableFuture.completedFuture(List.of(SendResult.success("dest")));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
         // Act
-        assertDoesNotThrow(() -> publisher.publish(event));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        List<SendResult> results = future.join();
 
         // Assert
-        assertTrue(called.get());
+        assertThat(results).hasSize(1);
     }
 
     @Test
@@ -60,13 +63,15 @@ class SilentEventPublisherTest {
     void shouldSilentlyCatchExceptionAndLogWarning() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        EventPublisher delegate = e -> {
-            throw new RuntimeException("Test exception");
-        };
+        EventPublisher delegate = e -> CompletableFuture.failedFuture(new RuntimeException("Test exception"));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, true);
 
         // Act & Assert
-        assertDoesNotThrow(() -> publisher.publish(event));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        List<SendResult> results = future.join();
+
+        assertDoesNotThrow(() -> results);
+        assertThat(results).isEmpty();
     }
 
     @Test
@@ -74,13 +79,15 @@ class SilentEventPublisherTest {
     void shouldSilentlyCatchExceptionAndLogDebug() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        EventPublisher delegate = e -> {
-            throw new RuntimeException("Test exception");
-        };
+        EventPublisher delegate = e -> CompletableFuture.failedFuture(new RuntimeException("Test exception"));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, false);
 
         // Act & Assert
-        assertDoesNotThrow(() -> publisher.publish(event));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        List<SendResult> results = future.join();
+
+        assertDoesNotThrow(() -> results);
+        assertThat(results).isEmpty();
     }
 
     @Test
@@ -88,13 +95,15 @@ class SilentEventPublisherTest {
     void shouldHandleDifferentExceptionTypes() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        EventPublisher delegate = e -> {
-            throw new EventPublisherException("Test");
-        };
+        EventPublisher delegate = e -> CompletableFuture.failedFuture(new EventPublisherException("Test"));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
         // Act & Assert
-        assertDoesNotThrow(() -> publisher.publish(event));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        List<SendResult> results = future.join();
+
+        assertDoesNotThrow(() -> results);
+        assertThat(results).isEmpty();
     }
 
     /**

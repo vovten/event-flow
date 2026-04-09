@@ -2,17 +2,18 @@ package com.github.vovten.eventflow.transport.outgoing;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.TransportException;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -55,8 +56,8 @@ class LocalQueueOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when queue is full")
-    void shouldThrowExceptionWhenQueueIsFull() {
+    @DisplayName("Should return failed result when queue is full")
+    void shouldReturnFailedResultWhenQueueIsFull() {
         // Arrange
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(2);
         LocalQueueOutTransport transport = new LocalQueueOutTransport(queue);
@@ -67,12 +68,12 @@ class LocalQueueOutTransportTest {
         // Act
         transport.send(event1);
         transport.send(event2);
+        CompletableFuture<SendResult> future = transport.send(event3);
 
         // Assert
-        TransportException exception = assertThrows(TransportException.class, () ->
-                transport.send(event3)
-        );
-        assertTrue(exception.getMessage().contains("Queue is full"));
+        SendResult result = future.join();
+        assertFalse(result.success());
+        assertTrue(result.errorDetails().contains("Queue is full"));
     }
 
     /**

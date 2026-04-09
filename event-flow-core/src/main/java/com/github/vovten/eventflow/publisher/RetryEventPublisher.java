@@ -1,10 +1,14 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>Uses exponential backoff: delay = initialDelay * (multiplier ^ (attempt - 1))</li>
  *   <li>Only retries transient exceptions (network, timeout), not configuration errors</li>
  *   <li>Logs each retry attempt with delay information</li>
- *   <li>After all retries exhausted, throws the last exception</li>
+ *   <li>After all retries exhausted, completes the future exceptionally</li>
  * </ul>
  * <p>
  * <b>Usage example:</b>
@@ -31,7 +35,9 @@ import java.util.concurrent.TimeUnit;
  *     Duration.ofMillis(100),         // initial delay 100ms
  *     2                               // multiplier 2x (100ms → 200ms → 400ms)
  * );
- * retryPublisher.publish(event);
+ * retryPublisher.publish(event)
+ *     .thenAccept(results -> log.info("Published to {} destinations", results.size()))
+ *     .exceptionally(ex -> { log.error("Failed after retries", ex); return null; });
  * }</pre>
  * <p>
  * <b>When to use:</b>
@@ -56,10 +62,13 @@ public class RetryEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(RetryEventPublisher.class);
 
+    private static final Duration DEFAULT_MAX_DELAY = Duration.ofSeconds(10);
+
     private final EventPublisher origin;
     private final int maxRetries;
     private final Duration initialDelay;
     private final double multiplier;
+    private final Duration maxDelay;
 
     /**
      * Create retry decorator with default settings.
@@ -67,12 +76,13 @@ public class RetryEventPublisher implements EventPublisher {
      *   <li>Max retries: 3</li>
      *   <li>Initial delay: 100ms</li>
      *   <li>Multiplier: 2.0 (exponential backoff)</li>
+     *   <li>Max delay: 10s</li>
      * </ul>
      *
      * @param origin the delegate publisher to wrap
      */
     public RetryEventPublisher(EventPublisher origin) {
-        this(origin, 3, Duration.ofMillis(100), 2.0);
+        this(origin, 3, Duration.ofMillis(100), 2.0, DEFAULT_MAX_DELAY);
     }
 
     /**
@@ -85,6 +95,21 @@ public class RetryEventPublisher implements EventPublisher {
      * @throws IllegalArgumentException if maxRetries < 0 or multiplier < 1.0
      */
     public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
+        this(origin, maxRetries, initialDelay, multiplier, DEFAULT_MAX_DELAY);
+    }
+
+    /**
+     * Create retry decorator with custom settings.
+     *
+     * @param origin       the origin publisher to wrap
+     * @param maxRetries   maximum number of retry attempts (must be >= 0)
+     * @param initialDelay initial delay between retries
+     * @param multiplier   backoff multiplier (must be >= 1.0)
+     * @param maxDelay     maximum delay between retries (caps exponential backoff)
+     * @throws IllegalArgumentException if maxRetries < 0, multiplier < 1.0, or maxDelay is not positive
+     */
+    public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay,
+                               double multiplier, Duration maxDelay) {
         if (maxRetries < 0) {
             throw new IllegalArgumentException("Max retries must be >= 0");
         }
@@ -94,42 +119,53 @@ public class RetryEventPublisher implements EventPublisher {
         if (multiplier < 1.0) {
             throw new IllegalArgumentException("Multiplier must be >= 1.0");
         }
+        if (maxDelay.isNegative() || maxDelay.isZero()) {
+            throw new IllegalArgumentException("Max delay must be positive");
+        }
         this.origin = origin;
         this.maxRetries = maxRetries;
         this.initialDelay = initialDelay;
         this.multiplier = multiplier;
+        this.maxDelay = maxDelay;
     }
 
     @Override
-    public void publish(Event event) {
-        Exception lastException = null;
+    public CompletableFuture<List<SendResult>> publish(Event event) {
+        CompletableFuture<List<SendResult>> resultFuture = new CompletableFuture<>();
+        retryPublish(event, 1, resultFuture);
+        return resultFuture;
+    }
+
+    private void retryPublish(Event event, int attempt, CompletableFuture<List<SendResult>> resultFuture) {
         String eventTypeName = event.type().getSimpleName();
-        for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
-            try {
-                origin.publish(event);
-                if (attempt > 1) {
-                    log.debug("Event {} published successfully after {} attempts", eventTypeName, attempt);
-                }
-                return;
-            } catch (Exception e) {
-                lastException = e;
-                if (!shouldRetry(e)) {
-                    log.warn("Non-retryable error publishing event {}: {}", eventTypeName, e.getMessage());
-                    throw e;
-                }
-                if (attempt <= maxRetries) {
-                    long delayMs = calculateDelay(attempt);
-                    log.warn("Failed to publish event {} (attempt {}/{}). Retrying in {}ms: {}",
-                            eventTypeName, attempt, maxRetries + 1, delayMs, e.getMessage());
-                    sleep(delayMs);
-                } else {
-                    log.error("Failed to publish event {} after {} attempts", eventTypeName, maxRetries + 1, e);
-                }
-            }
-        }
-        String text = "Failed to publish event %s after %d attempts";
-        String msg = String.format(text, eventTypeName, maxRetries + 1);
-        throw new EventPublisherException(msg, lastException);
+        origin.publish(event)
+                .thenAccept(resultFuture::complete)
+                .exceptionally(ex -> {
+                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null
+                            ? ex.getCause()
+                            : ex;
+                    if (!shouldRetry(cause)) {
+                        log.warn("Non-retryable error publishing event {}: {}", eventTypeName, cause.getMessage());
+                        resultFuture.completeExceptionally(ex);
+                        return null;
+                    }
+                    if (attempt <= maxRetries) {
+                        long delayMs = calculateDelay(attempt);
+                        log.warn("Failed to publish event {} (attempt {}/{}). Retrying in {}ms: {}",
+                                eventTypeName, attempt, maxRetries + 1, delayMs, cause.getMessage());
+                        scheduleRetry(event, attempt, delayMs, resultFuture);
+                    } else {
+                        log.error("Failed to publish event {} after {} attempts", eventTypeName, maxRetries + 1, cause);
+                        String msg = String.format("Failed to publish event %s after %d attempts", eventTypeName, maxRetries + 1);
+                        resultFuture.completeExceptionally(new EventPublisherException(msg, cause));
+                    }
+                    return null;
+                });
+    }
+
+    private void scheduleRetry(Event event, int attempt, long delayMs, CompletableFuture<List<SendResult>> resultFuture) {
+        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS)
+                .execute(() -> retryPublish(event, attempt + 1, resultFuture));
     }
 
     /**
@@ -140,7 +176,7 @@ public class RetryEventPublisher implements EventPublisher {
      */
     private long calculateDelay(int attempt) {
         double delay = initialDelay.toMillis() * Math.pow(multiplier, attempt - 1);
-        return (long) Math.min(delay, 10000); // Cap at 10 seconds
+        return (long) Math.min(delay, maxDelay.toMillis());
     }
 
     /**
@@ -159,32 +195,16 @@ public class RetryEventPublisher implements EventPublisher {
      *   <li>{@link IllegalArgumentException} - invalid arguments</li>
      * </ul>
      *
-     * @param e the exception to check
+     * @param ex the exception to check
      * @return true if the exception should trigger a retry
      */
-    private boolean shouldRetry(Exception e) {
-        if (e instanceof EventPublisherConfigException) {
+    private boolean shouldRetry(Throwable ex) {
+        if (ex instanceof EventPublisherConfigException) {
             return false;
         }
-        if (e instanceof IllegalArgumentException) {
+        if (ex instanceof IllegalArgumentException) {
             return false;
         }
         return true;
-    }
-
-    /**
-     * Sleep for the specified duration.
-     * Package-private for testing.
-     *
-     * @param millis the duration to sleep in milliseconds
-     * @throws EventPublisherException if sleep is interrupted
-     */
-    void sleep(long millis) {
-        try {
-            TimeUnit.MILLISECONDS.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new EventPublisherException("Retry interrupted", e);
-        }
     }
 }

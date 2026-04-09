@@ -1,19 +1,24 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Event publisher decorator that silently catches and logs all publishing errors.
  * <p>
  * This publisher wraps another publisher and catches any exceptions that occur during
- * event publishing. Instead of propagating the exception, it logs the error and continues.
- * This is useful for "fire-and-forget" scenarios where event delivery is not critical.
+ * event publishing. Instead of propagating the exception, it logs the error and returns
+ * an empty result list. This is useful for "fire-and-forget" scenarios where event
+ * delivery is not critical.
  * <p>
  * <b>Key features:</b>
  * <ul>
- *   <li>Never throws exceptions — all errors are logged</li>
+ *   <li>Never completes exceptionally — all errors are logged</li>
  *   <li>Configurable log level (WARN or DEBUG)</li>
  *   <li>Detailed error context (event type, error message, stack trace)</li>
  *   <li>Compatible with other decorators (Retry)</li>
@@ -54,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * );
  * }</pre>
  * <p>
- * <b>Note:</b> For transactional publishing with silent error handling, use the
+ * <b>Note:</b> For transactional event publishing with silent error handling, use the
  * event-flow-spring module which provides Spring-aware transaction support.
  *
  * @author Vladimir Aleshkov
@@ -101,18 +106,19 @@ public class SilentEventPublisher implements EventPublisher {
      * The exception is never propagated to the caller.
      *
      * @param event the event to publish
+     * @return CompletableFuture that completes with SendResults, or empty list on failure
      */
     @Override
-    public void publish(Event event) {
-        try {
-            origin.publish(event);
-        } catch (Exception e) {
-            String msg = "Failed to publish event '{}' (silently ignored): {}";
-            if (logWarnings) {
-                log.warn(msg, event.type().getSimpleName(), e.getMessage(), e);
-            } else {
-                log.debug(msg, event.type().getSimpleName(), e.getMessage(), e);
-            }
-        }
+    public CompletableFuture<List<SendResult>> publish(Event event) {
+        return origin.publish(event)
+                .exceptionally(ex -> {
+                    String msg = "Failed to publish event '{}' (silently ignored): {}";
+                    if (logWarnings) {
+                        log.warn(msg, event.type().getSimpleName(), ex.getMessage(), ex);
+                    } else {
+                        log.debug(msg, event.type().getSimpleName(), ex.getMessage(), ex);
+                    }
+                    return List.of();
+                });
     }
 }

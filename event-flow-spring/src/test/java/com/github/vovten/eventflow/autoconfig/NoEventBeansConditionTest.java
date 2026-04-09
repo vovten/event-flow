@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Conditional;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -84,8 +86,7 @@ class NoEventBeansConditionTest {
     static class PublisherConfig {
         @Bean
         public EventPublisher eventPublisher() {
-            return event -> {
-            };
+            return event -> CompletableFuture.completedFuture(List.of());
         }
     }
 
@@ -101,8 +102,7 @@ class NoEventBeansConditionTest {
     static class BothConfig {
         @Bean
         public EventPublisher eventPublisher() {
-            return event -> {
-            };
+            return event -> CompletableFuture.completedFuture(List.of());
         }
 
         @Bean

@@ -5,11 +5,15 @@ import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.transport.OutTransport;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -37,6 +41,7 @@ class ChannelEventPublisherTest {
         EventChannel channel = mock(EventChannel.class);
         when(channel.name()).thenReturn("test");
         when(channel.transports()).thenReturn(List.of());
+        when(channel.send(any())).thenReturn(CompletableFuture.completedFuture(List.of()));
 
         assertDoesNotThrow(() -> new ChannelEventPublisher(List.of(channel)));
     }
@@ -45,13 +50,16 @@ class ChannelEventPublisherTest {
     @DisplayName("Should send event to configured channel")
     void shouldSendEventToConfiguredChannel() {
         OutTransport transport = mock(OutTransport.class);
+        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
         EventChannel channel = new InternalEventChannel(transport);
 
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
-        publisher.publish(event);
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        List<SendResult> results = future.join();
 
+        assertThat(results).hasSize(1);
         verify(transport).send(event);
     }
 
@@ -65,29 +73,24 @@ class ChannelEventPublisherTest {
 
         TestEventWithExternalChannel event = new TestEventWithExternalChannel();
 
-        EventPublisherConfigException exception = assertThrows(
-                EventPublisherConfigException.class,
-                () -> publisher.publish(event)
-        );
-        assertTrue(exception.getMessage().contains("ExternalEventChannel"));
+        assertThatThrownBy(() -> publisher.publish(event).join())
+                .hasCauseInstanceOf(EventPublisherConfigException.class)
+                .hasStackTraceContaining("ExternalEventChannel");
     }
 
     @Test
-    @DisplayName("Should wrap send exception in EventPublisherException")
-    void shouldWrapSendExceptionInEventPublisherException() {
+    @DisplayName("Should complete exceptionally when send fails")
+    void shouldCompleteExceptionallyWhenSendFails() {
         OutTransport transport = mock(OutTransport.class);
-        doThrow(new RuntimeException("Send failed")).when(transport).send(any());
+        when(transport.send(any())).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Send failed")));
         EventChannel channel = new InternalEventChannel(transport);
 
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
-        EventPublisherException exception = assertThrows(
-                EventPublisherException.class,
-                () -> publisher.publish(event)
-        );
-        assertTrue(exception.getMessage().contains("TestEvent"));
-        assertTrue(exception.getMessage().contains("internal"));
+        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+
+        assertThat(future).isCompletedExceptionally();
     }
 
     static class TestEvent extends AbstractTraceableEvent {
@@ -123,6 +126,11 @@ class ChannelEventPublisherTest {
         @Override
         public List<OutTransport> transports() {
             return List.of();
+        }
+
+        @Override
+        public CompletableFuture<List<SendResult>> send(Event event) {
+            return CompletableFuture.completedFuture(List.of());
         }
     }
 }

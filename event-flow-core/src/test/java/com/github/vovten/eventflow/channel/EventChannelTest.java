@@ -3,12 +3,15 @@ package com.github.vovten.eventflow.channel;
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
+import com.github.vovten.eventflow.transport.SendResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -34,19 +37,26 @@ class EventChannelTest {
     @Test
     @DisplayName("Should send event to all transports")
     void shouldSendEventToAllTransports() {
-        channel.send(testEvent);
+        when(transport1.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest1")));
+        when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
 
+        CompletableFuture<List<SendResult>> future = channel.send(testEvent);
+        List<SendResult> results = future.join();
+
+        assertThat(results).hasSize(2);
         verify(transport1).send(testEvent);
         verify(transport2).send(testEvent);
     }
 
     @Test
-    @DisplayName("Should propagate exception from transport")
-    void shouldPropagateExceptionFromTransport() {
-        doThrow(new RuntimeException("Transport failed")).when(transport1).send(testEvent);
+    @DisplayName("Should complete exceptionally when transport fails")
+    void shouldCompleteExceptionallyWhenTransportFails() {
+        when(transport1.send(testEvent)).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Transport failed")));
+        when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
 
-        assertThrows(RuntimeException.class, () -> channel.send(testEvent));
-        verify(transport2, never()).send(any());
+        CompletableFuture<List<SendResult>> future = channel.send(testEvent);
+
+        assertThat(future).isCompletedExceptionally();
     }
 
     @Test
@@ -65,21 +75,14 @@ class EventChannelTest {
         assertTrue(transports.contains(transport2));
     }
 
-    static class TestEventChannel implements EventChannel {
-        private final List<OutTransport> transports;
-
+    static class TestEventChannel extends AbstractEventChannel {
         TestEventChannel(List<OutTransport> transports) {
-            this.transports = transports;
+            super(transports);
         }
 
         @Override
         public String name() {
             return "test-channel";
-        }
-
-        @Override
-        public List<OutTransport> transports() {
-            return transports;
         }
     }
 

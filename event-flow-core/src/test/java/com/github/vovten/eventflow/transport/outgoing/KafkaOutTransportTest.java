@@ -5,10 +5,11 @@ import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.serialization.EventSerializer;
 import com.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import com.github.vovten.eventflow.serialization.msgpack.MsgPackEventSerializer;
-import com.github.vovten.eventflow.transport.TransportException;
+import com.github.vovten.eventflow.transport.SendResult;
+import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.errors.NetworkException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,16 +19,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Properties;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 /**
  * Tests for {@link KafkaOutTransport}.
@@ -42,14 +41,11 @@ class KafkaOutTransportTest {
     @Mock
     private KafkaProducer<String, byte[]> mockProducer;
 
-    @Mock
-    private Future<RecordMetadata> mockFuture;
-
-    @Mock
-    private RecordMetadata mockMetadata;
-
     @Captor
     private ArgumentCaptor<ProducerRecord<String, byte[]>> recordCaptor;
+
+    @Captor
+    private ArgumentCaptor<Callback> callbackCaptor;
 
     @Test
     @DisplayName("Should create transport with default JSON serializer")
@@ -87,20 +83,28 @@ class KafkaOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should send event with JSON serializer")
-    void shouldSendEventWithJsonSerializer() throws Exception {
-        when(mockProducer.send(recordCaptor.capture())).thenReturn(mockFuture);
-        when(mockFuture.get(anyLong(), any())).thenReturn(mockMetadata);
-        when(mockMetadata.hasOffset()).thenReturn(true);
-
+    @DisplayName("Should send event asynchronously with JSON serializer")
+    void shouldSendEventAsyncWithJsonSerializer() {
         TestEvent event = TestEvent.create("test-id", "test-message");
 
         KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new JsonEventSerializer());
         transport.producer = mockProducer;
 
-        transport.send(event);
+        // Mock async send with immediate success callback
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata("test-topic", 0, 100), null);
+            return null;
+        }).when(mockProducer).send(recordCaptor.capture(), callbackCaptor.capture());
 
-        verify(mockProducer, times(1)).send(any());
+        CompletableFuture<SendResult> future = transport.send(event);
+        SendResult result = future.join();
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.destination()).isEqualTo("test-topic-p0");
+        assertThat(result.metadata()).containsEntry("partition", 0);
+        assertThat(result.metadata()).containsEntry("offset", 100L);
+
         ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
         assertThat(capturedRecord.topic()).isEqualTo("test-topic");
         assertThat(capturedRecord.key()).isEqualTo(TestEvent.class.getName());
@@ -110,20 +114,27 @@ class KafkaOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should send event with MessagePack serializer")
-    void shouldSendEventWithMsgPackSerializer() throws Exception {
-        when(mockProducer.send(recordCaptor.capture())).thenReturn(mockFuture);
-        when(mockFuture.get(anyLong(), any())).thenReturn(mockMetadata);
-        when(mockMetadata.hasOffset()).thenReturn(true);
-
+    @DisplayName("Should send event asynchronously with MessagePack serializer")
+    void shouldSendEventAsyncWithMsgPackSerializer() {
         TestEvent event = TestEvent.create("test-id", "test-message");
 
         KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new MsgPackEventSerializer());
         transport.producer = mockProducer;
 
-        transport.send(event);
+        // Mock async send with immediate success callback
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata("test-topic", 1, 200), null);
+            return null;
+        }).when(mockProducer).send(recordCaptor.capture(), callbackCaptor.capture());
 
-        verify(mockProducer, times(1)).send(any());
+        CompletableFuture<SendResult> future = transport.send(event);
+        SendResult result = future.join();
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.destination()).isEqualTo("test-topic-p1");
+        assertThat(result.metadata()).containsEntry("partition", 1);
+
         ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
         assertThat(capturedRecord.topic()).isEqualTo("test-topic");
         assertThat(capturedRecord.key()).isEqualTo(TestEvent.class.getName());
@@ -133,59 +144,93 @@ class KafkaOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when send fails")
-    void shouldThrowExceptionWhenSendFails() throws Exception {
-        when(mockProducer.send(any())).thenReturn(mockFuture);
-        when(mockFuture.get(anyLong(), any())).thenThrow(
-                new java.util.concurrent.ExecutionException(
-                        new org.apache.kafka.common.errors.NetworkException("Network error")
-                )
-        );
-
+    @DisplayName("Should handle send failure")
+    void shouldHandleSendFailure() {
         TestEvent event = TestEvent.create("test-id", "test-message");
 
         KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new JsonEventSerializer());
         transport.producer = mockProducer;
 
-        assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(TransportException.class)
-                .hasMessageContaining("Failed to send event");
+        // Mock async send with error callback
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata("test-topic", 0, 0), new NetworkException("Network error"));
+            return null;
+        }).when(mockProducer).send(any(), any(Callback.class));
+
+        CompletableFuture<SendResult> future = transport.send(event);
+        SendResult result = future.join();
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.destination()).isEqualTo("test-topic-p0");
+        assertThat(result.error()).isInstanceOf(NetworkException.class);
+        assertThat(result.errorDetails()).isEqualTo("Network error");
     }
 
     @Test
-    @DisplayName("Should throw exception on timeout")
-    void shouldThrowExceptionOnTimeout() throws Exception {
-        when(mockProducer.send(any())).thenReturn(mockFuture);
-        when(mockFuture.get(anyLong(), any())).thenThrow(
-                new java.util.concurrent.TimeoutException("Timeout")
-        );
+    @DisplayName("Should complete exceptionally when serialization fails")
+    void shouldCompleteExceptionallyWhenSerializationFails() {
+        EventSerializer failingSerializer = new FailingEventSerializer();
 
         TestEvent event = TestEvent.create("test-id", "test-message");
 
-        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new JsonEventSerializer());
+        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", failingSerializer);
         transport.producer = mockProducer;
 
-        assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(TransportException.class)
-                .hasMessageContaining("Timeout");
+        CompletableFuture<SendResult> future = transport.send(event);
+
+        assertThat(future).isCompletedExceptionally();
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(RuntimeException.class)
+                .hasRootCauseMessage("Serialization error");
+
+        verify(mockProducer, never()).send(any(), any());
     }
 
     @Test
-    @DisplayName("Should throw exception on interrupt")
-    void shouldThrowExceptionOnInterrupt() throws Exception {
-        when(mockProducer.send(any())).thenReturn(mockFuture);
-        when(mockFuture.get(anyLong(), any())).thenThrow(
-                new InterruptedException("Interrupted")
-        );
-
+    @DisplayName("Should throw exception when sending on closed transport")
+    void shouldThrowExceptionWhenSendingOnClosedTransport() {
         TestEvent event = TestEvent.create("test-id", "test-message");
 
         KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new JsonEventSerializer());
         transport.producer = mockProducer;
+        transport.close();
 
         assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(TransportException.class)
-                .hasMessageContaining("interrupted");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("KafkaOutTransport is already closed");
+    }
+
+    @Test
+    @DisplayName("Should close producer when close() is called")
+    void shouldCloseProducer() {
+        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new JsonEventSerializer());
+        transport.producer = mockProducer;
+
+        transport.close();
+
+        verify(mockProducer).close();
+    }
+
+    @Test
+    @DisplayName("Should be idempotent on close")
+    void shouldBeIdempotentOnClose() {
+        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new JsonEventSerializer());
+        transport.producer = mockProducer;
+
+        transport.close();
+        transport.close(); // Second close should be safe
+
+        verify(mockProducer, times(1)).close();
+    }
+
+    private org.apache.kafka.clients.producer.RecordMetadata mockMetadata(String topic, int partition, long offset) {
+        var metadata = mock(org.apache.kafka.clients.producer.RecordMetadata.class);
+        lenient().when(metadata.hasOffset()).thenReturn(true);
+        lenient().when(metadata.partition()).thenReturn(partition);
+        lenient().when(metadata.offset()).thenReturn(offset);
+        lenient().when(metadata.topic()).thenReturn(topic);
+        return metadata;
     }
 
     static class TestEvent extends AbstractTraceableEvent {
@@ -209,6 +254,28 @@ class KafkaOutTransportTest {
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
+        }
+    }
+
+    static class FailingEventSerializer implements EventSerializer {
+        @Override
+        public byte[] serialize(Event event) {
+            throw new RuntimeException("Serialization error");
+        }
+
+        @Override
+        public <T extends Event> T deserialize(byte[] data, Class<T> eventType) {
+            throw new RuntimeException("Deserialization error");
+        }
+
+        @Override
+        public byte getCode() {
+            return (byte) 0x99;
+        }
+
+        @Override
+        public String getName() {
+            return "failing";
         }
     }
 }

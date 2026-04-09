@@ -2,8 +2,10 @@ package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
+import com.github.vovten.eventflow.transport.SendResult;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Event channel — a logical route for event delivery.
@@ -39,17 +41,14 @@ public interface EventChannel {
     List<OutTransport> transports();
 
     /**
-     * Send event to all transports associated with this channel.
+     * Send event to all transports associated with this channel asynchronously.
      * <p>
      * This method iterates over all configured transports and sends
-     * the event to each one. If a transport fails, the exception
-     * propagates to the caller.
+     * the event to each one. Returns a CompletableFuture that completes
+     * when all transports have finished sending.
      *
      * @param event the event to send
+     * @return CompletableFuture that completes with list of SendResults from all transports
      */
-    default void send(Event event) {
-        for (OutTransport transport : transports()) {
-            transport.send(event);
-        }
-    }
+    CompletableFuture<List<SendResult>> send(Event event);
 }

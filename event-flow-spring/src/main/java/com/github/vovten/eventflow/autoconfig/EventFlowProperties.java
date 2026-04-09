@@ -5,8 +5,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 /**
  * Configuration properties for Event Flow auto-configuration.
@@ -27,11 +25,6 @@ import java.util.concurrent.Executors;
  *       max-attempts: 3
  *       initial-delay: 100ms
  *       multiplier: 2.0
- *     async:
- *       enabled: true
- *       core-size: 2
- *       max-size: 8
- *       queue-capacity: 256
  *     channels:
  *       - name: internal
  *         transports:
@@ -117,7 +110,6 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private boolean silent = false;
         private RetryConfig retry = new RetryConfig();
-        private AsyncConfig async = new AsyncConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
         public boolean isEnabled() {
@@ -150,14 +142,6 @@ public class EventFlowProperties {
 
         public void setRetry(RetryConfig retry) {
             this.retry = retry;
-        }
-
-        public AsyncConfig getAsync() {
-            return async;
-        }
-
-        public void setAsync(AsyncConfig async) {
-            this.async = async;
         }
 
         public List<ChannelConfig> getChannels() {
@@ -208,80 +192,6 @@ public class EventFlowProperties {
 
         public void setMultiplier(double multiplier) {
             this.multiplier = multiplier;
-        }
-    }
-
-    /**
-     * Async publishing configuration.
-     */
-    public static class AsyncConfig {
-        private boolean enabled = false;
-        private int coreSize = 2;
-        private int maxSize = 10;
-        private int queueCapacity = 1000;
-        private int keepAliveSeconds = 60;
-        private String threadNamePrefix = "event-flow-async-publisher";
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public int getCoreSize() {
-            return coreSize;
-        }
-
-        public void setCoreSize(int coreSize) {
-            this.coreSize = coreSize;
-        }
-
-        public int getMaxSize() {
-            return maxSize;
-        }
-
-        public void setMaxSize(int maxSize) {
-            this.maxSize = maxSize;
-        }
-
-        public int getQueueCapacity() {
-            return queueCapacity;
-        }
-
-        public void setQueueCapacity(int queueCapacity) {
-            this.queueCapacity = queueCapacity;
-        }
-
-        public int getKeepAliveSeconds() {
-            return keepAliveSeconds;
-        }
-
-        public void setKeepAliveSeconds(int keepAliveSeconds) {
-            this.keepAliveSeconds = keepAliveSeconds;
-        }
-
-        public String getThreadNamePrefix() {
-            return threadNamePrefix;
-        }
-
-        public void setThreadNamePrefix(String threadNamePrefix) {
-            this.threadNamePrefix = threadNamePrefix;
-        }
-
-        /**
-         * Create an Executor based on this configuration.
-         * <p>
-         * Uses virtual threads by default for optimal I/O-bound performance.
-         * Falls back to platform thread pool if virtual threads are not available
-         * (Java < 21).
-         *
-         * @return configured executor
-         */
-        public Executor createExecutor() {
-            // Use virtual threads by default (Java 21+)
-            return Executors.newVirtualThreadPerTaskExecutor();
         }
     }
 

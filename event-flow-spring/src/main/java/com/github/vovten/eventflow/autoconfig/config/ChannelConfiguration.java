@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.autoconfig.config;
 
 import com.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import com.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
+import com.github.vovten.eventflow.channel.AbstractEventChannel;
 import com.github.vovten.eventflow.channel.BroadcastEventChannel;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.ExternalEventChannel;
@@ -161,6 +162,17 @@ public class ChannelConfiguration {
     /**
      * Generic event channel for custom channel names.
      */
-    private record GenericEventChannel(String name, List<OutTransport> transports) implements EventChannel {
+    private static class GenericEventChannel extends AbstractEventChannel {
+        private final String channelName;
+
+        GenericEventChannel(String name, List<OutTransport> transports) {
+            super(transports);
+            this.channelName = name;
+        }
+
+        @Override
+        public String name() {
+            return channelName;
+        }
     }
 }
