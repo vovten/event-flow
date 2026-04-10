@@ -59,10 +59,17 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(UnifiedEventDispatcher.class);
 
+    private final List<InTransport> transports;
     private final ExecutorService executorService;
     private final EventHandlerRegistry handlerRegistry;
-    private final List<InTransport> transports;
+
+    /**
+     * Limits concurrent handler executions to prevent overwhelming downstream systems.
+     * Null means unlimited (use with platform threads + CallerRunsPolicy).
+     * Critical for virtual threads where executor never rejects tasks.
+     */
     private final Semaphore concurrencySemaphore;
+
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
@@ -165,15 +172,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                 if (concurrencySemaphore != null) {
                     concurrencySemaphore.acquire();
                 }
-                executorService.execute(() -> {
-                    try {
-                        handler.onEvent(event);
-                    } finally {
-                        if (concurrencySemaphore != null) {
-                            concurrencySemaphore.release();
-                        }
-                    }
-                });
+                executorService.execute(new HandlerTask(handler, event));
                 submittedHandlers++;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -223,5 +222,32 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         String msg = "EventDispatcher started with %s transport(s): %s";
         String names = transports.stream().map(InTransport::name).collect(joining(","));
         return String.format(msg, transports.size(), names);
+    }
+
+    private final class HandlerTask implements Runnable {
+        private final EventHandler handler;
+        private final Event event;
+
+        private HandlerTask(EventHandler handler, Event event) {
+            this.handler = handler;
+            this.event = event;
+        }
+
+        @Override
+        public void run() {
+            try {
+                handler.onEvent(event);
+            } catch (Exception e) {
+                log.error("Handler execution failed for event {} in handler {}: {}",
+                        event.type().getSimpleName(),
+                        handler.getClass().getSimpleName(),
+                        e.getMessage(),
+                        e);
+            } finally {
+                if (concurrencySemaphore != null) {
+                    concurrencySemaphore.release();
+                }
+            }
+        }
     }
 }

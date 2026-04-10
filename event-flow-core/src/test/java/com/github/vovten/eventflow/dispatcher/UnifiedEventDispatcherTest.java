@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.dispatcher;
 
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
+import com.github.vovten.eventflow.EventHandler;
 import com.github.vovten.eventflow.EventSubscriber;
 import com.github.vovten.eventflow.registry.EventHandlerRegistry;
 import com.github.vovten.eventflow.transport.InTransport;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -154,6 +156,28 @@ class UnifiedEventDispatcherTest {
         boolean result = dispatcher.isRegistered(handler);
 
         assertTrue(result);
+    }
+
+    @Test
+    @DisplayName("Should release semaphore when handler throws exception")
+    void shouldReleaseSemaphoreWhenHandlerThrowsException() throws InterruptedException {
+        Semaphore semaphore = new Semaphore(1);
+
+        EventHandler failingHandler = mock(EventHandler.class);
+        doThrow(new RuntimeException("Handler failed!")).when(failingHandler).onEvent(any());
+
+        when(handlerRegistry.getHandlers(any())).thenReturn(List.of(failingHandler));
+
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1), semaphore);
+
+        assertEquals(1, semaphore.availablePermits());
+
+        TestEvent event = new TestEvent();
+        dispatcher.dispatch(event);
+
+        Thread.sleep(200);
+
+        assertEquals(1, semaphore.availablePermits());
     }
 
     static class TestEvent extends AbstractTraceableEvent {
