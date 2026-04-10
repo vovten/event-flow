@@ -11,7 +11,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.List;
+import com.github.vovten.eventflow.transport.SendResults;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -201,7 +201,7 @@ class PublisherConfigurationTest {
     static class CustomPublisherConfig {
         @Bean(name = "eventPublisher")
         public EventPublisher customPublisher() {
-            return event -> CompletableFuture.completedFuture(List.of());
+            return event -> CompletableFuture.completedFuture(SendResults.empty());
         }
     }
 }

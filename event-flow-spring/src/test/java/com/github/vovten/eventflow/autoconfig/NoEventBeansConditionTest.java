@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.autoconfig;
 import com.github.vovten.eventflow.dispatcher.EventDispatcher;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.publisher.EventPublisher;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -10,7 +11,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Conditional;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -86,7 +86,7 @@ class NoEventBeansConditionTest {
     static class PublisherConfig {
         @Bean
         public EventPublisher eventPublisher() {
-            return event -> CompletableFuture.completedFuture(List.of());
+            return event -> CompletableFuture.completedFuture(SendResults.empty());
         }
     }
 
@@ -102,7 +102,7 @@ class NoEventBeansConditionTest {
     static class BothConfig {
         @Bean
         public EventPublisher eventPublisher() {
-            return event -> CompletableFuture.completedFuture(List.of());
+            return event -> CompletableFuture.completedFuture(SendResults.empty());
         }
 
         @Bean

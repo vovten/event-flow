@@ -1,18 +1,25 @@
 package com.github.vovten.eventflow.channel;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.SendResult;
 import com.github.vovten.eventflow.transport.SendResults;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -27,12 +34,27 @@ class EventChannelTest {
     private TestEventChannel channel;
     private TestEvent testEvent;
 
+    private Logger channelLogger;
+    private ListAppender<ILoggingEvent> listAppender;
+
     @BeforeEach
     void setUp() {
-        transport1 = mock(OutTransport.class);
-        transport2 = mock(OutTransport.class);
+        transport1 = mock(OutTransport.class, "mock-transport-1");
+        transport2 = mock(OutTransport.class, "mock-transport-2");
+        when(transport1.name()).thenReturn("mock-transport-1");
+        when(transport2.name()).thenReturn("mock-transport-2");
         channel = new TestEventChannel(List.of(transport1, transport2));
         testEvent = new TestEvent();
+
+        channelLogger = (Logger) LoggerFactory.getLogger(AbstractEventChannel.class);
+        listAppender = new ListAppender<>();
+        listAppender.start();
+        channelLogger.addAppender(listAppender);
+    }
+
+    @AfterEach
+    void tearDown() {
+        channelLogger.detachAppender(listAppender);
     }
 
     @Test
@@ -61,6 +83,48 @@ class EventChannelTest {
 
         assertThat(results.isPartialSuccess()).isTrue();
         assertThat(results.getFailedCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should log warning when one transport fails")
+    void shouldLogWarningWhenOneTransportFails() {
+        // Arrange
+        when(transport1.send(testEvent)).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Connection refused")));
+        when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
+
+        // Act
+        CompletableFuture<SendResults> future = channel.send(testEvent);
+        SendResults results = future.join();
+
+        // Assert — partial success
+        assertThat(results.isPartialSuccess()).isTrue();
+        assertThat(results.getSuccessfulCount()).isEqualTo(1);
+        assertThat(results.getFailedCount()).isEqualTo(1);
+
+        // Assert — failure result contains transport name
+        assertThat(results.getFirstFailure()).isPresent();
+        assertThat(results.getFirstFailure().get().destination()).isEqualTo("mock-transport-1");
+        assertThat(results.getFirstFailure().get().error()).isInstanceOf(RuntimeException.class);
+        assertThat(results.getFirstFailure().get().errorDetails()).isEqualTo("Connection refused");
+
+        // Assert — warning log was written with transport name
+        List<ILoggingEvent> logs = listAppender.list;
+        assertThat(logs).hasSize(1);
+        ILoggingEvent logEvent = logs.get(0);
+        assertThat(logEvent.getLevel()).isEqualTo(Level.WARN);
+        assertThat(logEvent.getFormattedMessage()).contains("mock-transport-1");
+        assertThat(logEvent.getFormattedMessage()).contains("TestEvent");
+        assertThat(logEvent.getFormattedMessage()).contains("Connection refused");
+        assertThat(logEvent.getThrowableProxy()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should fail when channel has no transports")
+    void shouldFailWhenChannelHasNoTransports() {
+        assertThatThrownBy(() -> new TestEventChannel(List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must have at least one transport")
+                .hasMessageContaining("test-channel");
     }
 
     @Test
