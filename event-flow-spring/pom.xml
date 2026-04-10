@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.github.vovten</groupId>
+        <groupId>io.github.vovten</groupId>
         <artifactId>event-flow</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.0</version>
     </parent>
 
     <artifactId>event-flow-spring</artifactId>
@@ -16,12 +16,32 @@
     <name>Event Flow Spring</name>
     <description>Event-driven architecture library - Spring Integration module</description>
 
+    <url>https://github.com/vovten/event-flow</url>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>vovten</id>
+            <name>Vladimir Aleshkov</name>
+            <email>vovten@mail.ru</email>
+            <url>https://github.com/vovten</url>
+        </developer>
+    </developers>
+    <scm>
+        <connection>scm:git:git://github.com/vovten/event-flow.git</connection>
+        <developerConnection>scm:git:ssh://github.com:vovten/event-flow.git</developerConnection>
+        <url>https://github.com/vovten/event-flow/tree/main</url>
+    </scm>
+
     <dependencies>
         <!-- Core module -->
         <dependency>
-            <groupId>com.github.vovten</groupId>
+            <groupId>io.github.vovten</groupId>
             <artifactId>event-flow-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Spring Framework -->
@@ -136,6 +156,18 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
