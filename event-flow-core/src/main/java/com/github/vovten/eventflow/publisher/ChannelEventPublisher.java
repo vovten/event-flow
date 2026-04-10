@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,18 +130,21 @@ public class ChannelEventPublisher implements EventPublisher {
      * @throws EventPublisherConfigException if required channel is not configured
      */
     @Override
-    public CompletableFuture<List<SendResult>> publish(Event event) {
+    public CompletableFuture<SendResults> publish(Event event) {
         try {
-            List<CompletableFuture<List<SendResult>>> channelFutures = new ArrayList<>();
+            List<CompletableFuture<SendResults>> channelFutures = new ArrayList<>();
             for (Class<? extends EventChannel> channelType : event.channels()) {
                 EventChannel channel = channels.get(channelType);
                 checkChannel(event, channelType, channel);
                 channelFutures.add(channel.send(event));
             }
             return CompletableFuture.allOf(channelFutures.toArray(new CompletableFuture[0]))
-                    .thenApply(v -> channelFutures.stream()
-                            .flatMap(future -> future.join().stream())
-                            .toList());
+                    .thenApply(v -> {
+                        List<SendResult> allResults = channelFutures.stream()
+                                .flatMap(future -> future.join().asList().stream())
+                                .toList();
+                        return SendResults.of(allResults);
+                    });
         } catch (EventPublisherConfigException ex) {
             return CompletableFuture.failedFuture(ex);
         }

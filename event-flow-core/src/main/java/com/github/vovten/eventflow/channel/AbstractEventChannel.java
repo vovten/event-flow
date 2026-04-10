@@ -3,9 +3,12 @@ package com.github.vovten.eventflow.channel;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Abstract base class for event channels providing common functionality.
@@ -50,13 +53,25 @@ public abstract class AbstractEventChannel implements EventChannel {
     }
 
     @Override
-    public CompletableFuture<List<SendResult>> send(Event event) {
+    public CompletableFuture<SendResults> send(Event event) {
+        if (transports().isEmpty()) {
+            return CompletableFuture.completedFuture(SendResults.empty());
+        }
         List<CompletableFuture<SendResult>> futures = transports().stream()
                 .map(transport -> transport.send(event))
                 .toList();
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .thenApply(v -> futures.stream()
-                        .map(CompletableFuture::join)
-                        .toList());
+                .handle((v, ex) -> {
+                    List<SendResult> results = new ArrayList<>();
+                    for (CompletableFuture<SendResult> future : futures) {
+                        try {
+                            results.add(future.join());
+                        } catch (CompletionException e) {
+                            Throwable cause = e.getCause() != null ? e.getCause() : e;
+                            results.add(SendResult.failure("transport", cause, cause.getMessage()));
+                        }
+                    }
+                    return SendResults.of(results);
+                });
     }
 }

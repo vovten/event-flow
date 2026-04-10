@@ -4,6 +4,7 @@ import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,10 +41,11 @@ class EventChannelTest {
         when(transport1.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest1")));
         when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
 
-        CompletableFuture<List<SendResult>> future = channel.send(testEvent);
-        List<SendResult> results = future.join();
+        CompletableFuture<SendResults> future = channel.send(testEvent);
+        SendResults results = future.join();
 
-        assertThat(results).hasSize(2);
+        assertThat(results.isAllSuccess()).isTrue();
+        assertThat(results.getTotalCount()).isEqualTo(2);
         verify(transport1).send(testEvent);
         verify(transport2).send(testEvent);
     }
@@ -54,9 +56,11 @@ class EventChannelTest {
         when(transport1.send(testEvent)).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Transport failed")));
         when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
 
-        CompletableFuture<List<SendResult>> future = channel.send(testEvent);
+        CompletableFuture<SendResults> future = channel.send(testEvent);
+        SendResults results = future.join();
 
-        assertThat(future).isCompletedExceptionally();
+        assertThat(results.isPartialSuccess()).isTrue();
+        assertThat(results.getFailedCount()).isEqualTo(1);
     }
 
     @Test

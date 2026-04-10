@@ -1,12 +1,11 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -130,13 +129,13 @@ public class RetryEventPublisher implements EventPublisher {
     }
 
     @Override
-    public CompletableFuture<List<SendResult>> publish(Event event) {
-        CompletableFuture<List<SendResult>> resultFuture = new CompletableFuture<>();
+    public CompletableFuture<SendResults> publish(Event event) {
+        CompletableFuture<SendResults> resultFuture = new CompletableFuture<>();
         retryPublish(event, 1, resultFuture);
         return resultFuture;
     }
 
-    private void retryPublish(Event event, int attempt, CompletableFuture<List<SendResult>> resultFuture) {
+    private void retryPublish(Event event, int attempt, CompletableFuture<SendResults> resultFuture) {
         String eventTypeName = event.type().getSimpleName();
         origin.publish(event)
                 .thenAccept(resultFuture::complete)
@@ -163,7 +162,7 @@ public class RetryEventPublisher implements EventPublisher {
                 });
     }
 
-    private void scheduleRetry(Event event, int attempt, long delayMs, CompletableFuture<List<SendResult>> resultFuture) {
+    private void scheduleRetry(Event event, int attempt, long delayMs, CompletableFuture<SendResults> resultFuture) {
         CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS)
                 .execute(() -> retryPublish(event, attempt + 1, resultFuture));
     }

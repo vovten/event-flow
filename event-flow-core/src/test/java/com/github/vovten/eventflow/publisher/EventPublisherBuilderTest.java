@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -156,7 +157,7 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with custom decorator")
     void shouldBuildPublisherWithCustomDecorator() {
         // Arrange
-        EventPublisherBuilder.DecoratorFunction decorator = pub -> event -> CompletableFuture.completedFuture(List.of());
+        EventPublisherBuilder.DecoratorFunction decorator = pub -> event -> CompletableFuture.completedFuture(SendResults.empty());
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.create(channel)
@@ -171,8 +172,8 @@ class EventPublisherBuilderTest {
     @DisplayName("Should build publisher with multiple decorators")
     void shouldBuildPublisherWithMultipleDecorators() {
         // Arrange
-        EventPublisherBuilder.DecoratorFunction decorator1 = pub -> event -> CompletableFuture.completedFuture(List.of());
-        EventPublisherBuilder.DecoratorFunction decorator2 = pub -> event -> CompletableFuture.completedFuture(List.of());
+        EventPublisherBuilder.DecoratorFunction decorator1 = pub -> event -> CompletableFuture.completedFuture(SendResults.empty());
+        EventPublisherBuilder.DecoratorFunction decorator2 = pub -> event -> CompletableFuture.completedFuture(SendResults.empty());
 
         // Act
         EventPublisher publisher = EventPublisherBuilder.create(channel)

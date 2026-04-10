@@ -2,7 +2,7 @@ package com.github.vovten.eventflow.channel;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.OutTransport;
-import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -48,7 +48,7 @@ public interface EventChannel {
      * when all transports have finished sending.
      *
      * @param event the event to send
-     * @return CompletableFuture that completes with list of SendResults from all transports
+     * @return CompletableFuture that completes with SendResults
      */
-    CompletableFuture<List<SendResult>> send(Event event);
+    CompletableFuture<SendResults> send(Event event);
 }

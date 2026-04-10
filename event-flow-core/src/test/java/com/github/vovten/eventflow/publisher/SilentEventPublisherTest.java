@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.event.AbstractTraceableEvent;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -47,15 +48,16 @@ class SilentEventPublisherTest {
     void shouldPublishEventSuccessfully() {
         // Arrange
         TestEvent event = new TestEvent("test");
-        EventPublisher delegate = e -> CompletableFuture.completedFuture(List.of(SendResult.success("dest")));
+        EventPublisher delegate = e -> CompletableFuture.completedFuture(SendResults.of(List.of(SendResult.success("dest"))));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
         // Act
-        CompletableFuture<List<SendResult>> future = publisher.publish(event);
-        List<SendResult> results = future.join();
+        CompletableFuture<SendResults> future = publisher.publish(event);
+        SendResults results = future.join();
 
         // Assert
-        assertThat(results).hasSize(1);
+        assertThat(results.isAllSuccess()).isTrue();
+        assertThat(results.getTotalCount()).isEqualTo(1);
     }
 
     @Test
@@ -67,14 +69,15 @@ class SilentEventPublisherTest {
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, true);
 
         // Act
-        CompletableFuture<List<SendResult>> future = publisher.publish(event);
-        List<SendResult> results = future.join();
+        CompletableFuture<SendResults> future = publisher.publish(event);
+        SendResults results = future.join();
 
         // Assert
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).success()).isFalse();
-        assertThat(results.get(0).error()).isInstanceOf(RuntimeException.class);
-        assertThat(results.get(0).errorDetails()).isEqualTo("Test exception");
+        assertThat(results.isAllFailure()).isTrue();
+        assertThat(results.getFailedCount()).isEqualTo(1);
+        assertThat(results.getFirstFailure()).isPresent();
+        assertThat(results.getFirstFailure().get().error()).isInstanceOf(RuntimeException.class);
+        assertThat(results.getFirstFailure().get().errorDetails()).isEqualTo("Test exception");
     }
 
     @Test
@@ -86,13 +89,12 @@ class SilentEventPublisherTest {
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, false);
 
         // Act
-        CompletableFuture<List<SendResult>> future = publisher.publish(event);
-        List<SendResult> results = future.join();
+        CompletableFuture<SendResults> future = publisher.publish(event);
+        SendResults results = future.join();
 
         // Assert
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).success()).isFalse();
-        assertThat(results.get(0).error()).isInstanceOf(RuntimeException.class);
+        assertThat(results.isAllFailure()).isTrue();
+        assertThat(results.getFirstFailure().get().error()).isInstanceOf(RuntimeException.class);
     }
 
     @Test
@@ -104,13 +106,12 @@ class SilentEventPublisherTest {
         SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
         // Act
-        CompletableFuture<List<SendResult>> future = publisher.publish(event);
-        List<SendResult> results = future.join();
+        CompletableFuture<SendResults> future = publisher.publish(event);
+        SendResults results = future.join();
 
         // Assert
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).success()).isFalse();
-        assertThat(results.get(0).error()).isInstanceOf(EventPublisherException.class);
+        assertThat(results.isAllFailure()).isTrue();
+        assertThat(results.getFirstFailure().get().error()).isInstanceOf(EventPublisherException.class);
     }
 
     /**

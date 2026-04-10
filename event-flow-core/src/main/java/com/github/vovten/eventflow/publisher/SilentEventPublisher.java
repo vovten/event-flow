@@ -2,6 +2,7 @@ package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +122,7 @@ public class SilentEventPublisher implements EventPublisher {
      * @return CompletableFuture that completes with SendResults (never exceptionally)
      */
     @Override
-    public CompletableFuture<List<SendResult>> publish(Event event) {
+    public CompletableFuture<SendResults> publish(Event event) {
         return origin.publish(event)
                 .handle((results, ex) -> {
                     if (ex != null) {
@@ -136,10 +137,10 @@ public class SilentEventPublisher implements EventPublisher {
                         }
                         List<SendResult> newResults = new ArrayList<>();
                         if (results != null) {
-                            newResults.addAll(results);
+                            newResults.addAll(results.asList());
                         }
                         newResults.add(SendResult.failure("publisher", cause, causeMsg));
-                        return newResults;
+                        return SendResults.of(newResults);
                     }
                     return results;
                 });
