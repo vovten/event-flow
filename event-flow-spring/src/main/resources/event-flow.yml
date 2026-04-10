@@ -38,10 +38,6 @@ event-flow:
       # Backoff multiplier for exponential backoff
       multiplier: 2.0
 
-    # Enable silent mode (catch and log all exceptions without rethrowing)
-    # When true, the publisher will never throw exceptions
-    silent: false
-
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
     # Transport name identifies the type (e.g., "local-queue", "kafka")

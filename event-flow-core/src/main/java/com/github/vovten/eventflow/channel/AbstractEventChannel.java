@@ -19,10 +19,6 @@ import java.util.concurrent.CompletionException;
  * including transport management and event sending logic. Concrete channel
  * implementations should extend this class and provide their specific
  * channel name.
- * <p>
- * The abstract class consolidates the common code that was previously
- * duplicated across BroadcastEventChannel, ExternalEventChannel, and
- * InternalEventChannel, reducing code duplication and improving maintainability.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-12

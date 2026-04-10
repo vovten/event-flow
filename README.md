@@ -341,18 +341,11 @@ EventPublisher publisher = EventPublisherBuilder.channels(channels)
     .transactional()
     .build();
 
-// Silent publisher with retry for analytics events
-EventPublisher publisher = EventPublisherBuilder.channels(analyticsChannel)
-    .withRetry()
-    .silent()
-    .build();
-
 // Complete configuration with custom decorator
 EventPublisher publisher = EventPublisherBuilder.channels(channels)
     .withRetry(5, Duration.ofSeconds(1), 1.5)
     .transactional()
     .withDecorator(pub -> new MetricsEventPublisher(pub, metricsRegistry))
-    .silent()
     .build();
 ```
 
@@ -364,7 +357,6 @@ EventPublisher publisher = EventPublisherBuilder.channels(channels)
 | `withRetry()` | Enable retry with default settings (3 attempts, 100ms initial delay, 2.0 multiplier) |
 | `withRetry(max, delay, multiplier)` | Enable retry with custom settings |
 | `transactional()` | Enable transactional publishing (defer until after commit) |
-| `silent()` | Enable silent mode (catch and log all exceptions) |
 | `withDecorator(fn)` | Add custom decorator to the publisher chain |
 | `build()` | Build the publisher |
 | `buildAndLog()` | Build and log the final configuration |
@@ -373,8 +365,7 @@ EventPublisher publisher = EventPublisherBuilder.channels(channels)
 1. Base `ChannelEventPublisher`
 2. Custom decorators (in order added)
 3. `RetryEventPublisher` (if enabled)
-4. `TransactionalEventPublisher` (if enabled)
-5. `SilentEventPublisher` (if enabled) — always outermost
+4. `TransactionalEventPublisher` (if enabled) — always outermost
 
 #### EventListenerRegistryBuilder
 
@@ -571,17 +562,6 @@ public class PaymentService {
         eventPublisher.publish(new PaymentCompletedEvent(orderId));
     }
 }
-```
-
-### Silent Publishing for Non-Critical Events
-
-```java
-EventPublisher analyticsPublisher = EventPublisherBuilder.channels(analyticsChannel)
-    .withRetry()
-    .silent()  // Exceptions are logged but not propagated
-    .build();
-
-analyticsPublisher.publish(new PageViewEvent(userId, pageUrl));
 ```
 
 ## ⚙️ Configuration

@@ -86,11 +86,6 @@ public class PublisherConfiguration {
         if (publisherConfig.isTransactional()) {
             builder.transactional();
         }
-        
-        // Apply silent mode
-        if (publisherConfig.isSilent()) {
-            builder.silent();
-        }
 
         return builder.buildAndLog();
     }

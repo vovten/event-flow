@@ -72,10 +72,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * For automatic retry on transient failures, wrap this publisher with
  * {@link RetryEventPublisher}.
  * <p>
- * <b>Silent publishing:</b>
- * For "fire-and-forget" scenarios where errors should be logged but not propagated,
- * wrap this publisher with {@link SilentEventPublisher}.
- * <p>
  * <b>Transaction support:</b>
  * For transactional event publishing (defer until after commit), use the
  * event-flow-spring module which provides {@code TransactionalEventPublisher}.
@@ -89,7 +85,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2026-03-05
  * @see EventChannel
  * @see RetryEventPublisher
- * @see SilentEventPublisher
  */
 public class ChannelEventPublisher implements EventPublisher {
 
