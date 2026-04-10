@@ -2,9 +2,8 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Java](https://img.shields.io/badge/Java-21-blue)](https://openjdk.java.net/)
-[![Kafka](https://img.shields.io/badge/Kafka-3.6.0-orange)](https://kafka.apache.org/)
 
-**Event Flow** is a lightweight library for building event-driven architecture in Java applications. It provides a flexible and extensible system for publishing and processing events that works equally well in simple standalone applications and complex Spring-based projects.
+**Event Flow** is a lightweight Java library for building event-driven architectures. It provides a flexible event publishing and processing system that works equally well in simple standalone applications and complex projects using DI frameworks.
 
 ## 📖 Table of Contents
 
@@ -19,14 +18,16 @@
 
 ## ✨ Features
 
-- **Event Model** — Type-safe events with JSON serialization
+- **Typed Events** — Events with JSON serialization and polymorphic deserialization
 - **Flexible Routing** — Event channels with configurable transports
-- **Multiple Transports** — Local-Queue and Apache Kafka support out of the box
+- **Multiple Transports** — LocalQueue (in-JVM) and Apache Kafka out of the box
 - **Annotation-Based** — Event handling via `@EventListener`
-- **Interface-Based** — Event handling via `EventListener` interface implementation
-- **Spring Integration** — Automatic listener discovery in Spring Context
+- **Interface-Based** — Event handling via `EventSubscriber` interface
+- **Idempotency** — Event deduplication based on UID
 - **Transactional Publishing** — Send events after transaction commit
-- **Retry Mechanism** — Exponential backoff retry attempts
+- **Retry Mechanism** — Exponential backoff with configurable parameters
+- **Extensible Serialization** — JSON and MessagePack with support for custom formats
+- **Security** — Event class whitelist to protect against deserialization attacks
 
 ## 🏗 Architecture
 
@@ -37,22 +38,22 @@
 │                         Event Flow Architecture                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  ┌──────────────┐         ┌─────────────────────────────────────────┐  │
-│  │   Publisher  │────────▶│           Event Channels                │  │
-│  │   (Builder)  │         │  ┌─────────────┐  ┌─────────────────┐   │  │
-│  └──────────────┘         │  │   Internal  │  │    External     │   │  │
-│                           │  │  (Local-Queue)│  │    (Kafka)      │   │  │
-│                           │  └──────┬──────┘  └────────┬────────┘   │  │
-│                           │         │                 │                │
-│                           └─────────┼─────────────────┼────────────┘   │
-│                                     │                 │                │
-│                           ┌─────────▼─────────────────▼────────────┐   │
-│                           │     Outgoing Event Transports           │  │
-│                           │  ┌─────────────┐  ┌─────────────────┐  │  │
-│                           │  │  Local-Queue  │  │      Kafka      │  │  │
-│                           │  │   Queue     │  │    Producer     │  │  │
-│                           │  └─────────────┘  └─────────────────┘  │  │
-│                           └─────────────────────────────────────────┘  │
+│  ┌──────────────┐         ┌─────────────────────────────────────────┐   │
+│  │   Service    │────────▶│           Event Channels                │   │
+│  │  (Publisher) │         │  ┌─────────────┐  ┌─────────────────┐   │   │
+│  └──────────────┘         │  │  Internal   │  │    External     │   │   │
+│                           │  │  (in-JVM)   │  │    (Kafka)      │   │   │
+│                           │  └──────┬──────┘  └────────┬────────┘   │   │
+│                           │         │                  │            │   │
+│                           └─────────┼───────────────── ┼────────────────┘
+│                                     │                  │                │
+│                           ┌─────────▼───────────────── ▼────────────┐   │
+│                           │     Outgoing Event Transports           │   │
+│                           │  ┌─────────────┐  ┌─────────────────┐   │   │
+│                           │  │ LocalQueue  │  │      Kafka      │   │   │
+│                           │  │   Queue     │  │    Producer     │   │   │
+│                           │  └─────────────┘  └─────────────────┘   │   │
+│                           └─────────────────────────────────────────┘   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -63,76 +64,76 @@
 │                    External Event Flow (Kafka)                          │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│                           ┌─────────────────────────────────────────┐  │
-│                           │      Incoming Event Transports          │  │
-│                           │  ┌─────────────┐  ┌─────────────────┐  │  │
-│                           │  │  Local-Queue  │  │      Kafka      │  │  │
-│                           │  │   Queue     │  │    Consumer     │  │  │
-│                           │  └─────────────┘  └─────────────────┘  │  │
-│                           └─────────┬─────────────────┬────────────┘  │
-│                                     │                 │               │
-│                           ┌─────────▼─────────────────▼────────────┐  │
-│                           │         Event Dispatcher                │  │
-│                           │    (UnifiedEventDispatcher)             │  │
-│                           └─────────┬─────────────────┬────────────┘  │
-│                                     │                 │               │
-│                           ┌─────────▼─────────────────▼────────────┐  │
-│                           │        Listener Registry                │  │
-│                           │  ┌─────────────┐  ┌─────────────────┐  │  │
-│                           │  │ Annotation  │  │   Interface     │  │  │
-│                           │  │   Based     │  │     Based       │  │  │
-│                           │  └─────────────┘  └─────────────────┘  │  │
-│                           └─────────┬─────────────────┬────────────┘  │
-│                                     │                 │               │
-│                           ┌─────────▼─────────────────▼────────────┐  │
-│                           │          Event Listeners                │  │
-│                           │    (@EventListener / Interface)         │  │
-│                           └─────────────────────────────────────────┘  │
+│                           ┌─────────────────────────────────────────┐   │
+│                           │      Incoming Event Transports          │   │
+│                           │  ┌─────────────┐  ┌─────────────────┐   │   │
+│                           │  │ LocalQueue  │  │      Kafka      │   │   │
+│                           │  │   Queue     │  │    Consumer     │   │   │
+│                           │  └─────────────┘  └─────────────────┘   │   │
+│                           └─────────┬─────────────────┬─────────────┘   │
+│                                     │                 │                 │
+│                           ┌─────────▼─────────────────▼────────────┐    │
+│                           │     Event Dispatcher                   │    │
+│                           │   (UnifiedEventDispatcher)             │    │
+│                           └─────────┬─────────────────┬────────────┘    │
+│                                     │                 │                 │
+│                           ┌─────────▼─────────────────▼────────────┐    │
+│                           │      Handler Registry                  │    │
+│                           │  ┌─────────────┐  ┌─────────────────┐  │    │
+│                           │  │ Annotation  │  │   Interface     │  │    │
+│                           │  │   Based     │  │     Based       │  │    │
+│                           │  └─────────────┘  └─────────────────┘  │    │
+│                           └─────────┬─────────────────┬────────────┘    │
+│                                     │                 │                 │
+│                           ┌─────────▼─────────────────▼────────────┐    │
+│                           │        Event Handlers                  │    │
+│                           │   (@EventListener / EventSubscriber)   │    │
+│                           └────────────────────────────────────────┘    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Microservices Communication Flow
+### Microservices Communication
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        Microservice A (Publisher)                           │
 │                                                                             │
 │   ┌──────────┐    ┌───────────┐    ┌──────────┐    ┌──────────────────┐     │
-│   │ Service  │───▶│ Publisher │───▶│ Channel  │───▶│ KafkaOutgoing  │     │
+│   │ Service  │───▶│ Publisher │───▶│ Channel  │───▶│ KafkaOutgoing    │     │
 │   │          │    │           │    │          │    │ EventTransport   │     │
 │   └──────────┘    └───────────┘    └──────────┘    └─────────┬────────┘     │
-└───────────────────────────────────────────────────────────────┼─────────────┘
-                                                                │
-                                                                │  publish()
-                                                                ▼
+└──────────────────────────────────────────────────────────────┼──────────────┘
+                                                               │
+                                                               │ publish()
+                                                               ▼
                     ═════════════════════════════════════════════
                     ═     Apache Kafka (Event Bus / Topic)      ═
                     ═════════════════════════════════════════════
-                                                                │
-                                                                │  consume()
-                                                                │
-┌───────────────────────────────────────────────────────────────┼─────────────┐
-│                        Microservice B (Consumer)              │             │
-│                                                               │             │
-│   ┌──────────────────┐    ┌───────────┐    ┌──────────────┐   │             │
+                                                               │
+                                                               │  consume()
+                                                               │
+┌──────────────────────────────────────────────────────────────┼─────────────┐
+│                        Microservice B (Consumer)             │             │
+│                                                              │             │
+│   ┌──────────────────┐    ┌───────────┐    ┌──────────────┐  │             │
 │   │ KafkaIncoming    │───▶│ Dispatcher│───▶│  Registry    │──┘             │
-│   │ EventTransport   │    │           │    │              │                 │
-│   └──────────────────┘    └─────┬─────┘    └──────┬───────┘                 │
-│                                 │                  │                        │
-│                                 │           ┌──────▼───────┐                │
-│                                 │           │  Listener 1  │                │
-│                                 │           └──────────────┘                │
-│                                 │           ┌──────┐                        │
-│                                 └──────────▶│ ...  │ (multiple listeners)   │
-│                                             └──────┘                        │
-│                                 ┌──────────▶┌──────┐                        │
-│                                 │           │ ...  │                        │
-│                                 │           └──────┘                        │
-│                                 │           ┌──────────────┐                │
-│                                 └──────────▶│ Listener N   │                │
-│                                             └──────────────┘                │
-└─────────────────────────────────────────────────────────────────────────────┘
+│   │ EventTransport   │    │           │    │              │                │
+│   └──────────────────┘    └─────┬─────┘    └───────┬──────┘                │
+│                                 │                  │                       │
+│                                 │           ┌──────▼───────┐               │
+│                                 │           │  Handler 1   │               │
+│                                 │           └──────────────┘               │
+│                                 │           ┌──────┐                       │
+│                                 └──────────▶│ ...  │ (multiple handlers)   │
+│                                             └──────┘                       │
+│                                 ┌──────────▶┌──────┐                       │
+│                                 │           │ ...  │                       │
+│                                 │           └──────┘                       │
+│                                 │           ┌──────────────┐               │
+│                                 └──────────▶│ Handler N    │               │
+│                                             └──────────────┘               │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Single Application Flow (Internal Events)
@@ -154,7 +155,7 @@
 │   └──────────────────┘    └─────┬─────┘    └──────┬───────┘                 │
 │                                 │                  │                        │
 │                                 │           ┌──────▼───────┐                │
-│                                 └──────────▶│  Listeners   │                │
+│                                 └──────────▶│  Handlers    │                │
 │                                             └──────────────┘                │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -173,69 +174,36 @@ Add the dependency to your `pom.xml`:
 </dependency>
 ```
 
+For Spring Boot integration:
+
+```xml
+<dependency>
+    <groupId>com.github.vovten</groupId>
+    <artifactId>event-flow-spring</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
 ### Gradle
 
 ```groovy
 implementation 'com.github.vovten:event-flow:1.0.0-SNAPSHOT'
+// For Spring Boot:
+implementation 'com.github.vovten:event-flow-spring:1.0.0-SNAPSHOT'
 ```
 
 ### Requirements
 
 - Java 21+
-- Spring Boot 3.2.5+
-- Apache Kafka 3.6.0+ (optional)
+- Apache Kafka 3.6.0+ (optional, for external events)
 
 ## 🚀 Quick Start
 
-### 1. Configure Event Flow Infrastructure
-
-First, set up the channels, transports, publisher, dispatcher, and listener registry:
-
-```java
-@Configuration
-public class EventFlowConfig {
-
-    @Bean
-    public EventChannel internalChannel() {
-        return new InternalEventChannel(
-            List.of(new LocalQueueOutTransport(queueProvider.getQueue("internal")))
-        );
-    }
-
-    @Bean
-    public EventPublisher eventPublisher(List<EventChannel> channels) {
-        return EventPublisherBuilder.channels(channels)
-            .build();
-    }
-
-    @Bean
-    public EventListenerRegistry listenerRegistry(ApplicationContext context) {
-        return EventListenerRegistryBuilder.create()
-            .withSpring(context, "com.example")
-            .withAnnotationListeners()
-            .build();
-    }
-
-    @Bean
-    public EventDispatcher eventDispatcher(
-            EventListenerRegistry registry,
-            List<InTransport> transports) {
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        return new UnifiedEventDispatcher(executor, registry, transports);
-    }
-
-    @Bean
-    public InTransport incomingTransport() {
-        return new LocalQueueInTransport(queueProvider.getQueue("internal"));
-    }
-}
-```
-
-### 2. Create an Event
+### 1. Create an Event
 
 ```java
 public record OrderCreatedEvent(String orderId, String customerId) implements Event {
-    
+
     @Override
     public Class<? extends Event> type() {
         return OrderCreatedEvent.class;
@@ -243,23 +211,67 @@ public record OrderCreatedEvent(String orderId, String customerId) implements Ev
 }
 ```
 
-### 3. Create a Listener (Annotation-Based)
+### 2. Set Up Infrastructure
 
 ```java
-@Component
-public class OrderEventListener {
+// Create transports for internal and external communication
+var internalTransports = LocalQueueTransportsBuilder.create("internal")
+    .queueSize(1000)
+    .build();
+
+var externalTransports = LocalQueueTransportsBuilder.create("external")
+    .queueSize(1000)
+    .build();
+
+// Create channels
+EventChannel internalChannel = new InternalEventChannel(
+    List.of(internalTransports.outTransport())
+);
+EventChannel externalChannel = new ExternalEventChannel(
+    List.of(externalTransports.outTransport())
+);
+
+// Create publisher
+EventPublisher eventPublisher = EventPublisherBuilder.channels(internalChannel, externalChannel)
+    .withRetry(3, Duration.ofMillis(100), 2.0)
+    .buildAndLog();
+
+// Create handler registry
+EventHandlerRegistry handlerRegistry = EventHandlerRegistryBuilder.create()
+    .withAnnotationListeners()
+    .withInterfaceListeners()
+    .buildAndLog();
+
+// Create dispatcher
+EventDispatcher eventDispatcher = EventDispatcherBuilder.create()
+    .executor(Executors.newVirtualThreadPerTaskExecutor())
+    .handlerRegistry(handlerRegistry)
+    .transports(List.of(internalTransports.inTransport(), externalTransports.inTransport()))
+    .concurrencyLimit(100)
+    .buildAndLog();
+
+// Start the dispatcher
+eventDispatcher.start();
+```
+
+### 3. Create a Handler (Annotation-Based)
+
+```java
+public class OrderEventHandler {
 
     @EventListener
     public void handleOrderCreated(OrderCreatedEvent event) {
         System.out.println("Order created: " + event.orderId());
     }
 }
+
+// Register the handler
+handlerRegistry.register(new OrderEventHandler());
 ```
 
 ### 4. Publish an Event
 
 ```java
-@Service
 public class OrderService {
 
     private final EventPublisher eventPublisher;
@@ -293,6 +305,8 @@ public interface Event {
 }
 ```
 
+**TraceableEvent** — extends `Event` with tracing fields: `uid` (UUID), `traceId` (correlation), `occurredAt` (timestamp).
+
 ### EventChannel
 
 A channel defines event delivery routes through transports.
@@ -308,7 +322,8 @@ public interface EventChannel {
 **Built-in Channels:**
 - `InternalEventChannel` — for internal in-application delivery
 - `ExternalEventChannel` — for external delivery to other applications/microservices
-- 
+- `BroadcastEventChannel` — sends to all configured transports simultaneously (fan-out)
+
 ### EventPublisher
 
 Publishes events to configured channels.
@@ -318,142 +333,148 @@ Publishes events to configured channels.
 ```java
 EventPublisher publisher = EventPublisherBuilder.channels(internalChannel, externalChannel)
     .withRetry(3, Duration.ofMillis(100), 2.0)
-    .transactional()
     .build();
 ```
 
-### Builders
-
-Event Flow provides fluent builders for convenient configuration of publishers and registries.
-
-#### EventPublisherBuilder
-
-Creates configured `EventPublisher` instances with flexible composition of features:
-
-```java
-// Simple publisher with channels only
-EventPublisher publisher = EventPublisherBuilder.channels(channel1, channel2)
-    .build();
-
-// Publisher with retry and transaction support
-EventPublisher publisher = EventPublisherBuilder.channels(channels)
-    .withRetry(3, Duration.ofMillis(100), 2.0)
-    .transactional()
-    .build();
-
-// Complete configuration with custom decorator
-EventPublisher publisher = EventPublisherBuilder.channels(channels)
-    .withRetry(5, Duration.ofSeconds(1), 1.5)
-    .transactional()
-    .withDecorator(pub -> new MetricsEventPublisher(pub, metricsRegistry))
-    .build();
-```
-
-**Builder Options:**
+**EventPublisherBuilder** — fluent builder for creating publishers with flexible configuration:
 
 | Method | Description |
 |--------|-------------|
 | `channels(...)` | Configure event channels (required) |
 | `withRetry()` | Enable retry with default settings (3 attempts, 100ms initial delay, 2.0 multiplier) |
 | `withRetry(max, delay, multiplier)` | Enable retry with custom settings |
-| `transactional()` | Enable transactional publishing (defer until after commit) |
 | `withDecorator(fn)` | Add custom decorator to the publisher chain |
 | `build()` | Build the publisher |
-| `buildAndLog()` | Build and log the final configuration |
-
-**Decorator Order** (from innermost to outermost):
-1. Base `ChannelEventPublisher`
-2. Custom decorators (in order added)
-3. `RetryEventPublisher` (if enabled)
-4. `TransactionalEventPublisher` (if enabled) — always outermost
-
-#### EventListenerRegistryBuilder
-
-Creates configured `EventListenerRegistry` instances with Spring integration support:
-
-```java
-// Simple annotation-based registry (non-Spring)
-EventListenerRegistry registry = EventListenerRegistryBuilder.create()
-    .withAnnotationListeners()
-    .build();
-
-// Spring-based registry with package scan
-EventListenerRegistry registry = EventListenerRegistryBuilder.create()
-    .withSpring(applicationContext, "com.example.listeners")
-    .withAnnotationListeners()
-    .withInterfaceListeners()
-    .build();
-
-// Composite registry with custom registries and decorators
-EventListenerRegistry registry = EventListenerRegistryBuilder.create()
-    .withAnnotationListeners()
-    .withInterfaceListeners()
-    .withCustomRegistry(customRegistry)
-    .withDecorator(reg -> new LoggingEventListenerRegistry(reg))
-    .build();
-```
-
-**Builder Options:**
-
-| Method | Description |
-|--------|-------------|
-| `withSpring(context, package)` | Enable Spring integration with package scan (package is **required**) |
-| `withAnnotationListeners()` | Discover listeners via `@EventListener` annotation |
-| `withInterfaceListeners()` | Discover listeners implementing `EventListener` interface |
-| `withCustomRegistry(registry)` | Add a custom registry to the composite |
-| `withDecorator(fn)` | Add a decorator to wrap the registry |
-| `build()` | Build the registry |
-| `buildAndLog()` | Build and log the final configuration |
-```
+| `buildAndLog()` | Build the publisher and log the configuration |
 
 ### EventDispatcher
 
-Delivers events from transports to listeners.
+Delivers events from transports to handlers.
 
 ```java
 public interface EventDispatcher {
     void dispatch(Event event);
     void register(Object listener);
     boolean isRegistered(Object listener);
+    void start(Consumer<Event> handler);
+    void stop();
 }
 ```
 
-### EventListenerRegistry
+**EventDispatcherBuilder** — fluent builder for creating dispatchers:
 
-Registry for discovering and managing listeners.
+| Method | Description |
+|--------|-------------|
+| `executor(...)` | Configure ExecutorService (required) |
+| `handlerRegistry(...)` | Handler registry (required) |
+| `transports(...)` | List of incoming transports |
+| `concurrencyLimit(n)` | Concurrency limiting via Semaphore |
+| `idempotent()` | Enable idempotency (deduplication by UID) |
+| `idempotent(maxSize, ttl)` | Enable idempotency with custom settings |
+| `withDecorator(fn)` | Add custom decorator |
+| `build()` | Build the dispatcher |
+| `buildAndLog()` | Build the dispatcher and log the configuration |
 
-**Implementation Options:**
-- `SpringAnnotationEventListenerRegistry` — scans Spring beans with `@EventListener`
-- `SpringInterfaceEventListenerRegistry` — scans beans implementing `EventListener`
-- `AnnotationEventListenerRegistry` — manual registration of annotated methods
-- `InterfaceEventListenerRegistry` — manual registration of interface listeners
-- `CompositeEventListenerRegistry` — combines multiple registries
+### EventHandlerRegistry
+
+Registry for discovering and managing event handlers.
+
+```java
+public interface EventHandlerRegistry {
+    List<EventHandler> getHandlers(Event event);
+    void register(Object listener);
+    void unregister(Object listener);
+    boolean isRegistered(Object listener);
+    void merge(EventHandlerRegistry registry);
+    int handlerCount();
+    String name();
+}
+```
+
+**Built-in implementations:**
+- `EventListenerRegistry` — discovery via `@EventListener` annotation
+- `EventSubscriberRegistry` — discovery via `EventSubscriber` interface
+- `CompositeEventHandlerRegistry` — combines multiple registries
+
+**EventHandlerRegistryBuilder** — fluent builder for creating registries:
+
+| Method | Description |
+|--------|-------------|
+| `withAnnotationListeners()` | Enable discovery via `@EventListener` annotation |
+| `withInterfaceListeners()` | Enable discovery via `EventSubscriber` interface |
+| `withCustomRegistry(registry)` | Add a custom registry |
+| `withDecorator(fn)` | Add a decorator |
+| `build()` | Build the registry |
+| `buildAndLog()` | Build the registry and log the configuration |
 
 ### EventTransport
 
 Transports for event delivery.
 
 **Incoming Transports (`InTransport`):**
-- `LocalQueueInTransport` — receive from local-queue
+- `LocalQueueInTransport` — receive from local queue
 - `KafkaInTransport` — receive from Kafka topics
 
 **Outgoing Transports (`OutTransport`):**
-- `LocalQueueOutTransport` — send to local-queue
+- `LocalQueueOutTransport` — send to local queue
 - `KafkaOutTransport` — send to Kafka topic
 - `BroadcastKafkaOutTransport` — send to all Kafka topic partitions
 
+### LocalQueueTransportsBuilder
+
+Utility for creating paired incoming/outgoing transports based on a local queue:
+
+```java
+var transports = LocalQueueTransportsBuilder.create("internal")
+    .queueSize(1000)
+    .build();
+
+EventChannel channel = new InternalEventChannel(
+    List.of(transports.outTransport())
+);
+
+EventDispatcher dispatcher = EventDispatcherBuilder.create()
+    .executor(Executors.newVirtualThreadPerTaskExecutor())
+    .handlerRegistry(registry)
+    .transports(List.of(transports.inTransport()))
+    .build();
+```
+
+### Serialization
+
+**EventSerializer** — serialization interface with magic byte prefix:
+- `0x01` — JSON
+- `0x02` — MessagePack
+
+**EventSerializerFactory** — factory with automatic format detection:
+
+```java
+// Register a custom serializer
+EventSerializerFactory.getInstance().register(new MyCustomSerializer());
+```
+
+**EventTypeRegistry** — security whitelist for allowed event classes:
+
+```java
+// Allow a package (default: com.github.vovten.eventflow.*)
+EventTypeRegistry.allowPackage("com.example.events");
+
+// Allow a specific class
+EventTypeRegistry.allowClass(MyEvent.class);
+```
+
 ## 📝 Usage Examples
 
-### Creating an Event with Multiple Channels
+### Event with Multiple Channels
 
 ```java
 public record UserRegisteredEvent(String userId, String email) implements Event {
-    
+
     @Override
     public Class<? extends Event> type() {
         return UserRegisteredEvent.class;
     }
-    
+
     @Override
     public List<Class<? extends EventChannel>> channels() {
         return List.of(InternalEventChannel.class, ExternalEventChannel.class);
@@ -461,88 +482,74 @@ public record UserRegisteredEvent(String userId, String email) implements Event 
 }
 ```
 
-### Interface-Based Listener
+### Interface-Based Handler
 
 ```java
-@Component
-public class NotificationEventListener implements EventListener {
-    
+public class NotificationEventSubscriber implements EventSubscriber {
+
     @Override
     public List<Class<? extends Event>> events() {
         return List.of(UserRegisteredEvent.class);
     }
-    
+
     @Override
     public void onEvent(Event event) {
         if (event instanceof UserRegisteredEvent e) {
             sendWelcomeEmail(e.email());
         }
     }
-    
+
     private void sendWelcomeEmail(String email) {
         // Email sending logic
     }
 }
+
+// Register the handler
+handlerRegistry.register(new NotificationEventSubscriber());
 ```
 
-### Configuring Channels and Transports
+### Kafka Transport Configuration
 
 ```java
-@Configuration
-public class EventFlowConfig {
+// Outgoing transport
+OutTransport kafkaOut = new KafkaOutTransport(
+    "localhost:9092",  // bootstrap servers
+    "events"           // topic
+);
 
-    @Value("${spring.kafka.bootstrap-servers}")
-    private String bootstrapServers;
+EventChannel externalChannel = new ExternalEventChannel(
+    List.of(kafkaOut)
+);
 
-    @Bean
-    public EventChannel internalChannel() {
-        return new InternalEventChannel(
-            List.of(new LocalQueueOutTransport(queueProvider.getQueue("internal")))
-        );
-    }
+// Incoming transport
+InTransport kafkaIn = new KafkaInTransport(
+    "localhost:9092",  // bootstrap servers
+    "events",          // topics (comma-separated)
+    "event-dispatcher" // group.id
+);
 
-    @Bean
-    public EventChannel externalChannel() {
-        return new ExternalEventChannel(
-            List.of(new KafkaOutTransport(bootstrapServers, "events"))
-        );
-    }
+// Dispatcher with Kafka transport
+EventDispatcher dispatcher = EventDispatcherBuilder.create()
+    .executor(Executors.newVirtualThreadPerTaskExecutor())
+    .handlerRegistry(handlerRegistry)
+    .transports(List.of(kafkaIn))
+    .build();
 
-    @Bean
-    public EventPublisher eventPublisher(List<EventChannel> channels) {
-        return EventPublisherBuilder.channels(channels)
-            .withRetry(3, Duration.ofMillis(100), 2.0)
-            .transactional()
-            .buildAndLog();
-    }
-
-    @Bean
-    public EventListenerRegistry listenerRegistry(ApplicationContext context) {
-        return new CompositeEventListenerRegistry(List.of(
-            new SpringAnnotationEventListenerRegistry(context, "com.example"),
-            new SpringInterfaceEventListenerRegistry(context)
-        ));
-    }
-
-    @Bean
-    public EventDispatcher eventDispatcher(
-            EventListenerRegistry registry,
-            List<InTransport> transports) {
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-        return new UnifiedEventDispatcher(executor, registry, transports);
-    }
-
-    @Bean
-    public InTransport kafkaIncomingTransport(
-            @Value("${spring.kafka.bootstrap-servers}") String servers,
-            @Value("${event.external.dispatcher.topics}") String topics,
-            @Value("${event.external.dispatcher.group.id}") String groupId) {
-        return new KafkaInTransport(servers, topics, groupId);
-    }
-}
+dispatcher.start();
 ```
 
-### Publishing with Retry and Transactions
+### Idempotent Dispatcher
+
+```java
+EventDispatcher idempotentDispatcher = EventDispatcherBuilder.create()
+    .executor(Executors.newVirtualThreadPerTaskExecutor())
+    .handlerRegistry(handlerRegistry)
+    .transports(List.of(inTransport))
+    .idempotent(10000, Duration.ofMinutes(5))  // max 10000 entries, 5 min TTL
+    .build();
+```
+
+### Transactional Publishing (Spring)
 
 ```java
 @Service
@@ -557,7 +564,7 @@ public class PaymentService {
     @Transactional
     public void processPayment(String orderId) {
         // Database transaction...
-        
+
         // Event will be sent only after commit
         eventPublisher.publish(new PaymentCompletedEvent(orderId));
     }
@@ -566,29 +573,85 @@ public class PaymentService {
 
 ## ⚙️ Configuration
 
-### application.properties
+### LocalQueue
 
-```properties
-# Kafka configuration
-spring.kafka.bootstrap-servers=localhost:9092
+LocalQueue is a built-in in-JVM transport for internal event exchange:
 
-# Event Flow configuration
-event.dispatcher.thread.pool.size=10
-event.listener.scan.package=com.example
+```java
+// Create a pair of transports sharing a BlockingDeque
+var transports = LocalQueueTransportsBuilder.create("internal")
+    .queueSize(1000)           // queue size
+    .build();
 
-# Unified dispatcher
-event.dispatcher.enabled=true
+// Or with a custom queue
+BlockingDeque<Event> customQueue = new LinkedBlockingDeque<>(500);
+var transports = LocalQueueTransportsBuilder.create("internal")
+    .queue(customQueue)
+    .build();
+```
 
-# Internal event bus (local-queue)
-event.internal.enabled=true
+### Kafka
 
-# External event bus (Kafka)
-event.external.enabled=false
-event.external.dispatcher.topics=eventflow.events
-event.external.dispatcher.group.id=event-dispatcher
+**Outgoing Transport:**
 
-# Transactional publishing
-event.transactional.publishing.enabled=true
+```java
+// Basic setup
+OutTransport kafkaOut = new KafkaOutTransport(
+    "localhost:9092",  // bootstrap servers
+    "events"           // topic
+);
+
+// Broadcast — send to all partitions
+OutTransport broadcastKafkaOut = new BroadcastKafkaOutTransport(
+    "localhost:9092",
+    "events"
+);
+```
+
+**Incoming Transport:**
+
+```java
+// Basic setup
+InTransport kafkaIn = new KafkaInTransport(
+    "localhost:9092",  // bootstrap servers
+    "events",          // topics (comma-separated)
+    "event-dispatcher" // group.id
+);
+
+// With custom Properties
+Properties kafkaProps = new Properties();
+kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+// ... other Kafka Consumer settings
+
+InTransport kafkaIn = new KafkaInTransport(kafkaProps, "events", "event-dispatcher");
+```
+
+### Custom Transport
+
+```java
+public class RabbitMQOutTransport implements OutTransport {
+
+    private final Channel channel;
+    private final String exchange;
+
+    public RabbitMQOutTransport(Channel channel, String exchange) {
+        this.channel = channel;
+        this.exchange = exchange;
+    }
+
+    @Override
+    public String name() {
+        return "rabbitmq";
+    }
+
+    @Override
+    public CompletableFuture<SendResult> send(Event event) {
+        // RabbitMQ sending logic
+        return CompletableFuture.completedFuture(
+            SendResult.success("rabbitmq", exchange)
+        );
+    }
+}
 ```
 
 ## 📊 Interaction Diagrams
@@ -615,16 +678,16 @@ event.transactional.publishing.enabled=true
        │                      │                         │                      │ dispatch(e) │
        │                      │                         │                      │────────────▶│
        │                      │                         │                      │             │
-       │                      │                         │                      │  getListeners()
+       │                      │                         │                      │  getHandlers()
        │                      │                         │                      │  ┌──────────┴──────┐
-       │                      │                         │                      │  │ ListenerRegistry│
+       │                      │                         │                      │  │HandlerRegistry  │
        │                      │                         │                      │  └──────────┬──────┘
        │                      │                         │                      │             │
        │                      │                         │                      │◀────────────┘
        │                      │                         │                      │
        │                      │                         │                      │ onEvent(event)
        │                      │                         │                      │────────────▶┌────────────┐
-       │                      │                         │                      │             │  Listener  │
+       │                      │                         │                      │             │  Handler   │
        │                      │                         │                      │             └────────────┘
 ```
 
@@ -646,45 +709,35 @@ event.transactional.publishing.enabled=true
        │                      │                         │                      │
        │                      │                         │                      │ offset
        │                      │                         │                      │◀─────────────┤
-       │                      │                         │                      │
-       │                      │                         │                      │
-       │                      │                         │                      │ consume()
-       │                      │                         │                      │◀────────────┐
-       │                      │                         │                      │             │
-       │                      │                         │                      │             │
-       │                      │                         │                      │  deliver(e)  │
-       │                      │                         │                      │─────────────▶│
-       │                      │                         │                      │             │
-       │                      │                         │                      │             │
 ```
 
-### 3. Event Processing by Multiple Listeners
+### 3. Event Processing by Multiple Handlers
 
 ```
 ┌──────────────────┐      ┌───────────────────┐      ┌─────────────────────────────────┐
-│   Dispatcher     │      │ ListenerRegistry  │      │         Event Listeners         │
+│   Dispatcher     │      │ HandlerRegistry   │      │        Event Handlers           │
 └────────┬─────────┘      └─────────┬─────────┘      └─────────────────────────────────┘
          │                         │                                   │
          │ dispatch(event)         │                                   │
          │────────────────────────▶│                                   │
          │                         │                                   │
-         │                         │ getListeners(event)               │
+         │                         │ getHandlers(event)                │
          │                         │──────────────────────────────────▶│
          │                         │                                   │
          │                         │◀──────────────────────────────────│
-         │                         │ [Listener1, Listener2, Listener3] │
+         │                         │ [Handler1, Handler2, Handler3]    │
          │                         │                                   │
-         │ listeners               │                                   │
+         │ handlers                │                                   │
          │◀────────────────────────│                                   │
          │                         │                                   │
          │ async execute           │                                   │
          │────────────────────────────────────────────────────────────▶│
          │                         │              ┌────────────────────┤
-         │                         │              │ Listener1.onEvent()│
+         │                         │              │ Handler1.onEvent() │
          │                         │              ├────────────────────┤
-         │                         │              │ Listener2.onEvent()│
+         │                         │              │ Handler2.onEvent() │
          │                         │              ├────────────────────┤
-         │                         │              │ Listener3.onEvent()│
+         │                         │              │ Handler3.onEvent() │
          │                         │              └────────────────────┘
 ```
 
@@ -722,47 +775,6 @@ event.transactional.publishing.enabled=true
          │                        │                        │                        │                        │◀──────────┘
 ```
 
-## 🔧 Extending
-
-### Creating a Custom Transport
-
-```java
-public class RabbitMQOutTransport implements OutTransport {
-
-    private final Channel channel;
-    private final String exchange;
-
-    @Override
-    public String name() {
-        return "rabbitmq";
-    }
-
-    @Override
-    public void send(Event event) {
-        // RabbitMQ sending logic
-    }
-}
-```
-
-### Creating a Custom Channel
-
-```java
-public class PriorityEventChannel implements EventChannel {
-
-    private final List<OutTransport> transports;
-
-    @Override
-    public String name() {
-        return "priority";
-    }
-
-    @Override
-    public List<OutTransport> transports() {
-        return transports;
-    }
-}
-```
-
 ## 📚 Documentation
 
 - [Javadoc](https://github.com/vovten/event-flow/javadoc)
@@ -779,7 +791,7 @@ public class PriorityEventChannel implements EventChannel {
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
 
 ## 👥 Authors
 
