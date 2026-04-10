@@ -66,12 +66,15 @@ class SilentEventPublisherTest {
         EventPublisher delegate = e -> CompletableFuture.failedFuture(new RuntimeException("Test exception"));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, true);
 
-        // Act & Assert
+        // Act
         CompletableFuture<List<SendResult>> future = publisher.publish(event);
         List<SendResult> results = future.join();
 
-        assertDoesNotThrow(() -> results);
-        assertThat(results).isEmpty();
+        // Assert
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).success()).isFalse();
+        assertThat(results.get(0).error()).isInstanceOf(RuntimeException.class);
+        assertThat(results.get(0).errorDetails()).isEqualTo("Test exception");
     }
 
     @Test
@@ -82,12 +85,14 @@ class SilentEventPublisherTest {
         EventPublisher delegate = e -> CompletableFuture.failedFuture(new RuntimeException("Test exception"));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate, false);
 
-        // Act & Assert
+        // Act
         CompletableFuture<List<SendResult>> future = publisher.publish(event);
         List<SendResult> results = future.join();
 
-        assertDoesNotThrow(() -> results);
-        assertThat(results).isEmpty();
+        // Assert
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).success()).isFalse();
+        assertThat(results.get(0).error()).isInstanceOf(RuntimeException.class);
     }
 
     @Test
@@ -98,12 +103,14 @@ class SilentEventPublisherTest {
         EventPublisher delegate = e -> CompletableFuture.failedFuture(new EventPublisherException("Test"));
         SilentEventPublisher publisher = new SilentEventPublisher(delegate);
 
-        // Act & Assert
+        // Act
         CompletableFuture<List<SendResult>> future = publisher.publish(event);
         List<SendResult> results = future.join();
 
-        assertDoesNotThrow(() -> results);
-        assertThat(results).isEmpty();
+        // Assert
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).success()).isFalse();
+        assertThat(results.get(0).error()).isInstanceOf(EventPublisherException.class);
     }
 
     /**

@@ -5,22 +5,25 @@ import com.github.vovten.eventflow.transport.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Event publisher decorator that silently catches and logs all publishing errors.
  * <p>
  * This publisher wraps another publisher and catches any exceptions that occur during
  * event publishing. Instead of propagating the exception, it logs the error and returns
- * an empty result list. This is useful for "fire-and-forget" scenarios where event
- * delivery is not critical.
+ * a result list that includes a failed {@link SendResult} entry. This allows the caller
+ * to inspect failures without handling exceptions.
  * <p>
  * <b>Key features:</b>
  * <ul>
  *   <li>Never completes exceptionally — all errors are logged</li>
+ *   <li>Returns failed SendResult entries instead of throwing</li>
+ *   <li>Preserves partial results when some transports succeed</li>
  *   <li>Configurable log level (WARN or DEBUG)</li>
- *   <li>Detailed error context (event type, error message, stack trace)</li>
  *   <li>Compatible with other decorators (Retry)</li>
  * </ul>
  * <p>
@@ -45,12 +48,19 @@ import java.util.concurrent.CompletableFuture;
  * EventPublisher silentPublisher = new SilentEventPublisher(
  *     new ChannelEventPublisher(channels)
  * );
- * silentPublisher.publish(new UserClickedButtonEvent());  // Never throws
+ * silentPublisher.publish(new UserClickedButtonEvent())
+ *     .thenAccept(results -> {
+ *         for (SendResult result : results) {
+ *             if (!result.success()) {
+ *                 log.warn("Failed to send: {}", result.errorDetails());
+ *             }
+ *         }
+ *     });
  * }</pre>
  * <p>
  * <b>Combination with RetryEventPublisher:</b>
  * <pre>{@code
- * // Retry 3 times, then silently ignore if still failing
+ * // Retry 3 times, then silently return failed results if still failing
  * EventPublisher publisher = new SilentEventPublisher(
  *     new RetryEventPublisher(
  *         new ChannelEventPublisher(channels),
@@ -104,21 +114,47 @@ public class SilentEventPublisher implements EventPublisher {
      * <p>
      * Any exceptions thrown by the delegate publisher are caught and logged.
      * The exception is never propagated to the caller.
+     * Instead, a failed {@link SendResult} entry is added to the result list,
+     * allowing the caller to inspect failures without handling exceptions.
      *
      * @param event the event to publish
-     * @return CompletableFuture that completes with SendResults, or empty list on failure
+     * @return CompletableFuture that completes with SendResults (never exceptionally)
      */
     @Override
     public CompletableFuture<List<SendResult>> publish(Event event) {
         return origin.publish(event)
-                .exceptionally(ex -> {
-                    String msg = "Failed to publish event '{}' (silently ignored): {}";
-                    if (logWarnings) {
-                        log.warn(msg, event.type().getSimpleName(), ex.getMessage(), ex);
-                    } else {
-                        log.debug(msg, event.type().getSimpleName(), ex.getMessage(), ex);
+                .handle((results, ex) -> {
+                    if (ex != null) {
+                        Throwable cause = unwrap(ex);
+                        String causeMsg = cause.getMessage();
+                        String typeName = event.type().getSimpleName();
+                        String msg = "Failed to publish event '{}' (silently ignored): {}";
+                        if (logWarnings) {
+                            log.warn(msg, typeName, causeMsg, cause);
+                        } else {
+                            log.debug(msg, typeName, causeMsg, cause);
+                        }
+                        List<SendResult> newResults = new ArrayList<>();
+                        if (results != null) {
+                            newResults.addAll(results);
+                        }
+                        newResults.add(SendResult.failure("publisher", cause, causeMsg));
+                        return newResults;
                     }
-                    return List.of();
+                    return results;
                 });
+    }
+
+    /**
+     * Unwrap CompletionException to get the real cause.
+     *
+     * @param ex the exception to unwrap
+     * @return the root cause exception
+     */
+    private Throwable unwrap(Throwable ex) {
+        if (ex instanceof CompletionException && ex.getCause() != null) {
+            return ex.getCause();
+        }
+        return ex;
     }
 }
