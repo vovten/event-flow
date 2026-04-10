@@ -1,4 +1,6 @@
 /target/
+.flattened-pom.xml
+**/.flattened-pom.xml
 /.idea/event-flow.iml
 /.mvn/wrapper/maven-wrapper.properties
 /.idea/modules.xml
