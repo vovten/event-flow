@@ -3,6 +3,7 @@ package com.github.vovten.eventflow.publisher;
 import com.github.vovten.eventflow.event.Event;
 import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,10 +72,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * For automatic retry on transient failures, wrap this publisher with
  * {@link RetryEventPublisher}.
  * <p>
- * <b>Silent publishing:</b>
- * For "fire-and-forget" scenarios where errors should be logged but not propagated,
- * wrap this publisher with {@link SilentEventPublisher}.
- * <p>
  * <b>Transaction support:</b>
  * For transactional event publishing (defer until after commit), use the
  * event-flow-spring module which provides {@code TransactionalEventPublisher}.
@@ -88,7 +85,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2026-03-05
  * @see EventChannel
  * @see RetryEventPublisher
- * @see SilentEventPublisher
  */
 public class ChannelEventPublisher implements EventPublisher {
 
@@ -129,18 +125,21 @@ public class ChannelEventPublisher implements EventPublisher {
      * @throws EventPublisherConfigException if required channel is not configured
      */
     @Override
-    public CompletableFuture<List<SendResult>> publish(Event event) {
+    public CompletableFuture<SendResults> publish(Event event) {
         try {
-            List<CompletableFuture<List<SendResult>>> channelFutures = new ArrayList<>();
+            List<CompletableFuture<SendResults>> channelFutures = new ArrayList<>();
             for (Class<? extends EventChannel> channelType : event.channels()) {
                 EventChannel channel = channels.get(channelType);
                 checkChannel(event, channelType, channel);
                 channelFutures.add(channel.send(event));
             }
             return CompletableFuture.allOf(channelFutures.toArray(new CompletableFuture[0]))
-                    .thenApply(v -> channelFutures.stream()
-                            .flatMap(future -> future.join().stream())
-                            .toList());
+                    .thenApply(v -> {
+                        List<SendResult> allResults = channelFutures.stream()
+                                .flatMap(future -> future.join().asList().stream())
+                                .toList();
+                        return SendResults.of(allResults);
+                    });
         } catch (EventPublisherConfigException ex) {
             return CompletableFuture.failedFuture(ex);
         }

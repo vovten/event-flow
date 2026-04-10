@@ -33,7 +33,6 @@ class EventFlowPropertiesTest {
         assertThat(eventFlowProperties.getDispatcher().getListenerPackages()).isEmpty();
         assertThat(eventFlowProperties.getPublisher().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getPublisher().isTransactional()).isTrue();
-        assertThat(eventFlowProperties.getPublisher().isSilent()).isFalse();
         assertThat(eventFlowProperties.getPublisher().getRetry().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getPublisher().getRetry().getMaxAttempts()).isEqualTo(3);
         assertThat(eventFlowProperties.getPublisher().getRetry().getInitialDelay()).isEqualTo(Duration.ofMillis(100));
@@ -54,7 +53,6 @@ class EventFlowPropertiesTest {
         Map<String, String> properties = Map.of(
                 "event-flow.publisher.enabled", "false",
                 "event-flow.publisher.transactional", "false",
-                "event-flow.publisher.silent", "true",
                 "event-flow.publisher.retry.enabled", "true",
                 "event-flow.publisher.retry.max-attempts", "5",
                 "event-flow.publisher.retry.initial-delay", "200ms",
@@ -70,7 +68,6 @@ class EventFlowPropertiesTest {
         // then
         assertThat(eventFlowProperties.getPublisher().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getPublisher().isTransactional()).isFalse();
-        assertThat(eventFlowProperties.getPublisher().isSilent()).isTrue();
         assertThat(eventFlowProperties.getPublisher().getRetry().isEnabled()).isTrue();
         assertThat(eventFlowProperties.getPublisher().getRetry().getMaxAttempts()).isEqualTo(5);
         assertThat(eventFlowProperties.getPublisher().getRetry().getInitialDelay()).isEqualTo(Duration.ofMillis(200));
@@ -242,7 +239,6 @@ class EventFlowPropertiesTest {
         assertThat(eventFlowProperties.getDispatcher().getListenerPackages()).isEqualTo("com.example.listener");
         assertThat(eventFlowProperties.getPublisher().isEnabled()).isTrue();
         assertThat(eventFlowProperties.getPublisher().isTransactional()).isTrue();
-        assertThat(eventFlowProperties.getPublisher().isSilent()).isFalse();
         assertThat(eventFlowProperties.getPublisher().getRetry().isEnabled()).isTrue();
         assertThat(eventFlowProperties.getPublisher().getChannels()).hasSize(1);
         assertThat(eventFlowProperties.getDispatcher().isEnabled()).isTrue();

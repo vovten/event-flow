@@ -1,13 +1,12 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -52,9 +51,9 @@ public class TransactionalEventPublisher implements EventPublisher {
     }
 
     @Override
-    public CompletableFuture<List<SendResult>> publish(Event event) {
+    public CompletableFuture<SendResults> publish(Event event) {
         if (isTransactionActive()) {
-            CompletableFuture<List<SendResult>> resultFuture = new CompletableFuture<>();
+            CompletableFuture<SendResults> resultFuture = new CompletableFuture<>();
             registerTransactionSynchronization(() ->
                     origin.publish(event)
                             .thenAccept(resultFuture::complete)

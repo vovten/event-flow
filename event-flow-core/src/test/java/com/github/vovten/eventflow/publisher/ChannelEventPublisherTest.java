@@ -6,6 +6,7 @@ import com.github.vovten.eventflow.channel.EventChannel;
 import com.github.vovten.eventflow.channel.InternalEventChannel;
 import com.github.vovten.eventflow.transport.OutTransport;
 import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +42,7 @@ class ChannelEventPublisherTest {
         EventChannel channel = mock(EventChannel.class);
         when(channel.name()).thenReturn("test");
         when(channel.transports()).thenReturn(List.of());
-        when(channel.send(any())).thenReturn(CompletableFuture.completedFuture(List.of()));
+        when(channel.send(any())).thenReturn(CompletableFuture.completedFuture(SendResults.empty()));
 
         assertDoesNotThrow(() -> new ChannelEventPublisher(List.of(channel)));
     }
@@ -56,10 +57,10 @@ class ChannelEventPublisherTest {
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
-        CompletableFuture<List<SendResult>> future = publisher.publish(event);
-        List<SendResult> results = future.join();
+        CompletableFuture<SendResults> future = publisher.publish(event);
+        SendResults results = future.join();
 
-        assertThat(results).hasSize(1);
+        assertThat(results.isAllSuccess()).isTrue();
         verify(transport).send(event);
     }
 
@@ -88,9 +89,10 @@ class ChannelEventPublisherTest {
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
-        CompletableFuture<List<SendResult>> future = publisher.publish(event);
+        CompletableFuture<SendResults> future = publisher.publish(event);
+        SendResults results = future.join();
 
-        assertThat(future).isCompletedExceptionally();
+        assertThat(results.isAllFailure()).isTrue();
     }
 
     static class TestEvent extends AbstractTraceableEvent {
@@ -129,8 +131,8 @@ class ChannelEventPublisherTest {
         }
 
         @Override
-        public CompletableFuture<List<SendResult>> send(Event event) {
-            return CompletableFuture.completedFuture(List.of());
+        public CompletableFuture<SendResults> send(Event event) {
+            return CompletableFuture.completedFuture(SendResults.empty());
         }
     }
 }

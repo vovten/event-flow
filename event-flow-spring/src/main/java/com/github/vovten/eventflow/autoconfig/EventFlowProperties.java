@@ -108,7 +108,6 @@ public class EventFlowProperties {
     public static class PublisherConfig {
         private boolean enabled = false;
         private boolean transactional = true;
-        private boolean silent = false;
         private RetryConfig retry = new RetryConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
@@ -126,14 +125,6 @@ public class EventFlowProperties {
 
         public void setTransactional(boolean transactional) {
             this.transactional = transactional;
-        }
-
-        public boolean isSilent() {
-            return silent;
-        }
-
-        public void setSilent(boolean silent) {
-            this.silent = silent;
         }
 
         public RetryConfig getRetry() {

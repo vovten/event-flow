@@ -27,13 +27,6 @@ import java.util.List;
  *     .transactional()
  *     .retryable(3, Duration.ofMillis(100), 2.0)
  *     .build();
- *
- * // Transactional publisher with silent mode
- * EventPublisher publisher = SpringEventPublisherBuilder.create(channels)
- *     .transactional()
- *     .retryable()
- *     .silent()
- *     .build();
  * }</pre>
  * <p>
  * <b>Order of decorators:</b>
@@ -42,7 +35,6 @@ import java.util.List;
  *   <li>Base {@link ChannelEventPublisher}</li>
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
- *   <li>{@link SilentEventPublisher} (if enabled)</li>
  *   <li>{@link TransactionalEventPublisher} (if enabled) — always outermost</li>
  * </ol>
  *
@@ -136,11 +128,10 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     @Override
     public EventPublisher buildAndLog() {
         EventPublisher publisher = build();
-        log.info("Built SpringEventPublisher with configuration: channels={}, transactional={}, retry={}, silent={}",
+        log.info("Built SpringEventPublisher with configuration: channels={}, transactional={}, retry={}",
                 getChannelsSize(),
                 transactional,
-                getRetryConfig() != null ? "enabled" : "disabled",
-                isSilent() ? "enabled" : "disabled"
+                getRetryConfig() != null ? "enabled" : "disabled"
         );
         return publisher;
     }

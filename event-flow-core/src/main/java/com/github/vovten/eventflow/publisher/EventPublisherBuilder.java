@@ -15,7 +15,6 @@ import java.util.List;
  * <ul>
  *   <li>Channel configuration</li>
  *   <li>Retry with exponential backoff</li>
- *   <li>Silent (fire-and-forget) mode</li>
  *   <li>Custom decorators</li>
  * </ul>
  * <p>
@@ -30,17 +29,10 @@ import java.util.List;
  *     .retryable(3, Duration.ofMillis(100), 2.0)
  *     .build();
  *
- * // Silent publisher with retry for analytics events
- * EventPublisher publisher = EventPublisherBuilder.create(analyticsChannel)
- *     .retryable()
- *     .silent()
- *     .build();
- *
  * // Complete configuration with custom decorator
  * EventPublisher publisher = EventPublisherBuilder.create(channels)
  *     .retryable(5, Duration.ofSeconds(1), 1.5)
  *     .withDecorator(pub -> new MetricsEventPublisher(pub, metricsRegistry))
- *     .silent()
  *     .build();
  * }</pre>
  * <p>
@@ -50,7 +42,6 @@ import java.util.List;
  *   <li>Base {@link ChannelEventPublisher}</li>
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
- *   <li>{@link SilentEventPublisher} (if enabled)</li>
  *   <li>Subclass decorations via {@link #decorate(EventPublisher)} — always outermost</li>
  * </ol>
  * <p>
@@ -66,7 +57,6 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 
     private static final Logger log = LoggerFactory.getLogger(EventPublisherBuilder.class);
 
-    private boolean silent = false;
     private RetryConfig retryConfig;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
@@ -158,18 +148,6 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     }
 
     /**
-     * Enable silent mode (catch and log all exceptions).
-     * When enabled, the publisher will never throw exceptions.
-     *
-     * @return this builder
-     */
-    @SuppressWarnings("unchecked")
-    public T silent() {
-        this.silent = true;
-        return (T) this;
-    }
-
-    /**
      * Add a custom decorator to the publisher chain.
      * Decorators are applied in the order they are added.
      *
@@ -213,11 +191,6 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
             log.debug("Applied retry decorator with maxRetries={}, initialDelay={}, multiplier={}",
                     retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
         }
-        // Apply silent if configured
-        if (silent) {
-            publisher = new SilentEventPublisher(publisher);
-            log.debug("Applied silent decorator");
-        }
         // Allow subclasses to add additional decorations (e.g., transactional) — always outermost
         publisher = decorate(publisher);
         return publisher;
@@ -242,10 +215,9 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      */
     public EventPublisher buildAndLog() {
         EventPublisher publisher = build();
-        log.info("Built EventPublisher with configuration: channels={}, retry={}, silent={}, customDecorators={}",
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, customDecorators={}",
                 channels.size(),
                 retryConfig != null ? "enabled" : "disabled",
-                silent,
                 decorators.size()
         );
         return publisher;
@@ -253,10 +225,6 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 
     protected int getChannelsSize() {
         return channels.size();
-    }
-
-    boolean isSilent() {
-        return silent;
     }
 
     RetryConfig getRetryConfig() {

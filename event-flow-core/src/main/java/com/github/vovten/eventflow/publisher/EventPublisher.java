@@ -1,9 +1,8 @@
 package com.github.vovten.eventflow.publisher;
 
 import com.github.vovten.eventflow.event.Event;
-import com.github.vovten.eventflow.transport.SendResult;
+import com.github.vovten.eventflow.transport.SendResults;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -18,7 +17,7 @@ public interface EventPublisher {
      * Publish the event asynchronously.
      *
      * @param event the event to publish
-     * @return CompletableFuture that completes with list of SendResults from all channels
+     * @return CompletableFuture that completes with SendResults
      */
-    CompletableFuture<List<SendResult>> publish(Event event);
+    CompletableFuture<SendResults> publish(Event event);
 }

@@ -7,6 +7,7 @@ import com.github.vovten.eventflow.EventListener;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -90,11 +91,21 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     private final Map<Class<? extends Event>, List<EventHandler>> eventListeners;
 
     /**
+     * Cache for combined handler lists to avoid reallocation on repeated getHandlers() calls.
+     * Key: Event class (specific event type)
+     * Value: Unmodifiable combined list (generic + specific handlers)
+     * <p>
+     * Cache is invalidated on register/unregister operations.
+     */
+    private final Map<Class<? extends Event>, List<EventHandler>> combinedHandlersCache;
+
+    /**
      * Creates a new annotation-based event listener registry.
      * Thread-safe for concurrent register/unregister/dispatch operations.
      */
     public EventListenerRegistry() {
         this.eventListeners = new ConcurrentHashMap<>();
+        this.combinedHandlersCache = new ConcurrentHashMap<>();
     }
 
     /**
@@ -107,25 +118,32 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * </ol>
      *
      * @param event the event to find listeners for
-     * @return list of listeners for this event type
+     * @return list of listeners for this event type (unmodifiable)
      */
     @Override
     public List<EventHandler> getHandlers(Event event) {
-        List<EventHandler> listeners = new ArrayList<>();
-
-        // Get handlers for generic Event.class (thread-safe snapshot from CopyOnWriteArrayList)
+        Class<? extends Event> eventType = event.getClass();
         List<EventHandler> genericHandlers = eventListeners.get(Event.class);
-        if (genericHandlers != null) {
-            listeners.addAll(new ArrayList<>(genericHandlers));
-        }
+        List<EventHandler> specificHandlers = eventListeners.get(eventType);
 
-        // Get handlers for specific event type (thread-safe snapshot from CopyOnWriteArrayList)
-        List<EventHandler> specificHandlers = eventListeners.get(event.getClass());
-        if (specificHandlers != null) {
-            listeners.addAll(new ArrayList<>(specificHandlers));
+        if (genericHandlers == null || genericHandlers.isEmpty()) {
+            return (specificHandlers == null || specificHandlers.isEmpty())
+                    ? Collections.emptyList()
+                    : Collections.unmodifiableList(specificHandlers);
         }
+        if (specificHandlers == null || specificHandlers.isEmpty()) {
+            return Collections.unmodifiableList(genericHandlers);
+        }
+        return combinedHandlersCache.computeIfAbsent(eventType,
+                key -> buildCombinedList(genericHandlers, specificHandlers));
+    }
 
-        return listeners;
+    private List<EventHandler> buildCombinedList(List<EventHandler> genericHandlers,
+                                                   List<EventHandler> specificHandlers) {
+        List<EventHandler> combined = new ArrayList<>(genericHandlers.size() + specificHandlers.size());
+        combined.addAll(genericHandlers);
+        combined.addAll(specificHandlers);
+        return Collections.unmodifiableList(combined);
     }
 
     /**
@@ -162,12 +180,16 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     @Override
     public boolean unregister(Object eventListener) {
+        boolean removed = false;
         for (List<EventHandler> handlers : eventListeners.values()) {
             if (handlers.removeIf(handler -> isHandlerForBean(handler, eventListener))) {
-                return true;
+                removed = true;
             }
         }
-        return false;
+        if (removed) {
+            combinedHandlersCache.clear();
+        }
+        return removed;
     }
 
     /**
@@ -248,6 +270,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
                 });
         if (!exists) {
             handlers.add(newHandler);
+            combinedHandlersCache.clear();
         }
     }
 
