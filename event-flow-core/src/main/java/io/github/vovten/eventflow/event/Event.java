@@ -34,6 +34,9 @@ public interface Event {
     }
 
     /**
+     * Returns the event as JSON string.
+     * Used for logging purposes when needed.
+     *
      * @return the event as JSON
      */
     default String asJson() {
