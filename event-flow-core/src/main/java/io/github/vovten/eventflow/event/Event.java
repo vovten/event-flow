@@ -35,7 +35,7 @@ public interface Event {
 
     /**
      * Returns the event as JSON string.
-     * Used for logging purposes when needed.
+     * Used for logging purposes.
      *
      * @return the event as JSON
      */

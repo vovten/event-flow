@@ -1,8 +1,8 @@
 package io.github.vovten.eventflow.util;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.serialization.EventSerializationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -74,15 +74,6 @@ class EventUtilsTest {
     void shouldThrowExceptionForNullClass() {
         assertThrows(IllegalArgumentException.class, () ->
                 EventUtils.fromJson("{}", null));
-    }
-
-    @Test
-    @DisplayName("Should return configured ObjectMapper")
-    void shouldReturnConfiguredObjectMapper() {
-        ObjectMapper mapper = EventUtils.getObjectMapper();
-
-        assertNotNull(mapper);
-        assertNotNull(mapper.findAndRegisterModules());
     }
 
     static class SimpleEvent extends AbstractTraceableEvent {

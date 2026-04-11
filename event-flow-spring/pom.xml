@@ -36,6 +36,14 @@
         <developerConnection>scm:git:ssh://github.com:vovten/event-flow.git</developerConnection>
         <url>https://github.com/vovten/event-flow/tree/main</url>
     </scm>
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/vovten/event-flow/issues</url>
+    </issueManagement>
+    <ciManagement>
+        <system>GitHub Actions</system>
+        <url>https://github.com/vovten/event-flow/actions</url>
+    </ciManagement>
 
     <dependencies>
         <!-- Core module -->
@@ -144,6 +152,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
