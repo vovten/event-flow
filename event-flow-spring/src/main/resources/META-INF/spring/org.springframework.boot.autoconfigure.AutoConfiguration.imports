@@ -1,2 +1,2 @@
-com.github.vovten.eventflow.autoconfig.EventFlowAutoConfiguration
-com.github.vovten.eventflow.autoconfig.EventFlowDisabledAutoConfiguration
+io.github.vovten.eventflow.autoconfig.EventFlowAutoConfiguration
+io.github.vovten.eventflow.autoconfig.EventFlowDisabledAutoConfiguration
