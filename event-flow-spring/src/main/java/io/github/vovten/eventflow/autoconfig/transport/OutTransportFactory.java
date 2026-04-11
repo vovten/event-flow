@@ -1,0 +1,41 @@
+package io.github.vovten.eventflow.autoconfig.transport;
+
+import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import io.github.vovten.eventflow.autoconfig.config.ChannelConfiguration;
+import io.github.vovten.eventflow.transport.OutTransport;
+
+/**
+ * Factory for creating publisher event transports.
+ * <p>
+ * Implementations should be annotated with {@code @Component} to be
+ * automatically discovered by {@link ChannelConfiguration}.
+ *
+ * @author Vladimir Aleshkov
+ * @since 2026-03-10
+ */
+public interface OutTransportFactory {
+
+    /**
+     * @return the name identifier this factory handles (e.g., "kafka", "in-memory")
+     */
+    String getName();
+
+    /**
+     * Create publisher transport from transport configuration.
+     *
+     * @param config transport configuration
+     * @return publisher transport instance
+     */
+    OutTransport createPublisher(EventFlowProperties.TransportConfig config);
+
+    /**
+     * Validate transport configuration.
+     * Override to add custom validation logic.
+     *
+     * @param config transport configuration to validate
+     * @throws IllegalStateException if configuration is invalid
+     */
+    default void validate(EventFlowProperties.TransportConfig config) {
+        // Default no-op validation
+    }
+}

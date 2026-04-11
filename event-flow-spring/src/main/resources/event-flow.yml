@@ -76,9 +76,9 @@ event-flow:
     deserialization:
       # List of allowed event packages for secure deserialization
       # Events from these packages can be safely deserialized
-      # Default: com.github.vovten.eventflow
+      # Default: io.github.vovten.eventflow
       allowed-event-packages:
-        - com.github.vovten.eventflow
+        - io.github.vovten.eventflow
 
     # Thread pool configuration for async event delivery
     thread-pool:

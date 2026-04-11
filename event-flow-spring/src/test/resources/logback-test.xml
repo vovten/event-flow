@@ -5,7 +5,7 @@
         </encoder>
     </appender>
 
-    <logger name="com.github.vovten.eventflow" level="DEBUG"/>
+    <logger name="io.github.vovten.eventflow" level="DEBUG"/>
     <logger name="org.springframework.kafka" level="INFO"/>
     <logger name="org.apache.kafka" level="WARN"/>
 
