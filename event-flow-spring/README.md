@@ -1,4 +1,13 @@
-# Event Flow Spring Boot Auto-Configuration
+# Event Flow Spring
+
+**Event Flow** with Spring Framework support. This module provides **automatic configuration** via YAML, eliminating boilerplate setup code.
+
+**What it gives you:**
+- Zero-config `EventPublisher` and `EventDispatcher` beans
+- YAML-based transport and channel configuration
+- Transactional publishing (events sent only after DB commit)
+- Automatic listener discovery (`@EventListener` scanning)
+- Pluggable transport factories (LocalQueue, Kafka, custom)
 
 ## Quick Start
 
@@ -6,9 +15,9 @@
 
 ```xml
 <dependency>
-    <groupId>com.github.vovten</groupId>
+    <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -68,7 +77,7 @@ public void createOrder() {
 
 ### Default Configuration File
 
-See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for all available options with defaults and examples.
+See [`event-flow.yml`](src/main/resources/event-flow.yml) for all available options with defaults and examples.
 
 ### Properties
 
@@ -79,15 +88,20 @@ See [`event-flow-defaults.yml`](src/main/resources/event-flow-defaults.yml) for 
 | `event-flow.publisher.enabled` | `false` | Enable/disable publisher |
 | `event-flow.dispatcher.enabled` | `false` | Enable/disable dispatcher |
 | `event-flow.publisher.transactional` | `true` | Defer publishing until after transaction commit |
-| `event-flow.publisher.silent` | `false` | Catch and log all exceptions |
 | `event-flow.publisher.retry.enabled` | `false` | Enable retry on publish failure |
 | `event-flow.publisher.retry.max-attempts` | `3` | Maximum retry attempts |
 | `event-flow.publisher.retry.initial-delay` | `100ms` | Initial delay between retries |
 | `event-flow.publisher.retry.multiplier` | `2.0` | Exponential backoff multiplier |
-| `event-flow.dispatcher.thread-pool.core-size` | `4` | Thread pool core size |
-| `event-flow.dispatcher.thread-pool.max-size` | `16` | Thread pool max size |
-| `event-flow.dispatcher.thread-pool.queue-capacity` | `100` | Event queue capacity |
-| `event-flow.dispatcher.deserialization.allowed-event-packages` | `["com.github.vovten.eventflow"]` | Allowed packages for secure deserialization |
+| `event-flow.dispatcher.thread-pool.core-size` | `4` | Thread pool core size (ignored with virtual threads) |
+| `event-flow.dispatcher.thread-pool.max-size` | `16` | Thread pool max size (ignored with virtual threads) |
+| `event-flow.dispatcher.thread-pool.queue-capacity` | `100` | Event queue capacity (ignored with virtual threads) |
+| `event-flow.dispatcher.thread-pool.keep-alive-seconds` | `60` | Keep-alive time for idle threads (ignored with virtual threads) |
+| `event-flow.dispatcher.thread-pool.concurrency-limit` | `0` | Max concurrent handler executions (0 = no limit, backpressure for virtual threads) |
+| `event-flow.dispatcher.deserialization.allowed-event-packages` | `["io.github.vovten.eventflow"]` | Allowed packages for secure deserialization |
+| `event-flow.dispatcher.idempotent.enabled` | `false` | Enable idempotent event processing (deduplication by UID) |
+| `event-flow.dispatcher.idempotent.ttl` | `10m` | Time-to-live for cached event UIDs |
+| `event-flow.dispatcher.idempotent.max-size` | `10000` | Maximum entries in the idempotency cache |
+| `event-flow.dispatcher.idempotent.warn-on-duplicate` | `true` | Log warnings when duplicate events are received |
 
 ---
 
@@ -432,5 +446,5 @@ public EventChannel customChannel() {
 
 ## See Also
 
-- [event-flow-defaults.yml](src/main/resources/event-flow-defaults.yml) - Complete configuration reference
+- [event-flow.yml](src/main/resources/event-flow.yml) - Complete configuration reference
 - [Event Flow Core](../event-flow-core/README.md) - Core library documentation

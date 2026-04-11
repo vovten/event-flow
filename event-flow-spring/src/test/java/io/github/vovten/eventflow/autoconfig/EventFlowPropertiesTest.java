@@ -216,7 +216,6 @@ class EventFlowPropertiesTest {
                 Map.entry("event-flow.dispatcher.listener-packages", "com.example.listener"),
                 Map.entry("event-flow.publisher.enabled", "true"),
                 Map.entry("event-flow.publisher.transactional", "true"),
-                Map.entry("event-flow.publisher.silent", "false"),
                 Map.entry("event-flow.publisher.retry.enabled", "true"),
                 Map.entry("event-flow.publisher.retry.max-attempts", "3"),
                 Map.entry("event-flow.publisher.channels[0].name", "internal"),

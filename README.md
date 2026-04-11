@@ -9,6 +9,7 @@
 
 - [Features](#-features)
 - [Architecture](#-architecture)
+- [Modules](#-modules)
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
 - [Core Components](#-core-components)
@@ -153,12 +154,19 @@
 │   │ LocalQueue       │◀───│ Dispatcher│◀───│  Registry    │                 │
 │   │ InTransport      │    │           │    │              │                 │
 │   └──────────────────┘    └─────┬─────┘    └──────┬───────┘                 │
-│                                 │                  │                        │
-│                                 │           ┌──────▼───────┐                │
-│                                 └──────────▶│  Handlers    │                │
-│                                             └──────────────┘                │
+│                                 │                 │                         │
+│                                 │           ┌─────▼───────┐                 │
+│                                 └──────────▶│  Handlers   │                 │
+│                                             └─────────────┘                 │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+## 📦 Modules
+
+| Module | Description | Documentation |
+|--------|-------------|---------------|
+| **event-flow-core** | Core library — framework-agnostic, pure Java 21+ | [README](event-flow-core/README.md) |
+| **event-flow-spring** | Spring Boot auto-configuration with YAML | [README](event-flow-spring/README.md) |
 
 ## 📦 Installation
 
@@ -168,9 +176,9 @@ Add the dependency to your `pom.xml`:
 
 ```xml
 <dependency>
-    <groupId>com.github.vovten</groupId>
+    <groupId>io.github.vovten</groupId>
     <artifactId>event-flow</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -178,18 +186,18 @@ For Spring Boot integration:
 
 ```xml
 <dependency>
-    <groupId>com.github.vovten</groupId>
+    <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'com.github.vovten:event-flow:1.0.0-SNAPSHOT'
+implementation 'io.github.vovten:event-flow:1.0.0'
 // For Spring Boot:
-implementation 'com.github.vovten:event-flow-spring:1.0.0-SNAPSHOT'
+implementation 'io.github.vovten:event-flow-spring:1.0.0'
 ```
 
 ### Requirements
@@ -322,7 +330,6 @@ public interface EventChannel {
 **Built-in Channels:**
 - `InternalEventChannel` — for internal in-application delivery
 - `ExternalEventChannel` — for external delivery to other applications/microservices
-- `BroadcastEventChannel` — sends to all configured transports simultaneously (fan-out)
 
 ### EventPublisher
 
@@ -456,7 +463,7 @@ EventSerializerFactory.getInstance().register(new MyCustomSerializer());
 **EventTypeRegistry** — security whitelist for allowed event classes:
 
 ```java
-// Allow a package (default: com.github.vovten.eventflow.*)
+// Allow a package (default: io.github.vovten.eventflow.*)
 EventTypeRegistry.allowPackage("com.example.events");
 
 // Allow a specific class
@@ -549,110 +556,27 @@ EventDispatcher idempotentDispatcher = EventDispatcherBuilder.create()
     .build();
 ```
 
-### Transactional Publishing (Spring)
+### Transactional Publishing
 
-```java
-@Service
-public class PaymentService {
-
-    private final EventPublisher eventPublisher;
-
-    public PaymentService(EventPublisher eventPublisher) {
-        this.eventPublisher = eventPublisher;
-    }
-
-    @Transactional
-    public void processPayment(String orderId) {
-        // Database transaction...
-
-        // Event will be sent only after commit
-        eventPublisher.publish(new PaymentCompletedEvent(orderId));
-    }
-}
-```
+For transactional publishing in Spring Boot applications, see [event-flow-spring/README.md](event-flow-spring/README.md).
 
 ## ⚙️ Configuration
 
+For detailed configuration examples, see:
+- **[Event Flow Core](event-flow-core/README.md)** — LocalQueue, Kafka, custom transports, serialization
+- **[Event Flow Spring](event-flow-spring/README.md)** — YAML auto-configuration, transactional publishing, retry support
+
 ### LocalQueue
 
-LocalQueue is a built-in in-JVM transport for internal event exchange:
-
-```java
-// Create a pair of transports sharing a BlockingDeque
-var transports = LocalQueueTransportsBuilder.create("internal")
-    .queueSize(1000)           // queue size
-    .build();
-
-// Or with a custom queue
-BlockingDeque<Event> customQueue = new LinkedBlockingDeque<>(500);
-var transports = LocalQueueTransportsBuilder.create("internal")
-    .queue(customQueue)
-    .build();
-```
+LocalQueue is a built-in in-JVM transport for internal event exchange. See [event-flow-core/README.md](event-flow-core/README.md#localqueue-in-jvm-transport) for details.
 
 ### Kafka
 
-**Outgoing Transport:**
-
-```java
-// Basic setup
-OutTransport kafkaOut = new KafkaOutTransport(
-    "localhost:9092",  // bootstrap servers
-    "events"           // topic
-);
-
-// Broadcast — send to all partitions
-OutTransport broadcastKafkaOut = new BroadcastKafkaOutTransport(
-    "localhost:9092",
-    "events"
-);
-```
-
-**Incoming Transport:**
-
-```java
-// Basic setup
-InTransport kafkaIn = new KafkaInTransport(
-    "localhost:9092",  // bootstrap servers
-    "events",          // topics (comma-separated)
-    "event-dispatcher" // group.id
-);
-
-// With custom Properties
-Properties kafkaProps = new Properties();
-kafkaProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-// ... other Kafka Consumer settings
-
-InTransport kafkaIn = new KafkaInTransport(kafkaProps, "events", "event-dispatcher");
-```
+Kafka transport for external event communication. See [event-flow-core/README.md](event-flow-core/README.md#kafka-transport) for configuration examples.
 
 ### Custom Transport
 
-```java
-public class RabbitMQOutTransport implements OutTransport {
-
-    private final Channel channel;
-    private final String exchange;
-
-    public RabbitMQOutTransport(Channel channel, String exchange) {
-        this.channel = channel;
-        this.exchange = exchange;
-    }
-
-    @Override
-    public String name() {
-        return "rabbitmq";
-    }
-
-    @Override
-    public CompletableFuture<SendResult> send(Event event) {
-        // RabbitMQ sending logic
-        return CompletableFuture.completedFuture(
-            SendResult.success("rabbitmq", exchange)
-        );
-    }
-}
-```
+Implement `OutTransport` or `InTransport` interfaces to add custom transport types. See [event-flow-core/README.md](event-flow-core/README.md#custom-transport) for an example.
 
 ## 📊 Interaction Diagrams
 
@@ -777,6 +701,8 @@ public class RabbitMQOutTransport implements OutTransport {
 
 ## 📚 Documentation
 
+- **[Event Flow Core](event-flow-core/README.md)** — Detailed core library documentation
+- **[Event Flow Spring](event-flow-spring/README.md)** — Spring Boot auto-configuration
 - [Javadoc](https://github.com/vovten/event-flow/javadoc)
 - [Source Code](https://github.com/vovten/event-flow)
 - [Usage Examples](https://github.com/vovten/event-flow/tree/main/src/test)
