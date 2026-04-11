@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.serialization.EventPolymorphicTypeValidator;
+import io.github.vovten.eventflow.serialization.EventSerializationException;
 
 /**
  * Utilities for working with events
@@ -64,14 +65,5 @@ public final class EventUtils {
         } catch (JsonProcessingException e) {
             throw new EventSerializationException("Error converting json to object", e);
         }
-    }
-
-    /**
-     * Get ObjectMapper for custom serialization/deserialization
-     *
-     * @return the ObjectMapper
-     */
-    public static ObjectMapper getObjectMapper() {
-        return objectMapper;
     }
 }

@@ -36,6 +36,7 @@
         <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
         <central-publishing-plugin.version>0.10.0</central-publishing-plugin.version>
         <flatten-maven-plugin.version>1.6.0</flatten-maven-plugin.version>
+        <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
         <checkstyle.version>13.4.0</checkstyle.version>
         <checkstyle.suppressions.file>${project.basedir}/config/checkstyle/suppressions.xml</checkstyle.suppressions.file>
     </properties>
@@ -136,6 +137,34 @@
                             <goals>
                                 <goal>jar-no-fork</goal>
                             </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Resources plugin for including LICENSE and NOTICE in JAR -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven-resources-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>copy-license-and-notice</id>
+                            <phase>process-resources</phase>
+                            <goals>
+                                <goal>copy-resources</goal>
+                            </goals>
+                            <configuration>
+                                <outputDirectory>${project.build.outputDirectory}/META-INF</outputDirectory>
+                                <resources>
+                                    <resource>
+                                        <directory>${project.basedir}/..</directory>
+                                        <includes>
+                                            <include>LICENSE</include>
+                                            <include>NOTICE</include>
+                                        </includes>
+                                    </resource>
+                                </resources>
+                            </configuration>
                         </execution>
                     </executions>
                 </plugin>
@@ -343,4 +372,12 @@
             <url>https://github.com/vovten</url>
         </developer>
     </developers>
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/vovten/event-flow/issues</url>
+    </issueManagement>
+    <ciManagement>
+        <system>GitHub Actions</system>
+        <url>https://github.com/vovten/event-flow/actions</url>
+    </ciManagement>
 </project>
