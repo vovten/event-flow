@@ -31,7 +31,7 @@ public record OrderCreatedEvent(String orderId, String customerId) implements Ev
 ### 2. Set Up Infrastructure
 
 ```java
-var transports = LocalQueueTransportsBuilder.create("internal")
+var transports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 
@@ -39,8 +39,8 @@ EventChannel channel = new InternalEventChannel(
     List.of(transports.outTransport())
 );
 
-EventPublisher publisher = EventPublisherBuilder.channels(channel)
-    .withRetry(3, Duration.ofMillis(100), 2.0)
+EventPublisher publisher = EventPublisherBuilder.create(channel)
+    .retryable(3, Duration.ofMillis(100), 2.0)
     .buildAndLog();
 
 EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
@@ -161,13 +161,13 @@ public interface EventChannel {
 
 ```java
 // Create a pair of transports sharing a BlockingDeque
-var transports = LocalQueueTransportsBuilder.create("internal")
+var transports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 
 // Or with a custom queue
 BlockingDeque<Event> customQueue = new LinkedBlockingDeque<>(500);
-var transports = LocalQueueTransportsBuilder.create("internal")
+var transports2 = new LocalQueueTransportsBuilder()
     .queue(customQueue)
     .build();
 ```
@@ -215,7 +215,7 @@ InTransport kafkaIn = new KafkaInTransport(kafkaProps, "events", "event-dispatch
 ### Full Example: Internal + External
 
 ```java
-var internalTransports = LocalQueueTransportsBuilder.create("internal")
+var internalTransports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 
@@ -228,7 +228,7 @@ EventChannel externalChannel = new ExternalEventChannel(
     List.of(kafkaOut)
 );
 
-EventPublisher publisher = EventPublisherBuilder.channels(internalChannel, externalChannel)
+EventPublisher publisher = EventPublisherBuilder.create(internalChannel, externalChannel)
     .build();
 
 InTransport kafkaIn = new KafkaInTransport("localhost:9092", "events", "my-group");
@@ -252,9 +252,9 @@ Fluent builder for creating publishers:
 
 | Method | Description |
 |--------|-------------|
-| `channels(...)` | Configure event channels (required) |
-| `withRetry()` | Enable retry with default settings (3 attempts, 100ms initial delay, 2.0 multiplier) |
-| `withRetry(max, delay, multiplier)` | Enable retry with custom settings |
+| `create(...)` | Create builder with event channels (required) |
+| `retryable()` | Enable retry with default settings (3 attempts, 100ms initial delay, 2.0 multiplier) |
+| `retryable(max, delay, multiplier)` | Enable retry with custom settings |
 | `withDecorator(fn)` | Add custom decorator to the publisher chain |
 | `build()` | Build the publisher |
 | `buildAndLog()` | Build the publisher and log the configuration |
@@ -262,8 +262,8 @@ Fluent builder for creating publishers:
 ### Retry Configuration
 
 ```java
-EventPublisher publisher = EventPublisherBuilder.channels(channel)
-    .withRetry(
+EventPublisher publisher = EventPublisherBuilder.create(channel)
+    .retryable(
         5,                        // max attempts
         Duration.ofMillis(200),   // initial delay
         2.0                       // exponential backoff multiplier

@@ -223,11 +223,11 @@ public record OrderCreatedEvent(String orderId, String customerId) implements Ev
 
 ```java
 // Create transports for internal and external communication
-var internalTransports = LocalQueueTransportsBuilder.create("internal")
+var internalTransports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 
-var externalTransports = LocalQueueTransportsBuilder.create("external")
+var externalTransports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 
@@ -240,8 +240,8 @@ EventChannel externalChannel = new ExternalEventChannel(
 );
 
 // Create publisher
-EventPublisher eventPublisher = EventPublisherBuilder.channels(internalChannel, externalChannel)
-    .withRetry(3, Duration.ofMillis(100), 2.0)
+EventPublisher eventPublisher = EventPublisherBuilder.create(internalChannel, externalChannel)
+    .retryable(3, Duration.ofMillis(100), 2.0)
     .buildAndLog();
 
 // Create handler registry
@@ -338,8 +338,8 @@ Publishes events to configured channels.
 **Creating via Builder:**
 
 ```java
-EventPublisher publisher = EventPublisherBuilder.channels(internalChannel, externalChannel)
-    .withRetry(3, Duration.ofMillis(100), 2.0)
+EventPublisher publisher = EventPublisherBuilder.create(internalChannel, externalChannel)
+    .retryable(3, Duration.ofMillis(100), 2.0)
     .build();
 ```
 
@@ -347,9 +347,9 @@ EventPublisher publisher = EventPublisherBuilder.channels(internalChannel, exter
 
 | Method | Description |
 |--------|-------------|
-| `channels(...)` | Configure event channels (required) |
-| `withRetry()` | Enable retry with default settings (3 attempts, 100ms initial delay, 2.0 multiplier) |
-| `withRetry(max, delay, multiplier)` | Enable retry with custom settings |
+| `create(...)` | Create builder with event channels (required) |
+| `retryable()` | Enable retry with default settings (3 attempts, 100ms initial delay, 2.0 multiplier) |
+| `retryable(max, delay, multiplier)` | Enable retry with custom settings |
 | `withDecorator(fn)` | Add custom decorator to the publisher chain |
 | `build()` | Build the publisher |
 | `buildAndLog()` | Build the publisher and log the configuration |
@@ -432,7 +432,7 @@ Transports for event delivery.
 Utility for creating paired incoming/outgoing transports based on a local queue:
 
 ```java
-var transports = LocalQueueTransportsBuilder.create("internal")
+var transports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 

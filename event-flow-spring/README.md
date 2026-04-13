@@ -160,7 +160,7 @@ event-flow:
     transports:
       - name: local-queue
         capacity: 1000
-      - name: kafka-in
+      - name: kafka
         topic: events
         servers: kafka:9092
         consumerGroup: my-service-group
@@ -314,9 +314,10 @@ event-flow:
   publisher:
     channels:
       - name: external
-        type: kafka
-        topic: events
-        bootstrap-servers: localhost:9092
+        transports:
+          - name: kafka
+            topic: events
+            servers: localhost:9092
 ```
 
 ### Coupled Local-Queue Publisher/Dispatcher
@@ -327,7 +328,7 @@ By default, publisher and dispatcher share the same local-queue queue for effici
 event-flow:
   dispatcher:
     transports:
-      - type: local-queue
+      - name: local-queue
         capacity: 1000  # Shared queue size
 ```
 
@@ -355,15 +356,15 @@ New transport types can be added by implementing `OutTransportFactory` or `InTra
 
 | Bean | Description | Override |
 |------|-------------|----------|
-| `SpringAnnotationEventListenerRegistry` | Scans @EventListener methods | Provide custom bean |
-| `SpringInterfaceEventListenerRegistry` | Scans EventListener implementers | Provide custom bean |
-| `EventListenerRegistry` | Composite of all registries | Provide custom bean |
-| `eventFlowExecutor` | Thread pool for dispatcher | Provide `ExecutorService` bean |
+| `springEventListenerRegistry` | Scans @EventListener methods in configured packages | Provide custom bean |
+| `springEventSubscriberRegistry` | Scans EventSubscriber implementers | Provide custom bean |
+| `eventHandlerRegistry` | Composite of all registries | Provide custom bean |
+| `dispatcherExecutor` | Thread pool for dispatcher (virtual threads) | Provide `ExecutorService` bean |
 | `localQueueProvider` | Shared queue for local-queue | Provide custom bean |
 | `eventChannels` | All channels (internal + external) | Provide custom bean |
 | `eventPublisher` | Main publisher with decorators | Provide `EventPublisher` bean |
 | `eventDispatcher` | Main dispatcher | Provide `EventDispatcher` bean |
-| `incomingEventTransports` | Additional incoming transports | Provide custom beans |
+| `dispatcherTransports` | Additional incoming transports | Provide custom beans |
 | `OutTransportFactory` / `InTransportFactory` implementations | Create transports from config | Provide custom factory |
 | `EventSerializer` beans | Custom serializers auto-registered in `EventSerializerFactory` | Implement `EventSerializer` + `@Component` |
 
@@ -376,14 +377,18 @@ event-flow:
   publisher:
     channels:
       - name: internal      # → InternalEventChannel
-        type: local-queue
-        capacity: 1000
+        transports:
+          - name: local-queue
+            capacity: 1000
       - name: external      # → ExternalEventChannel
-        type: kafka
-        topic: events
+        transports:
+          - name: kafka
+            topic: events
+            servers: kafka:9092
       - name: custom        # → GenericEventChannel
-        type: rabbitmq
-        ...
+        transports:
+          - name: rabbitmq
+            ...
 ```
 
 ---
@@ -427,8 +432,9 @@ event-flow:
   publisher:
     channels:
       - name: my-channel
-        type: custom  # Your factory type
-        # Custom properties...
+        transports:
+          - name: custom  # Your factory type
+            # Custom properties...
 ```
 
 ### Custom Channel Implementation
