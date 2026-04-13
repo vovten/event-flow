@@ -88,10 +88,10 @@ public class RetryEventPublisher implements EventPublisher {
      * Create retry decorator with custom settings.
      *
      * @param origin       the origin publisher to wrap
-     * @param maxRetries   maximum number of retry attempts (must be >= 0)
+     * @param maxRetries   maximum number of retry attempts (must be &gt;= 0)
      * @param initialDelay initial delay between retries
-     * @param multiplier   backoff multiplier (must be >= 1.0)
-     * @throws IllegalArgumentException if maxRetries < 0 or multiplier < 1.0
+     * @param multiplier   backoff multiplier (must be &gt;= 1.0)
+     * @throws IllegalArgumentException if maxRetries &lt; 0 or multiplier &lt; 1.0
      */
     public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
         this(origin, maxRetries, initialDelay, multiplier, DEFAULT_MAX_DELAY);
@@ -101,11 +101,11 @@ public class RetryEventPublisher implements EventPublisher {
      * Create retry decorator with custom settings.
      *
      * @param origin       the origin publisher to wrap
-     * @param maxRetries   maximum number of retry attempts (must be >= 0)
+     * @param maxRetries   maximum number of retry attempts (must be &gt;= 0)
      * @param initialDelay initial delay between retries
-     * @param multiplier   backoff multiplier (must be >= 1.0)
+     * @param multiplier   backoff multiplier (must be &gt;= 1.0)
      * @param maxDelay     maximum delay between retries (caps exponential backoff)
-     * @throws IllegalArgumentException if maxRetries < 0, multiplier < 1.0, or maxDelay is not positive
+     * @throws IllegalArgumentException if maxRetries &lt; 0, multiplier &lt; 1.0, or maxDelay is not positive
      */
     public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay,
                                double multiplier, Duration maxDelay) {

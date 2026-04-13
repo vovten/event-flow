@@ -25,8 +25,8 @@ import java.util.List;
  * <ul>
  *   <li>{@link EventListenerRegistry} — discovers methods annotated with {@code @EventListener}</li>
  *   <li>{@link EventSubscriberRegistry} — discovers beans implementing {@code EventSubscriber} interface</li>
- *   <li>{@link SpringEventListenerRegistry} — Spring-aware annotation-based discovery</li>
- *   <li>{@link SpringEventSubscriberRegistry} — Spring-aware interface-based discovery</li>
+ *   <li>Spring-based annotation discovery (event-flow-spring module)</li>
+ *   <li>Spring-based interface discovery (event-flow-spring module)</li>
  *   <li>{@link CompositeEventHandlerRegistry} — combines multiple registries</li>
  * </ul>
  * <p>
