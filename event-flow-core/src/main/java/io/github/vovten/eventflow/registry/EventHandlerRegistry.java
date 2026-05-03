@@ -82,11 +82,11 @@ public interface EventHandlerRegistry {
      * Some implementations may also return handlers for parent event types
      * or generic {@code Event.class} handlers.
      *
-     * @param event the event to find handlers for
+     * @param event the event to find handlers for (can be any object, including plain domain events)
      * @return list of handlers that handle this event type (never null)
      * @see EventSubscriber#events()
      */
-    List<EventHandler> getHandlers(Event event);
+    List<EventHandler> getHandlers(Object event);
 
     /**
      * Register an event handler in the registry.

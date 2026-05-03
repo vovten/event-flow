@@ -30,7 +30,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * public class OrderCreatedSubscriber implements EventSubscriber {
  *
  *     @Override
- *     public List<Class<? extends Event>> events() {
+ *     public List<Class<?>> events() {
  *         return List.of(OrderCreatedEvent.class);
  *     }
  *
@@ -52,7 +52,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * public class MultiEventSubscriber implements EventSubscriber {
  *
  *     @Override
- *     public List<Class<? extends Event>> events() {
+ *     public List<Class<?>> events() {
  *         return List.of(
  *             OrderCreatedEvent.class,
  *             OrderUpdatedEvent.class,
@@ -87,12 +87,12 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
 
     /**
      * Map of event types to subscribers.
-     * Key: Event class
+     * Key: Event class (can be any class, not just Event implementations)
      * Value: List of EventSubscriber instances
      * <p>
      * Thread-safe: uses ConcurrentHashMap + CopyOnWriteArrayList for read-heavy workload.
      */
-    private final Map<Class<? extends Event>, List<EventSubscriber>> eventSubscribers;
+    private final Map<Class<?>, List<EventSubscriber>> eventSubscribers;
 
     /**
      * Creates a new interface-based event subscriber registry.
@@ -115,11 +115,13 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      * @return list of subscribers for this event type
      */
     @Override
-    public List<EventHandler> getHandlers(Event event) {
+    public List<EventHandler> getHandlers(Object event) {
         List<EventHandler> handlers = new ArrayList<>();
 
+        Class<?> eventClass = event.getClass();
+
         // Get subscribers for specific event type (thread-safe snapshot)
-        List<EventSubscriber> specific = eventSubscribers.get(event.getClass());
+        List<EventSubscriber> specific = eventSubscribers.get(eventClass);
         if (specific != null) {
             handlers.addAll(new ArrayList<>(specific));
         }
@@ -217,9 +219,10 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      */
     protected void registerSubscriber(EventSubscriber subscriber) {
         // Defensive copy to prevent external modification of subscriber.events()
-        List<Class<? extends Event>> eventTypes = List.copyOf(subscriber.events());
+        List<Class<?>> eventTypes = List.copyOf(subscriber.events());
 
-        for (Class<? extends Event> event : eventTypes) {
+        for (Class<?> event : eventTypes) {
+            @SuppressWarnings("unchecked")
             var subscribers = eventSubscribers.computeIfAbsent(event, k -> new CopyOnWriteArrayList<>());
             if (!subscribers.contains(subscriber)) {
                 subscribers.add(subscriber);

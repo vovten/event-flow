@@ -191,7 +191,7 @@ class UnifiedEventDispatcherTest {
         private final AtomicBoolean called = new AtomicBoolean(false);
 
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class);
         }
 

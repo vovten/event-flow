@@ -1,7 +1,5 @@
 package io.github.vovten.eventflow;
 
-import io.github.vovten.eventflow.event.Event;
-
 import java.util.List;
 
 /**
@@ -18,5 +16,5 @@ public interface EventSubscriber extends EventHandler {
     /**
      * @return list of event types handled by this subscriber
      */
-    List<Class<? extends Event>> events();
+    List<Class<?>> events();
 }

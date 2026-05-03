@@ -121,8 +121,11 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * @return list of listeners for this event type (unmodifiable)
      */
     @Override
-    public List<EventHandler> getHandlers(Event event) {
-        Class<? extends Event> eventType = event.getClass();
+    public List<EventHandler> getHandlers(Object event) {
+        if (!(event instanceof Event)) {
+            return Collections.emptyList();
+        }
+        Class<? extends Event> eventType = ((Event) event).getClass();
         List<EventHandler> genericHandlers = eventListeners.get(Event.class);
         List<EventHandler> specificHandlers = eventListeners.get(eventType);
 

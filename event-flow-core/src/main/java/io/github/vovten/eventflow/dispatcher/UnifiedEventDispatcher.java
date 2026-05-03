@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.dispatcher;
 
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
@@ -159,7 +160,8 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     @Override
     public void dispatch(Event event) {
-        List<EventHandler> handlers = handlerRegistry.getHandlers(event);
+        Event eventToDispatch = resolveEvent(event);
+        List<EventHandler> handlers = handlerRegistry.getHandlers(eventToDispatch);
         if (handlers.isEmpty()) {
             log.debug("No handlers found for event: {}", event);
             return;
@@ -172,7 +174,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                 if (concurrencySemaphore != null) {
                     concurrencySemaphore.acquire();
                 }
-                executorService.execute(new HandlerTask(handler, event));
+                executorService.execute(new HandlerTask(handler, eventToDispatch));
                 submittedHandlers++;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -196,6 +198,17 @@ public class UnifiedEventDispatcher implements EventDispatcher {
             log.warn("Partial handler submission for event {}: {}/{} handlers submitted",
                     event.type().getSimpleName(), submittedHandlers, totalHandlers);
         }
+    }
+
+    private Event resolveEvent(Event event) {
+        if (!(event instanceof Envelope<?> envelope)) {
+            return event;
+        }
+        List<EventHandler> envelopeHandlers = handlerRegistry.getHandlers(event);
+        if (envelopeHandlers.isEmpty()) {
+            return (Event) envelope.payload();
+        }
+        return event;
     }
 
     @Override

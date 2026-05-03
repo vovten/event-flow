@@ -202,7 +202,7 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
         }
 
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(ConcurrencyTestEvent.class);
         }
 

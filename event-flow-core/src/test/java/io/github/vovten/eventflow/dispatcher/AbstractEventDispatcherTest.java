@@ -166,7 +166,7 @@ class AbstractEventDispatcherTest {
         }
 
         @Override
-        public List<EventHandler> getHandlers(Event event) {
+        public List<EventHandler> getHandlers(Object event) {
             List<EventHandler> result = new ArrayList<>();
             for (TestEventHandler handler : handlers) {
                 result.add(new SimpleEventHandler(handler));

@@ -214,7 +214,7 @@ class EventSubscriberRegistryTest {
      */
     private static final class TestEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class);
         }
 
@@ -228,7 +228,7 @@ class EventSubscriberRegistryTest {
      */
     private static final class AnotherEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(AnotherEvent.class);
         }
 
@@ -242,7 +242,7 @@ class EventSubscriberRegistryTest {
      */
     private static final class MultiEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class, AnotherEvent.class);
         }
 
@@ -256,7 +256,7 @@ class EventSubscriberRegistryTest {
      */
     private static final class GenericEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(Event.class);
         }
 

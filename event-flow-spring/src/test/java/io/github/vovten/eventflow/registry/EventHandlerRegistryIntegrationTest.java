@@ -98,7 +98,7 @@ class EventHandlerRegistryIntegrationTest {
     // Interface-based subscriber
     public static class InterfaceBasedSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class);
         }
 

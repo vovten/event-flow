@@ -96,7 +96,7 @@ class ConcurrentRegistryTest {
                         // Register a subscriber
                         EventSubscriber subscriber = new EventSubscriber() {
                             @Override
-                            public List<Class<? extends Event>> events() {
+                            public List<Class<?>> events() {
                                 return List.of(TestEvent.class, Event.class);
                             }
 
@@ -187,7 +187,7 @@ class ConcurrentRegistryTest {
             final int id = i;
             registry.register(new EventSubscriber() {
                 @Override
-                public List<Class<? extends Event>> events() {
+                public List<Class<?>> events() {
                     return List.of(TestEvent.class);
                 }
 
@@ -212,7 +212,7 @@ class ConcurrentRegistryTest {
                     // Register new subscriber
                     registry.register(new EventSubscriber() {
                         @Override
-                        public List<Class<? extends Event>> events() {
+                        public List<Class<?>> events() {
                             return List.of(TestEvent.class);
                         }
 

@@ -208,7 +208,7 @@ class SpringEventHandlerRegistryBuilderTest {
 
     static class TestEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class);
         }
 
