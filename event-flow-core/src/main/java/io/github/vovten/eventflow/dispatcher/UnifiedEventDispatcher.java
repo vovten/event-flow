@@ -206,7 +206,13 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         }
         List<EventHandler> envelopeHandlers = handlerRegistry.getHandlers(event);
         if (envelopeHandlers.isEmpty()) {
-            return (Event) envelope.payload();
+            Object payload = envelope.payload();
+            if (payload instanceof Event eventPayload) {
+                return eventPayload;
+            }
+            log.warn("Envelope payload {} does not implement Event interface, keeping envelope",
+                    payload.getClass().getSimpleName());
+            return event;
         }
         return event;
     }
