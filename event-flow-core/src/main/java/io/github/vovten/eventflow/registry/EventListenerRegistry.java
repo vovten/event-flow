@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.registry;
 
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventListener;
@@ -116,16 +117,35 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      *   <li>Listeners registered for the exact event class</li>
      *   <li>Listeners registered for generic Event.class (if any)</li>
      * </ol>
+     * <p>
+     * If the event is an {@link Envelope}, handlers for Envelope.class are also returned.
      *
      * @param event the event to find listeners for
      * @return list of listeners for this event type (unmodifiable)
      */
     @Override
     public List<EventHandler> getHandlers(Object event) {
-        if (!(event instanceof Event)) {
-            return Collections.emptyList();
+        Object eventToLookup = event;
+        if (eventToLookup instanceof Envelope<?> envelope) {
+            eventToLookup = envelope.payload();
         }
-        Class<? extends Event> eventType = ((Event) event).getClass();
+        if (!(eventToLookup instanceof Event)) {
+            // Payload is not an Event - look for handlers for the Envelope itself
+            List<EventHandler> handlers = eventListeners.get(event.getClass());
+            List<EventHandler> genericHandlers = eventListeners.get(Event.class);
+            if (handlers == null || handlers.isEmpty()) {
+                return genericHandlers != null && !genericHandlers.isEmpty()
+                        ? Collections.unmodifiableList(genericHandlers)
+                        : Collections.emptyList();
+            }
+            if (genericHandlers == null || genericHandlers.isEmpty()) {
+                return Collections.unmodifiableList(handlers);
+            }
+            List<EventHandler> combined = new ArrayList<>(genericHandlers);
+            combined.addAll(handlers);
+            return Collections.unmodifiableList(combined);
+        }
+        Class<? extends Event> eventType = ((Event) eventToLookup).getClass();
         List<EventHandler> genericHandlers = eventListeners.get(Event.class);
         List<EventHandler> specificHandlers = eventListeners.get(eventType);
 

@@ -34,15 +34,15 @@ class UnifiedEventDispatcherEnvelopeTest {
     }
 
     @Test
-    @DisplayName("Should unwrap Envelope and dispatch payload to handlers when no Envelope handlers exist")
+    @DisplayName("Should unwrap Envelope and dispatch payload when payload implements Event")
     void shouldUnwrapEnvelopeAndDispatchPayload() throws InterruptedException {
         PayloadEventSubscriber subscriber = new PayloadEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
-            Event event = invocation.getArgument(0);
-            if (event instanceof Envelope) {
-                return List.of();
+            Object event = invocation.getArgument(0);
+            if (event instanceof PlainDomainEvent) {
+                return List.of(subscriber);
             }
-            return List.of(subscriber);
+            return List.of();
         });
 
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
@@ -59,11 +59,12 @@ class UnifiedEventDispatcherEnvelopeTest {
     }
 
     @Test
-    @DisplayName("Should dispatch Envelope directly when Envelope handlers exist")
-    void shouldDispatchEnvelopeDirectlyWhenHandlersExist() throws InterruptedException {
-        EnvelopeEventSubscriber subscriber = new EnvelopeEventSubscriber();
+    @DisplayName("Should dispatch Envelope when payload does not implement Event")
+    void shouldDispatchEnvelopeWhenPayloadNotEvent() throws InterruptedException {
+        NonEventPayload payload = new NonEventPayload("data-123");
+        NonEventSubscriber subscriber = new NonEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
-            Event event = invocation.getArgument(0);
+            Object event = invocation.getArgument(0);
             if (event instanceof Envelope) {
                 return List.of(subscriber);
             }
@@ -72,40 +73,16 @@ class UnifiedEventDispatcherEnvelopeTest {
 
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
 
-        PlainDomainEvent payload = new PlainDomainEvent("order-456", "user@mail.ru");
-        Envelope<PlainDomainEvent> envelope = Envelope.of(payload, "trace-xyz");
+        Envelope<NonEventPayload> envelope = Envelope.of(payload, "trace-xyz");
         dispatcher.dispatch(envelope);
 
         Thread.sleep(100);
 
         assertThat(subscriber.receivedEvent).isNotNull();
         assertThat(subscriber.receivedEvent).isInstanceOf(Envelope.class);
-    }
-
-    @Test
-    @DisplayName("Should preserve metadata when Envelope is dispatched")
-    void shouldPreserveMetadataWhenEnvelopeDispatched() throws InterruptedException {
-        MetadataPreservingSubscriber subscriber = new MetadataPreservingSubscriber();
-        when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
-            Event event = invocation.getArgument(0);
-            if (event instanceof Envelope) {
-                return List.of(subscriber);
-            }
-            return List.of();
-        });
-
-        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
-
-        PlainDomainEvent payload = new PlainDomainEvent("order-789", "admin@mail.ru");
-        Envelope<PlainDomainEvent> envelope = Envelope.of(payload, "trace-metadata");
-        dispatcher.dispatch(envelope);
-
-        Thread.sleep(100);
-
-        assertThat(subscriber.receivedEvent).isInstanceOf(Envelope.class);
         Envelope<?> receivedEnvelope = (Envelope<?>) subscriber.receivedEvent;
-        assertThat(receivedEnvelope.traceId()).isEqualTo("trace-metadata");
-        assertThat(receivedEnvelope.payload()).isInstanceOf(PlainDomainEvent.class);
+        assertThat(receivedEnvelope.traceId()).isEqualTo("trace-xyz");
+        assertThat(receivedEnvelope.payload()).isInstanceOf(NonEventPayload.class);
     }
 
     static class PlainDomainEvent implements Event {
@@ -131,6 +108,18 @@ class UnifiedEventDispatcherEnvelopeTest {
         }
     }
 
+    static class NonEventPayload {
+        private final String data;
+
+        NonEventPayload(String data) {
+            this.data = data;
+        }
+
+        String data() {
+            return data;
+        }
+    }
+
     static class PayloadEventSubscriber implements EventSubscriber {
         volatile Event receivedEvent;
 
@@ -145,22 +134,8 @@ class UnifiedEventDispatcherEnvelopeTest {
         }
     }
 
-    static class EnvelopeEventSubscriber implements EventSubscriber {
-        volatile Event receivedEvent;
-
-        @Override
-        public List<Class<?>> events() {
-            return List.of(Envelope.class);
-        }
-
-        @Override
-        public void onEvent(Event event) {
-            this.receivedEvent = event;
-        }
-    }
-
-    static class MetadataPreservingSubscriber implements EventSubscriber {
-        volatile Event receivedEvent;
+    static class NonEventSubscriber implements EventSubscriber {
+        volatile Object receivedEvent;
 
         @Override
         public List<Class<?>> events() {
