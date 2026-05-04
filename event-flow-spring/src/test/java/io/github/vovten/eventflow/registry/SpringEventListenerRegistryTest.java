@@ -193,7 +193,7 @@ class SpringEventListenerRegistryTest {
 
     static class InvalidSignatureListener {
         @io.github.vovten.eventflow.EventListener
-        public void handleEvent(String invalidParam) {
+        public void handleEvent(TestEvent event, String secondParam) {
         }
     }
 

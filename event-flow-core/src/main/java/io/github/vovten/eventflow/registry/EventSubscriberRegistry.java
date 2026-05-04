@@ -1,6 +1,5 @@
 package io.github.vovten.eventflow.registry;
 
-import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventSubscriber;
@@ -111,21 +110,15 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      *   <li>Subscribers registered for the exact event class</li>
      *   <li>Subscribers registered for generic Event.class (if any)</li>
      * </ol>
-     * <p>
-     * If the event is an {@link Envelope}, the payload type is used for lookup.
      *
      * @param event the event to find subscribers for
      * @return list of subscribers for this event type
      */
     @Override
-    public List<EventHandler> getHandlers(Object event) {
-        Object eventToLookup = event;
-        if (eventToLookup instanceof Envelope<?> envelope) {
-            eventToLookup = envelope.payload();
-        }
+    public List<EventHandler> getHandlers(Event event) {
         List<EventHandler> handlers = new ArrayList<>();
 
-        Class<?> eventClass = eventToLookup.getClass();
+        Class<?> eventClass = event.getClass();
 
         // Get subscribers for specific event type (thread-safe snapshot)
         List<EventSubscriber> specific = eventSubscribers.get(eventClass);

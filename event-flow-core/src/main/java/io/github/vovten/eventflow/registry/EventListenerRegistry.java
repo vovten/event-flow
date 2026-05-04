@@ -83,22 +83,22 @@ public class EventListenerRegistry implements EventHandlerRegistry {
 
     /**
      * Map of event types to event handlers.
-     * Key: Event class
+     * Key: Event class (or any class for non-Event payloads)
      * Value: List of EventHandler instances
      * <p>
      * Thread-safe: uses ConcurrentHashMap + CopyOnWriteArrayList for read-heavy workload.
      * EventHandler wrappers are created once during registration and reused.
      */
-    private final Map<Class<? extends Event>, List<EventHandler>> eventListeners;
+    private final Map<Class<?>, List<EventHandler>> eventListeners;
 
     /**
      * Cache for combined handler lists to avoid reallocation on repeated getHandlers() calls.
-     * Key: Event class (specific event type)
+     * Key: Event class (or any class for non-Event payloads)
      * Value: Unmodifiable combined list (generic + specific handlers)
      * <p>
      * Cache is invalidated on register/unregister operations.
      */
-    private final Map<Class<? extends Event>, List<EventHandler>> combinedHandlersCache;
+    private final Map<Class<?>, List<EventHandler>> combinedHandlersCache;
 
     /**
      * Creates a new annotation-based event listener registry.
@@ -117,35 +117,13 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      *   <li>Listeners registered for the exact event class</li>
      *   <li>Listeners registered for generic Event.class (if any)</li>
      * </ol>
-     * <p>
-     * If the event is an {@link Envelope}, handlers for Envelope.class are also returned.
      *
      * @param event the event to find listeners for
      * @return list of listeners for this event type (unmodifiable)
      */
     @Override
-    public List<EventHandler> getHandlers(Object event) {
-        Object eventToLookup = event;
-        if (eventToLookup instanceof Envelope<?> envelope) {
-            eventToLookup = envelope.payload();
-        }
-        if (!(eventToLookup instanceof Event)) {
-            // Payload is not an Event - look for handlers for the Envelope itself
-            List<EventHandler> handlers = eventListeners.get(event.getClass());
-            List<EventHandler> genericHandlers = eventListeners.get(Event.class);
-            if (handlers == null || handlers.isEmpty()) {
-                return genericHandlers != null && !genericHandlers.isEmpty()
-                        ? Collections.unmodifiableList(genericHandlers)
-                        : Collections.emptyList();
-            }
-            if (genericHandlers == null || genericHandlers.isEmpty()) {
-                return Collections.unmodifiableList(handlers);
-            }
-            List<EventHandler> combined = new ArrayList<>(genericHandlers);
-            combined.addAll(handlers);
-            return Collections.unmodifiableList(combined);
-        }
-        Class<? extends Event> eventType = ((Event) eventToLookup).getClass();
+    public List<EventHandler> getHandlers(Event event) {
+        Class<?> eventType = resolveEventType(event);
         List<EventHandler> genericHandlers = eventListeners.get(Event.class);
         List<EventHandler> specificHandlers = eventListeners.get(eventType);
 
@@ -159,6 +137,20 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         }
         return combinedHandlersCache.computeIfAbsent(eventType,
                 key -> buildCombinedList(genericHandlers, specificHandlers));
+    }
+
+    /**
+     * Resolve the event type to search for handlers.
+     * If the event is an Envelope, resolves to the payload type.
+     *
+     * @param event the event or envelope
+     * @return resolved event type
+     */
+    private Class<?> resolveEventType(Event event) {
+        if (event instanceof Envelope<?> envelope) {
+            return envelope.payload().getClass();
+        }
+        return event.getClass();
     }
 
     private List<EventHandler> buildCombinedList(List<EventHandler> genericHandlers,
@@ -281,7 +273,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * @param method the method to register
      */
     protected void registerListener(Object bean, Method method) {
-        var eventType = (Class<? extends Event>) method.getParameterTypes()[0];
+        Class<?> eventType = method.getParameterTypes()[0];
         var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
         var newHandler = new MethodInvokingEventHandler(bean, method);
         // Check for duplicate (same bean and method)
@@ -311,7 +303,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     protected void checkMethodSignature(Method method) {
         var types = method.getParameterTypes();
-        if (types.length != 1 || !Event.class.isAssignableFrom(types[0])) {
+        if (types.length != 1) {
             throw new InvalidEventListenerMethodSignatureException(
                     method.getDeclaringClass().getName(), method.getName());
         }
@@ -336,10 +328,18 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         @Override
         public void onEvent(Event event) {
             try {
-                method.invoke(object, event);
+                Object arg = unwrapIfEnvelope(event, method.getParameterTypes()[0]);
+                method.invoke(object, arg);
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new EventHandlerInvocationException(object, event, e);
             }
+        }
+
+        private Object unwrapIfEnvelope(Event event, Class<?> expectedType) {
+            if (event instanceof Envelope<?> envelope && !expectedType.isAssignableFrom(Envelope.class)) {
+                return envelope.payload();
+            }
+            return event;
         }
     }
 }

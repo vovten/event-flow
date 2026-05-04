@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.event;
 
+import io.github.vovten.eventflow.channel.ExternalEventChannel;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.publisher.EventPublisher;
@@ -16,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -227,6 +229,80 @@ class DefaultEventBuilderTest {
 
         assertThat(capturedEnvelope.get()).isNotNull();
         assertThat(capturedEnvelope.get().eventId()).isEqualTo(expectedId);
+    }
+
+    @Test
+    @DisplayName("Should set target channels via withChannels")
+    void shouldSetTargetChannelsViaWithChannels() {
+        OutTransport transport = mock(OutTransport.class);
+        AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
+        when(transport.send(any())).thenAnswer(invocation -> {
+            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
+            return CompletableFuture.completedFuture(SendResult.success("dest"));
+        });
+        EventChannel internalChannel = new InternalEventChannel(transport);
+        EventChannel externalChannel = new ExternalEventChannel(List.of(transport));
+        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(internalChannel, externalChannel));
+
+        TestPayload payload = new TestPayload("test");
+        new DefaultEventBuilder<>(publisher, payload)
+                .withChannels(ExternalEventChannel.class)
+                .publish()
+                .join();
+
+        assertThat(capturedEnvelope.get()).isNotNull();
+        assertThat(capturedEnvelope.get().channels()).containsExactly(ExternalEventChannel.class);
+    }
+
+    @Test
+    @DisplayName("Should support multiple channels via withChannels")
+    void shouldSupportMultipleChannelsViaWithChannels() {
+        OutTransport transport = mock(OutTransport.class);
+        AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
+        when(transport.send(any())).thenAnswer(invocation -> {
+            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
+            return CompletableFuture.completedFuture(SendResult.success("dest"));
+        });
+        EventChannel internalChannel = new InternalEventChannel(transport);
+        EventChannel externalChannel = new ExternalEventChannel(List.of(transport));
+        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(internalChannel, externalChannel));
+
+        TestPayload payload = new TestPayload("test");
+        new DefaultEventBuilder<>(publisher, payload)
+                .withChannels(InternalEventChannel.class, ExternalEventChannel.class)
+                .publish()
+                .join();
+
+        assertThat(capturedEnvelope.get()).isNotNull();
+        assertThat(capturedEnvelope.get().channels()).containsExactly(InternalEventChannel.class, ExternalEventChannel.class);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when withChannels called with null")
+    void shouldThrowExceptionWhenWithChannelsCalledWithNull() {
+        OutTransport transport = mock(OutTransport.class);
+        EventChannel channel = new InternalEventChannel(transport);
+        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+
+        TestPayload payload = new TestPayload("test");
+
+        assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
+                .withChannels((Class<? extends EventChannel>[]) null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when withChannels called with empty array")
+    void shouldThrowExceptionWhenWithChannelsCalledWithEmptyArray() {
+        OutTransport transport = mock(OutTransport.class);
+        EventChannel channel = new InternalEventChannel(transport);
+        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+
+        TestPayload payload = new TestPayload("test");
+
+        assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
+                .withChannels(new Class[0]))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     record TestPayload(String value) {}

@@ -51,6 +51,21 @@ public final class EventUtils {
     }
 
     /**
+     * Convert object to json string
+     *
+     * @param object the object
+     * @return json string
+     * @throws EventSerializationException if error occurs during object to json conversion
+     */
+    public static String toJson(Object object) {
+        try {
+            return objectMapper.writeValueAsString(object);
+        } catch (JsonProcessingException e) {
+            throw new EventSerializationException("Error converting object to json", e);
+        }
+    }
+
+    /**
      * Convert json string to event
      *
      * @param json the json string

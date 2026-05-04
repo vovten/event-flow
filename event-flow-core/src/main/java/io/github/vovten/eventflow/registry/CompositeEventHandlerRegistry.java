@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.registry;
 
+import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 
 import java.util.List;
@@ -104,7 +105,7 @@ public class CompositeEventHandlerRegistry implements EventHandlerRegistry {
      * @return combined list of handlers from all registries
      */
     @Override
-    public List<EventHandler> getHandlers(Object event) {
+    public List<EventHandler> getHandlers(Event event) {
         return registries.stream()
                 .flatMap(registry -> registry.getHandlers(event).stream())
                 .toList();

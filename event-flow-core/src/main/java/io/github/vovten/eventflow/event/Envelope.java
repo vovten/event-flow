@@ -5,8 +5,11 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
+import io.github.vovten.eventflow.util.EventUtils;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,6 +31,7 @@ import java.util.UUID;
 public final class Envelope<T> implements Event {
 
     private static final String PAYLOAD_TYPE_KEY = "payloadType";
+    private static final String CHANNELS_KEY = "channels";
 
     private final UUID eventId;
     private final String traceId;
@@ -51,6 +55,7 @@ public final class Envelope<T> implements Event {
 
     /**
      * Create envelope with auto-generated eventId, null traceId, and current timestamp.
+     * Channels are resolved from payload's {@link DomainEvent} annotation, or default to internal.
      *
      * @param <T>     the payload type
      * @param payload the domain event to wrap
@@ -68,6 +73,7 @@ public final class Envelope<T> implements Event {
 
     /**
      * Create envelope with auto-generated eventId, specified traceId, and current timestamp.
+     * Channels are resolved from payload's {@link DomainEvent} annotation, or default to internal.
      *
      * @param <T>     the payload type
      * @param payload the domain event to wrap
@@ -81,6 +87,63 @@ public final class Envelope<T> implements Event {
                 Instant.now(),
                 payload,
                 Map.of(PAYLOAD_TYPE_KEY, payload.getClass().getName())
+        );
+    }
+
+    /**
+     * Create envelope with auto-generated eventId, null traceId, and specified channels.
+     * Channels take priority over payload's {@link DomainEvent} annotation.
+     *
+     * @param <T>      the payload type
+     * @param payload  the domain event to wrap
+     * @param channels channel classes for routing
+     * @return new envelope instance
+     * @throws IllegalArgumentException if channels array is empty
+     */
+    @SafeVarargs
+    public static <T> Envelope<T> of(T payload, Class<? extends EventChannel>... channels) {
+        Objects.requireNonNull(channels, "channels must not be null");
+        if (channels.length == 0) {
+            throw new IllegalArgumentException("At least one channel must be specified");
+        }
+        Map<String, String> meta = new LinkedHashMap<>();
+        meta.put(PAYLOAD_TYPE_KEY, payload.getClass().getName());
+        meta.put(CHANNELS_KEY, toChannelNames(channels));
+        return new Envelope<>(
+                UUID.randomUUID(),
+                null,
+                Instant.now(),
+                payload,
+                meta
+        );
+    }
+
+    /**
+     * Create envelope with auto-generated eventId, specified traceId, and specified channels.
+     * Channels take priority over payload's {@link DomainEvent} annotation.
+     *
+     * @param <T>      the payload type
+     * @param payload  the domain event to wrap
+     * @param traceId  the trace ID
+     * @param channels channel classes for routing
+     * @return new envelope instance
+     * @throws IllegalArgumentException if channels array is empty
+     */
+    @SafeVarargs
+    public static <T> Envelope<T> of(T payload, String traceId, Class<? extends EventChannel>... channels) {
+        Objects.requireNonNull(channels, "channels must not be null");
+        if (channels.length == 0) {
+            throw new IllegalArgumentException("At least one channel must be specified");
+        }
+        Map<String, String> meta = new LinkedHashMap<>();
+        meta.put(PAYLOAD_TYPE_KEY, payload.getClass().getName());
+        meta.put(CHANNELS_KEY, toChannelNames(channels));
+        return new Envelope<>(
+                UUID.randomUUID(),
+                traceId,
+                Instant.now(),
+                payload,
+                meta
         );
     }
 
@@ -133,10 +196,33 @@ public final class Envelope<T> implements Event {
     }
 
     /**
-     * @return default channels with {@link InternalEventChannel}
+     * Resolves channels in the following priority:
+     * <ol>
+     *   <li>Channels specified via factory method</li>
+     *   <li>Channels from payload's {@link DomainEvent} annotation</li>
+     *   <li>{@link InternalEventChannel} as default</li>
+     * </ol>
+     *
+     * @return resolved list of channel classes
      */
     @Override
     public List<Class<? extends EventChannel>> channels() {
+        String channelsValue = metadata.get(CHANNELS_KEY);
+        if (channelsValue != null && !channelsValue.isEmpty()) {
+            return Arrays.stream(channelsValue.split(","))
+                    .<Class<? extends EventChannel>>map(s -> {
+                        try {
+                            return (Class<? extends EventChannel>) Class.forName(s);
+                        } catch (ClassNotFoundException e) {
+                            throw new IllegalStateException("Channel class not found: " + s, e);
+                        }
+                    })
+                    .toList();
+        }
+        DomainEvent annotation = payload.getClass().getAnnotation(DomainEvent.class);
+        if (annotation != null) {
+            return Arrays.asList(annotation.channels());
+        }
         return List.of(InternalEventChannel.class);
     }
 
@@ -145,6 +231,19 @@ public final class Envelope<T> implements Event {
      */
     public String getPayloadType() {
         return metadata.get(PAYLOAD_TYPE_KEY);
+    }
+
+    /**
+     * Convert channel classes to comma-separated FQCN list for metadata storage.
+     *
+     * @param channels channel classes
+     * @return comma-separated fully qualified class names
+     */
+    private static String toChannelNames(Class<? extends EventChannel>[] channels) {
+        return Arrays.stream(channels)
+                .map(Class::getName)
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
     }
 
     @Override
@@ -162,7 +261,13 @@ public final class Envelope<T> implements Event {
 
     @Override
     public String toString() {
+        String payloadJson;
+        try {
+            payloadJson = EventUtils.toJson(payload);
+        } catch (Exception e) {
+            payloadJson = payload.getClass().getSimpleName();
+        }
         return String.format("Envelope{eventId=%s, traceId=%s, occurredAt=%s, payload=%s}",
-                eventId, traceId, occurredAt, payload.getClass().getSimpleName());
+                eventId, traceId, occurredAt, payloadJson);
     }
 }
