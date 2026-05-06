@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -23,14 +24,14 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     private final EventPublisher publisher;
     private final T payload;
     private UUID eventId;
-    private UUID traceId;
+    private UUID processId;
     private Instant occurredAt;
     private final Map<String, String> metadata;
     private Class<? extends EventChannel>[] channels;
 
     public DefaultEventBuilder(EventPublisher publisher, T payload) {
-        this.publisher = publisher;
-        this.payload = payload;
+        this.publisher = Objects.requireNonNull(publisher, "publisher must not be null");
+        this.payload = Objects.requireNonNull(payload, "payload must not be null");
         this.eventId = UUID.randomUUID();
         this.occurredAt = Instant.now();
         this.metadata = new HashMap<>();
@@ -49,14 +50,8 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     }
 
     @Override
-    public EventBuilder<T> withTraceId(String traceId) {
-        this.traceId = traceId != null ? UUID.nameUUIDFromBytes(traceId.getBytes()) : null;
-        return this;
-    }
-
-    @Override
-    public EventBuilder<T> withTraceId(UUID traceId) {
-        this.traceId = traceId;
+    public EventBuilder<T> withProcessId(UUID processId) {
+        this.processId = processId;
         return this;
     }
 
@@ -99,7 +94,7 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
         }
         Envelope<T> envelope = new Envelope<>(
                 eventId,
-                traceId,
+                processId,
                 occurredAt,
                 payload,
                 Map.copyOf(meta)

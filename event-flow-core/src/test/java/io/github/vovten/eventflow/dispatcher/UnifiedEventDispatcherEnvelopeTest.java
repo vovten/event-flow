@@ -49,8 +49,8 @@ class UnifiedEventDispatcherEnvelopeTest {
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
 
         PlainDomainEvent payload = new PlainDomainEvent("order-123", "test@mail.ru");
-        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
-        Envelope<PlainDomainEvent> envelope = Envelope.of(payload, traceId);
+        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        Envelope<PlainDomainEvent> envelope = Envelope.of(payload, processId);
         dispatcher.dispatch(envelope);
 
         Thread.sleep(100);
@@ -63,6 +63,7 @@ class UnifiedEventDispatcherEnvelopeTest {
     @Test
     @DisplayName("Should dispatch Envelope when payload does not implement Event")
     void shouldDispatchEnvelopeWhenPayloadNotEvent() throws InterruptedException {
+        UUID traceId = null;
         NonEventPayload payload = new NonEventPayload("data-123");
         NonEventSubscriber subscriber = new NonEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
@@ -75,8 +76,8 @@ class UnifiedEventDispatcherEnvelopeTest {
 
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
 
-        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
-        Envelope<NonEventPayload> envelope = Envelope.of(payload, traceId);
+        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        Envelope<NonEventPayload> envelope = Envelope.of(payload, processId);
         dispatcher.dispatch(envelope);
 
         Thread.sleep(100);
@@ -84,7 +85,7 @@ class UnifiedEventDispatcherEnvelopeTest {
         assertThat(subscriber.receivedEvent).isNotNull();
         assertThat(subscriber.receivedEvent).isInstanceOf(Envelope.class);
         Envelope<?> receivedEnvelope = (Envelope<?>) subscriber.receivedEvent;
-        assertThat(receivedEnvelope.traceId()).isEqualTo(traceId);
+        assertThat(receivedEnvelope.processId()).isEqualTo(processId);
         assertThat(receivedEnvelope.payload()).isInstanceOf(NonEventPayload.class);
     }
 

@@ -35,7 +35,6 @@ class DefaultEventBuilderTest {
 
         TestPayload payload = new TestPayload("test-123");
         new DefaultEventBuilder<>(publisher, payload).publish().join();
-
         assertThat(payload).isNotNull();
     }
 
@@ -63,8 +62,8 @@ class DefaultEventBuilderTest {
     }
 
     @Test
-    @DisplayName("Should set custom traceId")
-    void shouldSetCustomTraceId() {
+    @DisplayName("Should set custom processId")
+    void shouldSetCustomProcessId() {
         OutTransport transport = mock(OutTransport.class);
         AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
         when(transport.send(any())).thenAnswer(invocation -> {
@@ -74,15 +73,15 @@ class DefaultEventBuilderTest {
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
 
-        String customTraceId = "550e8400-e29b-41d4-a716-446655440000";
+        UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
-                .withTraceId(customTraceId)
+                .withProcessId(customProcessId)
                 .publish()
                 .join();
 
         assertThat(capturedEnvelope.get()).isNotNull();
-        assertThat(capturedEnvelope.get().traceId()).isEqualTo(UUID.nameUUIDFromBytes(customTraceId.getBytes()));
+        assertThat(capturedEnvelope.get().processId()).isEqualTo(customProcessId);
     }
 
     @Test
@@ -168,12 +167,12 @@ class DefaultEventBuilderTest {
         EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
 
         UUID customId = UUID.randomUUID();
-        UUID customTraceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
+        UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         Instant customTime = Instant.parse("2025-02-20T08:00:00Z");
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
                 .withEventId(customId)
-                .withTraceId(customTraceId)
+                .withProcessId(customProcessId)
                 .withOccurredAt(customTime)
                 .withMetadata("key1", "value1")
                 .withMetadata("key2", "value2")
@@ -182,7 +181,7 @@ class DefaultEventBuilderTest {
 
         assertThat(capturedEnvelope.get()).isNotNull();
         assertThat(capturedEnvelope.get().eventId()).isEqualTo(customId);
-        assertThat(capturedEnvelope.get().traceId()).isEqualTo(customTraceId);
+        assertThat(capturedEnvelope.get().processId()).isEqualTo(customProcessId);
         assertThat(capturedEnvelope.get().occurredAt()).isEqualTo(customTime);
         assertThat(capturedEnvelope.get().metadata())
                 .containsEntry("key1", "value1")
@@ -283,9 +282,7 @@ class DefaultEventBuilderTest {
         OutTransport transport = mock(OutTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
-
         TestPayload payload = new TestPayload("test");
-
         assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
                 .withChannels((Class<? extends EventChannel>[]) null))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -297,9 +294,7 @@ class DefaultEventBuilderTest {
         OutTransport transport = mock(OutTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
-
         TestPayload payload = new TestPayload("test");
-
         assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
                 .withChannels(new Class[0]))
                 .isInstanceOf(IllegalArgumentException.class);

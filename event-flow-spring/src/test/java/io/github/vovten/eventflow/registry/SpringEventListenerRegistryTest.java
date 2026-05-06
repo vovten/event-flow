@@ -118,7 +118,7 @@ class SpringEventListenerRegistryTest {
 
     @Test
     @DisplayName("Should register listener with annotation value for domain event type")
-    void shouldRegisterListenerWithAnnotationValueForDomainEvent() {
+    void shouldRegisterListenerWithAnnotationValueForEvent() {
         SpringEventListenerRegistry registry = new SpringEventListenerRegistry(applicationContext, "com.example");
         EnvelopeWithAnnotationListener listener = new EnvelopeWithAnnotationListener();
 
@@ -129,7 +129,7 @@ class SpringEventListenerRegistryTest {
 
     @Test
     @DisplayName("Should find handler by payload type when annotated with domain event")
-    void shouldFindHandlerByPayloadTypeWhenAnnotatedWithDomainEvent() {
+    void shouldFindHandlerByPayloadTypeWhenAnnotatedWithEvent() {
         SpringEventListenerRegistry registry = new SpringEventListenerRegistry(applicationContext, "com.example");
         EnvelopeWithAnnotationListener listener = new EnvelopeWithAnnotationListener();
         registry.register(listener);

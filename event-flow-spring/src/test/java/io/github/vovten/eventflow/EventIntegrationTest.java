@@ -2,7 +2,7 @@ package io.github.vovten.eventflow;
 
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.test.TestEvent;
+import io.github.vovten.eventflow.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +20,7 @@ class EventIntegrationTest {
     @DisplayName("Should serialize and deserialize event correctly")
     void shouldSerializeAndDeserializeEventCorrectly() {
         // given
-        TestEvent originalEvent = TestEvent.create("Serialization test");
+        TestEvent originalEvent = new TestEvent("Serialization test");
 
         // when
         String json = originalEvent.asJson();
@@ -35,7 +35,7 @@ class EventIntegrationTest {
     @DisplayName("Should return correct channel types")
     void shouldReturnCorrectChannelTypes() {
         // given
-        TestEvent event = TestEvent.create();
+        TestEvent event = new TestEvent();
 
         // when
         var channels = event.channels();
@@ -50,7 +50,7 @@ class EventIntegrationTest {
     @DisplayName("Should return event type class")
     void shouldReturnEventTypeClass() {
         // given
-        TestEvent event = TestEvent.create();
+        TestEvent event = new TestEvent();
 
         // when
         Class<? extends Event> type = event.type();
@@ -64,10 +64,10 @@ class EventIntegrationTest {
     void shouldProduceConsistentJsonOutput() {
         Instant dateTime = Instant.ofEpochSecond(1741089600); // 2026-03-04 12:00:00 UTC
         UUID sameUid = UUID.randomUUID();
-        UUID sameTraceId = UUID.randomUUID();
+        UUID sameProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         // given
-        TestEvent event1 = new TestEvent(sameUid, sameTraceId, "same-id", "same-message", dateTime);
-        TestEvent event2 = new TestEvent(sameUid, sameTraceId, "same-id", "same-message", dateTime);
+        TestEvent event1 = new TestEvent(sameUid, sameProcessId, "same-id", "same-message", dateTime);
+        TestEvent event2 = new TestEvent(sameUid, sameProcessId, "same-id", "same-message", dateTime);
 
         // when
         String json1 = event1.asJson();

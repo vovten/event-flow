@@ -8,9 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.UUID;
 
 /**
  * Tests for {@link EventListenerRegistry}.
@@ -90,8 +89,8 @@ class EventListenerRegistryTest {
         // Act
         registry.register(listener);
         PojoEvent pojoEvent = new PojoEvent("test-id");
-        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
-        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, traceId);
+        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, processId);
 
         // Assert
         var handlers = registry.getHandlers(envelope);
@@ -211,8 +210,8 @@ class EventListenerRegistryTest {
         CapturingPayloadListener listener = new CapturingPayloadListener();
         registry.register(listener);
         TestEvent testEvent = new TestEvent("payload-data");
-        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
-        Envelope<TestEvent> envelope = Envelope.of(testEvent, traceId);
+        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        Envelope<TestEvent> envelope = Envelope.of(testEvent, processId);
 
         // Act
         var handlers = registry.getHandlers(envelope);

@@ -19,7 +19,7 @@ import java.util.UUID;
 /**
  * Envelope wrapper for domain events that adds technical metadata.
  * <p>
- * Automatically captures: eventId (UUID), traceId (String), occurredAt (Instant).
+ * Automatically captures: eventId (UUID), processId (UUID), occurredAt (Instant).
  * Additional metadata can be added via {@link #metadata()}.
  * <p>
  * The envelope implements {@link Event} interface, so it passes through
@@ -34,7 +34,7 @@ public final class Envelope<T> implements TraceableEvent {
     private static final String CHANNELS_KEY = "channels";
 
     private final UUID eventId;
-    private final UUID traceId;
+    private final UUID processId;
     private final Instant occurredAt;
     private final Map<String, String> metadata;
 
@@ -44,20 +44,20 @@ public final class Envelope<T> implements TraceableEvent {
     @JsonCreator
     public Envelope(
             @JsonProperty("eventId") UUID eventId,
-            @JsonProperty("traceId") UUID traceId,
+            @JsonProperty("processId") UUID processId,
             @JsonProperty("occurredAt") Instant occurredAt,
             @JsonProperty("payload") T payload,
             @JsonProperty("metadata") Map<String, String> metadata) {
         this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
-        this.traceId = traceId;
+        this.processId = processId;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
         this.payload = Objects.requireNonNull(payload, "payload must not be null");
         this.metadata = Map.copyOf(metadata);
     }
 
     /**
-     * Create envelope with auto-generated eventId, null traceId, and current timestamp.
-     * Channels are resolved from payload's {@link DomainEvent} annotation, or default to internal.
+     * Create envelope with auto-generated eventId, null processId, and current timestamp.
+     * Channels are resolved from payload's {@link Event} annotation, or default to internal.
      *
      * @param <T>     the payload type
      * @param payload the domain event to wrap
@@ -74,18 +74,18 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
-     * Create envelope with auto-generated eventId, specified traceId (as String), and current timestamp.
-     * Channels are resolved from payload's {@link DomainEvent} annotation, or default to internal.
+     * Create envelope with auto-generated eventId, specified processId, and current timestamp.
+     * Channels are resolved from payload's {@link Event} annotation, or default to internal.
      *
-     * @param <T>     the payload type
-     * @param payload the domain event to wrap
-     * @param traceId the trace ID as String
+     * @param <T>        the payload type
+     * @param payload    the domain event to wrap
+     * @param processId  the process identifier (e.g., saga ID)
      * @return new envelope instance
      */
-    public static <T> Envelope<T> of(T payload, String traceId) {
+    public static <T> Envelope<T> of(T payload, UUID processId) {
         return new Envelope<>(
                 UUID.randomUUID(),
-                traceId != null ? UUID.nameUUIDFromBytes(traceId.getBytes()) : null,
+                processId,
                 Instant.now(),
                 payload,
                 Map.of()
@@ -93,27 +93,8 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
-     * Create envelope with auto-generated eventId, specified traceId, and current timestamp.
-     * Channels are resolved from payload's {@link DomainEvent} annotation, or default to internal.
-     *
-     * @param <T>     the payload type
-     * @param payload the domain event to wrap
-     * @param traceId the trace ID
-     * @return new envelope instance
-     */
-    public static <T> Envelope<T> of(T payload, UUID traceId) {
-        return new Envelope<>(
-                UUID.randomUUID(),
-                traceId,
-                Instant.now(),
-                payload,
-                Map.of()
-        );
-    }
-
-    /**
-     * Create envelope with auto-generated eventId, null traceId, and specified channels.
-     * Channels take priority over payload's {@link DomainEvent} annotation.
+     * Create envelope with auto-generated eventId, null processId, and specified channels.
+     * Channels take priority over payload's {@link Event} annotation.
      *
      * @param <T>      the payload type
      * @param payload  the domain event to wrap
@@ -139,18 +120,18 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
-     * Create envelope with auto-generated eventId, specified traceId, and specified channels.
-     * Channels take priority over payload's {@link DomainEvent} annotation.
+     * Create envelope with auto-generated eventId, specified processId, and specified channels.
+     * Channels take priority over payload's {@link Event} annotation.
      *
-     * @param <T>      the payload type
-     * @param payload  the domain event to wrap
-     * @param traceId  the trace ID as String
-     * @param channels channel classes for routing
+     * @param <T>        the payload type
+     * @param payload    the domain event to wrap
+     * @param processId  the process identifier (e.g., saga ID)
+     * @param channels   channel classes for routing
      * @return new envelope instance
      * @throws IllegalArgumentException if channels array is empty
      */
     @SafeVarargs
-    public static <T> Envelope<T> of(T payload, String traceId, Class<? extends EventChannel>... channels) {
+    public static <T> Envelope<T> of(T payload, UUID processId, Class<? extends EventChannel>... channels) {
         Objects.requireNonNull(channels, "channels must not be null");
         if (channels.length == 0) {
             throw new IllegalArgumentException("At least one channel must be specified");
@@ -159,35 +140,7 @@ public final class Envelope<T> implements TraceableEvent {
         meta.put(CHANNELS_KEY, toChannelNames(channels));
         return new Envelope<>(
                 UUID.randomUUID(),
-                traceId != null ? UUID.nameUUIDFromBytes(traceId.getBytes()) : null,
-                Instant.now(),
-                payload,
-                meta
-        );
-    }
-
-    /**
-     * Create envelope with auto-generated eventId, specified traceId, and specified channels.
-     * Channels take priority over payload's {@link DomainEvent} annotation.
-     *
-     * @param <T>      the payload type
-     * @param payload  the domain event to wrap
-     * @param traceId  the trace ID
-     * @param channels channel classes for routing
-     * @return new envelope instance
-     * @throws IllegalArgumentException if channels array is empty
-     */
-    @SafeVarargs
-    public static <T> Envelope<T> of(T payload, UUID traceId, Class<? extends EventChannel>... channels) {
-        Objects.requireNonNull(channels, "channels must not be null");
-        if (channels.length == 0) {
-            throw new IllegalArgumentException("At least one channel must be specified");
-        }
-        Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(CHANNELS_KEY, toChannelNames(channels));
-        return new Envelope<>(
-                UUID.randomUUID(),
-                traceId,
+                processId,
                 Instant.now(),
                 payload,
                 meta
@@ -198,22 +151,25 @@ public final class Envelope<T> implements TraceableEvent {
      * @return the unique event identifier
      */
     @JsonGetter("eventId")
+    @Override
     public UUID eventId() {
         return eventId;
     }
 
     /**
-     * @return the trace ID for correlation
+     * @return the process identifier for correlation (e.g., saga ID)
      */
-    @JsonGetter("traceId")
-    public UUID traceId() {
-        return traceId;
+    @JsonGetter("processId")
+    @Override
+    public UUID processId() {
+        return processId;
     }
 
     /**
      * @return the timestamp when the event occurred
      */
     @JsonGetter("occurredAt")
+    @Override
     public Instant occurredAt() {
         return occurredAt;
     }
@@ -246,7 +202,7 @@ public final class Envelope<T> implements TraceableEvent {
      * Resolves channels in the following priority:
      * <ol>
      *   <li>Channels specified via factory method</li>
-     *   <li>Channels from payload's {@link DomainEvent} annotation</li>
+     *   <li>Channels from payload's {@link Event} annotation</li>
      *   <li>{@link InternalEventChannel} as default</li>
      * </ol>
      *
@@ -266,7 +222,8 @@ public final class Envelope<T> implements TraceableEvent {
                     })
                     .toList();
         }
-        DomainEvent annotation = payload.getClass().getAnnotation(DomainEvent.class);
+        io.github.vovten.eventflow.event.annotation.Event annotation =
+                payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
         if (annotation != null) {
             return Arrays.asList(annotation.channels());
         }
@@ -307,7 +264,7 @@ public final class Envelope<T> implements TraceableEvent {
         } catch (Exception e) {
             payloadJson = payload.getClass().getSimpleName();
         }
-        return String.format("Envelope{eventId=%s, traceId=%s, occurredAt=%s, payload=%s}",
-                eventId, traceId, occurredAt, payloadJson);
+        return String.format("Envelope{eventId=%s, processId=%s, occurredAt=%s, payload=%s}",
+                eventId, processId, occurredAt, payloadJson);
     }
 }
