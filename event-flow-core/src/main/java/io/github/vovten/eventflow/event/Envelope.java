@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.event;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.util.EventUtils;
@@ -36,8 +37,10 @@ public final class Envelope<T> implements Event {
     private final UUID eventId;
     private final String traceId;
     private final Instant occurredAt;
-    private final T payload;
     private final Map<String, String> metadata;
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
+    private final T payload;
 
     @JsonCreator
     public Envelope(

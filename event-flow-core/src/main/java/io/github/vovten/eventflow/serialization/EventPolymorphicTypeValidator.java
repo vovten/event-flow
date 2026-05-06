@@ -3,7 +3,6 @@ package io.github.vovten.eventflow.serialization;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
-import io.github.vovten.eventflow.event.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,23 +54,10 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
         Class<?> rawClass = subType.getRawClass();
         String className = rawClass.getName();
 
-        // 1. Verify it's actually an Event (defense-in-depth)
-        if (!Event.class.isAssignableFrom(rawClass)) {
-            log.error(
-                    "Blocked deserialization of non-Event class: {}. "
-                    + "This class does not implement the Event interface and cannot be deserialized for security reasons.",
-                    className
-            );
-            return Validity.DENIED;
-        }
-
-        // 2. Check against the whitelist
         if (EventTypeRegistry.isAllowed(className)) {
             log.debug("Allowed event subtype: {}", className);
             return Validity.ALLOWED;
         }
-
-        // 3. Block everything else with helpful message
         String packageName = getPackageName(className);
         log.error(
                 "Blocked deserialization of unauthorized event class: '{}'.\n"
