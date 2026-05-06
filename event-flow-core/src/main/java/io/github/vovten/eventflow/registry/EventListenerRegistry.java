@@ -153,6 +153,78 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         return event.getClass();
     }
 
+    /**
+     * <p>
+     * Scans all public methods and registers those with the annotation.
+     *
+     * @param bean the listener object to scan
+     * @throws InvalidEventListenerMethodSignatureException if method signature is invalid
+     */
+    protected void registerIfAnnotationPresent(Object bean) {
+        Method[] methods = bean.getClass().getMethods();
+        for (Method method : methods) {
+            if (method.isAnnotationPresent(EventListener.class)) {
+                checkMethodSignature(method);
+                EventListener annotation = method.getAnnotation(EventListener.class);
+                Class<?> eventType = resolveListenerEventType(method, annotation);
+                registerListener(bean, method, eventType);
+            }
+        }
+    }
+
+    /**
+     * Resolve the event type for listener registration.
+     * If method parameter is Envelope and annotation value is not specified,
+     * throws exception requiring explicit domain event type.
+     *
+     * @param method the annotated method
+     * @param annotation the annotation
+     * @return the event type to register
+     * @throws IllegalArgumentException if Envelope is used without annotation value
+     */
+    private Class<?> resolveListenerEventType(Method method, EventListener annotation) {
+        Class<?> annotationValue = annotation.value();
+        Class<?> paramType = method.getParameterTypes()[0];
+        if (Envelope.class.isAssignableFrom(paramType)) {
+            if (annotationValue == null || annotationValue.equals(Event.class)) {
+                throw new IllegalArgumentException(
+                        "Listener '" + method.getDeclaringClass().getSimpleName() + "." + method.getName() +
+                                "()': When method parameter is Envelope, annotation value must specify domain event type. " +
+                                "Use @EventListener(YourDomainEvent.class) instead of @EventListener");
+            }
+            return annotationValue;
+        }
+        if (annotationValue != null && !annotationValue.equals(Event.class)) {
+            return annotationValue;
+        }
+        return paramType;
+    }
+
+    /**
+     * Register a specific method as an event listener.
+     * <p>
+     * The method's first parameter determines the event type it will handle.
+     * Duplicate registrations (same bean and method) are ignored.
+     *
+     * @param bean the listener object
+     * @param method the method to register
+     * @param eventType the event type to register for
+     */
+    protected void registerListener(Object bean, Method method, Class<?> eventType) {
+        var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
+        var newHandler = new MethodInvokingEventHandler(bean, method);
+        boolean exists = handlers.stream()
+                .filter(h -> h instanceof MethodInvokingEventHandler mih)
+                .anyMatch(h -> {
+                    MethodInvokingEventHandler mih = (MethodInvokingEventHandler) h;
+                    return mih.object().equals(bean) && mih.method().equals(method);
+                });
+        if (!exists) {
+            handlers.add(newHandler);
+            combinedHandlersCache.clear();
+        }
+    }
+
     private List<EventHandler> buildCombinedList(List<EventHandler> genericHandlers,
                                                    List<EventHandler> specificHandlers) {
         List<EventHandler> combined = new ArrayList<>(genericHandlers.size() + specificHandlers.size());
@@ -246,50 +318,6 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     }
 
     /**
-     * Register a listener if its methods have @EventListener annotation.
-     * <p>
-     * Scans all public methods and registers those with the annotation.
-     *
-     * @param bean the listener object to scan
-     * @throws InvalidEventListenerMethodSignatureException if method signature is invalid
-     */
-    protected void registerIfAnnotationPresent(Object bean) {
-        Method[] methods = bean.getClass().getMethods();
-        for (Method method : methods) {
-            if (method.isAnnotationPresent(EventListener.class)) {
-                checkMethodSignature(method);
-                registerListener(bean, method);
-            }
-        }
-    }
-
-    /**
-     * Register a specific method as an event listener.
-     * <p>
-     * The method's first parameter determines the event type it will handle.
-     * Duplicate registrations (same bean and method) are ignored.
-     *
-     * @param bean the listener object
-     * @param method the method to register
-     */
-    protected void registerListener(Object bean, Method method) {
-        Class<?> eventType = method.getParameterTypes()[0];
-        var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
-        var newHandler = new MethodInvokingEventHandler(bean, method);
-        // Check for duplicate (same bean and method)
-        boolean exists = handlers.stream()
-                .filter(h -> h instanceof MethodInvokingEventHandler mih)
-                .anyMatch(h -> {
-                    MethodInvokingEventHandler mih = (MethodInvokingEventHandler) h;
-                    return mih.object().equals(bean) && mih.method().equals(method);
-                });
-        if (!exists) {
-            handlers.add(newHandler);
-            combinedHandlersCache.clear();
-        }
-    }
-
-    /**
      * Validate that a method has a valid listener signature.
      * <p>
      * Requirements:
@@ -328,15 +356,18 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         @Override
         public void onEvent(Event event) {
             try {
-                Object arg = unwrapIfEnvelope(event, method.getParameterTypes()[0]);
+                Object arg = adaptEventToMethodParameter(event, method.getParameterTypes()[0]);
                 method.invoke(object, arg);
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new EventHandlerInvocationException(object, event, e);
             }
         }
 
-        private Object unwrapIfEnvelope(Event event, Class<?> expectedType) {
-            if (event instanceof Envelope<?> envelope && !expectedType.isAssignableFrom(Envelope.class)) {
+        private Object adaptEventToMethodParameter(Event event, Class<?> expectedType) {
+            if (event instanceof Envelope<?> envelope) {
+                if (expectedType.isAssignableFrom(Envelope.class)) {
+                    return envelope;
+                }
                 return envelope.payload();
             }
             return event;

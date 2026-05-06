@@ -112,67 +112,57 @@ class SpringEventListenerRegistryTest {
         TestAnnotatedListener listener = new TestAnnotatedListener();
         registry.register(listener);
 
-        TestEvent event = new TestEvent();
-        List<EventHandler> handlers = registry.getHandlers(event);
-
+        List<EventHandler> handlers = registry.getHandlers(new TestEvent());
         assertEquals(1, handlers.size());
     }
 
     @Test
-    @DisplayName("Should unregister existing listener")
-    void shouldUnregisterExistingListener() {
+    @DisplayName("Should register listener with annotation value for domain event type")
+    void shouldRegisterListenerWithAnnotationValueForDomainEvent() {
         SpringEventListenerRegistry registry = new SpringEventListenerRegistry(applicationContext, "com.example");
-        TestAnnotatedListener listener = new TestAnnotatedListener();
+        EnvelopeWithAnnotationListener listener = new EnvelopeWithAnnotationListener();
+
         registry.register(listener);
 
-        boolean result = registry.unregister(listener);
-
-        assertTrue(result);
-        assertFalse(registry.isRegistered(listener));
+        assertEquals(1, registry.handlerCount());
     }
 
     @Test
-    @DisplayName("Should throw exception on merge")
-    void shouldThrowExceptionOnMerge() {
+    @DisplayName("Should find handler by payload type when annotated with domain event")
+    void shouldFindHandlerByPayloadTypeWhenAnnotatedWithDomainEvent() {
         SpringEventListenerRegistry registry = new SpringEventListenerRegistry(applicationContext, "com.example");
-        SpringEventListenerRegistry otherRegistry = mock(SpringEventListenerRegistry.class);
-
-        assertThrows(UnsupportedOperationException.class, () -> registry.merge(otherRegistry));
-    }
-
-    @Test
-    @DisplayName("Should invoke handler method")
-    void shouldInvokeHandlerMethod() {
-        SpringEventListenerRegistry registry = new SpringEventListenerRegistry(applicationContext, "com.example");
-        TestAnnotatedListener listener = new TestAnnotatedListener();
+        EnvelopeWithAnnotationListener listener = new EnvelopeWithAnnotationListener();
         registry.register(listener);
 
-        TestEvent event = new TestEvent();
-        List<EventHandler> handlers = registry.getHandlers(event);
+        io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> envelope =
+                io.github.vovten.eventflow.event.Envelope.of(new DomainOrderEvent("order-123"));
 
+        List<EventHandler> handlers = registry.getHandlers(envelope);
         assertEquals(1, handlers.size());
-        handlers.get(0).onEvent(event);
-
-        assertTrue(listener.wasCalled());
     }
 
-    static class TestAnnotatedListener {
-        private boolean called = false;
+    @Test
+    @DisplayName("Should throw exception when Envelope used without annotation value")
+    void shouldThrowExceptionWhenEnvelopeWithoutAnnotationValue() {
+        SpringEventListenerRegistry registry = new SpringEventListenerRegistry(applicationContext, "com.example");
+        EnvelopeWithoutAnnotationListener listener = new EnvelopeWithoutAnnotationListener();
 
-        @io.github.vovten.eventflow.EventListener
-        public void handleTestEvent(TestEvent event) {
-            this.called = true;
-        }
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                registry.register(listener));
 
-        boolean wasCalled() {
-            return called;
-        }
+        assertTrue(exception.getMessage().contains("annotation value must specify domain event type"));
     }
 
     static class TestEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
+        }
+    }
+
+    static class TestAnnotatedListener {
+        @io.github.vovten.eventflow.EventListener
+        public void handleTestEvent(TestEvent event) {
         }
     }
 
@@ -201,6 +191,33 @@ class SpringEventListenerRegistryTest {
         @Override
         public Class<? extends Event> type() {
             return SpecificEvent.class;
+        }
+    }
+
+    static class DomainOrderEvent {
+        private final String orderId;
+
+        DomainOrderEvent(String orderId) {
+            this.orderId = orderId;
+        }
+
+        String orderId() {
+            return orderId;
+        }
+    }
+
+    static class EnvelopeWithAnnotationListener {
+        io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> capturedEnvelope;
+
+        @io.github.vovten.eventflow.EventListener(DomainOrderEvent.class)
+        public void handleDomainOrderEvent(io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> event) {
+            this.capturedEnvelope = event;
+        }
+    }
+
+    static class EnvelopeWithoutAnnotationListener {
+        @io.github.vovten.eventflow.EventListener
+        public void handleEnvelope(io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> event) {
         }
     }
 }

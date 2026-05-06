@@ -244,6 +244,54 @@ class EventListenerRegistryTest {
         assertEquals(2, handlers.size());
     }
 
+    @Test
+    @DisplayName("Should register listener with annotation value and receive Envelope")
+    void shouldRegisterListenerWithAnnotationValueReceivingEnvelope() {
+        // Arrange
+        EnvelopeReceivingListener listener = new EnvelopeReceivingListener();
+        registry.register(listener);
+        DomainOrderEvent orderEvent = new DomainOrderEvent("order-123");
+        Envelope<DomainOrderEvent> envelope = Envelope.of(orderEvent);
+
+        // Act
+        var handlers = registry.getHandlers(envelope);
+
+        // Assert
+        assertEquals(1, handlers.size());
+        handlers.forEach(handler -> handler.onEvent(envelope));
+        assertNotNull(listener.capturedEnvelope);
+        assertEquals("order-123", listener.capturedEnvelope.payload().orderId());
+    }
+
+    @Test
+    @DisplayName("Should register listener with annotation value for domain event and find handler by payload type")
+    void shouldFindHandlerByPayloadTypeWhenAnnotatedWithDomainEvent() {
+        // Arrange
+        EnvelopeReceivingListener listener = new EnvelopeReceivingListener();
+        registry.register(listener);
+        DomainOrderEvent orderEvent = new DomainOrderEvent("order-456");
+        Envelope<DomainOrderEvent> envelope = Envelope.of(orderEvent);
+
+        // Act
+        var handlers = registry.getHandlers(envelope);
+
+        // Assert
+        assertEquals(1, handlers.size());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when Envelope used without annotation value")
+    void shouldThrowExceptionWhenEnvelopeWithoutAnnotationValue() {
+        // Arrange
+        EnvelopeWithoutAnnotationListener listener = new EnvelopeWithoutAnnotationListener();
+
+        // Act & Assert
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                registry.register(listener));
+
+        assertTrue(exception.getMessage().contains("Listener 'EnvelopeWithoutAnnotationListener.handleEnvelope()':"));
+    }
+
     /**
      * Test event class.
      */
@@ -368,6 +416,42 @@ class EventListenerRegistryTest {
         @EventListener
         public void handleTestEvent(TestEvent event) {
             this.capturedEvent = event;
+        }
+    }
+
+    /**
+     * Domain order event for testing annotation value.
+     */
+    static final class DomainOrderEvent {
+        private final String orderId;
+
+        DomainOrderEvent(String orderId) {
+            this.orderId = orderId;
+        }
+
+        String orderId() {
+            return orderId;
+        }
+    }
+
+    /**
+     * Listener that receives Envelope with @EventListener(DomainOrderEvent.class) annotation.
+     */
+    static final class EnvelopeReceivingListener {
+        Envelope<DomainOrderEvent> capturedEnvelope;
+
+        @EventListener(DomainOrderEvent.class)
+        public void handleDomainOrderEvent(Envelope<DomainOrderEvent> event) {
+            this.capturedEnvelope = event;
+        }
+    }
+
+    /**
+     * Listener that receives Envelope WITHOUT annotation value - should throw exception.
+     */
+    static final class EnvelopeWithoutAnnotationListener {
+        @EventListener
+        public void handleEnvelope(Envelope<DomainOrderEvent> event) {
         }
     }
 }
