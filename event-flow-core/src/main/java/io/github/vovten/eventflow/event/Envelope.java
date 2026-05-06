@@ -31,7 +31,6 @@ import java.util.UUID;
  */
 public final class Envelope<T> implements TraceableEvent {
 
-    private static final String PAYLOAD_TYPE_KEY = "payloadType";
     private static final String CHANNELS_KEY = "channels";
 
     private final UUID eventId;
@@ -70,7 +69,7 @@ public final class Envelope<T> implements TraceableEvent {
                 null,
                 Instant.now(),
                 payload,
-                Map.of(PAYLOAD_TYPE_KEY, payload.getClass().getName())
+                Map.of()
         );
     }
 
@@ -89,7 +88,7 @@ public final class Envelope<T> implements TraceableEvent {
                 traceId != null ? UUID.nameUUIDFromBytes(traceId.getBytes()) : null,
                 Instant.now(),
                 payload,
-                Map.of(PAYLOAD_TYPE_KEY, payload.getClass().getName())
+                Map.of()
         );
     }
 
@@ -108,7 +107,7 @@ public final class Envelope<T> implements TraceableEvent {
                 traceId,
                 Instant.now(),
                 payload,
-                Map.of(PAYLOAD_TYPE_KEY, payload.getClass().getName())
+                Map.of()
         );
     }
 
@@ -129,7 +128,6 @@ public final class Envelope<T> implements TraceableEvent {
             throw new IllegalArgumentException("At least one channel must be specified");
         }
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(PAYLOAD_TYPE_KEY, payload.getClass().getName());
         meta.put(CHANNELS_KEY, toChannelNames(channels));
         return new Envelope<>(
                 UUID.randomUUID(),
@@ -158,7 +156,6 @@ public final class Envelope<T> implements TraceableEvent {
             throw new IllegalArgumentException("At least one channel must be specified");
         }
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(PAYLOAD_TYPE_KEY, payload.getClass().getName());
         meta.put(CHANNELS_KEY, toChannelNames(channels));
         return new Envelope<>(
                 UUID.randomUUID(),
@@ -187,7 +184,6 @@ public final class Envelope<T> implements TraceableEvent {
             throw new IllegalArgumentException("At least one channel must be specified");
         }
         Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(PAYLOAD_TYPE_KEY, payload.getClass().getName());
         meta.put(CHANNELS_KEY, toChannelNames(channels));
         return new Envelope<>(
                 UUID.randomUUID(),
@@ -275,13 +271,6 @@ public final class Envelope<T> implements TraceableEvent {
             return Arrays.asList(annotation.channels());
         }
         return List.of(InternalEventChannel.class);
-    }
-
-    /**
-     * @return fully qualified class name of the wrapped payload
-     */
-    public String getPayloadType() {
-        return metadata.get(PAYLOAD_TYPE_KEY);
     }
 
     /**

@@ -81,7 +81,7 @@ class EventPublisherGenericMethodsTest {
         publisher.publish(event).join();
 
         verify(transport).send(argThat((Envelope<?> e) ->
-                e.getPayloadType().equals(PlainDomainEvent.class.getName())));
+                e.payload().getClass().equals(PlainDomainEvent.class)));
     }
 
     @Test

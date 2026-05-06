@@ -18,7 +18,6 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class DefaultEventBuilder<T> implements EventBuilder<T> {
 
-    private static final String PAYLOAD_TYPE_KEY = "payloadType";
     private static final String CHANNELS_KEY = "channels";
 
     private final EventPublisher publisher;
@@ -35,7 +34,6 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
         this.eventId = UUID.randomUUID();
         this.occurredAt = Instant.now();
         this.metadata = new HashMap<>();
-        this.metadata.put(PAYLOAD_TYPE_KEY, payload.getClass().getName());
     }
 
     @Override

@@ -205,7 +205,7 @@ class DefaultEventBuilderTest {
         new DefaultEventBuilder<>(publisher, payload).publish().join();
 
         assertThat(capturedEnvelope.get()).isNotNull();
-        assertThat(capturedEnvelope.get().getPayloadType()).isEqualTo(TestPayload.class.getName());
+        assertThat(capturedEnvelope.get().payload()).isEqualTo(payload);
     }
 
     @Test

@@ -159,7 +159,7 @@ class EnvelopeTest {
         Envelope<PojoEvent> envelope = Envelope.of(pojoEvent);
 
         // Assert
-        assertEquals(PojoEvent.class.getName(), envelope.getPayloadType());
+        assertNotNull(envelope.payload());
     }
 
     @Test
