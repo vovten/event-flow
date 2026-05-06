@@ -92,7 +92,7 @@ public class ReplicasTestEvent extends AbstractTraceableEvent {
         return "ReplicasTestEvent{" +
                 "id='" + id + '\'' +
                 ", data='" + data + '\'' +
-                ", uid=" + uid() +
+                ", eventId=" + eventId() +
                 ", timestamp=" + this.occurredAt() +
                 '}';
     }

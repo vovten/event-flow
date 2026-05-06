@@ -89,7 +89,7 @@ class MsgPackEventSerializerTest {
         byte[] data = serializer.serialize(original);
         TraceableTestEvent deserialized = serializer.deserialize(data, TraceableTestEvent.class);
 
-        assertEquals(fixedUid, deserialized.uid());
+        assertEquals(fixedUid, deserialized.eventId());
         assertEquals(fixedTraceId, deserialized.traceId());
         assertEquals(fixedInstant, deserialized.occurredAt());
         assertEquals("data", deserialized.data);
@@ -103,7 +103,7 @@ class MsgPackEventSerializerTest {
         byte[] data = serializer.serialize(original);
         TraceableTestEvent deserialized = serializer.deserialize(data, TraceableTestEvent.class);
 
-        assertNotNull(deserialized.uid());
+        assertNotNull(deserialized.eventId());
         assertNotNull(deserialized.traceId());
         assertNotNull(deserialized.occurredAt());
         assertEquals("auto-generated", deserialized.data);
@@ -135,7 +135,7 @@ class MsgPackEventSerializerTest {
         byte[] data = serializer.serialize(original);
         ComplexTraceableEvent deserialized = serializer.deserialize(data, ComplexTraceableEvent.class);
 
-        assertEquals(original.uid(), deserialized.uid());
+        assertEquals(original.eventId(), deserialized.eventId());
         assertEquals(original.traceId(), deserialized.traceId());
         assertNotNull(deserialized.occurredAt());
         assertEquals("complex-data", deserialized.data);

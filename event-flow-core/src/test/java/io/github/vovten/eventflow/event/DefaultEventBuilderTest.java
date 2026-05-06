@@ -74,7 +74,7 @@ class DefaultEventBuilderTest {
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
 
-        String customTraceId = "trace-abc-123";
+        String customTraceId = "550e8400-e29b-41d4-a716-446655440000";
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
                 .withTraceId(customTraceId)
@@ -82,7 +82,7 @@ class DefaultEventBuilderTest {
                 .join();
 
         assertThat(capturedEnvelope.get()).isNotNull();
-        assertThat(capturedEnvelope.get().traceId()).isEqualTo(customTraceId);
+        assertThat(capturedEnvelope.get().traceId()).isEqualTo(UUID.nameUUIDFromBytes(customTraceId.getBytes()));
     }
 
     @Test
@@ -168,7 +168,7 @@ class DefaultEventBuilderTest {
         EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
 
         UUID customId = UUID.randomUUID();
-        String customTraceId = "trace-chain";
+        UUID customTraceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         Instant customTime = Instant.parse("2025-02-20T08:00:00Z");
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)

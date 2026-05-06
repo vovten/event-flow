@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -48,7 +49,8 @@ class UnifiedEventDispatcherEnvelopeTest {
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
 
         PlainDomainEvent payload = new PlainDomainEvent("order-123", "test@mail.ru");
-        Envelope<PlainDomainEvent> envelope = Envelope.of(payload, "trace-abc");
+        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        Envelope<PlainDomainEvent> envelope = Envelope.of(payload, traceId);
         dispatcher.dispatch(envelope);
 
         Thread.sleep(100);
@@ -73,7 +75,8 @@ class UnifiedEventDispatcherEnvelopeTest {
 
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
 
-        Envelope<NonEventPayload> envelope = Envelope.of(payload, "trace-xyz");
+        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
+        Envelope<NonEventPayload> envelope = Envelope.of(payload, traceId);
         dispatcher.dispatch(envelope);
 
         Thread.sleep(100);
@@ -81,7 +84,7 @@ class UnifiedEventDispatcherEnvelopeTest {
         assertThat(subscriber.receivedEvent).isNotNull();
         assertThat(subscriber.receivedEvent).isInstanceOf(Envelope.class);
         Envelope<?> receivedEnvelope = (Envelope<?>) subscriber.receivedEvent;
-        assertThat(receivedEnvelope.traceId()).isEqualTo("trace-xyz");
+        assertThat(receivedEnvelope.traceId()).isEqualTo(traceId);
         assertThat(receivedEnvelope.payload()).isInstanceOf(NonEventPayload.class);
     }
 

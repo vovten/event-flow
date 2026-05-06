@@ -99,7 +99,7 @@ public class ExternalTestEvent extends AbstractTraceableEvent {
         return "ExternalTestEvent{" +
                 "id='" + id + '\'' +
                 ", payload='" + payload + '\'' +
-                ", uid=" + uid() +
+                ", eventId=" + eventId() +
                 ", timestamp=" + this.occurredAt() +
                 '}';
     }

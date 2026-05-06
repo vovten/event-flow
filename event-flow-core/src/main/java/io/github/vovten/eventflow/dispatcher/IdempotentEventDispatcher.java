@@ -64,16 +64,16 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
             origin.dispatch(event);
             return;
         }
-        UUID uid = traceable.uid();
-        Boolean existing = cache.getIfPresent(uid);
+        UUID eventId = traceable.eventId();
+        Boolean existing = cache.getIfPresent(eventId);
 
         if (existing == null) {
             origin.dispatch(event);
-            cache.put(uid, Boolean.TRUE);
-            log.debug("Event processed: {}", uid);
+            cache.put(eventId, Boolean.TRUE);
+            log.debug("Event processed: {}", eventId);
         } else {
             if (warnOnDuplicate) {
-                log.warn("Duplicate event ignored: {}", uid);
+                log.warn("Duplicate event ignored: {}", eventId);
             }
         }
     }

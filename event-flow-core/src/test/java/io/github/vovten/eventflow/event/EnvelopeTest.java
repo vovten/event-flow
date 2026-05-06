@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -71,12 +72,13 @@ class EnvelopeTest {
     void shouldCreateEnvelopeWithTraceIdAndChannelsViaFactoryMethod() {
         // Arrange
         PojoEvent pojoEvent = new PojoEvent("test");
+        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
 
         // Act
-        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, "trace-123", ExternalEventChannel.class, BroadcastEventChannel.class);
+        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, traceId, ExternalEventChannel.class, BroadcastEventChannel.class);
 
         // Assert
-        assertEquals("trace-123", envelope.traceId());
+        assertEquals(traceId, envelope.traceId());
         List<Class<? extends EventChannel>> channels = envelope.channels();
         assertEquals(2, channels.size());
         assertEquals(ExternalEventChannel.class, channels.get(0));
@@ -88,12 +90,13 @@ class EnvelopeTest {
     void shouldCreateEnvelopeWithTraceIdOnlyViaFactoryMethod() {
         // Arrange
         PojoEvent pojoEvent = new PojoEvent("test");
+        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
 
         // Act
-        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, "trace-xyz");
+        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, traceId);
 
         // Assert
-        assertEquals("trace-xyz", envelope.traceId());
+        assertEquals(traceId, envelope.traceId());
         List<Class<? extends EventChannel>> channels = envelope.channels();
         assertEquals(1, channels.size());
         assertEquals(InternalEventChannel.class, channels.get(0));

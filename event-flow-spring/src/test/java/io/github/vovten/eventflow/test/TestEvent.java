@@ -107,7 +107,7 @@ public class TestEvent extends AbstractTraceableEvent {
         return "TestEvent{" +
                 "id='" + id + '\'' +
                 ", message='" + message + '\'' +
-                ", uid=" + uid() +
+                ", eventId=" + eventId() +
                 ", timestamp=" + this.occurredAt() +
                 '}';
     }

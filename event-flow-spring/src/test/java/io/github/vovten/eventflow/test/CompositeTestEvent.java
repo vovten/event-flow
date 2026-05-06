@@ -100,7 +100,7 @@ public class CompositeTestEvent extends AbstractTraceableEvent {
         return "CompositeTestEvent{" +
                 "id='" + id + '\'' +
                 ", content='" + content + '\'' +
-                ", uid=" + uid() +
+                ", eventId=" + eventId() +
                 ", timestamp=" + this.occurredAt() +
                 '}';
     }

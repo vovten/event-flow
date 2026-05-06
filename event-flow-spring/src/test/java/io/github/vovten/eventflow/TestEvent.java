@@ -54,6 +54,6 @@ public class TestEvent extends AbstractTraceableEvent {
 
     @Override
     public String toString() {
-        return "TestEvent{id='" + id + "', uid=" + uid() + ", traceId=" + traceId() + ", timestamp=" + occurredAt() + "}";
+        return "TestEvent{id='" + id + "', eventId=" + eventId() + ", traceId=" + traceId() + ", timestamp=" + occurredAt() + "}";
     }
 }

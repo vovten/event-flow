@@ -16,9 +16,9 @@ public interface TraceableEvent extends Event {
     /**
      * Returns the unique identifier of the event.
      *
-     * @return the unique trace identifier
+     * @return the unique event identifier
      */
-    UUID uid();
+    UUID eventId();
 
     /**
      * @return correlation ID that groups related events together (e.g., business process ID)

@@ -29,7 +29,7 @@ import java.util.UUID;
  * @author Vladimir Aleshkov
  * @since 2026-05-03
  */
-public final class Envelope<T> implements Event {
+public final class Envelope<T> implements TraceableEvent {
 
     private static final String PAYLOAD_TYPE_KEY = "payloadType";
     private static final String CHANNELS_KEY = "channels";

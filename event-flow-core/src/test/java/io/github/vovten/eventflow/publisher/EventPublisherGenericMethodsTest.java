@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -106,13 +107,14 @@ class EventPublisherGenericMethodsTest {
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
+        UUID customTraceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         publisher.prepare(event)
-                .withTraceId("custom-trace-456")
+                .withTraceId(customTraceId)
                 .publish()
                 .join();
 
         verify(transport).send(argThat((Envelope<?> e) ->
-                e.traceId().equals("custom-trace-456")));
+                e.traceId().equals(customTraceId)));
     }
 
     @Test
@@ -124,14 +126,15 @@ class EventPublisherGenericMethodsTest {
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
+        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         publisher.prepare(event)
-                .withTraceId("trace-789")
+                .withTraceId(traceId)
                 .withMetadata("source", "order-service")
                 .publish()
                 .join();
 
         verify(transport).send(argThat((Envelope<?> e) ->
-                e.traceId().equals("trace-789") &&
+                e.traceId().equals(traceId) &&
                         e.metadata().get("source").equals("order-service")));
     }
 
