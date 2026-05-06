@@ -1,17 +1,18 @@
 package io.github.vovten.eventflow.transport.incoming;
 
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.transport.InTransport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
@@ -233,8 +234,13 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
             EventSerializer serializer = serializerFactory.getByData(data);
             Event event = serializer.deserialize(data, Event.class);
             eventConsumer.accept(event);
-            log.debug("Event delivered from Kafka topic: {}, key: {}, event type: {}",
-                    record.topic(), record.key(), event.type().getSimpleName());
+            if (log.isDebugEnabled()) {
+                String payloadType = event instanceof Envelope<?> envelope
+                        ? envelope.payload().getClass().getSimpleName()
+                        : event.getClass().getSimpleName();
+                log.debug("Event delivered from Kafka topic: {}, key: {}, event type: {}, payload type: {}",
+                        record.topic(), record.key(), event.type().getSimpleName(), payloadType);
+            }
         } catch (Exception e) {
             log.error("Failed to deliver event from topic: {}, key: {}", record.topic(), record.key(), e);
         }
