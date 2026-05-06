@@ -44,6 +44,14 @@ public interface EventBuilder<T> {
     EventBuilder<T> withTraceId(String traceId);
 
     /**
+     * Set trace ID for correlation.
+     *
+     * @param traceId the trace identifier
+     * @return this builder
+     */
+    EventBuilder<T> withTraceId(UUID traceId);
+
+    /**
      * Set custom occurrence timestamp.
      *
      * @param occurredAt the event timestamp

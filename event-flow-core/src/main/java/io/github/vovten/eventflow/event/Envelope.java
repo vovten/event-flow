@@ -35,7 +35,7 @@ public final class Envelope<T> implements Event {
     private static final String CHANNELS_KEY = "channels";
 
     private final UUID eventId;
-    private final String traceId;
+    private final UUID traceId;
     private final Instant occurredAt;
     private final Map<String, String> metadata;
 
@@ -45,7 +45,7 @@ public final class Envelope<T> implements Event {
     @JsonCreator
     public Envelope(
             @JsonProperty("eventId") UUID eventId,
-            @JsonProperty("traceId") String traceId,
+            @JsonProperty("traceId") UUID traceId,
             @JsonProperty("occurredAt") Instant occurredAt,
             @JsonProperty("payload") T payload,
             @JsonProperty("metadata") Map<String, String> metadata) {
@@ -75,6 +75,25 @@ public final class Envelope<T> implements Event {
     }
 
     /**
+     * Create envelope with auto-generated eventId, specified traceId (as String), and current timestamp.
+     * Channels are resolved from payload's {@link DomainEvent} annotation, or default to internal.
+     *
+     * @param <T>     the payload type
+     * @param payload the domain event to wrap
+     * @param traceId the trace ID as String
+     * @return new envelope instance
+     */
+    public static <T> Envelope<T> of(T payload, String traceId) {
+        return new Envelope<>(
+                UUID.randomUUID(),
+                traceId != null ? UUID.nameUUIDFromBytes(traceId.getBytes()) : null,
+                Instant.now(),
+                payload,
+                Map.of(PAYLOAD_TYPE_KEY, payload.getClass().getName())
+        );
+    }
+
+    /**
      * Create envelope with auto-generated eventId, specified traceId, and current timestamp.
      * Channels are resolved from payload's {@link DomainEvent} annotation, or default to internal.
      *
@@ -83,7 +102,7 @@ public final class Envelope<T> implements Event {
      * @param traceId the trace ID
      * @return new envelope instance
      */
-    public static <T> Envelope<T> of(T payload, String traceId) {
+    public static <T> Envelope<T> of(T payload, UUID traceId) {
         return new Envelope<>(
                 UUID.randomUUID(),
                 traceId,
@@ -127,13 +146,42 @@ public final class Envelope<T> implements Event {
      *
      * @param <T>      the payload type
      * @param payload  the domain event to wrap
-     * @param traceId  the trace ID
+     * @param traceId  the trace ID as String
      * @param channels channel classes for routing
      * @return new envelope instance
      * @throws IllegalArgumentException if channels array is empty
      */
     @SafeVarargs
     public static <T> Envelope<T> of(T payload, String traceId, Class<? extends EventChannel>... channels) {
+        Objects.requireNonNull(channels, "channels must not be null");
+        if (channels.length == 0) {
+            throw new IllegalArgumentException("At least one channel must be specified");
+        }
+        Map<String, String> meta = new LinkedHashMap<>();
+        meta.put(PAYLOAD_TYPE_KEY, payload.getClass().getName());
+        meta.put(CHANNELS_KEY, toChannelNames(channels));
+        return new Envelope<>(
+                UUID.randomUUID(),
+                traceId != null ? UUID.nameUUIDFromBytes(traceId.getBytes()) : null,
+                Instant.now(),
+                payload,
+                meta
+        );
+    }
+
+    /**
+     * Create envelope with auto-generated eventId, specified traceId, and specified channels.
+     * Channels take priority over payload's {@link DomainEvent} annotation.
+     *
+     * @param <T>      the payload type
+     * @param payload  the domain event to wrap
+     * @param traceId  the trace ID
+     * @param channels channel classes for routing
+     * @return new envelope instance
+     * @throws IllegalArgumentException if channels array is empty
+     */
+    @SafeVarargs
+    public static <T> Envelope<T> of(T payload, UUID traceId, Class<? extends EventChannel>... channels) {
         Objects.requireNonNull(channels, "channels must not be null");
         if (channels.length == 0) {
             throw new IllegalArgumentException("At least one channel must be specified");
@@ -162,7 +210,7 @@ public final class Envelope<T> implements Event {
      * @return the trace ID for correlation
      */
     @JsonGetter("traceId")
-    public String traceId() {
+    public UUID traceId() {
         return traceId;
     }
 

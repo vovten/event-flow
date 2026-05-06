@@ -24,7 +24,7 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     private final EventPublisher publisher;
     private final T payload;
     private UUID eventId;
-    private String traceId;
+    private UUID traceId;
     private Instant occurredAt;
     private final Map<String, String> metadata;
     private Class<? extends EventChannel>[] channels;
@@ -52,6 +52,12 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
 
     @Override
     public EventBuilder<T> withTraceId(String traceId) {
+        this.traceId = traceId != null ? UUID.nameUUIDFromBytes(traceId.getBytes()) : null;
+        return this;
+    }
+
+    @Override
+    public EventBuilder<T> withTraceId(UUID traceId) {
         this.traceId = traceId;
         return this;
     }
