@@ -11,7 +11,8 @@ import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -81,7 +82,6 @@ public class PersistenceConfiguration {
      * Creates JDBC event repository.
      */
     @Bean
-    @ConditionalOnBean(DataSource.class)
     @ConditionalOnMissingBean(EventRepository.class)
     public EventRepository eventRepository(DataSource dataSource, EventFlowProperties properties) {
         EventFlowProperties.JdbcConfig jdbc = properties.getPublisher().getPersistence().getJdbc();
@@ -106,21 +106,21 @@ public class PersistenceConfiguration {
     }
 
     /**
-     * Creates persistent event publisher wrapping the base publisher.
-     * Uses same bean name "eventPublisher" to replace the base publisher.
+     * Wraps the base EventPublisher with PersistentEventPublisher using BeanPostProcessor.
+     * This approach ensures the base publisher is created first, then wrapped.
      */
     @Bean
-    @ConditionalOnBean(DataSource.class)
-    @ConditionalOnMissingBean(EventPublisher.class)
-    public EventPublisher persistentEventPublisher(
-            @Qualifier("eventPublisher") EventPublisher basePublisher,
-            EventRepository repository,
-            EventSerializer serializer) {
-
-        log.info("Wrapping EventPublisher with PersistentEventPublisher for outbox pattern");
-        log.info("  - Repository: {}", repository.getClass().getSimpleName());
-        log.info("  - Serializer: {}", serializer.getClass().getSimpleName());
-
-        return new PersistentEventPublisher(basePublisher, repository, serializer);
+    @ConditionalOnBean(EventPublisher.class)
+    public BeanPostProcessor persistentPublisherWrapper(EventRepository repository, EventSerializer serializer) {
+        return new BeanPostProcessor() {
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+                if ("eventPublisher".equals(beanName) && bean instanceof EventPublisher) {
+                    log.info("Wrapping EventPublisher '{}' with PersistentEventPublisher", bean.getClass().getSimpleName());
+                    return new PersistentEventPublisher((EventPublisher) bean, repository, serializer);
+                }
+                return bean;
+            }
+        };
     }
 }

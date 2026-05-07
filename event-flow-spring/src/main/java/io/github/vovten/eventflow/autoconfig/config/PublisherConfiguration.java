@@ -21,6 +21,7 @@ import static java.util.stream.Collectors.toMap;
 
 /**
  * Auto-configuration for event publisher.
+ * Creates the base event publisher that will be wrapped by PersistenceConfiguration if persistence is enabled.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
@@ -42,7 +43,8 @@ public class PublisherConfiguration {
     }
 
     /**
-     * Creates event publisher with all configured channels.
+     * Creates base event publisher with all configured channels.
+     * This bean name "eventPublisher" will be used directly or wrapped by persistence.
      *
      * @param eventChannels list of event channels to configure
      * @return configured event publisher
