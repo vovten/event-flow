@@ -14,8 +14,9 @@ public class EventRecord {
 
     private final UUID id;
     private final UUID processId;
-    private final String payload; // JSON
+    private final String payload; // JSON - full event (Envelope or Event)
     private final Instant createdAt;
+    private boolean retry;
     private String errorMessage;
     private EventStatus status = EventStatus.PENDING;
 
@@ -46,6 +47,15 @@ public class EventRecord {
         return createdAt;
     }
 
+    public boolean retry() {
+        return retry;
+    }
+
+    public EventRecord retry(boolean retry) {
+        this.retry = retry;
+        return this;
+    }
+
     public String errorMessage() {
         return errorMessage;
     }
@@ -70,6 +80,7 @@ public class EventRecord {
                 "id=" + id +
                 ", processId=" + processId +
                 ", status=" + status +
+                ", retry=" + retry +
                 ", createdAt=" + createdAt +
                 '}';
     }

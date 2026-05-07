@@ -18,10 +18,12 @@ import java.util.concurrent.CompletableFuture;
  * <p>
  * Implements the transactional outbox pattern:
  * <ol>
- *   <li>Serialize and save event to outbox table with PENDING status</li>
+ *   <li>Serialize full event (Envelope or raw Event) to JSON and save with PENDING status</li>
  *   <li>Publish event to destination</li>
  *   <li>Update status to PUBLISHED or FAILED</li>
  * </ol>
+ * <p>
+ * Events can be retried later by setting {@code retry = true} in the database.
  *
  * @author Vladimir Aleshkov
  * @since 1.1.0
@@ -50,21 +52,22 @@ public class PersistentEventPublisher implements EventPublisher {
         if (payload instanceof Envelope) {
             @SuppressWarnings("unchecked")
             Envelope<T> envelope = (Envelope<T>) payload;
-            return doPublish(envelope.payload(), envelope);
+            return doPublish(envelope, envelope);
         }
         return doPublish(payload, null);
     }
 
     private <T> CompletableFuture<SendResults> doPublish(T event, Envelope<?> envelope) {
-        // Extract event ID, processId, and serialize
+        // Extract event ID, processId, and serialize the full event (Envelope or raw Event)
         UUID eventId;
         UUID processId;
         Event eventToSerialize;
         
         if (envelope != null) {
+            // If we have an envelope, serialize the entire Envelope
             eventId = envelope.eventId();
             processId = envelope.processId();
-            eventToSerialize = (Event) envelope.payload();
+            eventToSerialize = (Event) envelope;
         } else if (event instanceof Event) {
             eventToSerialize = (Event) event;
             if (eventToSerialize instanceof TraceableEvent) {
@@ -81,7 +84,7 @@ public class PersistentEventPublisher implements EventPublisher {
             eventToSerialize = null;
         }
 
-        // Serialize to JSON
+        // Serialize to JSON - serialize the full event (Envelope or Event)
         String payloadJson;
         if (eventToSerialize != null) {
             byte[] serialized = serializer.serialize(eventToSerialize);
