@@ -74,7 +74,7 @@ class PersistentEventPublisherTest {
         publisher.publish(event).join();
 
         ArgumentCaptor<UUID> idCaptor = ArgumentCaptor.forClass(UUID.class);
-        verify(repository).updateStatus(idCaptor.capture(), eq(EventStatus.PUBLISHED), any(Instant.class));
+        verify(repository).updateStatus(idCaptor.capture(), eq(EventStatus.PUBLISHED));
         assertNotNull(idCaptor.getValue());
     }
 
@@ -105,7 +105,6 @@ class PersistentEventPublisherTest {
         ArgumentCaptor<EventRecord> recordCaptor = ArgumentCaptor.forClass(EventRecord.class);
         verify(repository).save(recordCaptor.capture());
         
-        // The saved event ID should match the envelope's event ID
         assertEquals(envelope.eventId(), recordCaptor.getValue().id());
     }
 

@@ -1,6 +1,5 @@
 package io.github.vovten.eventflow.publisher.persistence;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,11 +25,10 @@ public interface EventRepository {
     /**
      * Update the status of an event.
      *
-     * @param id          event ID
-     * @param status      new status (PUBLISHED or FAILED)
-     * @param publishedAt timestamp of successful publication (null for FAILED)
+     * @param id     event ID
+     * @param status new status (PUBLISHED or FAILED)
      */
-    void updateStatus(UUID id, EventStatus status, Instant publishedAt);
+    void updateStatus(UUID id, EventStatus status);
 
     /**
      * Update the status of an event with error message.
@@ -39,9 +37,7 @@ public interface EventRepository {
      * @param status       new status (FAILED)
      * @param errorMessage error message if status is FAILED
      */
-    default void updateStatus(UUID id, EventStatus status, String errorMessage) {
-        updateStatus(id, status, (Instant) null);
-    }
+    void updateStatus(UUID id, EventStatus status, String errorMessage);
 
     /**
      * Find an event by ID.

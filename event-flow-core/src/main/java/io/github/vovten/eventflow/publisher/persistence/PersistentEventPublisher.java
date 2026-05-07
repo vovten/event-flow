@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -104,7 +103,7 @@ public class PersistentEventPublisher implements EventPublisher {
                         repository.updateStatus(eventId, EventStatus.FAILED, error.getMessage());
                     } else {
                         log.debug("Event {} published successfully", eventId);
-                        repository.updateStatus(eventId, EventStatus.PUBLISHED, Instant.now());
+                        repository.updateStatus(eventId, EventStatus.PUBLISHED);
                     }
                 });
     }

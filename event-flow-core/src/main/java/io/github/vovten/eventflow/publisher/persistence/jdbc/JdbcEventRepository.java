@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.publisher.persistence.jdbc;
 
 import io.github.vovten.eventflow.publisher.persistence.EventRecord;
 import io.github.vovten.eventflow.publisher.persistence.EventStatus;
+import io.github.vovten.eventflow.publisher.persistence.EventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * JDBC implementation of {@link io.github.vovten.eventflow.publisher.persistence.EventRepository}
+ * JDBC implementation of {@link EventRepository}
  * using a simplified schema with a single JSON payload column.
  * <p>
  * Table schema:
@@ -25,13 +26,11 @@ import java.util.UUID;
  *     payload     JSONB NOT NULL,
  *     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
  *     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
- *     published_at TIMESTAMP,
- *     error_message TEXT,
- *     CONSTRAINT chk_status CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED'))
+ *     error_message TEXT
  * );
  * }</pre>
  */
-public class JdbcEventRepository implements io.github.vovten.eventflow.publisher.persistence.EventRepository {
+public class JdbcEventRepository implements EventRepository {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcEventRepository.class);
 
@@ -43,23 +42,10 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
     private final String selectByIdSql;
     private final boolean createTableIfNotExists;
 
-    /**
-     * Create a new JdbcEventRepository.
-     *
-     * @param dataSource the JDBC DataSource
-     * @param tableName  the outbox table name
-     */
     public JdbcEventRepository(DataSource dataSource, String tableName) {
         this(dataSource, tableName, true);
     }
 
-    /**
-     * Create a new JdbcEventRepository.
-     *
-     * @param dataSource          the JDBC DataSource
-     * @param tableName           the outbox table name
-     * @param createTableIfNotExists create table if it doesn't exist
-     */
     public JdbcEventRepository(DataSource dataSource, String tableName, boolean createTableIfNotExists) {
         this.dataSource = dataSource;
         this.tableName = tableName;
@@ -68,11 +54,11 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
         this.insertSql = String.format(
                 "INSERT INTO %s (id, process_id, payload, status, created_at) VALUES (?, ?, ?::jsonb, ?, ?)", tableName);
         this.updateStatusSql = String.format(
-                "UPDATE %s SET status = ?, published_at = ?, error_message = ? WHERE id = ?", tableName);
+                "UPDATE %s SET status = ?, error_message = ? WHERE id = ?", tableName);
         this.selectPendingSql = String.format(
-                "SELECT id, process_id, payload, status, created_at, published_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", tableName);
+                "SELECT id, process_id, payload, status, created_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", tableName);
         this.selectByIdSql = String.format(
-                "SELECT id, process_id, payload, status, created_at, published_at, error_message FROM %s WHERE id = ?", tableName);
+                "SELECT id, process_id, payload, status, created_at, error_message FROM %s WHERE id = ?", tableName);
 
         createTableIfNotExists();
     }
@@ -98,38 +84,20 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
     }
 
     @Override
-    public void updateStatus(UUID id, EventStatus status, Instant publishedAt) {
+    public void updateStatus(UUID id, EventStatus status) {
+        updateStatus(id, status, null);
+    }
+
+    @Override
+    public void updateStatus(UUID id, EventStatus status, String errorMessage) {
         log.debug("Updating event status: id={}, status={}", id, status);
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(updateStatusSql)) {
 
             stmt.setString(1, status.name());
-            stmt.setTimestamp(2, publishedAt != null ? Timestamp.from(publishedAt) : null);
-            stmt.setString(3, null);
-            stmt.setObject(4, id);
-
-            int updated = stmt.executeUpdate();
-            if (updated == 0) {
-                log.warn("No event record found to update: id={}", id);
-            }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to update event status: " + id, e);
-        }
-    }
-
-    @Override
-    public void updateStatus(UUID id, EventStatus status, String errorMessage) {
-        log.debug("Updating event status with error: id={}, status={}", id, status);
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(updateStatusSql)) {
-
-            stmt.setString(1, status.name());
-            stmt.setTimestamp(2, null);
-            stmt.setString(3, errorMessage);
-            stmt.setObject(4, id);
+            stmt.setString(2, errorMessage);
+            stmt.setObject(3, id);
 
             int updated = stmt.executeUpdate();
             if (updated == 0) {
@@ -194,7 +162,6 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
                     payload     JSONB NOT NULL,
                     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
                     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
-                    published_at TIMESTAMP,
                     error_message TEXT,
                     CONSTRAINT chk_status CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED'))
                 )
@@ -221,13 +188,10 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
         String payload = rs.getString("payload");
         EventStatus status = EventStatus.valueOf(rs.getString("status"));
         Instant createdAt = rs.getTimestamp("created_at").toInstant();
-        Timestamp publishedAtTs = rs.getTimestamp("published_at");
-        Instant publishedAt = publishedAtTs != null ? publishedAtTs.toInstant() : null;
         String errorMessage = rs.getString("error_message");
 
         return new EventRecord(id, processId, payload, createdAt)
                 .status(status)
-                .publishedAt(publishedAt)
                 .errorMessage(errorMessage);
     }
 }

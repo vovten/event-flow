@@ -16,7 +16,6 @@ public class EventRecord {
     private final UUID processId;
     private final String payload; // JSON
     private final Instant createdAt;
-    private Instant publishedAt;
     private String errorMessage;
     private EventStatus status = EventStatus.PENDING;
 
@@ -47,10 +46,6 @@ public class EventRecord {
         return createdAt;
     }
 
-    public Instant publishedAt() {
-        return publishedAt;
-    }
-
     public String errorMessage() {
         return errorMessage;
     }
@@ -61,11 +56,6 @@ public class EventRecord {
 
     public EventRecord status(EventStatus status) {
         this.status = status;
-        return this;
-    }
-
-    public EventRecord publishedAt(Instant publishedAt) {
-        this.publishedAt = publishedAt;
         return this;
     }
 
@@ -81,7 +71,6 @@ public class EventRecord {
                 ", processId=" + processId +
                 ", status=" + status +
                 ", createdAt=" + createdAt +
-                ", publishedAt=" + publishedAt +
                 '}';
     }
 }
