@@ -5,7 +5,7 @@ import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventFlowTestApplication;
 import io.github.vovten.eventflow.EventListener;
 import io.github.vovten.eventflow.EventSubscriber;
-import io.github.vovten.eventflow.test.TestEvent;
+import io.github.vovten.eventflow.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +33,7 @@ class EventHandlerRegistryIntegrationTest {
     void shouldGetInterfaceBasedSubscribers() {
         SpringEventSubscriberRegistry registry = new SpringEventSubscriberRegistry(applicationContext);
         registry.register(new InterfaceBasedSubscriber());
-        TestEvent event = TestEvent.create("Interface subscriber test");
+        TestEvent event = new TestEvent("Interface subscriber test");
         var handlers = registry.getHandlers(event);
         assertFalse(handlers.isEmpty());
         assertEquals(1, handlers.size());
@@ -46,7 +46,7 @@ class EventHandlerRegistryIntegrationTest {
                 applicationContext, "io.github.vovten.eventflow.test");
         AnnotationBasedHandler handler = new AnnotationBasedHandler();
         registry.register(handler);
-        TestEvent event = TestEvent.create("Annotation handler test");
+        TestEvent event = new TestEvent("Annotation handler test");
         var handlers = registry.getHandlers(event);
         // Note: May include other handlers from the scanned package
         assertFalse(handlers.isEmpty());
@@ -67,7 +67,7 @@ class EventHandlerRegistryIntegrationTest {
         CompositeEventHandlerRegistry compositeRegistry = new CompositeEventHandlerRegistry(
                 new java.util.ArrayList<>(List.of(interfaceRegistry, annotationRegistry)));
 
-        TestEvent event = TestEvent.create("Composite subscriber test");
+        TestEvent event = new TestEvent("Composite subscriber test");
         var handlers = compositeRegistry.getHandlers(event);
         assertEquals(2, handlers.size());
     }

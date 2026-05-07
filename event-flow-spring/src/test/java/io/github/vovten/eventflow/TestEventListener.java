@@ -1,9 +1,6 @@
 package io.github.vovten.eventflow;
 
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.test.CompositeTestEvent;
-import io.github.vovten.eventflow.test.ExternalTestEvent;
-import io.github.vovten.eventflow.test.TestEvent;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

@@ -4,13 +4,14 @@ import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.transport.SendResults;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Builder for constructing {@link Envelope} instances with optional technical metadata.
  * <p>
- * Allows fluent configuration of eventId, traceId, occurredAt, custom metadata,
+ * Allows fluent configuration of eventId, processId, occurredAt, custom metadata,
  * and target channels before publishing a domain event.
  *
  * @param <T> the type of the payload being built
@@ -20,36 +21,12 @@ import java.util.concurrent.CompletableFuture;
 public interface EventBuilder<T> {
 
     /**
-     * Set custom event ID.
+     * Set process ID for correlation (e.g., saga ID).
      *
-     * @param eventId the unique event identifier
+     * @param processId the process identifier
      * @return this builder
      */
-    EventBuilder<T> withEventId(UUID eventId);
-
-    /**
-     * Set custom event ID from string.
-     *
-     * @param eventId the unique event identifier as string
-     * @return this builder
-     */
-    EventBuilder<T> withEventId(String eventId);
-
-    /**
-     * Set trace ID for correlation.
-     *
-     * @param traceId the trace identifier
-     * @return this builder
-     */
-    EventBuilder<T> withTraceId(String traceId);
-
-    /**
-     * Set trace ID for correlation.
-     *
-     * @param traceId the trace identifier
-     * @return this builder
-     */
-    EventBuilder<T> withTraceId(UUID traceId);
+    EventBuilder<T> withProcessId(UUID processId);
 
     /**
      * Set custom occurrence timestamp.
@@ -74,12 +51,12 @@ public interface EventBuilder<T> {
      * @param metadata the metadata map to merge
      * @return this builder
      */
-    EventBuilder<T> withMetadata(java.util.Map<String, String> metadata);
+    EventBuilder<T> withMetadata(Map<String, String> metadata);
 
     /**
      * Set target event channels for routing.
      * <p>
-     * Channels specified here take priority over any {@link DomainEvent} annotation
+     * Channels specified here take priority over any {@link io.github.vovten.eventflow.event.annotation.Event} annotation
      * on the payload class. If channels are set via this method, the
      * annotation's channel configuration is ignored.
      *

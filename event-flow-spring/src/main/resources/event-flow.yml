@@ -1,7 +1,7 @@
 # =============================================================================
-# Event Flow Default Configuration
+# Event Flow Configuration
 # =============================================================================
-# This file contains default settings for Event Flow auto-configuration.
+# This file contains the default settings for Event Flow auto-configuration.
 # Copy and modify these properties in your application.yml/application.properties
 # to customize the behavior.
 #
@@ -13,7 +13,6 @@
 
 event-flow:
   # Enable or disable all Event Flow auto-configuration
-  # Set to true to enable auto-configuration (disabled by default)
   enabled: false
 
   # ---------------------------------------------------------------------------
@@ -23,7 +22,7 @@ event-flow:
     # Enable or disable publisher auto-configuration
     enabled: false
 
-    # Enable transactional publishing (defer until after transaction commit)
+    # Enable or disable transactional publishing (defer until after transaction commit)
     # When true, events are published only after the current transaction commits
     transactional: true
 
@@ -40,25 +39,26 @@ event-flow:
 
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
-    # Transport name identifies the type (e.g., "local-queue", "kafka")
-    # Note: No default channel is configured. You must explicitly define at least one channel.
+    # Transport name identifies the type (e.g., "local-queue", "kafka", "broadcast-kafka")
+    # Channel types: internal (InternalEventChannel), external (ExternalEventChannel), broadcast (BroadcastEventChannel)
+    # You can add custom channels with any name (they will use GenericEventChannel)
+    # You can also implement custom OutTransportFactory to add your own transport types
     channels:
-      # Example: Internal channel with local-queue transport
-      # - name: internal
-      #   transports:
-      #     - name: local-queue
-      #       capacity: 1000
-
-      # Example: External channel with Kafka transport
-      # - name: external
-      #   transports:
-      #     - name: kafka
-      #       topic: events
-      #       servers: localhost:9092
-      #       # Serialization format (default: json)
-      #       # - json: UTF-8 encoded JSON, readable in Kafka UI tools
-      #       # - msgpack: Compact binary format for better performance
-      #       serialization: json
+      - name: internal
+        transports:
+          - name: local-queue
+            capacity: 1000
+      - name: external
+        transports:
+          - name: kafka
+            servers: localhost:9092
+            topics: events
+            serialization: json
+      - name: broadcast
+        transports:
+          - name: broadcast-kafka
+            servers: localhost:9092
+            topics: events
 
   # ---------------------------------------------------------------------------
   # Event Dispatcher Configuration
@@ -69,14 +69,12 @@ event-flow:
 
     # Package(s) to scan for @EventListener annotated beans
     # Multiple packages can be specified as comma-separated values
-    # Example: "com.example.listener,com.example.handler"
-    listener-packages: ""
+    listener-packages: "io.github.vovten.eventflow"
 
     # Deserialization security configuration
     deserialization:
       # List of allowed event packages for secure deserialization
       # Events from these packages can be safely deserialized
-      # Default: io.github.vovten.eventflow
       allowed-event-packages:
         - io.github.vovten.eventflow
 
@@ -105,17 +103,13 @@ event-flow:
       concurrency-limit: 0
 
     # Incoming event transports to listen to
-    # Note: No default transport is configured. You must explicitly define at least one transport.
     transports:
-      # Example: Local-queue transport
-      # - name: local-queue
-      #   capacity: 1000
-
-      # Example: Kafka transport
-      # - name: kafka
-      #   topic: events
-      #   servers: localhost:9092
-      #   consumerGroup: event-flow-group
+      - name: local-queue
+        capacity: 1000
+      - name: kafka
+        servers: localhost:9092
+        topics: events
+        consumerGroup: event-flow-group
 
     # Idempotent event processing configuration
     # Prevents duplicate event processing using a Caffeine cache
@@ -128,164 +122,3 @@ event-flow:
       max-size: 10000
       # Log warnings when duplicate events are received
       warn-on-duplicate: true
-
-# =============================================================================
-# Configuration Examples
-# =============================================================================
-#
-# Example 1: Minimal configuration with local-queue
-# ---------------------------------------------------------------------------
-# event-flow:
-#   enabled: true
-#   dispatcher.listener-packages: com.example
-#   publisher:
-#     enabled: true
-#     channels:
-#       - name: internal
-#         transports:
-#           - name: local-queue
-#             capacity: 1000
-#   dispatcher:
-#     enabled: true
-#     transports:
-#       - name: local-queue
-#         capacity: 1000
-#
-# Example 2: Production configuration with Kafka
-# ---------------------------------------------------------------------------
-# event-flow:
-#   enabled: true
-#   dispatcher.listener-packages: com.example.listener
-#   publisher:
-#     enabled: true
-#     transactional: true
-#     retry:
-#       enabled: true
-#       max-attempts: 3
-#       initial-delay: 200ms
-#       multiplier: 2.0
-#     channels:
-#       - name: internal
-#         transports:
-#           - name: local-queue
-#             capacity: 1000
-#       - name: external
-#         transports:
-#           - name: kafka
-#             topic: events
-#             servers: kafka:9092
-#             serialization: json  # or msgpack for binary format
-#   dispatcher:
-#     enabled: true
-#     thread-pool:
-#       core-size: 8
-#       max-size: 32
-#       queue-capacity: 500
-#       # Backpressure for virtual threads: max 50 concurrent handlers
-#       concurrency-limit: 50
-#     transports:
-#       - name: local-queue
-#         capacity: 1000
-#       - name: kafka
-#         topic: events
-#         servers: kafka:9092
-#         consumerGroup: my-service-group
-#
-# Example 3: Development configuration (local-queue only)
-# ---------------------------------------------------------------------------
-# event-flow:
-#   enabled: true
-#   dispatcher.listener-packages: com.example
-#   publisher:
-#     enabled: true
-#     transactional: false
-#     channels:
-#       - name: internal
-#         transports:
-#           - name: local-queue
-#             capacity: 500
-#   dispatcher:
-#     enabled: true
-#     thread-pool:
-#       core-size: 2
-#       max-size: 4
-#     transports:
-#       - name: local-queue
-#         capacity: 500
-#
-# Example 4: Configuration with idempotent event processing
-# ---------------------------------------------------------------------------
-# event-flow:
-#   enabled: true
-#   dispatcher.listener-packages: com.example
-#   publisher:
-#     enabled: true
-#     channels:
-#       - name: internal
-#         transports:
-#           - name: local-queue
-#             capacity: 1000
-#   dispatcher:
-#     enabled: true
-#     idempotent:
-#       enabled: true
-#       ttl: 30m
-#       max-size: 50000
-#       warn-on-duplicate: true
-#     transports:
-#       - name: local-queue
-#         capacity: 1000
-#
-# Example 5: Disable auto-configuration and provide custom beans
-# ---------------------------------------------------------------------------
-# event-flow:
-#   enabled: false
-#
-# Then create your own @Configuration class with custom beans:
-# @Configuration
-# public class CustomEventFlowConfig {
-#     @Bean
-#     public EventPublisher eventPublisher() { ... }
-#
-#     @Bean
-#     public EventDispatcher eventDispatcher() { ... }
-# }
-#
-# Example 6: Mixed serialization formats (JSON and MessagePack)
-# ---------------------------------------------------------------------------
-# event-flow:
-#   enabled: true
-#   dispatcher.listener-packages: com.example
-#   publisher:
-#     enabled: true
-#     channels:
-#       - name: internal
-#         transports:
-#           - name: local-queue
-#             capacity: 1000
-#       - name: external-json
-#         transports:
-#           - name: kafka
-#             topic: events-json
-#             servers: kafka:9092
-#             serialization: json  # Readable in Kafka UI
-#       - name: external-binary
-#         transports:
-#           - name: kafka
-#             topic: events-binary
-#             servers: kafka:9092
-#             serialization: msgpack  # Compact binary format
-#   dispatcher:
-#     enabled: true
-#     transports:
-#       - name: kafka
-#         topic: events-json
-#         servers: kafka:9092
-#         consumerGroup: group-json
-#       - name: kafka
-#         topic: events-binary
-#         servers: kafka:9092
-#         consumerGroup: group-binary
-#     # Note: Dispatcher auto-detects serialization format from message
-#
-# =============================================================================

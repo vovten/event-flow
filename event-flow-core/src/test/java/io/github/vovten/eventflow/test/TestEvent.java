@@ -19,7 +19,9 @@ public class TestEvent extends AbstractTraceableEvent {
     private String message;
 
     public TestEvent() {
-        this(UUID.randomUUID().toString(), "Test event message");
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.message = "Test event message";
     }
 
     public TestEvent(String id, String message) {
@@ -28,14 +30,14 @@ public class TestEvent extends AbstractTraceableEvent {
         this.message = message;
     }
 
-    public TestEvent(UUID uid, UUID traceId, String id, String message, Instant timestamp) {
-        super(uid, traceId, timestamp);
+    public TestEvent(UUID uid, UUID processId, String id, String message, Instant timestamp) {
+        super(uid, processId, timestamp);
         this.id = id;
         this.message = message;
     }
 
     public TestEvent(String id, String message, Instant timestamp) {
-        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
+        super(null, timestamp);
         this.id = id;
         this.message = message;
     }

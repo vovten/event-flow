@@ -19,7 +19,9 @@ public class ReplicasTestEvent extends AbstractTraceableEvent {
     private String data;
 
     public ReplicasTestEvent() {
-        this(UUID.randomUUID().toString(), "Replicas test event data");
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.data = "Replicas test event data";
     }
 
     public ReplicasTestEvent(String id, String data) {
@@ -28,14 +30,14 @@ public class ReplicasTestEvent extends AbstractTraceableEvent {
         this.data = data;
     }
 
-    public ReplicasTestEvent(UUID uid, UUID traceId, String id, String data, Instant timestamp) {
-        super(uid, traceId, timestamp);
+    public ReplicasTestEvent(UUID uid, UUID processId, String id, String data, Instant timestamp) {
+        super(uid, processId, timestamp);
         this.id = id;
         this.data = data;
     }
 
     public ReplicasTestEvent(String id, String data, Instant timestamp) {
-        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
+        super(null, timestamp);
         this.id = id;
         this.data = data;
     }

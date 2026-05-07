@@ -21,9 +21,9 @@ public interface TraceableEvent extends Event {
     UUID eventId();
 
     /**
-     * @return correlation ID that groups related events together (e.g., business process ID)
+     * @return process ID that groups related events together (e.g., business process/saga ID)
      */
-    UUID traceId();
+    UUID processId();
 
     /**
      * Returns the timestamp when the event occurred.

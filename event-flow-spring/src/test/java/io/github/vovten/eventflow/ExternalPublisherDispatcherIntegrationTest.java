@@ -9,7 +9,6 @@ import io.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import io.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import io.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
-import io.github.vovten.eventflow.test.ExternalTestEvent;
 import io.github.vovten.eventflow.transport.incoming.KafkaInTransport;
 import io.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
 import io.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;

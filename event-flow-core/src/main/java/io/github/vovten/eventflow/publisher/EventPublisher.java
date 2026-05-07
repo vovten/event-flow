@@ -37,7 +37,7 @@ public interface EventPublisher {
      * The payload is automatically wrapped in an Envelope with:
      * <ul>
      *   <li>eventId - randomly generated UUID</li>
-     *   <li>traceId - null (use {@link #prepare(Object)} to set)</li>
+     *   <li>processId - null (use {@link #prepare(Object)} to set)</li>
      *   <li>occurredAt - current timestamp</li>
      *   <li>metadata - with payloadType key</li>
      * </ul>
