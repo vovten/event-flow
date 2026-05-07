@@ -63,7 +63,6 @@ class UnifiedEventDispatcherEnvelopeTest {
     @Test
     @DisplayName("Should dispatch Envelope when payload does not implement Event")
     void shouldDispatchEnvelopeWhenPayloadNotEvent() throws InterruptedException {
-        UUID traceId = null;
         NonEventPayload payload = new NonEventPayload("data-123");
         NonEventSubscriber subscriber = new NonEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {

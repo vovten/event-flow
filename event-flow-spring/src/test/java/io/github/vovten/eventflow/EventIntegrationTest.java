@@ -2,7 +2,6 @@ package io.github.vovten.eventflow;
 
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

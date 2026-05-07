@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.event;
 import io.github.vovten.eventflow.channel.ExternalEventChannel;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
+import io.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.transport.OutTransport;
 import io.github.vovten.eventflow.transport.SendResult;
@@ -31,7 +32,7 @@ class DefaultEventBuilderTest {
         OutTransport transport = mock(OutTransport.class);
         when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         TestPayload payload = new TestPayload("test-123");
         new DefaultEventBuilder<>(publisher, payload).publish().join();
@@ -48,7 +49,7 @@ class DefaultEventBuilderTest {
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         UUID customId = UUID.randomUUID();
         TestPayload payload = new TestPayload("test");
@@ -71,7 +72,7 @@ class DefaultEventBuilderTest {
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         TestPayload payload = new TestPayload("test");
@@ -90,11 +91,11 @@ class DefaultEventBuilderTest {
         OutTransport transport = mock(OutTransport.class);
         AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
         when(transport.send(any())).thenAnswer(invocation -> {
-            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
+            capturedEnvelope.set(invocation.getArgument(0));
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         Instant customTime = Instant.parse("2025-01-15T10:30:00Z");
         TestPayload payload = new TestPayload("test");
@@ -117,7 +118,7 @@ class DefaultEventBuilderTest {
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
@@ -139,7 +140,7 @@ class DefaultEventBuilderTest {
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         TestPayload payload = new TestPayload("test");
         Map<String, String> metadata = Map.of("source", "api", "version", "1.0");
@@ -164,7 +165,7 @@ class DefaultEventBuilderTest {
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         UUID customId = UUID.randomUUID();
         UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
@@ -198,7 +199,7 @@ class DefaultEventBuilderTest {
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload).publish().join();
@@ -217,7 +218,7 @@ class DefaultEventBuilderTest {
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         UUID expectedId = UUID.randomUUID();
         TestPayload payload = new TestPayload("test");
@@ -241,7 +242,7 @@ class DefaultEventBuilderTest {
         });
         EventChannel internalChannel = new InternalEventChannel(transport);
         EventChannel externalChannel = new ExternalEventChannel(List.of(transport));
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(internalChannel, externalChannel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
 
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
@@ -264,7 +265,7 @@ class DefaultEventBuilderTest {
         });
         EventChannel internalChannel = new InternalEventChannel(transport);
         EventChannel externalChannel = new ExternalEventChannel(List.of(transport));
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(internalChannel, externalChannel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
 
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
@@ -281,7 +282,7 @@ class DefaultEventBuilderTest {
     void shouldThrowExceptionWhenWithChannelsCalledWithNull() {
         OutTransport transport = mock(OutTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestPayload payload = new TestPayload("test");
         assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
                 .withChannels((Class<? extends EventChannel>[]) null))
@@ -293,7 +294,7 @@ class DefaultEventBuilderTest {
     void shouldThrowExceptionWhenWithChannelsCalledWithEmptyArray() {
         OutTransport transport = mock(OutTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new io.github.vovten.eventflow.publisher.ChannelEventPublisher(List.of(channel));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestPayload payload = new TestPayload("test");
         assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
                 .withChannels(new Class[0]))

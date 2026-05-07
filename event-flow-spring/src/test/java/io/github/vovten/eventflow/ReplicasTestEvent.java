@@ -29,6 +29,7 @@ public class ReplicasTestEvent extends AbstractTraceableEvent {
         this.id = id;
         this.data = data;
     }
+
     public ReplicasTestEvent(String data) {
         super();
         this.id = UUID.randomUUID().toString();

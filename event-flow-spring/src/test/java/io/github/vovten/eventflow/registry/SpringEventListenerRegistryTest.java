@@ -1,8 +1,10 @@
 package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
+import io.github.vovten.eventflow.EventListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -134,8 +136,8 @@ class SpringEventListenerRegistryTest {
         EnvelopeWithAnnotationListener listener = new EnvelopeWithAnnotationListener();
         registry.register(listener);
 
-        io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> envelope =
-                io.github.vovten.eventflow.event.Envelope.of(new DomainOrderEvent("order-123"));
+        Envelope<DomainOrderEvent> envelope =
+                Envelope.of(new DomainOrderEvent("order-123"));
 
         List<EventHandler> handlers = registry.getHandlers(envelope);
         assertEquals(1, handlers.size());
@@ -161,17 +163,17 @@ class SpringEventListenerRegistryTest {
     }
 
     static class TestAnnotatedListener {
-        @io.github.vovten.eventflow.EventListener
+        @EventListener
         public void handleTestEvent(TestEvent event) {
         }
     }
 
     static class MultiMethodListener {
-        @io.github.vovten.eventflow.EventListener
+        @EventListener
         public void handleTestEvent(TestEvent event) {
         }
 
-        @io.github.vovten.eventflow.EventListener
+        @EventListener
         public void handleSpecificEvent(SpecificEvent event) {
         }
     }
@@ -182,7 +184,7 @@ class SpringEventListenerRegistryTest {
     }
 
     static class InvalidSignatureListener {
-        @io.github.vovten.eventflow.EventListener
+        @EventListener
         public void handleEvent(TestEvent event, String secondParam) {
         }
     }
@@ -207,17 +209,17 @@ class SpringEventListenerRegistryTest {
     }
 
     static class EnvelopeWithAnnotationListener {
-        io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> capturedEnvelope;
+        Envelope<DomainOrderEvent> capturedEnvelope;
 
-        @io.github.vovten.eventflow.EventListener(DomainOrderEvent.class)
-        public void handleDomainOrderEvent(io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> event) {
+        @EventListener(DomainOrderEvent.class)
+        public void handleDomainOrderEvent(Envelope<DomainOrderEvent> event) {
             this.capturedEnvelope = event;
         }
     }
 
     static class EnvelopeWithoutAnnotationListener {
-        @io.github.vovten.eventflow.EventListener
-        public void handleEnvelope(io.github.vovten.eventflow.event.Envelope<DomainOrderEvent> event) {
+        @EventListener
+        public void handleEnvelope(Envelope<DomainOrderEvent> event) {
         }
     }
 }

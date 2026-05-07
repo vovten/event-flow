@@ -24,6 +24,9 @@
 - **Multiple Transports** — LocalQueue (in-JVM) and Apache Kafka out of the box
 - **Annotation-Based** — Event handling via `@EventListener`
 - **Interface-Based** — Event handling via `EventSubscriber` interface
+- **POJO Events** — Support for plain Java objects without `Event` interface
+- **Envelope Support** — Technical metadata wrapper (eventId, processId, occurredAt)
+- **Envelope Handling** — Handle the entire envelope including metadata in handlers
 - **Idempotency** — Event deduplication based on UID
 - **Transactional Publishing** — Send events after transaction commit
 - **Retry Mechanism** — Exponential backoff with configurable parameters
@@ -318,7 +321,43 @@ public interface Event {
 }
 ```
 
-**TraceableEvent** — extends `Event` with tracing fields: `uid` (UUID), `traceId` (correlation), `occurredAt` (timestamp).
+**TraceableEvent** — extends `Event` with tracing fields: `uid` (UUID), `processId` (correlation), `occurredAt` (timestamp).
+
+### Envelope
+
+Wrapper for domain events that adds technical metadata. Automatically captures:
+- `eventId` (UUID) — unique event identifier
+- `processId` (UUID) — correlation ID (e.g., saga ID)
+- `occurredAt` (Instant) — event timestamp
+- `metadata` (Map) — custom key-value pairs
+- `payload` — the actual domain object
+
+The envelope implements `Event` interface, so it passes through existing transport infrastructure.
+
+**Creating Envelopes:**
+
+```java
+// Auto-generated metadata
+Envelope<OrderCreatedEvent> envelope = Envelope.of(new OrderCreatedEvent("123"));
+
+// With custom processId (correlation)
+UUID processId = UUID.fromString("...");
+Envelope<OrderCreatedEvent> envelope = Envelope.of(new OrderCreatedEvent("123"), processId);
+
+// With explicit channels
+Envelope<OrderCreatedEvent> envelope = Envelope.of(
+    new OrderCreatedEvent("123"),
+    List.of(ExternalEventChannel.class)
+);
+```
+
+**Channels from `@Event` Annotation:**
+POJO classes can use the `@Event` annotation to specify default channels:
+
+```java
+@Event(channels = ExternalEventChannel.class)
+public record OrderCreatedEvent(String orderId) {}
+```
 
 ### EventChannel
 
@@ -518,6 +557,58 @@ public class NotificationEventSubscriber implements EventSubscriber {
 
 // Register the handler
 handlerRegistry.register(new NotificationEventSubscriber());
+```
+
+### POJO Events (without Event interface)
+
+Plain Java objects can be used as events without implementing the `Event` interface. Wrap them in an `Envelope`:
+
+```java
+// Define a POJO (no interface needed)
+public record OrderPlacedEvent(String orderId, BigDecimal amount) {}
+
+// Publish as Envelope
+EventPublisher publisher = ...;
+publisher.publish(Envelope.of(new OrderPlacedEvent("order-1", new BigDecimal("99.99"))));
+```
+
+The `@Event` annotation can specify default channels for POJOs:
+
+```java
+@Event(channels = {InternalEventChannel.class, ExternalEventChannel.class})
+public record OrderPlacedEvent(String orderId, BigDecimal amount) {}
+```
+
+### Handling Envelope (entire wrapper with metadata)
+
+Handlers can receive the entire `Envelope` including metadata:
+
+```java
+public class OrderEventHandler {
+
+    @EventListener
+    public void handleOrder(Envelope<OrderPlacedEvent> envelope) {
+        // Access payload
+        OrderPlacedEvent event = envelope.payload();
+
+        // Access metadata
+        UUID eventId = envelope.eventId();
+        UUID processId = envelope.processId();
+        Instant occurredAt = envelope.occurredAt();
+        Map<String, String> metadata = envelope.metadata();
+
+        System.out.println("Processed: " + event.orderId());
+    }
+}
+```
+
+**Note:** When using `Envelope` as a handler parameter, you must specify the payload type in the annotation:
+
+```java
+@EventListener(OrderPlacedEvent.class)
+public void handleOrder(Envelope<OrderPlacedEvent> envelope) {
+    // Handle envelope
+}
 ```
 
 ### Kafka Transport Configuration

@@ -29,6 +29,7 @@ public class ExternalTestEvent extends AbstractTraceableEvent {
         this.id = id;
         this.payload = payload;
     }
+
     public ExternalTestEvent(String payload) {
         super();
         this.id = UUID.randomUUID().toString();
