@@ -23,7 +23,7 @@ import java.util.UUID;
  * CREATE TABLE schema_name.event_outbox (
  *     id          UUID PRIMARY KEY,
  *     process_id  UUID,
- *     payload     JSONB NOT NULL,  -- full serialized event (Envelope or Event)
+ *     event     JSONB NOT NULL,  -- full serialized event (Envelope or Event)
  *     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
  *     retry       BOOLEAN NOT NULL DEFAULT FALSE,
  *     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -62,15 +62,15 @@ public class JdbcEventRepository implements EventRepository {
         this.createTableIfNotExists = createTableIfNotExists;
 
         this.insertSql = String.format(
-                "INSERT INTO %s (id, process_id, payload, status, retry, created_at) VALUES (?, ?, ?::jsonb, ?, ?, ?)", qualifiedTableName);
+                "INSERT INTO %s (id, process_id, event, status, retry, created_at) VALUES (?, ?, ?::jsonb, ?, ?, ?)", qualifiedTableName);
         this.updateStatusSql = String.format(
                 "UPDATE %s SET status = ?, error_message = ? WHERE id = ?", qualifiedTableName);
         this.selectPendingSql = String.format(
-                "SELECT id, process_id, payload, status, retry, created_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", qualifiedTableName);
+                "SELECT id, process_id, event, status, retry, created_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", qualifiedTableName);
         this.selectForRetrySql = String.format(
-                "SELECT id, process_id, payload, status, retry, created_at, error_message FROM %s WHERE retry = TRUE AND status IN ('PENDING', 'FAILED') ORDER BY created_at FOR UPDATE SKIP LOCKED", qualifiedTableName);
+                "SELECT id, process_id, event, status, retry, created_at, error_message FROM %s WHERE retry = TRUE AND status IN ('PENDING', 'FAILED') ORDER BY created_at FOR UPDATE SKIP LOCKED", qualifiedTableName);
         this.selectByIdSql = String.format(
-                "SELECT id, process_id, payload, status, retry, created_at, error_message FROM %s WHERE id = ?", qualifiedTableName);
+                "SELECT id, process_id, event, status, retry, created_at, error_message FROM %s WHERE id = ?", qualifiedTableName);
 
         createTableIfNotExists();
     }
@@ -194,7 +194,7 @@ public class JdbcEventRepository implements EventRepository {
                 CREATE TABLE IF NOT EXISTS %s (
                     id          UUID PRIMARY KEY,
                     process_id  UUID,
-                    payload     JSONB NOT NULL,
+                    event     JSONB NOT NULL,
                     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
                     retry       BOOLEAN NOT NULL DEFAULT FALSE,
                     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -221,7 +221,7 @@ public class JdbcEventRepository implements EventRepository {
     private EventRecord mapRow(ResultSet rs) throws SQLException {
         UUID id = rs.getObject("id", UUID.class);
         UUID processId = rs.getObject("process_id", UUID.class);
-        String payload = rs.getString("payload");
+        String payload = rs.getString("event");
         EventStatus status = EventStatus.valueOf(rs.getString("status"));
         boolean retry = rs.getBoolean("retry");
         Instant createdAt = rs.getTimestamp("created_at").toInstant();
