@@ -13,24 +13,30 @@ import java.util.UUID;
 public class EventRecord {
 
     private final UUID id;
+    private final UUID processId;
     private final String payload; // JSON
     private final Instant createdAt;
     private Instant publishedAt;
     private String errorMessage;
     private EventStatus status = EventStatus.PENDING;
 
-    public EventRecord(UUID id, String payload, Instant createdAt) {
+    public EventRecord(UUID id, UUID processId, String payload, Instant createdAt) {
         this.id = id;
+        this.processId = processId;
         this.payload = payload;
         this.createdAt = createdAt;
     }
 
-    public static EventRecord create(UUID id, String payload) {
-        return new EventRecord(id, payload, Instant.now());
+    public static EventRecord create(UUID id, UUID processId, String payload) {
+        return new EventRecord(id, processId, payload, Instant.now());
     }
 
     public UUID id() {
         return id;
+    }
+
+    public UUID processId() {
+        return processId;
     }
 
     public String payload() {
@@ -72,6 +78,7 @@ public class EventRecord {
     public String toString() {
         return "EventRecord{" +
                 "id=" + id +
+                ", processId=" + processId +
                 ", status=" + status +
                 ", createdAt=" + createdAt +
                 ", publishedAt=" + publishedAt +

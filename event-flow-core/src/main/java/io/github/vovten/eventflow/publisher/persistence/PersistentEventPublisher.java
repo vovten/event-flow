@@ -57,22 +57,28 @@ public class PersistentEventPublisher implements EventPublisher {
     }
 
     private <T> CompletableFuture<SendResults> doPublish(T event, Envelope<?> envelope) {
-        // Extract event ID and serialize
+        // Extract event ID, processId, and serialize
         UUID eventId;
+        UUID processId;
         Event eventToSerialize;
         
         if (envelope != null) {
             eventId = envelope.eventId();
+            processId = envelope.processId();
             eventToSerialize = (Event) envelope.payload();
         } else if (event instanceof Event) {
             eventToSerialize = (Event) event;
             if (eventToSerialize instanceof TraceableEvent) {
-                eventId = ((TraceableEvent) eventToSerialize).eventId();
+                TraceableEvent te = (TraceableEvent) eventToSerialize;
+                eventId = te.eventId();
+                processId = te.processId();
             } else {
                 eventId = UUID.randomUUID();
+                processId = null;
             }
         } else {
             eventId = UUID.randomUUID();
+            processId = null;
             eventToSerialize = null;
         }
 
@@ -86,9 +92,9 @@ public class PersistentEventPublisher implements EventPublisher {
         }
 
         // Save to outbox with PENDING status
-        EventRecord record = EventRecord.create(eventId, payloadJson);
+        EventRecord record = EventRecord.create(eventId, processId, payloadJson);
         repository.save(record);
-        log.debug("Event {} saved to outbox with PENDING status", eventId);
+        log.debug("Event {} saved to outbox with PENDING status (processId={})", eventId, processId);
 
         // Publish to destination
         return delegate.publish(event)

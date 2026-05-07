@@ -21,6 +21,7 @@ import java.util.UUID;
  * <pre>{@code
  * CREATE TABLE event_outbox (
  *     id          UUID PRIMARY KEY,
+ *     process_id  UUID,
  *     payload     JSONB NOT NULL,
  *     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
  *     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -65,28 +66,29 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
         this.createTableIfNotExists = createTableIfNotExists;
 
         this.insertSql = String.format(
-                "INSERT INTO %s (id, payload, status, created_at) VALUES (?, ?::jsonb, ?, ?)", tableName);
+                "INSERT INTO %s (id, process_id, payload, status, created_at) VALUES (?, ?, ?::jsonb, ?, ?)", tableName);
         this.updateStatusSql = String.format(
                 "UPDATE %s SET status = ?, published_at = ?, error_message = ? WHERE id = ?", tableName);
         this.selectPendingSql = String.format(
-                "SELECT id, payload, status, created_at, published_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", tableName);
+                "SELECT id, process_id, payload, status, created_at, published_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", tableName);
         this.selectByIdSql = String.format(
-                "SELECT id, payload, status, created_at, published_at, error_message FROM %s WHERE id = ?", tableName);
+                "SELECT id, process_id, payload, status, created_at, published_at, error_message FROM %s WHERE id = ?", tableName);
 
         createTableIfNotExists();
     }
 
     @Override
     public void save(EventRecord record) {
-        log.debug("Saving event record: id={}", record.id());
+        log.debug("Saving event record: id={}, processId={}", record.id(), record.processId());
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(insertSql)) {
 
             stmt.setObject(1, record.id());
-            stmt.setString(2, record.payload());
-            stmt.setString(3, record.status().name());
-            stmt.setTimestamp(4, Timestamp.from(record.createdAt()));
+            stmt.setObject(2, record.processId());
+            stmt.setString(3, record.payload());
+            stmt.setString(4, record.status().name());
+            stmt.setTimestamp(5, Timestamp.from(record.createdAt()));
 
             stmt.executeUpdate();
 
@@ -188,6 +190,7 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
         String createTableSql = String.format("""
                 CREATE TABLE IF NOT EXISTS %s (
                     id          UUID PRIMARY KEY,
+                    process_id  UUID,
                     payload     JSONB NOT NULL,
                     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
                     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -214,6 +217,7 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
 
     private EventRecord mapRow(ResultSet rs) throws SQLException {
         UUID id = rs.getObject("id", UUID.class);
+        UUID processId = rs.getObject("process_id", UUID.class);
         String payload = rs.getString("payload");
         EventStatus status = EventStatus.valueOf(rs.getString("status"));
         Instant createdAt = rs.getTimestamp("created_at").toInstant();
@@ -221,7 +225,7 @@ public class JdbcEventRepository implements io.github.vovten.eventflow.publisher
         Instant publishedAt = publishedAtTs != null ? publishedAtTs.toInstant() : null;
         String errorMessage = rs.getString("error_message");
 
-        return new EventRecord(id, payload, createdAt)
+        return new EventRecord(id, processId, payload, createdAt)
                 .status(status)
                 .publishedAt(publishedAt)
                 .errorMessage(errorMessage);
