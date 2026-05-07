@@ -33,9 +33,10 @@ import javax.sql.DataSource;
  *     enabled: true
  *     jdbc:
  *       url: jdbc:postgresql://localhost:5432/events
+ *       schema: events
+ *       table-name: event_outbox
  *       username: user
  *       password: pass
- *       table-name: event_outbox
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -47,9 +48,6 @@ public class PersistenceConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(PersistenceConfiguration.class);
 
-    /**
-     * Create HikariCP DataSource from properties.
-     */
     @Bean
     @ConditionalOnMissingBean(name = "eventFlowDataSource")
     @ConditionalOnProperty(prefix = "event-flow.persistence.jdbc", name = "url")
@@ -62,7 +60,6 @@ public class PersistenceConfiguration {
         config.setPassword(jdbc.getPassword());
         config.setPoolName("event-flow-pool");
 
-        // Apply custom settings if provided
         if (jdbc.getMaximumPoolSize() != null) {
             config.setMaximumPoolSize(jdbc.getMaximumPoolSize());
         }
@@ -74,37 +71,28 @@ public class PersistenceConfiguration {
         return new HikariDataSource(config);
     }
 
-    /**
-     * Create JDBC event repository.
-     */
     @Bean
     @ConditionalOnBean(DataSource.class)
     @ConditionalOnMissingBean(EventRepository.class)
     public EventRepository eventRepository(DataSource dataSource, EventFlowProperties properties) {
-        String tableName = properties.getPersistence().getJdbc().getTableName();
+        EventFlowProperties.JdbcConfig jdbc = properties.getPersistence().getJdbc();
 
-        log.info("Creating JdbcEventRepository with table: {}", tableName);
+        log.info("Creating JdbcEventRepository with schema={}, table={}", jdbc.getSchema(), jdbc.getTableName());
 
         return JdbcEventRepositoryBuilder.builder()
                 .dataSource(dataSource)
-                .tableName(tableName)
+                .schema(jdbc.getSchema())
+                .tableName(jdbc.getTableName())
                 .createTableIfNotExists(true)
                 .build();
     }
 
-    /**
-     * Create event serializer for persistence.
-     */
     @Bean
     @ConditionalOnMissingBean(name = "persistenceEventSerializer")
     public EventSerializer persistenceEventSerializer() {
         return new JsonEventSerializer();
     }
 
-    /**
-     * Create persistent event publisher.
-     * Wraps the existing EventPublisher with persistence.
-     */
     @Bean
     @ConditionalOnBean(EventPublisher.class)
     @ConditionalOnMissingBean(name = "persistentEventPublisher")
