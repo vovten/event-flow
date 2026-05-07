@@ -33,8 +33,7 @@ import javax.sql.DataSource;
  *     enabled: true
  *     jdbc:
  *       url: jdbc:postgresql://localhost:5432/events
- *       schema: events
- *       table-name: event_outbox
+ *       table-name: events.event_outbox
  *       username: user
  *       password: pass
  * }</pre>
@@ -77,11 +76,10 @@ public class PersistenceConfiguration {
     public EventRepository eventRepository(DataSource dataSource, EventFlowProperties properties) {
         EventFlowProperties.JdbcConfig jdbc = properties.getPersistence().getJdbc();
 
-        log.info("Creating JdbcEventRepository with schema={}, table={}", jdbc.getSchema(), jdbc.getTableName());
+        log.info("Creating JdbcEventRepository with table={}", jdbc.getTableName());
 
         return JdbcEventRepositoryBuilder.builder()
                 .dataSource(dataSource)
-                .schema(jdbc.getSchema())
                 .tableName(jdbc.getTableName())
                 .createTableIfNotExists(true)
                 .build();

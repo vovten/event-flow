@@ -511,8 +511,8 @@ public class EventFlowProperties {
         private String url;
         private String username;
         private String password;
-        private String schema = "public";
-        private String tableName = "event_outbox";
+        
+        private String tableName = "public.event_outbox";
         private Integer maximumPoolSize;
         private Integer minimumIdle;
 
@@ -537,14 +537,6 @@ public class EventFlowProperties {
 
         public void setPassword(String password) {
             this.password = password;
-        }
-
-        public String getSchema() {
-            return schema;
-        }
-
-        public void setSchema(String schema) {
-            this.schema = schema;
         }
 
         public String getTableName() {
