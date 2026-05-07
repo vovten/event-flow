@@ -10,7 +10,8 @@ import javax.sql.DataSource;
  * DataSource dataSource = ...;
  * EventRepository repository = JdbcEventRepositoryBuilder.builder()
  *         .dataSource(dataSource)
- *         .tableName("events.event_outbox")  // schema.table
+ *         .schema("events")
+ *         .tableName("event_outbox")
  *         .createTableIfNotExists(true)
  *         .build();
  * }</pre>
@@ -18,6 +19,7 @@ import javax.sql.DataSource;
 public class JdbcEventRepositoryBuilder {
 
     private DataSource dataSource;
+    private String schema = "public";
     private String tableName = "event_outbox";
     private boolean createTableIfNotExists = true;
 
@@ -30,6 +32,11 @@ public class JdbcEventRepositoryBuilder {
 
     public JdbcEventRepositoryBuilder dataSource(DataSource dataSource) {
         this.dataSource = dataSource;
+        return this;
+    }
+
+    public JdbcEventRepositoryBuilder schema(String schema) {
+        this.schema = schema;
         return this;
     }
 
@@ -47,6 +54,6 @@ public class JdbcEventRepositoryBuilder {
         if (dataSource == null) {
             throw new IllegalArgumentException("DataSource is required");
         }
-        return new JdbcEventRepository(dataSource, tableName, createTableIfNotExists);
+        return new JdbcEventRepository(dataSource, schema, tableName, createTableIfNotExists);
     }
 }

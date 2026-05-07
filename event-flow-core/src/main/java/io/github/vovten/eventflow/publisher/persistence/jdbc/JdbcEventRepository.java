@@ -35,7 +35,9 @@ public class JdbcEventRepository implements EventRepository {
     private static final Logger log = LoggerFactory.getLogger(JdbcEventRepository.class);
 
     private final DataSource dataSource;
+    private final String schema;
     private final String tableName;
+    private final String qualifiedTableName;
     private final String insertSql;
     private final String updateStatusSql;
     private final String selectPendingSql;
@@ -43,22 +45,28 @@ public class JdbcEventRepository implements EventRepository {
     private final boolean createTableIfNotExists;
 
     public JdbcEventRepository(DataSource dataSource, String tableName) {
-        this(dataSource, tableName, true);
+        this(dataSource, "public", tableName, true);
     }
 
-    public JdbcEventRepository(DataSource dataSource, String tableName, boolean createTableIfNotExists) {
+    public JdbcEventRepository(DataSource dataSource, String schema, String tableName) {
+        this(dataSource, schema, tableName, true);
+    }
+
+    public JdbcEventRepository(DataSource dataSource, String schema, String tableName, boolean createTableIfNotExists) {
         this.dataSource = dataSource;
+        this.schema = schema;
         this.tableName = tableName;
+        this.qualifiedTableName = schema + "." + tableName;
         this.createTableIfNotExists = createTableIfNotExists;
 
         this.insertSql = String.format(
-                "INSERT INTO %s (id, process_id, payload, status, created_at) VALUES (?, ?, ?::jsonb, ?, ?)", tableName);
+                "INSERT INTO %s (id, process_id, payload, status, created_at) VALUES (?, ?, ?::jsonb, ?, ?)", qualifiedTableName);
         this.updateStatusSql = String.format(
-                "UPDATE %s SET status = ?, error_message = ? WHERE id = ?", tableName);
+                "UPDATE %s SET status = ?, error_message = ? WHERE id = ?", qualifiedTableName);
         this.selectPendingSql = String.format(
-                "SELECT id, process_id, payload, status, created_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", tableName);
+                "SELECT id, process_id, payload, status, created_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED", qualifiedTableName);
         this.selectByIdSql = String.format(
-                "SELECT id, process_id, payload, status, created_at, error_message FROM %s WHERE id = ?", tableName);
+                "SELECT id, process_id, payload, status, created_at, error_message FROM %s WHERE id = ?", qualifiedTableName);
 
         createTableIfNotExists();
     }
@@ -165,23 +173,20 @@ public class JdbcEventRepository implements EventRepository {
                     error_message TEXT,
                     CONSTRAINT chk_status CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED'))
                 )
-                """, tableName);
+                """, qualifiedTableName);
 
-        String tableBaseName = tableName.contains(".") 
-                ? tableName.substring(tableName.lastIndexOf('.') + 1) 
-                : tableName;
         String createIndexSql = String.format(
-                "CREATE INDEX IF NOT EXISTS idx_%s_status ON %s (status)", tableBaseName, tableName);
+                "CREATE INDEX IF NOT EXISTS idx_%s_status ON %s (status)", tableName, qualifiedTableName);
 
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
 
             stmt.execute(createTableSql);
             stmt.execute(createIndexSql);
-            log.info("Ensured outbox table exists: {}", tableName);
+            log.info("Ensured outbox table exists: {}", qualifiedTableName);
 
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to create outbox table: " + tableName, e);
+            throw new RuntimeException("Failed to create outbox table: " + qualifiedTableName, e);
         }
     }
 
