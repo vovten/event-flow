@@ -482,6 +482,7 @@ public class EventFlowProperties {
     public static class PersistenceConfig {
         private boolean enabled = false;
         private JdbcConfig jdbc = new JdbcConfig();
+        private OutboxRetryConfig retry = new OutboxRetryConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -497,6 +498,38 @@ public class EventFlowProperties {
 
         public void setJdbc(JdbcConfig jdbc) {
             this.jdbc = jdbc;
+        }
+
+        public OutboxRetryConfig getRetry() {
+            return retry;
+        }
+
+        public void setRetry(OutboxRetryConfig retry) {
+            this.retry = retry;
+        }
+    }
+
+    /**
+     * Retry configuration for outbox scheduler.
+     */
+    public static class OutboxRetryConfig {
+        private boolean enabled = false;
+        private long fixedDelay = 30000; // milliseconds
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public long getFixedDelay() {
+            return fixedDelay;
+        }
+
+        public void setFixedDelay(long fixedDelay) {
+            this.fixedDelay = fixedDelay;
         }
     }
 

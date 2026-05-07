@@ -1,12 +1,14 @@
 package io.github.vovten.eventflow.autoconfig;
 
 import io.github.vovten.eventflow.autoconfig.config.*;
+import io.github.vovten.eventflow.autoconfig.persistence.PersistenceConfiguration;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Import;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Main auto-configuration class for Event Flow components in Spring applications.
@@ -65,6 +67,7 @@ import org.springframework.context.annotation.Import;
     CommonConfiguration.class,
     ChannelConfiguration.class,
     PublisherConfiguration.class,
+    PersistenceConfiguration.class,
     DispatcherConfiguration.class
 })
 public class EventFlowAutoConfiguration {
