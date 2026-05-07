@@ -233,7 +233,7 @@ class ChannelConfigurationTest {
             channelConfig.setName("external");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
-            transportConfig.setTopic("test-topic");
+            transportConfig.setTopics("test-topic");
             transportConfig.setServers("localhost:9092");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);

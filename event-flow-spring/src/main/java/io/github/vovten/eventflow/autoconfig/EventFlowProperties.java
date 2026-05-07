@@ -33,7 +33,7 @@ import java.util.List;
  *       - name: external
  *         transports:
  *           - name: kafka
- *             topic: events-topic
+ *             topics: events-topic
  *             servers: localhost:9092
  *   dispatcher:
  *     enabled: true
@@ -389,7 +389,7 @@ public class EventFlowProperties {
     public static class TransportConfig {
         private String name = "local-queue";
         private int capacity = 1000;
-        private String topic;
+        private String topics;
         private String servers;
         private String consumerGroup = "event-flow-group";
         /**
@@ -414,12 +414,12 @@ public class EventFlowProperties {
             this.capacity = capacity;
         }
 
-        public String getTopic() {
-            return topic;
+        public String getTopics() {
+            return topics;
         }
 
-        public void setTopic(String topic) {
-            this.topic = topic;
+        public void setTopics(String topics) {
+            this.topics = topics;
         }
 
         public String getServers() {
