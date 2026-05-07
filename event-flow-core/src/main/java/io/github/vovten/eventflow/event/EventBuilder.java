@@ -21,22 +21,6 @@ import java.util.concurrent.CompletableFuture;
 public interface EventBuilder<T> {
 
     /**
-     * Set custom event ID.
-     *
-     * @param eventId the unique event identifier
-     * @return this builder
-     */
-    EventBuilder<T> withEventId(UUID eventId);
-
-    /**
-     * Set custom event ID from string.
-     *
-     * @param eventId the unique event identifier as string
-     * @return this builder
-     */
-    EventBuilder<T> withEventId(String eventId);
-
-    /**
      * Set process ID for correlation (e.g., saga ID).
      *
      * @param processId the process identifier

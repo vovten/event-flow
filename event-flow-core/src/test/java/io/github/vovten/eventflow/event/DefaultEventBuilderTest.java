@@ -40,29 +40,6 @@ class DefaultEventBuilderTest {
     }
 
     @Test
-    @DisplayName("Should set custom eventId")
-    void shouldSetCustomEventId() {
-        OutTransport transport = mock(OutTransport.class);
-        AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
-        when(transport.send(any())).thenAnswer(invocation -> {
-            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
-            return CompletableFuture.completedFuture(SendResult.success("dest"));
-        });
-        EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
-
-        UUID customId = UUID.randomUUID();
-        TestPayload payload = new TestPayload("test");
-        new DefaultEventBuilder<>(publisher, payload)
-                .withEventId(customId)
-                .publish()
-                .join();
-
-        assertThat(capturedEnvelope.get()).isNotNull();
-        assertThat(capturedEnvelope.get().eventId()).isEqualTo(customId);
-    }
-
-    @Test
     @DisplayName("Should set custom processId")
     void shouldSetCustomProcessId() {
         OutTransport transport = mock(OutTransport.class);
@@ -167,12 +144,10 @@ class DefaultEventBuilderTest {
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
-        UUID customId = UUID.randomUUID();
         UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         Instant customTime = Instant.parse("2025-02-20T08:00:00Z");
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
-                .withEventId(customId)
                 .withProcessId(customProcessId)
                 .withOccurredAt(customTime)
                 .withMetadata("key1", "value1")
@@ -181,7 +156,7 @@ class DefaultEventBuilderTest {
                 .join();
 
         assertThat(capturedEnvelope.get()).isNotNull();
-        assertThat(capturedEnvelope.get().eventId()).isEqualTo(customId);
+        assertThat(capturedEnvelope.get().eventId()).isNotNull();
         assertThat(capturedEnvelope.get().processId()).isEqualTo(customProcessId);
         assertThat(capturedEnvelope.get().occurredAt()).isEqualTo(customTime);
         assertThat(capturedEnvelope.get().metadata())
@@ -206,29 +181,6 @@ class DefaultEventBuilderTest {
 
         assertThat(capturedEnvelope.get()).isNotNull();
         assertThat(capturedEnvelope.get().payload()).isEqualTo(payload);
-    }
-
-    @Test
-    @DisplayName("Should parse string eventId")
-    void shouldParseStringEventId() {
-        OutTransport transport = mock(OutTransport.class);
-        AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
-        when(transport.send(any())).thenAnswer(invocation -> {
-            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
-            return CompletableFuture.completedFuture(SendResult.success("dest"));
-        });
-        EventChannel channel = new InternalEventChannel(transport);
-        EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
-
-        UUID expectedId = UUID.randomUUID();
-        TestPayload payload = new TestPayload("test");
-        new DefaultEventBuilder<>(publisher, payload)
-                .withEventId(expectedId.toString())
-                .publish()
-                .join();
-
-        assertThat(capturedEnvelope.get()).isNotNull();
-        assertThat(capturedEnvelope.get().eventId()).isEqualTo(expectedId);
     }
 
     @Test

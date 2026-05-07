@@ -23,7 +23,6 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
 
     private final EventPublisher publisher;
     private final T payload;
-    private UUID eventId;
     private UUID processId;
     private Instant occurredAt;
     private final Map<String, String> metadata;
@@ -32,21 +31,8 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     public DefaultEventBuilder(EventPublisher publisher, T payload) {
         this.publisher = Objects.requireNonNull(publisher, "publisher must not be null");
         this.payload = Objects.requireNonNull(payload, "payload must not be null");
-        this.eventId = UUID.randomUUID();
         this.occurredAt = Instant.now();
         this.metadata = new HashMap<>();
-    }
-
-    @Override
-    public EventBuilder<T> withEventId(UUID eventId) {
-        this.eventId = eventId;
-        return this;
-    }
-
-    @Override
-    public EventBuilder<T> withEventId(String eventId) {
-        this.eventId = UUID.fromString(eventId);
-        return this;
     }
 
     @Override
@@ -93,7 +79,7 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
                     .orElse(""));
         }
         Envelope<T> envelope = new Envelope<>(
-                eventId,
+                UUID.randomUUID(),
                 processId,
                 occurredAt,
                 payload,

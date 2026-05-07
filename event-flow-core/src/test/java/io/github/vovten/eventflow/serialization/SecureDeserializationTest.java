@@ -87,4 +87,33 @@ class SecureDeserializationTest {
         TestEvent deserialized = serializer.deserialize(serialized, TestEvent.class);
         assertEquals(event.getId(), deserialized.getId());
     }
+
+    @Test
+    @DisplayName("Should deny non-existent class gracefully")
+    void deniesNonExistentClass() {
+        String nonExistentClassJson = "{\"@class\":\"com.nonexistent.FakeEvent\",\"id\":\"test\"}";
+        byte[] data = nonExistentClassJson.getBytes();
+        byte[] dataWithMarker = new byte[data.length + 1];
+        dataWithMarker[0] = 0x01;
+        System.arraycopy(data, 0, dataWithMarker, 1, data.length);
+
+        JsonEventSerializer serializer = new JsonEventSerializer();
+        assertThrows(EventSerializationException.class, () -> {
+            serializer.deserialize(dataWithMarker, TestEvent.class);
+        });
+    }
+
+    @Test
+    @DisplayName("Should cache known classes for performance")
+    void cachesKnownClasses() {
+        EventPolymorphicTypeValidator validator = new EventPolymorphicTypeValidator();
+
+        String existingClass = "java.lang.String";
+        assertTrue(validator.classExists(existingClass));
+        assertTrue(validator.classExists(existingClass));
+
+        String nonExistingClass = "com.nonexistent.NonExistingClass12345";
+        assertFalse(validator.classExists(nonExistingClass));
+        assertFalse(validator.classExists(nonExistingClass));
+    }
 }

@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Polymorphic type validator for secure event deserialization.
  * <p>
@@ -24,6 +27,8 @@ import org.slf4j.LoggerFactory;
 public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base {
 
     private static final Logger log = LoggerFactory.getLogger(EventPolymorphicTypeValidator.class);
+
+    private final Set<String> knownClasses = ConcurrentHashMap.newKeySet();
 
     /**
      * Validate the base type (the type passed to readValue).
@@ -54,6 +59,10 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
         Class<?> rawClass = subType.getRawClass();
         String className = rawClass.getName();
 
+        if (!classExists(className)) {
+            log.warn("Skipping event: class '{}' not found in classpath", className);
+            return Validity.DENIED;
+        }
         if (EventTypeRegistry.isAllowed(className)) {
             log.debug("Allowed event subtype: {}", className);
             return Validity.ALLOWED;
@@ -82,6 +91,26 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
                 EventTypeRegistry.getAllowedPackages()
         );
         return Validity.DENIED;
+    }
+
+    /**
+     * Check if class exists in classpath.
+     * Uses caching for performance optimization.
+     *
+     * @param className fully qualified class name
+     * @return true if class exists, false otherwise
+     */
+    boolean classExists(String className) {
+        if (knownClasses.contains(className)) {
+            return true;
+        }
+        try {
+            Class.forName(className, false, Thread.currentThread().getContextClassLoader());
+            knownClasses.add(className);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 
     /**
