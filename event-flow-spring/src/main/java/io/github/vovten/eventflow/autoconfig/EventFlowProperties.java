@@ -78,6 +78,11 @@ public class EventFlowProperties {
      */
     private DispatcherConfig dispatcher = new DispatcherConfig();
 
+    /**
+     * Persistence configuration for outbox pattern.
+     */
+    private PersistenceConfig persistence = new PersistenceConfig();
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -100,6 +105,14 @@ public class EventFlowProperties {
 
     public void setDispatcher(DispatcherConfig dispatcher) {
         this.dispatcher = dispatcher;
+    }
+
+    public PersistenceConfig getPersistence() {
+        return persistence;
+    }
+
+    public void setPersistence(PersistenceConfig persistence) {
+        this.persistence = persistence;
     }
 
     /**
@@ -464,6 +477,90 @@ public class EventFlowProperties {
 
         public void setAllowedEventPackages(List<String> allowedEventPackages) {
             this.allowedEventPackages = allowedEventPackages;
+        }
+    }
+
+    /**
+     * Persistence configuration for outbox pattern.
+     */
+    public static class PersistenceConfig {
+        private boolean enabled = false;
+        private JdbcConfig jdbc = new JdbcConfig();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public JdbcConfig getJdbc() {
+            return jdbc;
+        }
+
+        public void setJdbc(JdbcConfig jdbc) {
+            this.jdbc = jdbc;
+        }
+    }
+
+    /**
+     * JDBC configuration for persistence.
+     */
+    public static class JdbcConfig {
+        private String url;
+        private String username;
+        private String password;
+        private String tableName = "event_outbox";
+        private Integer maximumPoolSize;
+        private Integer minimumIdle;
+
+        public String getUrl() {
+            return url;
+        }
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public String getTableName() {
+            return tableName;
+        }
+
+        public void setTableName(String tableName) {
+            this.tableName = tableName;
+        }
+
+        public Integer getMaximumPoolSize() {
+            return maximumPoolSize;
+        }
+
+
+        public void setMaximumPoolSize(Integer maximumPoolSize) {
+            this.maximumPoolSize = maximumPoolSize;
+        }
+
+        public Integer getMinimumIdle() {
+            return minimumIdle;
+        }
+
+        public void setMinimumIdle(Integer minimumIdle) {
+            this.minimumIdle = minimumIdle;
         }
     }
 }

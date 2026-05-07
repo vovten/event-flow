@@ -88,6 +88,20 @@
             <version>5.22.0</version>
         </dependency>
 
+        <!-- HikariCP (for JDBC connection pooling) -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- PostgreSQL JDBC Driver -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Jakarta Annotation -->
         <dependency>
             <groupId>jakarta.annotation</groupId>

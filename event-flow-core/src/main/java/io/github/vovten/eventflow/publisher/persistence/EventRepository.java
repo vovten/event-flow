@@ -1,17 +1,15 @@
 package io.github.vovten.eventflow.publisher.persistence;
 
-import io.github.vovten.eventflow.event.Envelope;
-import io.github.vovten.eventflow.event.Event;
-
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Repository interface for persisting events before publishing.
+ * Repository interface for persisting events to database.
  * <p>
- * Implement this interface to store events in any database (JDBC, JPA, MongoDB, etc.)
- * Before publishing, events are saved with status {@link EventStatus#PENDING}.
- * After successful publishing, status is updated to {@link EventStatus#PUBLISHED}.
+ * Implementations handle different databases (PostgreSQL, MySQL, etc.)
+ * with support for the transactional outbox pattern.
  *
  * @author Vladimir Aleshkov
  * @since 1.1.0
@@ -19,28 +17,57 @@ import java.util.UUID;
 public interface EventRepository {
 
     /**
-     * Save an event to the database before publishing.
+     * Save an event record to the database.
      *
-     * @param envelope the event envelope to save
-     * @return the saved event record
+     * @param record event record with all data
      */
-    EventRecord save(EventRecord record);
+    void save(EventRecord record);
 
     /**
-     * Update the status of an event after publishing.
+     * Update the status of an event.
      *
-     * @param id          the event ID
-     * @param status      the new status
-     * @param publishedAt timestamp when published
+     * @param id          event ID
+     * @param status      new status (PUBLISHED or FAILED)
+     * @param publishedAt timestamp of successful publication (null for FAILED)
      */
     void updateStatus(UUID id, EventStatus status, Instant publishedAt);
 
     /**
-     * Find pending events that haven't been published yet.
-     * Used by background retry jobs.
+     * Update the status of an event with error message.
+     *
+     * @param id           event ID
+     * @param status       new status (FAILED)
+     * @param errorMessage error message if status is FAILED
+     */
+    default void updateStatus(UUID id, EventStatus status, String errorMessage) {
+        updateStatus(id, status, (Instant) null);
+    }
+
+    /**
+     * Find an event by ID.
+     *
+     * @param id event ID
+     * @return event record or empty
+     */
+    default Optional<EventRecord> findById(UUID id) {
+        return Optional.empty();
+    }
+
+    /**
+     * Find pending events that need to be published.
      *
      * @param limit maximum number of events to return
      * @return list of pending event records
      */
-    java.util.List<EventRecord> findPending(int limit);
+    List<EventRecord> findPending(int limit);
+
+    /**
+     * Find failed events for retry.
+     *
+     * @param limit maximum number of events to return
+     * @return list of failed event records
+     */
+    default List<EventRecord> findFailed(int limit) {
+        return List.of();
+    }
 }
