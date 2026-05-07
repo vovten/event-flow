@@ -6,12 +6,12 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.persistence.EventRepository;
 import io.github.vovten.eventflow.publisher.persistence.PersistentEventPublisher;
-import io.github.vovten.eventflow.publisher.persistence.jdbc.JdbcEventRepository;
 import io.github.vovten.eventflow.publisher.persistence.jdbc.JdbcEventRepositoryBuilder;
 import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,7 +29,9 @@ import javax.sql.DataSource;
  * Configuration example:
  * <pre>{@code
  * event-flow:
+ *   enabled: true
  *   publisher:
+ *     enabled: true
  *     persistence:
  *       enabled: true
  *       jdbc:
@@ -49,17 +51,20 @@ public class PersistenceConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(PersistenceConfiguration.class);
 
+    /**
+     * Creates HikariCP DataSource from properties.
+     */
     @Bean
-    @ConditionalOnMissingBean(name = "eventFlowDataSource")
+    @ConditionalOnMissingBean(name = "persistenceDataSource")
     @ConditionalOnProperty(prefix = "event-flow.publisher.persistence.jdbc", name = "url")
-    public DataSource eventFlowDataSource(EventFlowProperties properties) {
+    public DataSource persistenceDataSource(EventFlowProperties properties) {
         EventFlowProperties.JdbcConfig jdbc = properties.getPublisher().getPersistence().getJdbc();
 
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(jdbc.getUrl());
         config.setUsername(jdbc.getUsername());
         config.setPassword(jdbc.getPassword());
-        config.setPoolName("event-flow-pool");
+        config.setPoolName("event-flow-persistence-pool");
 
         if (jdbc.getMaximumPoolSize() != null) {
             config.setMaximumPoolSize(jdbc.getMaximumPoolSize());
@@ -68,10 +73,13 @@ public class PersistenceConfiguration {
             config.setMinimumIdle(jdbc.getMinimumIdle());
         }
 
-        log.info("Creating HikariCP DataSource for: {}", jdbc.getUrl());
+        log.info("Creating HikariCP DataSource for event persistence: {}", jdbc.getUrl());
         return new HikariDataSource(config);
     }
 
+    /**
+     * Creates JDBC event repository.
+     */
     @Bean
     @ConditionalOnBean(DataSource.class)
     @ConditionalOnMissingBean(EventRepository.class)
@@ -88,22 +96,31 @@ public class PersistenceConfiguration {
                 .build();
     }
 
-    @Bean
+    /**
+     * Creates event serializer for persistence.
+     */
+    @Bean("persistenceEventSerializer")
     @ConditionalOnMissingBean(name = "persistenceEventSerializer")
     public EventSerializer persistenceEventSerializer() {
         return new JsonEventSerializer();
     }
 
+    /**
+     * Creates persistent event publisher wrapping the base publisher.
+     * Uses same bean name "eventPublisher" to replace the base publisher.
+     */
     @Bean
-    @ConditionalOnBean(EventPublisher.class)
-    @ConditionalOnMissingBean(name = "persistentEventPublisher")
+    @ConditionalOnBean(DataSource.class)
+    @ConditionalOnMissingBean(EventPublisher.class)
     public EventPublisher persistentEventPublisher(
-            EventPublisher delegate,
+            @Qualifier("eventPublisher") EventPublisher basePublisher,
             EventRepository repository,
             EventSerializer serializer) {
 
-        log.info("Creating PersistentEventPublisher wrapping delegate publisher");
+        log.info("Wrapping EventPublisher with PersistentEventPublisher for outbox pattern");
+        log.info("  - Repository: {}", repository.getClass().getSimpleName());
+        log.info("  - Serializer: {}", serializer.getClass().getSimpleName());
 
-        return new PersistentEventPublisher(delegate, repository, serializer);
+        return new PersistentEventPublisher(basePublisher, repository, serializer);
     }
 }
