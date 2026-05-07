@@ -84,7 +84,7 @@ public class JdbcEventRepository implements EventRepository {
 
             stmt.setObject(1, record.id());
             stmt.setObject(2, record.processId());
-            stmt.setString(3, record.payload());
+            stmt.setString(3, record.event());
             stmt.setString(4, record.status().name());
             stmt.setBoolean(5, record.retry());
             stmt.setTimestamp(6, Timestamp.from(record.createdAt()));

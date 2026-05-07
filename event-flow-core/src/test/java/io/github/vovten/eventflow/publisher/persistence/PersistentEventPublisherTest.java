@@ -121,7 +121,7 @@ class PersistentEventPublisherTest {
         verify(serializer).serialize(any(Event.class));
         ArgumentCaptor<EventRecord> recordCaptor = ArgumentCaptor.forClass(EventRecord.class);
         verify(repository).save(recordCaptor.capture());
-        assertEquals(new String(expectedBytes), recordCaptor.getValue().payload());
+        assertEquals(new String(expectedBytes), recordCaptor.getValue().event());
     }
 
     private static class TestEventPublisher implements EventPublisher {

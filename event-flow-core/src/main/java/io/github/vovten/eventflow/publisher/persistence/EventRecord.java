@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * Record representing a persisted event in the outbox table.
- * The payload contains the entire serialized event as JSON.
+ * The event contains the entire serialized event as JSON.
  *
  * @author Vladimir Aleshkov
  * @since 1.1.0
@@ -14,21 +14,21 @@ public class EventRecord {
 
     private final UUID id;
     private final UUID processId;
-    private final String payload; // JSON - full event (Envelope or Event)
+    private final String event; // JSON - full serialized event (Envelope or Event)
     private final Instant createdAt;
     private boolean retry;
     private String errorMessage;
     private EventStatus status = EventStatus.PENDING;
 
-    public EventRecord(UUID id, UUID processId, String payload, Instant createdAt) {
+    public EventRecord(UUID id, UUID processId, String event, Instant createdAt) {
         this.id = id;
         this.processId = processId;
-        this.payload = payload;
+        this.event = event;
         this.createdAt = createdAt;
     }
 
-    public static EventRecord create(UUID id, UUID processId, String payload) {
-        return new EventRecord(id, processId, payload, Instant.now());
+    public static EventRecord create(UUID id, UUID processId, String event) {
+        return new EventRecord(id, processId, event, Instant.now());
     }
 
     public UUID id() {
@@ -39,8 +39,8 @@ public class EventRecord {
         return processId;
     }
 
-    public String payload() {
-        return payload;
+    public String event() {
+        return event;
     }
 
     public Instant createdAt() {
