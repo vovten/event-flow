@@ -29,29 +29,30 @@ import javax.sql.DataSource;
  * Configuration example:
  * <pre>{@code
  * event-flow:
- *   persistence:
- *     enabled: true
- *     jdbc:
- *       url: jdbc:postgresql://localhost:5432/events
- *       table-name: events.event_outbox
- *       username: user
- *       password: pass
+ *   publisher:
+ *     persistence:
+ *       enabled: true
+ *       jdbc:
+ *         url: jdbc:postgresql://localhost:5432/events
+ *         table-name: public.event_outbox
+ *         username: user
+ *         password: pass
  * }</pre>
  *
  * @author Vladimir Aleshkov
  * @since 1.1.0
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "event-flow.persistence", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "event-flow.publisher.persistence", name = "enabled", havingValue = "true")
 public class PersistenceConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(PersistenceConfiguration.class);
 
     @Bean
     @ConditionalOnMissingBean(name = "eventFlowDataSource")
-    @ConditionalOnProperty(prefix = "event-flow.persistence.jdbc", name = "url")
+    @ConditionalOnProperty(prefix = "event-flow.publisher.persistence.jdbc", name = "url")
     public DataSource eventFlowDataSource(EventFlowProperties properties) {
-        EventFlowProperties.JdbcConfig jdbc = properties.getPersistence().getJdbc();
+        EventFlowProperties.JdbcConfig jdbc = properties.getPublisher().getPersistence().getJdbc();
 
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(jdbc.getUrl());
@@ -74,7 +75,7 @@ public class PersistenceConfiguration {
     @ConditionalOnBean(DataSource.class)
     @ConditionalOnMissingBean(EventRepository.class)
     public EventRepository eventRepository(DataSource dataSource, EventFlowProperties properties) {
-        EventFlowProperties.JdbcConfig jdbc = properties.getPersistence().getJdbc();
+        EventFlowProperties.JdbcConfig jdbc = properties.getPublisher().getPersistence().getJdbc();
 
         log.info("Creating JdbcEventRepository with table={}", jdbc.getTableName());
 

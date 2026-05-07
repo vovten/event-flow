@@ -78,11 +78,6 @@ public class EventFlowProperties {
      */
     private DispatcherConfig dispatcher = new DispatcherConfig();
 
-    /**
-     * Persistence configuration for outbox pattern.
-     */
-    private PersistenceConfig persistence = new PersistenceConfig();
-
     public boolean isEnabled() {
         return enabled;
     }
@@ -107,14 +102,6 @@ public class EventFlowProperties {
         this.dispatcher = dispatcher;
     }
 
-    public PersistenceConfig getPersistence() {
-        return persistence;
-    }
-
-    public void setPersistence(PersistenceConfig persistence) {
-        this.persistence = persistence;
-    }
-
     /**
      * Publisher configuration settings.
      */
@@ -123,6 +110,7 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private RetryConfig retry = new RetryConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
+        private PersistenceConfig persistence = new PersistenceConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -154,6 +142,14 @@ public class EventFlowProperties {
 
         public void setChannels(List<ChannelConfig> channels) {
             this.channels = channels;
+        }
+
+        public PersistenceConfig getPersistence() {
+            return persistence;
+        }
+
+        public void setPersistence(PersistenceConfig persistence) {
+            this.persistence = persistence;
         }
     }
 
