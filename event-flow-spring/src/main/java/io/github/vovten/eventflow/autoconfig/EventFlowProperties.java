@@ -515,6 +515,10 @@ public class EventFlowProperties {
     public static class OutboxRetryConfig {
         private boolean enabled = false;
         private long fixedDelay = 30000; // milliseconds
+        private int maxRetryCount = 5;
+        private long initialDelay = 10000; // initial retry delay in ms
+        private long maxDelay = 300000;    // max delay cap in ms (5 minutes)
+        private double multiplier = 2.0;   // exponential backoff multiplier
 
         public boolean isEnabled() {
             return enabled;
@@ -530,6 +534,38 @@ public class EventFlowProperties {
 
         public void setFixedDelay(long fixedDelay) {
             this.fixedDelay = fixedDelay;
+        }
+
+        public int getMaxRetryCount() {
+            return maxRetryCount;
+        }
+
+        public void setMaxRetryCount(int maxRetryCount) {
+            this.maxRetryCount = maxRetryCount;
+        }
+
+        public long getInitialDelay() {
+            return initialDelay;
+        }
+
+        public void setInitialDelay(long initialDelay) {
+            this.initialDelay = initialDelay;
+        }
+
+        public long getMaxDelay() {
+            return maxDelay;
+        }
+
+        public void setMaxDelay(long maxDelay) {
+            this.maxDelay = maxDelay;
+        }
+
+        public double getMultiplier() {
+            return multiplier;
+        }
+
+        public void setMultiplier(double multiplier) {
+            this.multiplier = multiplier;
         }
     }
 

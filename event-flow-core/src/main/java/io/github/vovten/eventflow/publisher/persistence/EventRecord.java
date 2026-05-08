@@ -16,6 +16,8 @@ public class EventRecord {
     private final UUID processId;
     private final String event; // JSON - full serialized event (Envelope or Event)
     private final Instant createdAt;
+    private Instant modifiedAt;
+    private int retryCount = 0;
     private boolean retry;
     private String errorMessage;
     private EventStatus status = EventStatus.PENDING;
@@ -25,6 +27,7 @@ public class EventRecord {
         this.processId = processId;
         this.event = event;
         this.createdAt = createdAt;
+        this.modifiedAt = createdAt;
     }
 
     public static EventRecord create(UUID id, UUID processId, String event) {
@@ -45,6 +48,29 @@ public class EventRecord {
 
     public Instant createdAt() {
         return createdAt;
+    }
+
+    public Instant modifiedAt() {
+        return modifiedAt;
+    }
+
+    public EventRecord modifiedAt(Instant modifiedAt) {
+        this.modifiedAt = modifiedAt;
+        return this;
+    }
+
+    public int retryCount() {
+        return retryCount;
+    }
+
+    public EventRecord retryCount(int retryCount) {
+        this.retryCount = retryCount;
+        return this;
+    }
+
+    public EventRecord incrementRetryCount() {
+        this.retryCount++;
+        return this;
     }
 
     public boolean retry() {
@@ -81,7 +107,9 @@ public class EventRecord {
                 ", processId=" + processId +
                 ", status=" + status +
                 ", retry=" + retry +
+                ", retryCount=" + retryCount +
                 ", createdAt=" + createdAt +
+                ", modifiedAt=" + modifiedAt +
                 '}';
     }
 }
