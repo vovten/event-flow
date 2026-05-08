@@ -15,6 +15,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +104,35 @@ class PublisherIntegrationTest {
         } finally {
             TransactionSynchronizationManager.setActualTransactionActive(false);
         }
+    }
+
+    @Test
+    @DisplayName("Should handle deadlock when join is called inside active transaction")
+    void shouldHandleDeadlockWhenJoinInsideTransaction() throws InterruptedException {
+        AtomicBoolean sendCalled = new AtomicBoolean(false);
+        OutTransport transport = createMockTransport(sendCalled);
+        InternalEventChannel channel = new InternalEventChannel(transport);
+
+        EventPublisher publisher = SpringEventPublisherBuilder.create(channel)
+                .transactional()
+                .build();
+
+        TestEvent event = TestEvent.create("Deadlock test event");
+
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+
+        Thread testThread = new Thread(() -> {
+            try {
+                publisher.publish(event).get(2, TimeUnit.SECONDS);
+            } catch (InterruptedException | java.util.concurrent.ExecutionException | TimeoutException e) {
+                // Expected - get times out because of deadlock
+            }
+        });
+
+        testThread.start();
+        testThread.join(3000);
+
+        assertThat(testThread.isAlive()).isFalse();
     }
 
     private OutTransport createMockTransport(AtomicBoolean sendCalled) {

@@ -37,10 +37,17 @@ import java.util.List;
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
  *   <li>{@link TransactionalEventPublisher} (if enabled) — always outermost</li>
  * </ol>
+ * <p>
+ * <b>Important: Transactional publishing limitations</b>
+ * <p>
+ * See {@link TransactionalEventPublisher} for important notes about thread safety
+ * and transaction boundaries. Do not use blocking operations like {@code .join()}
+ * or {@code .get()} inside {@code @Transactional} methods.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-31
  * @see EventPublisherBuilder
+ * @see TransactionalEventPublisher
  */
 public final class SpringEventPublisherBuilder extends EventPublisherBuilder<SpringEventPublisherBuilder> {
 
