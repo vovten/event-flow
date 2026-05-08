@@ -3,30 +3,27 @@ package io.github.vovten.eventflow.autoconfig.persistence;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.persistence.EventRepository;
-import io.github.vovten.eventflow.publisher.persistence.PersistentEventPublisher;
 import io.github.vovten.eventflow.publisher.persistence.jdbc.JdbcEventRepositoryBuilder;
 import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 import javax.sql.DataSource;
 
 /**
- * Auto-configuration for persistent event publisher.
+ * Auto-configuration for event persistence infrastructure.
  * <p>
- * Enables event persistence to database before publishing, implementing
- * the transactional outbox pattern.
+ * Creates DataSource, EventRepository, and EventSerializer beans
+ * for the transactional outbox pattern.
+ * <p>
+ * Note: The actual wrapping of EventPublisher with PersistentEventPublisher
+ * is done in PublisherConfiguration.
  * <p>
  * Configuration example:
  * <pre>{@code
@@ -48,7 +45,6 @@ import javax.sql.DataSource;
  * @since 1.1.0
  */
 @Configuration(proxyBeanMethods = false)
-@EnableScheduling
 @ConditionalOnProperty(prefix = "event-flow.publisher.persistence", name = "enabled", havingValue = "true")
 public class PersistenceConfiguration {
 
@@ -105,24 +101,5 @@ public class PersistenceConfiguration {
     @ConditionalOnMissingBean(name = "persistenceEventSerializer")
     public EventSerializer persistenceEventSerializer() {
         return new JsonEventSerializer();
-    }
-
-    /**
-     * Wraps the base EventPublisher with PersistentEventPublisher using BeanPostProcessor.
-     * This approach ensures the base publisher is created first, then wrapped.
-     */
-    @Bean
-    @ConditionalOnBean(EventPublisher.class)
-    public BeanPostProcessor persistentPublisherWrapper(EventRepository repository, EventSerializer serializer) {
-        return new BeanPostProcessor() {
-            @Override
-            public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-                if ("eventPublisher".equals(beanName) && bean instanceof EventPublisher) {
-                    log.info("Wrapping EventPublisher '{}' with PersistentEventPublisher", bean.getClass().getSimpleName());
-                    return new PersistentEventPublisher((EventPublisher) bean, repository, serializer);
-                }
-                return bean;
-            }
-        };
     }
 }

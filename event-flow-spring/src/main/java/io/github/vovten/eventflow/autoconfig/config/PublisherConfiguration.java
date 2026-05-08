@@ -5,12 +5,18 @@ import io.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
+import io.github.vovten.eventflow.publisher.persistence.EventRepository;
+import io.github.vovten.eventflow.publisher.persistence.PersistentEventPublisher;
+import io.github.vovten.eventflow.serialization.EventSerializer;
+import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
 import java.util.Map;
@@ -21,7 +27,7 @@ import static java.util.stream.Collectors.toMap;
 
 /**
  * Auto-configuration for event publisher.
- * Creates the base event publisher that will be wrapped by PersistenceConfiguration if persistence is enabled.
+ * Includes optional persistence (outbox pattern) support.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-10
@@ -36,23 +42,24 @@ public class PublisherConfiguration {
     private final Map<String, OutTransportFactory> publisherTransportFactories;
 
     public PublisherConfiguration(EventFlowProperties properties,
-                                  List<OutTransportFactory> publisherTransportFactories) {
+                                  @Lazy List<OutTransportFactory> publisherTransportFactories) {
         this.properties = properties;
         this.publisherTransportFactories = collect(publisherTransportFactories);
         log.info("Registered publisher transport factories: {}", this.publisherTransportFactories.keySet());
     }
 
     /**
-     * Creates base event publisher with all configured channels.
-     * This bean name "eventPublisher" will be used directly or wrapped by persistence.
-     *
-     * @param eventChannels list of event channels to configure
-     * @return configured event publisher
+     * Creates event publisher with all configured channels,
+     * optionally wrapped with PersistentEventPublisher if persistence is enabled.
      */
     @Bean
     @ConditionalOnMissingBean(name = "eventPublisher")
     @ConditionalOnProperty(prefix = "event-flow.publisher", name = "enabled", havingValue = "true")
-    public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
+    public EventPublisher eventPublisher(
+            List<EventChannel> eventChannels,
+            @Lazy ObjectProvider<EventRepository> repositoryProvider,
+            ObjectProvider<EventSerializer> serializerProvider) {
+        
         if (eventChannels.isEmpty()) {
             log.warn("""
 
@@ -72,10 +79,11 @@ public class PublisherConfiguration {
                     """, publisherTransportFactories.keySet());
             return null;
         }
+
         logInfo(eventChannels);
-        EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
+        var publisherConfig = properties.getPublisher();
         
-        // Use Spring-aware builder
+        // Build base publisher
         SpringEventPublisherBuilder builder = SpringEventPublisherBuilder.create(eventChannels);
         
         // Apply retry if enabled
@@ -89,7 +97,21 @@ public class PublisherConfiguration {
             builder.transactional();
         }
 
-        return builder.buildAndLog();
+        EventPublisher basePublisher = builder.buildAndLog();
+        
+        // Wrap with persistence if repository available
+        var repository = repositoryProvider.getIfAvailable();
+        EventSerializer serializer = serializerProvider.getIfAvailable();
+        
+        if (repository != null) {
+            if (serializer == null) {
+                serializer = new JsonEventSerializer();
+            }
+            log.info("Wrapping EventPublisher with PersistentEventPublisher for transactional outbox pattern");
+            return new PersistentEventPublisher(basePublisher, repository, serializer);
+        }
+        
+        return basePublisher;
     }
 
     private static void logInfo(List<EventChannel> eventChannels) {
@@ -100,9 +122,6 @@ public class PublisherConfiguration {
 
     /**
      * Collect unique map of publisher transport factories.
-     *
-     * @param publisherTransportFactories list of factories
-     * @return map of factories by type
      */
     private static Map<String, OutTransportFactory> collect(List<OutTransportFactory> publisherTransportFactories) {
         return publisherTransportFactories.stream()
