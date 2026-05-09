@@ -18,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -133,6 +134,43 @@ class PublisherIntegrationTest {
         testThread.join(3000);
 
         assertThat(testThread.isAlive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should hang when join is called inside active transaction - demonstrates deadlock")
+    void shouldHangWhenJoinInsideActiveTransaction() throws InterruptedException {
+        AtomicBoolean sendCalled = new AtomicBoolean(false);
+        OutTransport transport = createMockTransport(sendCalled);
+        InternalEventChannel channel = new InternalEventChannel(transport);
+
+        EventPublisher publisher = SpringEventPublisherBuilder.create(channel)
+                .retryable(3, Duration.ofMillis(100), 2.0)
+                .transactional()
+                .build();
+
+        TestEvent event = TestEvent.create("Hang test event");
+
+        AtomicReference<Thread.State> threadState = new AtomicReference<>();
+        Thread testThread = new Thread(() -> {
+            TransactionSynchronizationManager.initSynchronization();
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            publisher.publish(event).join();
+        });
+
+        try {
+            testThread.start();
+
+            Thread.sleep(500);
+
+            threadState.set(testThread.getState());
+
+            assertThat(threadState.get()).isIn(Thread.State.WAITING, Thread.State.BLOCKED);
+            assertThat(sendCalled.get()).isFalse();
+
+        } finally {
+            testThread.interrupt();
+            testThread.join(1000);
+        }
     }
 
     private OutTransport createMockTransport(AtomicBoolean sendCalled) {
