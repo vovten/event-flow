@@ -18,13 +18,13 @@ import java.util.UUID;
  * JDBC implementation of {@link EventRepository}
  * using a simplified schema with a single JSON event column.
  * <p>
- * Table schema (PostgreSQL):
+ * Table schema:
  * <pre>{@code
  * CREATE TABLE schema_name.event_outbox (
  *     id          UUID PRIMARY KEY,
  *     process_id  UUID,
- *     event       JSONB NOT NULL,  -- full serialized event (Envelope or Event)
- *     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+ *     event       JSON NOT NULL,  -- full serialized event (Envelope or Event)
+ *     status      SMALLINT NOT NULL DEFAULT 0,  -- 0=PENDING, 1=PUBLISHED, 2=FAILED
  *     retry       BOOLEAN NOT NULL DEFAULT FALSE,
  *     retry_count INTEGER NOT NULL DEFAULT 0,
  *     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -32,6 +32,13 @@ import java.util.UUID;
  *     error_message TEXT
  * );
  * }</pre>
+ * <p>
+ * Status codes (SMALLINT):
+ * <ul>
+ *   <li>0 = PENDING - Event is saved but not yet published</li>
+ *   <li>1 = PUBLISHED - Event was successfully published</li>
+ *   <li>2 = FAILED - Event publishing failed after all retries</li>
+ * </ul>
  */
 public class JdbcEventRepository implements EventRepository {
 
@@ -42,6 +49,7 @@ public class JdbcEventRepository implements EventRepository {
     private final String tableName;
     private final String qualifiedTableName;
     private final boolean createTableIfNotExists;
+    private final boolean isPostgres;
 
     public JdbcEventRepository(DataSource dataSource, String tableName) {
         this(dataSource, "public", tableName, true);
@@ -58,7 +66,29 @@ public class JdbcEventRepository implements EventRepository {
         this.qualifiedTableName = schema + "." + tableName;
         this.createTableIfNotExists = createTableIfNotExists;
 
+        this.isPostgres = detectPostgres();
         createTableIfNotExists();
+    }
+
+    /**
+     * Detect if we're connected to PostgreSQL.
+     */
+    private boolean detectPostgres() {
+        try (Connection conn = dataSource.getConnection()) {
+            String productName = conn.getMetaData().getDatabaseProductName();
+            return "PostgreSQL".equalsIgnoreCase(productName);
+        } catch (SQLException e) {
+            log.warn("Failed to detect database type, assuming non-PostgreSQL", e);
+            return false;
+        }
+    }
+
+    /**
+     * Get SQL type for JSON column.
+     * PostgreSQL uses JSONB, others use TEXT or JSON.
+     */
+    private String jsonType() {
+        return isPostgres ? "JSONB" : "TEXT";
     }
 
     @Override
@@ -66,7 +96,7 @@ public class JdbcEventRepository implements EventRepository {
         log.debug("Saving event record: id={}, processId={}, retry={}", record.id(), record.processId(), record.retry());
 
         String sql = String.format(
-                "INSERT INTO %s (id, process_id, event, status, retry, retry_count, created_at, modified_at) VALUES (?, ?::jsonb, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO %s (id, process_id, event, status, retry, retry_count, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 qualifiedTableName);
 
         try (Connection conn = dataSource.getConnection();
@@ -75,7 +105,7 @@ public class JdbcEventRepository implements EventRepository {
             stmt.setObject(1, record.id());
             stmt.setObject(2, record.processId());
             stmt.setString(3, record.event());
-            stmt.setString(4, record.status().name());
+            stmt.setInt(4, record.status().code());
             stmt.setBoolean(5, record.retry());
             stmt.setInt(6, record.retryCount());
             stmt.setTimestamp(7, Timestamp.from(record.createdAt()));
@@ -105,7 +135,7 @@ public class JdbcEventRepository implements EventRepository {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, status.name());
+            stmt.setInt(1, status.code());
             stmt.setString(2, errorMessage);
             stmt.setTimestamp(3, Timestamp.from(now));
             stmt.setObject(4, id);
@@ -132,7 +162,7 @@ public class JdbcEventRepository implements EventRepository {
 
         if (update.status() != null) {
             sql.append("status = ?");
-            params.add(update.status().name());
+            params.add(update.status().code());
             first = false;
         }
         if (update.retry() != null) {
@@ -173,7 +203,7 @@ public class JdbcEventRepository implements EventRepository {
 
         // Then update with incremented retry count and modified_at
         String updateSql = String.format(
-                "UPDATE %s SET status = 'FAILED', error_message = ?, retry_count = retry_count + 1, modified_at = ? WHERE id = ?",
+                "UPDATE %s SET status = ?, error_message = ?, retry_count = retry_count + 1, modified_at = ? WHERE id = ?",
                 qualifiedTableName);
 
         int newRetryCount = 0;
@@ -191,9 +221,10 @@ public class JdbcEventRepository implements EventRepository {
 
             // Update with incremented count
             try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                updateStmt.setString(1, errorMessage);
-                updateStmt.setTimestamp(2, Timestamp.from(Instant.now()));
-                updateStmt.setObject(3, id);
+                updateStmt.setInt(1, EventStatus.FAILED.code());
+                updateStmt.setString(2, errorMessage);
+                updateStmt.setTimestamp(3, Timestamp.from(Instant.now()));
+                updateStmt.setObject(4, id);
                 updateStmt.executeUpdate();
             }
 
@@ -210,14 +241,15 @@ public class JdbcEventRepository implements EventRepository {
         log.debug("Finding pending events: limit={}", limit);
 
         String sql = String.format(
-                "SELECT id, process_id, event, status, retry, retry_count, created_at, modified_at, error_message FROM %s WHERE status = 'PENDING' ORDER BY created_at LIMIT ?",
+                "SELECT id, process_id, event, status, retry, retry_count, created_at, modified_at, error_message FROM %s WHERE status = ? ORDER BY created_at LIMIT ?",
                 qualifiedTableName);
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setMaxRows(limit);
-            stmt.setInt(1, limit);
+            stmt.setInt(1, EventStatus.PENDING.code());
+            stmt.setInt(2, limit);
 
             List<EventRecord> records = new ArrayList<>();
             try (ResultSet rs = stmt.executeQuery()) {
@@ -238,14 +270,16 @@ public class JdbcEventRepository implements EventRepository {
 
         String sql = String.format(
                 "SELECT id, process_id, event, status, retry, retry_count, created_at, modified_at, error_message FROM %s " +
-                "WHERE retry = TRUE AND status IN ('PENDING', 'FAILED') ORDER BY modified_at LIMIT ?",
+                "WHERE retry = TRUE AND status IN (?, ?) ORDER BY modified_at LIMIT ?",
                 qualifiedTableName);
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setMaxRows(limit);
-            stmt.setInt(1, limit);
+            stmt.setInt(1, EventStatus.PENDING.code());
+            stmt.setInt(2, EventStatus.FAILED.code());
+            stmt.setInt(3, limit);
 
             List<EventRecord> records = new ArrayList<>();
             try (ResultSet rs = stmt.executeQuery()) {
@@ -266,7 +300,7 @@ public class JdbcEventRepository implements EventRepository {
 
         String sql = String.format(
                 "SELECT id, process_id, event, status, retry, retry_count, created_at, modified_at, error_message FROM %s " +
-                "WHERE status = 'FAILED' AND retry_count < ? AND modified_at <= ? " +
+                "WHERE status = ? AND retry_count < ? AND modified_at <= ? " +
                 "ORDER BY modified_at LIMIT ?",
                 qualifiedTableName);
 
@@ -274,9 +308,10 @@ public class JdbcEventRepository implements EventRepository {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setMaxRows(limit);
-            stmt.setInt(1, maxRetryCount);
-            stmt.setTimestamp(2, Timestamp.from(minModifiedAt));
-            stmt.setInt(3, limit);
+            stmt.setInt(1, EventStatus.FAILED.code());
+            stmt.setInt(2, maxRetryCount);
+            stmt.setTimestamp(3, Timestamp.from(minModifiedAt));
+            stmt.setInt(4, limit);
 
             List<EventRecord> records = new ArrayList<>();
             try (ResultSet rs = stmt.executeQuery()) {
@@ -323,23 +358,24 @@ public class JdbcEventRepository implements EventRepository {
                 CREATE TABLE IF NOT EXISTS %s (
                     id          UUID PRIMARY KEY,
                     process_id  UUID,
-                    event       JSONB NOT NULL,
-                    status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                    event       %s NOT NULL,
+                    status      SMALLINT NOT NULL DEFAULT 0,
                     retry       BOOLEAN NOT NULL DEFAULT FALSE,
                     retry_count INTEGER NOT NULL DEFAULT 0,
                     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
                     modified_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                    error_message TEXT,
-                    CONSTRAINT chk_status CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED'))
+                    error_message TEXT
                 )
-                """, qualifiedTableName);
+                """, qualifiedTableName, jsonType());
 
         String createIndexSql = String.format(
-                "CREATE INDEX IF NOT EXISTS idx_%s_status_retry ON %s (status, retry)", tableName, qualifiedTableName);
+                "CREATE INDEX IF NOT EXISTS idx_%s_status ON %s (status)", tableName, qualifiedTableName);
 
         String createIndexRetrySql = String.format(
-                "CREATE INDEX IF NOT EXISTS idx_%s_failed_retry ON %s (status, retry_count, modified_at) WHERE status = 'FAILED'",
-                tableName, qualifiedTableName);
+                "CREATE INDEX IF NOT EXISTS idx_%s_retry ON %s (retry, status)", tableName, qualifiedTableName);
+
+        String createIndexFailedSql = String.format(
+                "CREATE INDEX IF NOT EXISTS idx_%s_failed ON %s (status, retry_count, modified_at)", tableName, qualifiedTableName);
 
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
@@ -347,6 +383,7 @@ public class JdbcEventRepository implements EventRepository {
             stmt.execute(createTableSql);
             stmt.execute(createIndexSql);
             stmt.execute(createIndexRetrySql);
+            stmt.execute(createIndexFailedSql);
             log.info("Ensured outbox table exists: {}", qualifiedTableName);
 
         } catch (SQLException e) {
@@ -358,7 +395,7 @@ public class JdbcEventRepository implements EventRepository {
         UUID id = rs.getObject("id", UUID.class);
         UUID processId = rs.getObject("process_id", UUID.class);
         String event = rs.getString("event");
-        EventStatus status = EventStatus.valueOf(rs.getString("status"));
+        EventStatus status = EventStatus.fromCode(rs.getInt("status"));
         boolean retry = rs.getBoolean("retry");
         int retryCount = rs.getInt("retry_count");
         Instant createdAt = rs.getTimestamp("created_at").toInstant();
