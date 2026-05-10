@@ -5,8 +5,8 @@ import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.transport.SendResults;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -18,8 +18,6 @@ import java.util.concurrent.CompletableFuture;
  * @param <T> the payload type
  */
 public final class DefaultEventBuilder<T> implements EventBuilder<T> {
-
-    private static final String CHANNELS_KEY = "channels";
 
     private final EventPublisher publisher;
     private final T payload;
@@ -71,19 +69,13 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
 
     @Override
     public CompletableFuture<SendResults> publish() {
-        Map<String, String> meta = new HashMap<>(metadata);
-        if (channels != null) {
-            meta.put(CHANNELS_KEY, Arrays.stream(channels)
-                    .map(Class::getName)
-                    .reduce((a, b) -> a + "," + b)
-                    .orElse(""));
-        }
         Envelope<T> envelope = new Envelope<>(
                 UUID.randomUUID(),
                 processId,
                 occurredAt,
                 payload,
-                Map.copyOf(meta)
+                Map.copyOf(metadata),
+                channels != null ? List.of(channels) : null
         );
         return publisher.publish(envelope);
     }

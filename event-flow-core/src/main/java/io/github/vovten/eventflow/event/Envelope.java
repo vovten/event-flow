@@ -10,13 +10,10 @@ import io.github.vovten.eventflow.util.EventUtils;
 
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * Envelope wrapper for events that adds technical metadata.
@@ -33,10 +30,6 @@ import java.util.concurrent.ConcurrentMap;
  */
 public final class Envelope<T> implements TraceableEvent {
 
-    private static final String CHANNELS_KEY = "channels";
-    private static final ConcurrentMap<String, Class<? extends EventChannel>> channelClassCache =
-            new ConcurrentHashMap<>();
-
     private final UUID eventId;
     private final UUID processId;
     private final Instant occurredAt;
@@ -44,6 +37,8 @@ public final class Envelope<T> implements TraceableEvent {
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
     private final T payload;
+
+    private final transient List<Class<? extends EventChannel>> targetChannels;
 
     @JsonCreator
     public Envelope(
@@ -57,6 +52,22 @@ public final class Envelope<T> implements TraceableEvent {
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
         this.payload = Objects.requireNonNull(payload, "payload must not be null");
         this.metadata = Map.copyOf(metadata);
+        this.targetChannels = null;
+    }
+
+    Envelope(
+            UUID eventId,
+            UUID processId,
+            Instant occurredAt,
+            T payload,
+            Map<String, String> metadata,
+            List<Class<? extends EventChannel>> targetChannels) {
+        this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
+        this.processId = processId;
+        this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
+        this.payload = Objects.requireNonNull(payload, "payload must not be null");
+        this.metadata = Map.copyOf(metadata);
+        this.targetChannels = targetChannels;
     }
 
     /**
@@ -73,7 +84,8 @@ public final class Envelope<T> implements TraceableEvent {
                 null,
                 Instant.now(),
                 payload,
-                Map.of()
+                Map.of(),
+                null
         );
     }
 
@@ -92,7 +104,8 @@ public final class Envelope<T> implements TraceableEvent {
                 processId,
                 Instant.now(),
                 payload,
-                Map.of()
+                Map.of(),
+                null
         );
     }
 
@@ -112,14 +125,13 @@ public final class Envelope<T> implements TraceableEvent {
         if (channels.length == 0) {
             throw new IllegalArgumentException("At least one channel must be specified");
         }
-        Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(CHANNELS_KEY, toChannelNames(channels));
         return new Envelope<>(
                 UUID.randomUUID(),
                 null,
                 Instant.now(),
                 payload,
-                meta
+                Map.of(),
+                List.of(channels)
         );
     }
 
@@ -140,14 +152,13 @@ public final class Envelope<T> implements TraceableEvent {
         if (channels.length == 0) {
             throw new IllegalArgumentException("At least one channel must be specified");
         }
-        Map<String, String> meta = new LinkedHashMap<>();
-        meta.put(CHANNELS_KEY, toChannelNames(channels));
         return new Envelope<>(
                 UUID.randomUUID(),
                 processId,
                 Instant.now(),
                 payload,
-                meta
+                Map.of(),
+                List.of(channels)
         );
     }
 
@@ -214,11 +225,8 @@ public final class Envelope<T> implements TraceableEvent {
      */
     @Override
     public List<Class<? extends EventChannel>> channels() {
-        String channelsValue = metadata.get(CHANNELS_KEY);
-        if (channelsValue != null && !channelsValue.isEmpty()) {
-            return Arrays.stream(channelsValue.split(","))
-                    .<Class<? extends EventChannel>>map(this::resolveChannelClass)
-                    .toList();
+        if (targetChannels != null) {
+            return targetChannels;
         }
         io.github.vovten.eventflow.event.annotation.Event annotation =
                 payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
@@ -226,31 +234,6 @@ public final class Envelope<T> implements TraceableEvent {
             return Arrays.asList(annotation.channels());
         }
         return List.of(InternalEventChannel.class);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Class<? extends EventChannel> resolveChannelClass(String className) {
-        return channelClassCache.computeIfAbsent(className, name -> {
-            try {
-                return (Class<? extends EventChannel>) Class.forName(
-                        name, false, Thread.currentThread().getContextClassLoader());
-            } catch (ClassNotFoundException e) {
-                throw new IllegalStateException("Channel class not found: " + name, e);
-            }
-        });
-    }
-
-    /**
-     * Convert channel classes to comma-separated FQCN list for metadata storage.
-     *
-     * @param channels channel classes
-     * @return comma-separated fully qualified class names
-     */
-    private static String toChannelNames(Class<? extends EventChannel>[] channels) {
-        return Arrays.stream(channels)
-                .map(Class::getName)
-                .reduce((a, b) -> a + "," + b)
-                .orElse("");
     }
 
     @Override
