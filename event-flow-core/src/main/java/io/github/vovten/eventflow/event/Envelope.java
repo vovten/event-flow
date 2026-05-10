@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Envelope wrapper for domain events that adds technical metadata.
+ * Envelope wrapper for events that adds technical metadata.
  * <p>
  * Automatically captures: eventId (UUID), processId (UUID), occurredAt (Instant).
  * Additional metadata can be added via {@link #metadata()}.
@@ -60,7 +60,7 @@ public final class Envelope<T> implements TraceableEvent {
      * Channels are resolved from payload's {@link Event} annotation, or default to internal.
      *
      * @param <T>     the payload type
-     * @param payload the domain event to wrap
+     * @param payload the event to wrap
      * @return new envelope instance
      */
     public static <T> Envelope<T> of(T payload) {
@@ -175,7 +175,7 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
-     * @return the wrapped domain event payload
+     * @return the wrapped event payload
      */
     @JsonGetter("payload")
     public T payload() {
