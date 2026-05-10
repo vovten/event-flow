@@ -2,7 +2,7 @@ package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.test.TestEvent;
+import io.github.vovten.eventflow.TestEvent;
 import io.github.vovten.eventflow.transport.OutTransport;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
