@@ -9,14 +9,10 @@ import io.github.vovten.eventflow.transport.SendResults;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Event publisher interface.
+ * Core interface for publishing events.
  * <p>
- * Provides methods for publishing events:
- * <ul>
- *   <li>{@link #publish(Event)} - publish an event implementing {@link Event} interface</li>
- *   <li>{@link #publish(Object)} - publish any domain object wrapped in an {@link Envelope}</li>
- *   <li>{@link #prepare(Object)} - create a builder for fine-grained control over envelope metadata</li>
- * </ul>
+ * Implementations handle event delivery to configured channels (internal queues, external brokers).
+ * Publishing is always asynchronous to avoid blocking the caller.
  *
  * @author Vladimir Aleshkov
  * @since 2024-11-20

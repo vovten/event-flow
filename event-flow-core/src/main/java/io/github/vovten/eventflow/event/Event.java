@@ -8,8 +8,13 @@ import io.github.vovten.eventflow.util.EventUtils;
 import java.util.List;
 
 /**
- * An event that occurs in the application and can be delivered to all interested parties
- * (components within the application, components of third-party applications (microservices)).
+ * Represents an event — a message indicating that something happened in the system.
+ * <p>
+ * Unlike commands, events describe facts (e.g., {@code OrderPlaced}, {@code PaymentFailed})
+ * that other parts of the system can react to. Events are immutable and typically
+ * published after state changes have already occurred.
+ * <p>
+ * Events are routed to channels based on {@link #channels()}.
  *
  * @author Vladimir Aleshkov
  * @since 2026-03-02
