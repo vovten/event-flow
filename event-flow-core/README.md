@@ -100,7 +100,7 @@ For tracing and correlation, extend `TraceableEvent`:
 public record PaymentCompletedEvent(
     String paymentId,
     UUID uid,
-    String traceId,
+    UUID processId,
     Instant occurredAt
 ) implements TraceableEvent {
 
@@ -113,7 +113,7 @@ public record PaymentCompletedEvent(
     public UUID uid() { return uid; }
 
     @Override
-    public String traceId() { return traceId; }
+    public UUID processId() { return processId; }
 
     @Override
     public Instant occurredAt() { return occurredAt; }

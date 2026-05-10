@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.EventHandler;
+import io.github.vovten.eventflow.EventListener;
 import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.test.TestEvent;
@@ -42,12 +43,12 @@ class ConcurrentRegistryTest {
                     for (int i = 0; i < iterations; i++) {
                         // Register a listener
                         Object listener = new Object() {
-                            @io.github.vovten.eventflow.EventListener
+                            @EventListener
                             public void handleTestEvent(TestEvent event) {
                                 // Handle event
                             }
 
-                            @io.github.vovten.eventflow.EventListener
+                            @EventListener
                             public void handleGenericEvent(Event event) {
                                 // Handle generic event
                             }

@@ -38,7 +38,7 @@ class KafkaOutTransportFactoryTest {
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("kafka-publisher");
         config.setServers("localhost:9092");
-        config.setTopic("test-topic");
+        config.setTopics("test-topic");
 
         // when
         OutTransport transport = factory.createPublisher(config);
@@ -54,7 +54,7 @@ class KafkaOutTransportFactoryTest {
         KafkaOutTransportFactory factory = new KafkaOutTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-        config.setTopic("test-topic");
+        config.setTopics("test-topic");
 
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
@@ -63,8 +63,8 @@ class KafkaOutTransportFactoryTest {
     }
 
     @Test
-    @DisplayName("KafkaPublisherTransportFactory should throw exception when topic is missing")
-    void kafkaPublisherTransportFactoryShouldThrowExceptionWhenTopicIsMissing() {
+    @DisplayName("KafkaPublisherTransportFactory should throw exception when topics is missing")
+    void kafkaPublisherTransportFactoryShouldThrowExceptionWhenTopicsIsMissing() {
         // given
         KafkaOutTransportFactory factory = new KafkaOutTransportFactory(serializerFactory);
 
@@ -74,6 +74,6 @@ class KafkaOutTransportFactoryTest {
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Kafka transport requires topic configuration");
+                .hasMessageContaining("Kafka transport requires topics configuration");
     }
 }

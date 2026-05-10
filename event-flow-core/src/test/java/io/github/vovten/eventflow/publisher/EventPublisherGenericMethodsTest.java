@@ -99,22 +99,22 @@ class EventPublisherGenericMethodsTest {
     }
 
     @Test
-    @DisplayName("Should publish via builder with custom traceId")
-    void shouldPublishViaBuilderWithCustomTraceId() {
+    @DisplayName("Should publish via builder with custom processId")
+    void shouldPublishViaBuilderWithCustomProcessId() {
         OutTransport transport = mock(OutTransport.class);
         when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
-        UUID customTraceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         publisher.prepare(event)
-                .withTraceId(customTraceId)
+                .withProcessId(customProcessId)
                 .publish()
                 .join();
 
         verify(transport).send(argThat((Envelope<?> e) ->
-                e.traceId().equals(customTraceId)));
+                customProcessId.equals(e.processId())));
     }
 
     @Test
@@ -126,15 +126,15 @@ class EventPublisherGenericMethodsTest {
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
-        UUID traceId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
+        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         publisher.prepare(event)
-                .withTraceId(traceId)
+                .withProcessId(processId)
                 .withMetadata("source", "order-service")
                 .publish()
                 .join();
 
         verify(transport).send(argThat((Envelope<?> e) ->
-                e.traceId().equals(traceId) &&
+                processId.equals(e.processId()) &&
                         e.metadata().get("source").equals("order-service")));
     }
 

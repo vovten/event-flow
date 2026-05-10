@@ -30,7 +30,7 @@ public class KafkaInTransportFactory implements InTransportFactory {
         validate(config);
         return new KafkaInTransport(
             config.getServers(),
-            config.getTopic(),
+            config.getTopics(),
             config.getConsumerGroup()
         );
     }
@@ -46,7 +46,7 @@ public class KafkaInTransportFactory implements InTransportFactory {
         validate(config);
         return new KafkaInTransport(
             config.getServers(),
-            config.getTopic(),
+            config.getTopics(),
             config.getConsumerGroup()
         );
     }
@@ -58,9 +58,9 @@ public class KafkaInTransportFactory implements InTransportFactory {
                     "Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
-        if (config.getTopic() == null) {
+        if (config.getTopics() == null) {
             throw new IllegalStateException(
-                    "Kafka transport requires topic configuration"
+                    "Kafka transport requires topics configuration"
             );
         }
     }

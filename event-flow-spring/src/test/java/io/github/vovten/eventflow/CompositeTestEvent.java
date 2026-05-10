@@ -1,10 +1,10 @@
-package io.github.vovten.eventflow.test;
+package io.github.vovten.eventflow;
 
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.ExternalEventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
-import io.github.vovten.eventflow.event.Event;
 
 import java.time.Instant;
 import java.util.List;
@@ -20,7 +20,9 @@ public class CompositeTestEvent extends AbstractTraceableEvent {
     private String content;
 
     public CompositeTestEvent() {
-        this(UUID.randomUUID().toString(), "Composite test event content");
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.content = "Composite test event content";
     }
 
     public CompositeTestEvent(String id, String content) {
@@ -29,14 +31,20 @@ public class CompositeTestEvent extends AbstractTraceableEvent {
         this.content = content;
     }
 
-    public CompositeTestEvent(String id, String content, Instant timestamp) {
-        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
+    public CompositeTestEvent(String content) {
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.content = content;
+    }
+
+    public CompositeTestEvent(UUID uid, UUID processId, String id, String content, Instant timestamp) {
+        super(uid, processId, timestamp);
         this.id = id;
         this.content = content;
     }
 
-    public CompositeTestEvent(UUID uid, UUID traceId, String id, String content, Instant timestamp) {
-        super(uid, traceId, timestamp);
+    public CompositeTestEvent(String id, String content, Instant timestamp) {
+        super(timestamp);
         this.id = id;
         this.content = content;
     }
