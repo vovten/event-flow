@@ -39,40 +39,27 @@ import java.util.concurrent.CompletableFuture;
  *   <li>The Future cannot complete until after the transaction commits (via afterCommit)</li>
  * </ul>
  * <p>
+ * <b>Incorrect usage (causes deadlock):</b>
+ * <pre>{@code
+ * @Transactional
+ * public void processOrder(Order order) {
+ *     orderRepository.save(order);
+ *     if (publisher.publish(new OrderCreatedEvent(order)).join().isAllSuccess()) {
+ *         outboxService.delete(order.getId());
+ *     }
+ * }
+ * }</pre>
+ * <p>
  * <b>Correct usage:</b>
  * <pre>{@code
  * // CORRECT - non-blocking, callback runs AFTER transaction commits
  * publisher.publish(event).thenAccept(results -> {
  *     // This callback executes in a separate thread AFTER transaction commits
  *     if (results.isAllSuccess()) {
- *         // Important: use separate @Transactional method for delete
- *         outboxRepository.delete(entity);
+ *         outboxService.delete(entity.getId());
  *     }
  * });
  * }</pre>
- * <p>
- * <b>Incorrect usage (causes deadlock):</b>
- * <pre>{@code
- * // WRONG - will block forever
- * SendResults results = publisher.publish(event).join();
- * }</pre>
- * <p>
- * <b>Outbox pattern usage:</b>
- * <pre>{@code
- * @Transactional
- * public void process() {
- *     for (EventOutboxEntity entity : repository.findAll()) {
- *         Event event = deserialize(entity.getPayload());
- *         publisher.publish(event).thenAccept(result -> {
- *             if (result.isAllSuccess()) {
- *                 // Separate transaction for deletion
- *                 outboxService.delete(entity.getId());
- *             }
- *         });
- *     }
- * }
- * }</pre>
- *
  * @author Vladimir Aleshkov
  * @since 2026-03-05
  * @see ChannelEventPublisher
