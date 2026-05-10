@@ -24,7 +24,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.14</spring-boot.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
-        <msgpack.version>0.9.8</msgpack.version>
+        <msgpack.version>0.9.11</msgpack.version>
         <!-- Skip parent deployment -->
         <maven.deploy.skip>true</maven.deploy.skip>
 

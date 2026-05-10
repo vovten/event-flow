@@ -228,8 +228,7 @@ public final class Envelope<T> implements TraceableEvent {
         if (targetChannels != null) {
             return targetChannels;
         }
-        io.github.vovten.eventflow.event.annotation.Event annotation =
-                payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
+        var annotation = payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
         if (annotation != null) {
             return Arrays.asList(annotation.channels());
         }
