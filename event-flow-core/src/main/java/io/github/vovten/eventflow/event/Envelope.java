@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Envelope wrapper for events that adds technical metadata.
@@ -32,6 +34,8 @@ import java.util.UUID;
 public final class Envelope<T> implements TraceableEvent {
 
     private static final String CHANNELS_KEY = "channels";
+    private static final ConcurrentMap<String, Class<? extends EventChannel>> channelClassCache =
+            new ConcurrentHashMap<>();
 
     private final UUID eventId;
     private final UUID processId;
@@ -213,13 +217,7 @@ public final class Envelope<T> implements TraceableEvent {
         String channelsValue = metadata.get(CHANNELS_KEY);
         if (channelsValue != null && !channelsValue.isEmpty()) {
             return Arrays.stream(channelsValue.split(","))
-                    .<Class<? extends EventChannel>>map(s -> {
-                        try {
-                            return (Class<? extends EventChannel>) Class.forName(s);
-                        } catch (ClassNotFoundException e) {
-                            throw new IllegalStateException("Channel class not found: " + s, e);
-                        }
-                    })
+                    .<Class<? extends EventChannel>>map(this::resolveChannelClass)
                     .toList();
         }
         io.github.vovten.eventflow.event.annotation.Event annotation =
@@ -228,6 +226,18 @@ public final class Envelope<T> implements TraceableEvent {
             return Arrays.asList(annotation.channels());
         }
         return List.of(InternalEventChannel.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Class<? extends EventChannel> resolveChannelClass(String className) {
+        return channelClassCache.computeIfAbsent(className, name -> {
+            try {
+                return (Class<? extends EventChannel>) Class.forName(
+                        name, false, Thread.currentThread().getContextClassLoader());
+            } catch (ClassNotFoundException e) {
+                throw new IllegalStateException("Channel class not found: " + name, e);
+            }
+        });
     }
 
     /**
