@@ -381,22 +381,25 @@ public class JdbcEventRepository implements EventRepository {
             return;
         }
 
+        // Step 1: Check if table exists
+        if (tableExists()) {
+            log.debug("Table already exists: {}", qualifiedTableName);
+            return;
+        }
+
+        log.info("Creating outbox table: {}", qualifiedTableName);
+
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
 
-            // Create ENUM type for PostgreSQL (ignore error if exists)
+            // Create ENUM type for PostgreSQL
             if (isPostgres()) {
-                try {
-                    stmt.execute("CREATE TYPE event_status AS ENUM ('PENDING', 'PUBLISHED', 'FAILED')");
-                } catch (SQLException e) {
-                    // Type already exists, ignore
-                    log.debug("Event status enum already exists");
-                }
+                stmt.execute("CREATE TYPE event_status AS ENUM ('PENDING', 'PUBLISHED', 'FAILED')");
             }
-            
+
             // Create table
             stmt.execute(String.format("""
-                    CREATE TABLE IF NOT EXISTS %s (
+                    CREATE TABLE %s (
                         id          UUID PRIMARY KEY,
                         process_id  UUID,
                         event       %s NOT NULL,
@@ -415,17 +418,84 @@ public class JdbcEventRepository implements EventRepository {
 
             // Create indexes
             stmt.execute(String.format(
-                    "CREATE INDEX IF NOT EXISTS idx_%s_status ON %s (status)", tableName, qualifiedTableName));
+                    "CREATE INDEX idx_%s_status ON %s (status)", tableName, qualifiedTableName));
             stmt.execute(String.format(
-                    "CREATE INDEX IF NOT EXISTS idx_%s_retry ON %s (retry, status)", tableName, qualifiedTableName));
+                    "CREATE INDEX idx_%s_retry ON %s (retry, status)", tableName, qualifiedTableName));
             stmt.execute(String.format(
-                    "CREATE INDEX IF NOT EXISTS idx_%s_failed ON %s (status, retry_count, modified_at)", tableName, qualifiedTableName));
+                    "CREATE INDEX idx_%s_failed ON %s (status, retry_count, modified_at)", tableName, qualifiedTableName));
 
-            log.info("Ensured outbox table exists: {} (type: {})", qualifiedTableName, getDatabaseType());
+            log.info("Created outbox table: {} (type: {})", qualifiedTableName, getDatabaseType());
 
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to create outbox table: " + qualifiedTableName, e);
+            log.error("""
+                    
+                    ╔═══════════════════════════════════════════════════════════════════╗
+                    ║ Failed to create outbox table. Create it manually using the schema  ║
+                    ╚═══════════════════════════════════════════════════════════════════╝
+                    """);
+            log.error("SQL Error: {}", e.getMessage());
+            log.error("Schema location: classpath:db/event_outbox.sql");
+            log.error("Or use the following DDL for your database:");
+            log.error("{}", getCreateTableDdl());
+            throw new RuntimeException(
+                    "Failed to create outbox table: " + qualifiedTableName + 
+                    ". See log for schema or check classpath:db/event_outbox.sql", e);
         }
+    }
+
+    /**
+     * Check if table exists by trying to select from it.
+     */
+    private boolean tableExists() {
+        String sql = String.format("SELECT 1 FROM %s WHERE 1=0", qualifiedTableName);
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeQuery(sql);
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Generate CREATE TABLE DDL for manual execution.
+     */
+    private String getCreateTableDdl() {
+        StringBuilder ddl = new StringBuilder();
+        
+        if (isPostgres()) {
+            ddl.append("-- PostgreSQL\n");
+            ddl.append("CREATE TYPE event_status AS ENUM ('PENDING', 'PUBLISHED', 'FAILED');\n\n");
+        }
+        
+        ddl.append(String.format("""
+                -- Table for database type: %s
+                CREATE TABLE %s (
+                    id          UUID PRIMARY KEY,
+                    process_id  UUID,
+                    event       %s NOT NULL,
+                    status      %s NOT NULL DEFAULT %s,
+                    retry       BOOLEAN NOT NULL DEFAULT FALSE,
+                    retry_count INTEGER NOT NULL DEFAULT 0,
+                    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+                    modified_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    error_message TEXT
+                );
+                
+                CREATE INDEX idx_%s_status ON %s (status);
+                CREATE INDEX idx_%s_retry ON %s (retry, status);
+                CREATE INDEX idx_%s_failed ON %s (status, retry_count, modified_at);
+                """,
+                getDatabaseType(),
+                qualifiedTableName,
+                jsonType(),
+                statusType(),
+                statusValue(EventStatus.PENDING),
+                tableName, qualifiedTableName,
+                tableName, qualifiedTableName,
+                tableName, qualifiedTableName));
+        
+        return ddl.toString();
     }
 
     private EventRecord mapRow(ResultSet rs) throws SQLException {
