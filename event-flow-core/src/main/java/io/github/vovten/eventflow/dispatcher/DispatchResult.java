@@ -1,5 +1,7 @@
 package io.github.vovten.eventflow.dispatcher;
 
+import io.github.vovten.eventflow.EventHandler;
+
 import java.util.List;
 
 /**
@@ -12,11 +14,11 @@ import java.util.List;
 public record DispatchResult(
         int totalHandlers,
         int invokedHandlers,
-        List<String> handlerNames
+        List<EventHandler> handlers
 ) {
 
     /**
-     * Creates a dispatch result with empty handler names.
+     * Creates a dispatch result with empty handlers list.
      *
      * @param totalHandlers     total handlers found
      * @param invokedHandlers   handlers that were invoked

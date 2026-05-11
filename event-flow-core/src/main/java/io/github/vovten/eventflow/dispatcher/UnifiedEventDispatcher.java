@@ -169,7 +169,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         }
         int totalHandlers = handlers.size();
         int submittedHandlers = 0;
-        List<String> handlerNames = new ArrayList<>();
+        List<EventHandler> submittedHandlersList = new ArrayList<>();
 
         for (EventHandler handler : handlers) {
             try {
@@ -178,7 +178,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                 }
                 executorService.execute(new HandlerTask(handler, eventToDispatch));
                 submittedHandlers++;
-                handlerNames.add(handler.name());
+                submittedHandlersList.add(handler);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("Handler submission interrupted for event {} (handler {}/{}): {}",
@@ -201,7 +201,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
             log.warn("Partial handler submission for event {}: {}/{} handlers submitted",
                     event.type().getSimpleName(), submittedHandlers, totalHandlers);
         }
-        return new DispatchResult(totalHandlers, submittedHandlers, handlerNames);
+        return new DispatchResult(totalHandlers, submittedHandlers, submittedHandlersList);
     }
 
     private Event resolveEvent(Event event) {

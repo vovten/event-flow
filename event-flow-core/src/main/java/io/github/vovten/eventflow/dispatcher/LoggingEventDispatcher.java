@@ -112,8 +112,8 @@ public class LoggingEventDispatcher implements EventDispatcher {
         buildEventId(eventInfo, event);
         buildPayload(eventInfo, event);
 
-        if (result != null && !result.handlerNames().isEmpty()) {
-            eventInfo.put("handlers", result.handlerNames());
+        if (result != null && !result.handlers().isEmpty()) {
+            eventInfo.put("handlers", result.handlers().stream().map(h -> h.name()).toList());
             eventInfo.put("handlersCount", result.invokedHandlers());
         }
         eventInfo.put("durationMs", durationMs);
