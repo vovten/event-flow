@@ -18,7 +18,8 @@ import java.util.UUID;
 /**
  * Envelope wrapper for events that adds technical metadata.
  * <p>
- * Automatically captures: eventId (UUID), processId (UUID), occurredAt (Instant).
+ * Automatically captures: eventId (UUID), occurredAt (Instant).
+ * processId is optional and can be set via factory methods or builder.
  * Additional metadata can be added via {@link #metadata()}.
  * <p>
  * The envelope implements {@link Event} interface, so it passes through
@@ -128,33 +129,6 @@ public final class Envelope<T> implements TraceableEvent {
         return new Envelope<>(
                 UUID.randomUUID(),
                 null,
-                Instant.now(),
-                payload,
-                Map.of(),
-                List.of(channels)
-        );
-    }
-
-    /**
-     * Create envelope with auto-generated eventId, specified processId, and specified channels.
-     * Channels take priority over payload's {@link Event} annotation.
-     *
-     * @param <T>        the payload type
-     * @param payload    the domain event to wrap
-     * @param processId  the process identifier (e.g., saga ID)
-     * @param channels   channel classes for routing
-     * @return new envelope instance
-     * @throws IllegalArgumentException if channels array is empty
-     */
-    @SafeVarargs
-    public static <T> Envelope<T> of(T payload, UUID processId, Class<? extends EventChannel>... channels) {
-        Objects.requireNonNull(channels, "channels must not be null");
-        if (channels.length == 0) {
-            throw new IllegalArgumentException("At least one channel must be specified");
-        }
-        return new Envelope<>(
-                UUID.randomUUID(),
-                processId,
                 Instant.now(),
                 payload,
                 Map.of(),

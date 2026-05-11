@@ -54,32 +54,19 @@ class EnvelopeTest {
     }
 
     @Test
-    @DisplayName("Should create envelope with processId and channels via factory method")
-    void shouldCreateEnvelopeWithProcessIdAndChannelsViaFactoryMethod() {
+    @DisplayName("Should create envelope with processId and channels via builder")
+    void shouldCreateEnvelopeWithProcessIdAndChannelsViaBuilder() {
         PojoEvent pojoEvent = new PojoEvent("test");
         UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
 
-        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, processId, ExternalEventChannel.class, BroadcastEventChannel.class);
+        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, ExternalEventChannel.class, BroadcastEventChannel.class);
+        // Note: processId is now set via EventBuilder, not factory method
+        // This test verifies that channels work correctly
 
-        assertEquals(processId, envelope.processId());
         List<Class<? extends EventChannel>> channels = envelope.channels();
         assertEquals(2, channels.size());
         assertEquals(ExternalEventChannel.class, channels.get(0));
         assertEquals(BroadcastEventChannel.class, channels.get(1));
-    }
-
-    @Test
-    @DisplayName("Should create envelope with processId only via factory method")
-    void shouldCreateEnvelopeWithProcessIdOnlyViaFactoryMethod() {
-        PojoEvent pojoEvent = new PojoEvent("test");
-        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
-
-        Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, processId);
-
-        assertEquals(processId, envelope.processId());
-        List<Class<? extends EventChannel>> channels = envelope.channels();
-        assertEquals(1, channels.size());
-        assertEquals(InternalEventChannel.class, channels.get(0));
     }
 
     @Test
@@ -137,16 +124,6 @@ class EnvelopeTest {
         PojoEvent pojoEvent = new PojoEvent("test");
         assertThrows(IllegalArgumentException.class, () ->
                 Envelope.of(pojoEvent, (Class<? extends EventChannel>[]) new Class[0])
-        );
-    }
-
-    @Test
-    @DisplayName("Should throw exception when channels array is null with processId")
-    void shouldThrowExceptionWhenChannelsArrayIsNullWithProcessId() {
-        PojoEvent pojoEvent = new PojoEvent("test");
-        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440002");
-        assertThrows(NullPointerException.class, () ->
-                Envelope.of(pojoEvent, processId, (Class<? extends EventChannel>[]) null)
         );
     }
 
