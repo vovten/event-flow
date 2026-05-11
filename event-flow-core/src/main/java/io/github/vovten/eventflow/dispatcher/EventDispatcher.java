@@ -17,19 +17,9 @@ public interface EventDispatcher {
      * Redirect the event to appropriate listeners.
      *
      * @param event the event
-     */
-    void dispatch(Event event);
-
-    /**
-     * Redirect the event to appropriate listeners and return dispatch result.
-     *
-     * @param event the event
      * @return dispatch result with information about invoked handlers
      */
-    default DispatchResult dispatchWithResult(Event event) {
-        dispatch(event);
-        return new DispatchResult(0, 0);
-    }
+    DispatchResult dispatch(Event event);
 
     /**
      * Register a listener

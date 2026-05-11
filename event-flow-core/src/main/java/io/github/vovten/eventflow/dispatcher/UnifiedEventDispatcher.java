@@ -160,12 +160,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void dispatch(Event event) {
-        dispatchWithResult(event);
-    }
-
-    @Override
-    public DispatchResult dispatchWithResult(Event event) {
+    public DispatchResult dispatch(Event event) {
         Event eventToDispatch = resolveEvent(event);
         List<EventHandler> handlers = handlerRegistry.getHandlers(eventToDispatch);
         if (handlers.isEmpty()) {

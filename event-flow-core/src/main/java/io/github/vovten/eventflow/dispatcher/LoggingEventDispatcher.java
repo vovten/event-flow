@@ -72,20 +72,10 @@ public class LoggingEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void dispatch(Event event) {
+    public DispatchResult dispatch(Event event) {
         long startTime = System.currentTimeMillis();
 
-        origin.dispatch(event);
-
-        long durationMs = System.currentTimeMillis() - startTime;
-        logEvent(event, null, durationMs, null);
-    }
-
-    @Override
-    public DispatchResult dispatchWithResult(Event event) {
-        long startTime = System.currentTimeMillis();
-
-        DispatchResult result = origin.dispatchWithResult(event);
+        DispatchResult result = origin.dispatch(event);
 
         long durationMs = System.currentTimeMillis() - startTime;
         logEvent(event, result, durationMs, null);
