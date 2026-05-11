@@ -31,7 +31,6 @@
 - **Transactional Publishing** — Send events after transaction commit
 - **Retry Mechanism** — Exponential backoff with configurable parameters
 - **Extensible Serialization** — JSON and MessagePack with support for custom formats
-- **Security** — Event class whitelist to protect against deserialization attacks
 
 ## 🏗 Architecture
 
@@ -516,6 +515,130 @@ EventTypeRegistry.allowClass(MyEvent.class);
 
 ## 📝 Usage Examples
 
+### Publishing Options Overview
+
+Event Flow provides multiple ways to publish events:
+
+| Method | Envelope | Channels | Metadata | Message Size |
+|--------|----------|----------|----------|--------------|
+| `implements Event` | ❌ No | From event | Minimal | ⚡ Smallest |
+| `prepare().publish()` | ✅ Auto | Custom | Custom | Medium |
+
+> **Note:** When POJO or `prepare()` is used, an `Envelope` is automatically created wrapping the payload with additional metadata (eventId, processId, occurredAt). This increases message size but adds correlation/tracing capabilities.
+
+### Recommended: `@Event` Annotation + `prepare()` Builder
+
+The most convenient approach for most use cases:
+
+```java
+// Define event with default channels via annotation
+@Event(channels = {InternalEventChannel.class, ExternalEventChannel.class})
+public record OrderCreatedEvent(long orderId) {}
+
+// Publish with custom metadata (channels from annotation are used automatically)
+eventPublisher.prepare(new OrderCreatedEvent(1))
+    .withProcessId(processId)
+    .publish();
+```
+
+This gives you:
+- Channels from `@Event` annotation (no need to specify in code)
+- Auto-generated eventId and occurredAt (timestamps)
+- Custom metadata via builder (processId, etc.)
+- Envelope for correlation/tracing
+
+### 1. Fastest: Event Interface (No Envelope)
+
+Implement `Event` interface for minimum overhead — no Envelope wrapper, smallest message size:
+
+```java
+public record OrderCreatedEvent(String orderId, String email) implements Event {
+
+    @Override
+    public Class<? extends Event> type() {
+        return OrderCreatedEvent.class;
+    }
+
+    @Override
+    public List<Class<? extends EventChannel>> channels() {
+        return List.of(InternalEventChannel.class, ExternalEventChannel.class);
+    }
+}
+
+eventPublisher.publish(new OrderCreatedEvent("order-123", "user@example.com"));
+```
+
+**Use cases:** High-throughput scenarios, microservice-to-microservice communication, Kafka topics.
+
+### 2. POJO Publishing (Enveloped)
+
+Publish any Java object directly — Envelope is created automatically:
+
+```java
+// Simple POJO
+public record OrderCreated(String orderId, String email) {}
+
+eventPublisher.publish(new OrderCreated("order-123", "user@example.com"));
+```
+
+Envelope with auto-generated metadata:
+- `eventId` — random UUID
+- `processId` — null
+- `occurredAt` — current timestamp
+- `metadata` — empty
+- Channels — `InternalEventChannel` (default)
+
+### 3. Full Control with `prepare()` Builder (Enveloped)
+
+Use the builder for custom metadata and channels — same Envelope is created internally:
+
+```java
+eventPublisher.prepare(new OrderCreated("order-123", "user@example.com"))
+    .withMetadata("key1", "data1")
+    .withMetadata("key2", "data2")
+    .withChannels(InternalEventChannel.class, ExternalEventChannel.class)
+    .withProcessId(UUID.randomUUID())
+    .withOccurredAt(Instant.now())
+    .publish();
+```
+
+> **Note:** Channels specified via `withChannels()` have priority over channels defined in `@Event` annotation on the payload class.
+
+**Available builder methods:**
+- `withMetadata(key, value)` — add single metadata entry
+- `withMetadata(Map)` — add multiple metadata entries
+- `withChannel(channel)` — set single channel (convenience alias)
+- `withChannels(c1)` — set one channel
+- `withChannels(c1, c2)` — set two channels
+- `withChannels(c1, c2, c3)` — set three channels
+- `withChannels(List)` — set arbitrary number of channels
+- `withProcessId(UUID)` — correlation ID (e.g., saga ID)
+- `withOccurredAt(Instant)` — custom event timestamp
+- `publish()` — send the event
+
+### 4. POJO with `@Event` Annotation
+
+Specify default channels on the POJO class:
+
+```java
+@Event(channels = ExternalEventChannel.class)
+public record OrderShipped(String orderId, Instant shippedAt) {}
+
+@Event(channels = {InternalEventChannel.class, ExternalEventChannel.class})
+public record OrderDelivered(String orderId, Instant deliveredAt) {}
+
+eventPublisher.publish(new OrderShipped("order-123", Instant.now()));
+```
+
+### Comparison Table
+
+| Approach | Best For | Envelope | Message Size |
+|----------|----------|----------|--------------|
+| `implements Event` | High throughput, Kafka, microservices | ❌ | Smallest |
+| `publish(POJO)` | Simple notifications, internal events | ✅ | Medium |
+| `publish(POJO) + @Event` | Default routing configuration | ✅ | Medium |
+| `prepare().publish()` | Custom metadata, dynamic routing | ✅ | Medium |
+
 ### Event with Multiple Channels
 
 ```java
@@ -557,26 +680,6 @@ public class NotificationEventSubscriber implements EventSubscriber {
 
 // Register the handler
 handlerRegistry.register(new NotificationEventSubscriber());
-```
-
-### POJO Events (without Event interface)
-
-Plain Java objects can be used as events without implementing the `Event` interface. Wrap them in an `Envelope`:
-
-```java
-// Define a POJO (no interface needed)
-public record OrderPlacedEvent(String orderId, BigDecimal amount) {}
-
-// Publish as Envelope
-EventPublisher publisher = ...;
-publisher.publish(Envelope.of(new OrderPlacedEvent("order-1", new BigDecimal("99.99"))));
-```
-
-The `@Event` annotation can specify default channels for POJOs:
-
-```java
-@Event(channels = {InternalEventChannel.class, ExternalEventChannel.class})
-public record OrderPlacedEvent(String orderId, BigDecimal amount) {}
 ```
 
 ### Handling Envelope (entire wrapper with metadata)
