@@ -8,6 +8,7 @@ import io.github.vovten.eventflow.transport.InTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
@@ -160,14 +161,20 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     @Override
     public void dispatch(Event event) {
+        dispatchWithResult(event);
+    }
+
+    @Override
+    public DispatchResult dispatchWithResult(Event event) {
         Event eventToDispatch = resolveEvent(event);
         List<EventHandler> handlers = handlerRegistry.getHandlers(eventToDispatch);
         if (handlers.isEmpty()) {
             log.debug("No handlers found for event: {}", event);
-            return;
+            return new DispatchResult(0, 0);
         }
         int totalHandlers = handlers.size();
         int submittedHandlers = 0;
+        List<String> handlerNames = new ArrayList<>();
 
         for (EventHandler handler : handlers) {
             try {
@@ -176,13 +183,14 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                 }
                 executorService.execute(new HandlerTask(handler, eventToDispatch));
                 submittedHandlers++;
+                handlerNames.add(handler.name());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("Handler submission interrupted for event {} (handler {}/{}): {}",
                         event.type().getSimpleName(),
                         submittedHandlers + 1,
                         totalHandlers,
-                        handler.getClass().getSimpleName(),
+                        handler.name(),
                         e);
                 break;
             } catch (Exception e) {
@@ -190,7 +198,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                         event.type().getSimpleName(),
                         submittedHandlers + 1,
                         totalHandlers,
-                        handler.getClass().getSimpleName(),
+                        handler.name(),
                         e);
             }
         }
@@ -198,6 +206,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
             log.warn("Partial handler submission for event {}: {}/{} handlers submitted",
                     event.type().getSimpleName(), submittedHandlers, totalHandlers);
         }
+        return new DispatchResult(totalHandlers, submittedHandlers, handlerNames);
     }
 
     private Event resolveEvent(Event event) {

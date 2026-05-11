@@ -20,4 +20,14 @@ public interface EventHandler {
      * @param event the event to process
      */
     void onEvent(Event event);
+
+    /**
+     * Returns the name of this handler for logging/tracing purposes.
+     * Default implementation returns the simple class name.
+     *
+     * @return the handler name
+     */
+    default String name() {
+        return getClass().getSimpleName();
+    }
 }

@@ -60,21 +60,39 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
 
     @Override
     public void dispatch(Event event) {
+        if (event instanceof TraceableEvent traceable) {
+            UUID eventId = traceable.eventId();
+            Boolean existing = cache.getIfPresent(eventId);
+            if (existing != null) {
+                if (warnOnDuplicate) {
+                    log.warn("Duplicate event ignored: {}", eventId);
+                }
+                return;
+            }
+            cache.put(eventId, Boolean.TRUE);
+            log.debug("Event processed: {}", eventId);
+        }
+        origin.dispatch(event);
+    }
+
+    @Override
+    public DispatchResult dispatchWithResult(Event event) {
         if (!(event instanceof TraceableEvent traceable)) {
-            origin.dispatch(event);
-            return;
+            return origin.dispatchWithResult(event);
         }
         UUID eventId = traceable.eventId();
         Boolean existing = cache.getIfPresent(eventId);
 
         if (existing == null) {
-            origin.dispatch(event);
+            DispatchResult result = origin.dispatchWithResult(event);
             cache.put(eventId, Boolean.TRUE);
             log.debug("Event processed: {}", eventId);
+            return result;
         } else {
             if (warnOnDuplicate) {
                 log.warn("Duplicate event ignored: {}", eventId);
             }
+            return new DispatchResult(0, 0);
         }
     }
 
