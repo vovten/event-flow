@@ -108,6 +108,7 @@ public class EventFlowProperties {
     public static class PublisherConfig {
         private boolean enabled = false;
         private boolean transactional = true;
+        private LoggingConfig logging = new LoggingConfig();
         private RetryConfig retry = new RetryConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
@@ -127,6 +128,14 @@ public class EventFlowProperties {
             this.transactional = transactional;
         }
 
+        public LoggingConfig getLogging() {
+            return logging;
+        }
+
+        public void setLogging(LoggingConfig logging) {
+            this.logging = logging;
+        }
+
         public RetryConfig getRetry() {
             return retry;
         }
@@ -141,6 +150,30 @@ public class EventFlowProperties {
 
         public void setChannels(List<ChannelConfig> channels) {
             this.channels = channels;
+        }
+    }
+
+    /**
+     * Logging configuration for event publishing.
+     */
+    public static class LoggingConfig {
+        private boolean enabled = false;
+        private int maxPayloadLength = 500;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getMaxPayloadLength() {
+            return maxPayloadLength;
+        }
+
+        public void setMaxPayloadLength(int maxPayloadLength) {
+            this.maxPayloadLength = maxPayloadLength;
         }
     }
 

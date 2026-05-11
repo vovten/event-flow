@@ -37,6 +37,14 @@ event-flow:
       # Backoff multiplier for exponential backoff
       multiplier: 2.0
 
+    # Enable logging of published events
+    # Logs include: eventId, processId, channels, payload, status, deliveredTo, etc.
+    logging:
+      # Enable or disable event logging
+      enabled: false
+      # Maximum length of payload in log output (characters)
+      max-payload-length: 500
+
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
     # Transport name identifies the type (e.g., "local-queue", "kafka", "broadcast-kafka")

@@ -35,6 +35,7 @@ import java.util.List;
  *   <li>Base {@link ChannelEventPublisher}</li>
  *   <li>Custom decorators (applied in order added)</li>
  *   <li>{@link RetryEventPublisher} (if enabled)</li>
+ *   <li>{@link LoggingEventPublisher} (if enabled)</li>
  *   <li>{@link TransactionalEventPublisher} (if enabled) — always outermost</li>
  * </ol>
  * <p>
@@ -54,6 +55,8 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     private static final Logger log = LoggerFactory.getLogger(SpringEventPublisherBuilder.class);
 
     private boolean transactional = false;
+    private boolean loggable = false;
+    private int logMaxPayloadLength = 500;
 
     /**
      * Start building a new SpringEventPublisher.
@@ -118,13 +121,42 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
         return this;
     }
 
+    /**
+     * Enable logging of published events at INFO level.
+     *
+     * @param maxPayloadLength maximum length of payload in log output
+     * @return this builder
+     */
+    public SpringEventPublisherBuilder loggable(int maxPayloadLength) {
+        this.loggable = true;
+        this.logMaxPayloadLength = maxPayloadLength;
+        return this;
+    }
+
+    /**
+     * Enable logging of published events at INFO level with default max payload length.
+     *
+     * @return this builder
+     */
+    public SpringEventPublisherBuilder loggable() {
+        return loggable(500);
+    }
+
     @Override
     protected EventPublisher decorate(EventPublisher publisher) {
+        EventPublisher result = publisher;
+
+        if (loggable) {
+            log.debug("Applying logging decorator with maxPayloadLength={}", logMaxPayloadLength);
+            result = new LoggingEventPublisher(result, logMaxPayloadLength);
+        }
+
         if (transactional) {
             log.debug("Applying transactional decorator");
-            return new TransactionalEventPublisher(publisher);
+            result = new TransactionalEventPublisher(result);
         }
-        return publisher;
+
+        return result;
     }
 
     /**
@@ -135,11 +167,16 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     @Override
     public EventPublisher buildAndLog() {
         EventPublisher publisher = build();
-        log.info("Built SpringEventPublisher with configuration: channels={}, transactional={}, retry={}",
+        log.info("Built SpringEventPublisher with configuration: channels={}, transactional={}, loggable={}, retry={}",
                 getChannelsSize(),
                 transactional,
+                loggable,
                 getRetryConfig() != null ? "enabled" : "disabled"
         );
         return publisher;
+    }
+
+    public boolean isLoggable() {
+        return loggable;
     }
 }

@@ -191,7 +191,8 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
             log.debug("Applied retry decorator with maxRetries={}, initialDelay={}, multiplier={}",
                     retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
         }
-        // Allow subclasses to add additional decorations (e.g., transactional) — always outermost
+
+        // Allow subclasses to add additional decorations (e.g., transactional, logging) — always outermost
         publisher = decorate(publisher);
         return publisher;
     }

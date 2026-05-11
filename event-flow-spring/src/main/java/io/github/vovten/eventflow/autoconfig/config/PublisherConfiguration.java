@@ -87,6 +87,12 @@ public class PublisherConfiguration {
             builder.transactional();
         }
 
+        // Apply logging if enabled
+        var loggingConfig = publisherConfig.getLogging();
+        if (loggingConfig.isEnabled()) {
+            builder.loggable(loggingConfig.getMaxPayloadLength());
+        }
+
         return builder.buildAndLog();
     }
 
