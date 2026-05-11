@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
@@ -84,18 +85,11 @@ public class LoggingEventDispatcher implements EventDispatcher {
     }
 
     private void logEvent(Event event, DispatchResult result, long durationMs, Throwable error) {
-        String json = buildLogEntry(event, result, durationMs, error);
-
-        if (error != null) {
-            log.error(json);
-        } else if (durationMs > 1000) {
-            log.warn(json);
-        } else {
-            log.info(json);
-        }
+        String json = buildLogEntry(event, result, durationMs);
+        log.info(json);
     }
 
-    private String buildLogEntry(Event event, DispatchResult result, long durationMs, Throwable error) {
+    private String buildLogEntry(Event event, DispatchResult result, long durationMs) {
         Map<String, Object> entry = new LinkedHashMap<>();
 
         addIfPresent(entry, "traceId", MDC.get("traceId"));
@@ -103,27 +97,16 @@ public class LoggingEventDispatcher implements EventDispatcher {
 
         Map<String, Object> eventInfo = new LinkedHashMap<>();
 
-        if (error != null) {
-            eventInfo.put("status", "failed");
-        } else {
-            eventInfo.put("status", "handled");
-        }
+        eventInfo.put("status", "handled");
 
         buildEventId(eventInfo, event);
         buildPayload(eventInfo, event);
 
         if (result != null && !result.handlers().isEmpty()) {
-            eventInfo.put("handlers", result.handlers().stream().map(h -> h.name()).toList());
+            eventInfo.put("handlers", result.handlers().stream().map(EventHandler::name).toList());
             eventInfo.put("handlersCount", result.invokedHandlers());
         }
         eventInfo.put("durationMs", durationMs);
-
-        if (error != null) {
-            Map<String, Object> errorInfo = new LinkedHashMap<>();
-            errorInfo.put("message", error.getMessage());
-            errorInfo.put("type", error.getClass().getSimpleName());
-            eventInfo.put("error", errorInfo);
-        }
 
         entry.put("event", eventInfo);
         entry.put("@timestamp", Instant.now().toString());
