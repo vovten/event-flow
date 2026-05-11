@@ -28,18 +28,18 @@ public interface EventPublisher {
     CompletableFuture<SendResults> publish(Event event);
 
     /**
-     * Publish any domain object wrapped in an {@link Envelope} with auto-generated metadata.
+     * Publish any Object as an event wrapped in an {@link Envelope} with auto-generated metadata.
      * <p>
+     * Allows publishing plain Java objects (POJO) directly without any annotations.
      * The payload is automatically wrapped in an Envelope with:
      * <ul>
      *   <li>eventId - randomly generated UUID</li>
      *   <li>processId - null (use {@link #prepare(Object)} to set)</li>
      *   <li>occurredAt - current timestamp</li>
-     *   <li>metadata - with payloadType key</li>
      * </ul>
      *
-     * @param <T>     the payload type
-     * @param payload the domain object to publish
+     * @param <T>     the payload type (any Object)
+     * @param payload the object to publish as an event
      * @return CompletableFuture that completes with SendResults
      */
     default <T> CompletableFuture<SendResults> publish(T payload) {

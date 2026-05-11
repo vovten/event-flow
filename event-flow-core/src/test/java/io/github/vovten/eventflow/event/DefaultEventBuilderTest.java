@@ -198,7 +198,7 @@ class DefaultEventBuilderTest {
 
         TestPayload payload = new TestPayload("test");
         new DefaultEventBuilder<>(publisher, payload)
-                .withChannels(ExternalEventChannel.class)
+                .withChannel(ExternalEventChannel.class)
                 .publish()
                 .join();
 
@@ -212,7 +212,7 @@ class DefaultEventBuilderTest {
         OutTransport transport = mock(OutTransport.class);
         AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
         when(transport.send(any())).thenAnswer(invocation -> {
-            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
+            capturedEnvelope.set(invocation.getArgument(0));
             return CompletableFuture.completedFuture(SendResult.success("dest"));
         });
         EventChannel internalChannel = new InternalEventChannel(transport);
@@ -230,26 +230,72 @@ class DefaultEventBuilderTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when withChannels called with null")
-    void shouldThrowExceptionWhenWithChannelsCalledWithNull() {
+    @DisplayName("Should support three channels via withChannels")
+    void shouldSupportThreeChannelsViaWithChannels() {
+        OutTransport transport = mock(OutTransport.class);
+        AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
+        when(transport.send(any())).thenAnswer(invocation -> {
+            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
+            return CompletableFuture.completedFuture(SendResult.success("dest"));
+        });
+        EventChannel internalChannel = new InternalEventChannel(transport);
+        EventChannel externalChannel = new ExternalEventChannel(List.of(transport));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
+
+        TestPayload payload = new TestPayload("test");
+        new DefaultEventBuilder<>(publisher, payload)
+                .withChannels(InternalEventChannel.class, ExternalEventChannel.class, InternalEventChannel.class)
+                .publish()
+                .join();
+
+        assertThat(capturedEnvelope.get()).isNotNull();
+        assertThat(capturedEnvelope.get().channels()).containsExactly(InternalEventChannel.class, ExternalEventChannel.class, InternalEventChannel.class);
+    }
+
+    @Test
+    @DisplayName("Should support varargs channels via withChannels")
+    void shouldSupportVarargsChannelsViaWithChannels() {
+        OutTransport transport = mock(OutTransport.class);
+        AtomicReference<Envelope<?>> capturedEnvelope = new AtomicReference<>();
+        when(transport.send(any())).thenAnswer(invocation -> {
+            capturedEnvelope.set((Envelope<?>) invocation.getArgument(0));
+            return CompletableFuture.completedFuture(SendResult.success("dest"));
+        });
+        EventChannel internalChannel = new InternalEventChannel(transport);
+        EventChannel externalChannel = new ExternalEventChannel(List.of(transport));
+        EventPublisher publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
+
+        TestPayload payload = new TestPayload("test");
+        new DefaultEventBuilder<>(publisher, payload)
+                .withChannels(List.of(InternalEventChannel.class, ExternalEventChannel.class))
+                .publish()
+                .join();
+
+        assertThat(capturedEnvelope.get()).isNotNull();
+        assertThat(capturedEnvelope.get().channels()).containsExactly(InternalEventChannel.class, ExternalEventChannel.class);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when withChannels called with null list")
+    void shouldThrowExceptionWhenWithChannelsCalledWithNullList() {
         OutTransport transport = mock(OutTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestPayload payload = new TestPayload("test");
         assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
-                .withChannels((Class<? extends EventChannel>[]) null))
+                .withChannels((List<Class<? extends EventChannel>>) null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("Should throw exception when withChannels called with empty array")
-    void shouldThrowExceptionWhenWithChannelsCalledWithEmptyArray() {
+    @DisplayName("Should throw exception when withChannels called with empty list")
+    void shouldThrowExceptionWhenWithChannelsCalledWithEmptyList() {
         OutTransport transport = mock(OutTransport.class);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestPayload payload = new TestPayload("test");
         assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
-                .withChannels(new Class[0]))
+                .withChannels(List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

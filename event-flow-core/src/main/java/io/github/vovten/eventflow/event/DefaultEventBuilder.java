@@ -24,7 +24,7 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     private UUID processId;
     private Instant occurredAt;
     private final Map<String, String> metadata;
-    private Class<? extends EventChannel>[] channels;
+    private List<Class<? extends EventChannel>> channels;
 
     public DefaultEventBuilder(EventPublisher publisher, T payload) {
         this.publisher = Objects.requireNonNull(publisher, "publisher must not be null");
@@ -58,9 +58,8 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     }
 
     @Override
-    @SafeVarargs
-    public final EventBuilder<T> withChannels(Class<? extends EventChannel>... channels) {
-        if (channels == null || channels.length == 0) {
+    public EventBuilder<T> withChannels(List<Class<? extends EventChannel>> channels) {
+        if (channels == null || channels.isEmpty()) {
             throw new IllegalArgumentException("At least one channel must be specified");
         }
         this.channels = channels;
@@ -75,7 +74,7 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
                 occurredAt,
                 payload,
                 Map.copyOf(metadata),
-                channels != null ? List.of(channels) : null
+                channels
         );
         return publisher.publish(envelope);
     }
