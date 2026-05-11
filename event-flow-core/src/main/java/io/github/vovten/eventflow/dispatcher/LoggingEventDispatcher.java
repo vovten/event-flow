@@ -79,12 +79,12 @@ public class LoggingEventDispatcher implements EventDispatcher {
         DispatchResult result = origin.dispatch(event);
 
         long durationMs = System.currentTimeMillis() - startTime;
-        logEvent(event, result, durationMs, null);
+        logEvent(event, result, durationMs);
 
         return result;
     }
 
-    private void logEvent(Event event, DispatchResult result, long durationMs, Throwable error) {
+    private void logEvent(Event event, DispatchResult result, long durationMs) {
         String json = buildLogEntry(event, result, durationMs);
         log.info(json);
     }

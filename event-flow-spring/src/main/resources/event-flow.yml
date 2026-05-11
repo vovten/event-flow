@@ -130,3 +130,11 @@ event-flow:
       max-size: 10000
       # Log warnings when duplicate events are received
       warn-on-duplicate: true
+
+    # Enable logging of dispatched events at INFO level
+    # Logs include: eventId, handler, durationMs, payload, status
+    logging:
+      # Enable or disable event logging
+      enabled: false
+      # Maximum length of payload in log output (characters)
+      max-payload-length: 500

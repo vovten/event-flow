@@ -259,6 +259,7 @@ public class EventFlowProperties {
         private ThreadPoolConfig threadPool = new ThreadPoolConfig();
         private List<TransportConfig> transports = new ArrayList<>();
         private IdempotentConfig idempotent = new IdempotentConfig();
+        private LoggingConfig logging = new LoggingConfig();
         private DeserializationConfig deserialization = new DeserializationConfig();
 
         public boolean isEnabled() {
@@ -299,6 +300,14 @@ public class EventFlowProperties {
 
         public void setIdempotent(IdempotentConfig idempotent) {
             this.idempotent = idempotent;
+        }
+
+        public LoggingConfig getLogging() {
+            return logging;
+        }
+
+        public void setLogging(LoggingConfig logging) {
+            this.logging = logging;
         }
 
         public DeserializationConfig getDeserialization() {

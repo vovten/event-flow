@@ -73,6 +73,10 @@ public class DispatcherConfiguration {
             EventFlowProperties.IdempotentConfig config = properties.getDispatcher().getIdempotent();
             builder.idempotent(config.getTtl(), config.getMaxSize(), config.isWarnOnDuplicate());
         }
+        var loggingConfig = properties.getDispatcher().getLogging();
+        if (loggingConfig.isEnabled()) {
+            builder.loggable(loggingConfig.getMaxPayloadLength());
+        }
         EventDispatcher dispatcher = builder.buildAndLog();
         dispatcher.start(dispatcher::dispatch);
         return dispatcher;

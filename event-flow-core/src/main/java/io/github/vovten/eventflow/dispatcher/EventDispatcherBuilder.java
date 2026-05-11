@@ -96,6 +96,8 @@ public final class EventDispatcherBuilder {
     private Duration idempotentTtl = Duration.ofMinutes(10);
     private long idempotentMaxSize = 10_000;
     private boolean idempotentWarnOnDuplicate = true;
+    private boolean loggable = false;
+    private int logMaxPayloadLength = 500;
     private final List<DecoratorFunction> decorators = new ArrayList<>();
 
     private EventDispatcherBuilder() {
@@ -247,6 +249,28 @@ public final class EventDispatcherBuilder {
     }
 
     /**
+     * Enable logging decorator with default max payload length (500).
+     *
+     * @return this builder
+     */
+    public EventDispatcherBuilder loggable() {
+        this.loggable = true;
+        return this;
+    }
+
+    /**
+     * Enable logging decorator with custom max payload length.
+     *
+     * @param maxPayloadLength maximum length of payload in log output
+     * @return this builder
+     */
+    public EventDispatcherBuilder loggable(int maxPayloadLength) {
+        this.loggable = true;
+        this.logMaxPayloadLength = maxPayloadLength;
+        return this;
+    }
+
+    /**
      * Build the EventDispatcher instance with all configured features.
      *
      * @return configured EventDispatcher
@@ -263,6 +287,10 @@ public final class EventDispatcherBuilder {
         EventDispatcher dispatcher = new UnifiedEventDispatcher(
                 executorService, handlerRegistry, transports, semaphore
         );
+        if (loggable) {
+            dispatcher = new LoggingEventDispatcher(dispatcher, logMaxPayloadLength);
+            log.debug("Applied logging decorator with maxPayloadLength={}", logMaxPayloadLength);
+        }
         // Apply custom decorators
         for (DecoratorFunction decorator : decorators) {
             dispatcher = decorator.apply(dispatcher);
@@ -292,9 +320,10 @@ public final class EventDispatcherBuilder {
     public EventDispatcher buildAndLog() {
         EventDispatcher dispatcher = build();
         String concurrencyInfo = concurrencyLimit != null ? "limit=" + concurrencyLimit : "unlimited";
-        log.info("Built EventDispatcher with configuration: transports={}, idempotent={}, customDecorators={}, concurrency={}",
+        log.info("Built EventDispatcher with configuration: transports={}, idempotent={}, logging={}, customDecorators={}, concurrency={}",
                 transports.size(),
                 idempotent ? "enabled" : "disabled",
+                loggable ? "enabled" : "disabled",
                 decorators.size(),
                 concurrencyInfo
         );

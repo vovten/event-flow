@@ -363,6 +363,11 @@ public class EventListenerRegistry implements EventHandlerRegistry {
             }
         }
 
+        @Override
+        public String name() {
+            return object.getClass().getSimpleName();
+        }
+
         private Object adaptEventToMethodParameter(Event event, Class<?> expectedType) {
             if (event instanceof Envelope<?> envelope) {
                 if (expectedType.isAssignableFrom(Envelope.class)) {
