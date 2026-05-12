@@ -274,8 +274,8 @@ class EventDispatcherBuilderTest {
 
         dispatcher.start(dispatcher::dispatch);
         try {
-            dispatcher.dispatch(event);
-            dispatcher.dispatch(event); // Duplicate
+            dispatcher.dispatch(event).get(); // Wait for first dispatch to complete
+            dispatcher.dispatch(event).get(); // Duplicate - should be filtered
             executorService.shutdown();
             executorService.awaitTermination(1, TimeUnit.SECONDS);
 

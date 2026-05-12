@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
@@ -18,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -73,23 +73,22 @@ public class LoggingEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public DispatchResult dispatch(Event event) {
+    public CompletableFuture<HandlerResults> dispatch(Event event) {
         long startTime = System.currentTimeMillis();
 
-        DispatchResult result = origin.dispatch(event);
-
-        long durationMs = System.currentTimeMillis() - startTime;
-        logEvent(event, result, durationMs);
-
-        return result;
+        return origin.dispatch(event)
+                .whenComplete((results, throwable) -> {
+                    long durationMs = System.currentTimeMillis() - startTime;
+                    logEvent(event, results, durationMs);
+                });
     }
 
-    private void logEvent(Event event, DispatchResult result, long durationMs) {
-        String json = buildLogEntry(event, result, durationMs);
+    private void logEvent(Event event, HandlerResults results, long durationMs) {
+        String json = buildLogEntry(event, results, durationMs);
         log.info(json);
     }
 
-    private String buildLogEntry(Event event, DispatchResult result, long durationMs) {
+    private String buildLogEntry(Event event, HandlerResults results, long durationMs) {
         Map<String, Object> entry = new LinkedHashMap<>();
 
         addIfPresent(entry, "traceId", MDC.get("traceId"));
@@ -102,9 +101,9 @@ public class LoggingEventDispatcher implements EventDispatcher {
         buildEventId(eventInfo, event);
         buildPayload(eventInfo, event);
 
-        if (result != null && !result.handlers().isEmpty()) {
-            eventInfo.put("handlers", result.handlers().stream().map(EventHandler::name).toList());
-            eventInfo.put("handlersCount", result.invokedHandlers());
+        if (results != null && !results.isEmpty()) {
+            eventInfo.put("handlers", results.getSuccesses().stream().map(HandlerResult::handlerName).toList());
+            eventInfo.put("handlersCount", results.getSuccessfulCount());
         }
         eventInfo.put("durationMs", durationMs);
 

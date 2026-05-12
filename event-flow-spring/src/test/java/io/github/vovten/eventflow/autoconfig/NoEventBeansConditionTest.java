@@ -1,7 +1,7 @@
 package io.github.vovten.eventflow.autoconfig;
 
-import io.github.vovten.eventflow.dispatcher.DispatchResult;
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
+import io.github.vovten.eventflow.dispatcher.HandlerResults;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.transport.SendResults;
@@ -123,8 +123,8 @@ class NoEventBeansConditionTest {
     static class TestEventDispatcher implements EventDispatcher {
 
         @Override
-        public DispatchResult dispatch(Event event) {
-            return new DispatchResult(0, 0);
+        public CompletableFuture<HandlerResults> dispatch(Event event) {
+            return CompletableFuture.completedFuture(HandlerResults.empty());
         }
 
         @Override

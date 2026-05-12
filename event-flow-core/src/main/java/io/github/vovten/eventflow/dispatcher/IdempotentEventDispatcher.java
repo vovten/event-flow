@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -59,24 +60,26 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public DispatchResult dispatch(Event event) {
+    public CompletableFuture<HandlerResults> dispatch(Event event) {
         if (!(event instanceof TraceableEvent traceable)) {
             return origin.dispatch(event);
         }
         UUID eventId = traceable.eventId();
         Boolean existing = cache.getIfPresent(eventId);
 
-        if (existing == null) {
-            DispatchResult result = origin.dispatch(event);
-            cache.put(eventId, Boolean.TRUE);
-            log.debug("Event processed: {}", eventId);
-            return result;
-        } else {
+        if (existing != null) {
             if (warnOnDuplicate) {
                 log.warn("Duplicate event ignored: {}", eventId);
             }
-            return new DispatchResult(0, 0);
+            return CompletableFuture.completedFuture(HandlerResults.empty());
         }
+
+        return origin.dispatch(event)
+                .thenApply(result -> {
+                    cache.put(eventId, Boolean.TRUE);
+                    log.debug("Event processed: {}", eventId);
+                    return result;
+                });
     }
 
     @Override
