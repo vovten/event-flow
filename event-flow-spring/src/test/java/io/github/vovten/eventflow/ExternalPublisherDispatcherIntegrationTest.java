@@ -121,7 +121,7 @@ class ExternalPublisherDispatcherIntegrationTest {
     void shouldPublishEventToKafkaTopic() throws InterruptedException {
         // arrange
         ExternalTestEvent testEvent = new ExternalTestEvent("test-id-123", "test-payload");
-        eventListener.setLatch(new CountDownLatch(1));
+        eventListener.setLatch(new CountDownLatch(2));
 
         // act
         publisher.publish(testEvent).join();
