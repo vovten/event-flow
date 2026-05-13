@@ -185,7 +185,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         }
 
         CompletableFuture<Void> allFutures = CompletableFuture
-                .allOf(futures.toArray(new CompletableFuture[0]));
+                .allOf(futures.toArray(CompletableFuture[]::new));
 
         return allFutures.thenApply(v ->
                 HandlerResults.of(futures.stream()
@@ -194,9 +194,11 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     }
 
     private HandlerResult executeHandler(EventHandler handler, Event event) {
+        boolean acquired = false;
         if (concurrencySemaphore != null) {
             try {
                 concurrencySemaphore.acquire();
+                acquired = true;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return HandlerResult.failure(handler.name(), e);
@@ -210,7 +212,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                     handler.name(), event.type().getSimpleName(), e.getMessage(), e);
             return HandlerResult.failure(handler.name(), e);
         } finally {
-            if (concurrencySemaphore != null) {
+            if (acquired) {
                 concurrencySemaphore.release();
             }
         }
@@ -253,30 +255,4 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         return String.format(msg, transports.size(), names);
     }
 
-    private final class HandlerTask implements Runnable {
-        private final EventHandler handler;
-        private final Event event;
-
-        private HandlerTask(EventHandler handler, Event event) {
-            this.handler = handler;
-            this.event = event;
-        }
-
-        @Override
-        public void run() {
-            try {
-                handler.onEvent(event);
-            } catch (Exception e) {
-                log.error("Handler execution failed for event {} in handler {}: {}",
-                        event.type().getSimpleName(),
-                        handler.getClass().getSimpleName(),
-                        e.getMessage(),
-                        e);
-            } finally {
-                if (concurrencySemaphore != null) {
-                    concurrencySemaphore.release();
-                }
-            }
-        }
-    }
 }
