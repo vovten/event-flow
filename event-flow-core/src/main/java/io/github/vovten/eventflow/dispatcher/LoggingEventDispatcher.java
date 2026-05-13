@@ -14,6 +14,7 @@ import org.slf4j.MDC;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -23,12 +24,17 @@ import java.util.function.Consumer;
 /**
  * Decorator for {@link EventDispatcher} that adds structured logging when events are dispatched.
  * <p>
- * Logs event handling information at INFO level with machine-parseable JSON format:
+ * Logs event handling information with machine-parseable JSON format:
  * <ul>
+ *   <li>status - handling result (handled/partial/failed)</li>
  *   <li>eventId - envelope identifier</li>
- *   <li>handler - handler class name</li>
- *   <li>durationMs - processing duration in milliseconds</li>
  *   <li>payload - event data with type discriminator and fields</li>
+ *   <li>occurredAt - event occurrence timestamp</li>
+ *   <li>processId - process correlation identifier</li>
+ *   <li>handlers - list of successful handler names</li>
+ *   <li>failedHandlers - list of failed handler names with errors</li>
+ *   <li>failedCount - number of failed handlers</li>
+ *   <li>durationMs - processing duration in milliseconds</li>
  *   <li>traceId - distributed trace ID from MDC</li>
  *   <li>spanId - span ID from MDC</li>
  * </ul>
@@ -75,11 +81,25 @@ public class LoggingEventDispatcher implements EventDispatcher {
     @Override
     public CompletableFuture<HandlerResults> dispatch(Event event) {
         long startTime = System.currentTimeMillis();
+        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
 
         return origin.dispatch(event)
                 .whenComplete((results, throwable) -> {
                     long durationMs = System.currentTimeMillis() - startTime;
-                    logEvent(event, results, durationMs);
+                    if (mdcContext != null) {
+                        MDC.setContextMap(mdcContext);
+                    }
+                    try {
+                        if (throwable != null) {
+                            log.error("Event dispatch failed for {}: {}", event, throwable.getMessage(), throwable);
+                        } else {
+                            logEvent(event, results, durationMs);
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to log event dispatch for {}: {}", event, e.getMessage(), e);
+                    } finally {
+                        MDC.clear();
+                    }
                 });
     }
 
@@ -89,28 +109,62 @@ public class LoggingEventDispatcher implements EventDispatcher {
     }
 
     private String buildLogEntry(Event event, HandlerResults results, long durationMs) {
-        Map<String, Object> entry = new LinkedHashMap<>();
-
-        addIfPresent(entry, "traceId", MDC.get("traceId"));
-        addIfPresent(entry, "spanId", MDC.get("spanId"));
-
         Map<String, Object> eventInfo = new LinkedHashMap<>();
-
-        eventInfo.put("status", "handled");
-
+        buildStatus(eventInfo, results);
         buildEventId(eventInfo, event);
         buildPayload(eventInfo, event);
-
-        if (results != null && !results.isEmpty()) {
-            eventInfo.put("handlers", results.getSuccesses().stream().map(HandlerResult::handlerName).toList());
-            eventInfo.put("handlersCount", results.getSuccessfulCount());
-        }
+        buildEnvelopeMetadata(eventInfo, event);
+        buildHandlers(eventInfo, results);
         eventInfo.put("durationMs", durationMs);
 
+        Map<String, Object> entry = new LinkedHashMap<>();
+        addIfPresent(entry, "traceId", MDC.get("traceId"));
+        addIfPresent(entry, "spanId", MDC.get("spanId"));
         entry.put("event", eventInfo);
         entry.put("@timestamp", Instant.now().toString());
 
         return toJson(entry);
+    }
+
+    private void buildStatus(Map<String, Object> eventInfo, HandlerResults results) {
+        if (results != null && !results.isEmpty()) {
+            if (results.isAllSuccess()) {
+                eventInfo.put("status", "handled");
+            } else if (results.isPartialSuccess()) {
+                eventInfo.put("status", "partial");
+            } else {
+                eventInfo.put("status", "failed");
+            }
+        } else {
+            eventInfo.put("status", "handled");
+        }
+    }
+
+    private void buildEnvelopeMetadata(Map<String, Object> eventInfo, Event event) {
+        if (event instanceof TraceableEvent te) {
+            addIfPresent(eventInfo, "processId", te.processId());
+            addIfPresent(eventInfo, "occurredAt", te.occurredAt());
+        }
+    }
+
+    private void buildHandlers(Map<String, Object> eventInfo, HandlerResults results) {
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+        List<String> handlerNames = results.getSuccesses().stream()
+                .map(HandlerResult::handlerName)
+                .toList();
+        if (!handlerNames.isEmpty()) {
+            eventInfo.put("handlers", handlerNames);
+        }
+
+        if (results.getFailedCount() > 0) {
+            List<String> failedHandlers = results.getFailures().stream()
+                    .map(f -> f.handlerName() + ": " + f.errorDetails())
+                    .toList();
+            eventInfo.put("failedHandlers", failedHandlers);
+            eventInfo.put("failedCount", results.getFailedCount());
+        }
     }
 
     private void buildEventId(Map<String, Object> eventInfo, Event event) {
@@ -135,17 +189,18 @@ public class LoggingEventDispatcher implements EventDispatcher {
         if (payload == null) {
             return null;
         }
-
         Map<String, Object> payloadInfo = new LinkedHashMap<>();
         payloadInfo.put("@class", payload.getClass().getName());
-
         try {
             String json = EventUtils.toJson(payload);
 
             if (json.length() > maxPayloadLength) {
                 payloadInfo.put("_truncated", true);
                 payloadInfo.put("_originalSize", json.length());
-                addPayloadFields(payloadInfo, json.substring(0, maxPayloadLength) + "...");
+                String truncated = json.substring(0, maxPayloadLength) + "...";
+                if (!addPayloadFields(payloadInfo, truncated)) {
+                    payloadInfo.put("data", truncated);
+                }
             } else {
                 if (!addPayloadFields(payloadInfo, json)) {
                     payloadInfo.put("data", json);
@@ -154,7 +209,6 @@ public class LoggingEventDispatcher implements EventDispatcher {
         } catch (Exception e) {
             payloadInfo.put("_raw", payload.toString());
         }
-
         return payloadInfo;
     }
 

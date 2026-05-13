@@ -1,5 +1,7 @@
 package io.github.vovten.eventflow.dispatcher;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
+
 /**
  * Result of a handler execution.
  *
@@ -36,7 +38,7 @@ public record HandlerResult(
      * @return failed HandlerResult
      */
     public static HandlerResult failure(String handlerName, Throwable error) {
-        return new HandlerResult(false, handlerName, error, error.getMessage());
+        return new HandlerResult(false, handlerName, error, resolveMessage(error));
     }
 
     /**
@@ -48,5 +50,16 @@ public record HandlerResult(
      */
     public static HandlerResult failure(String handlerName, String errorDetails) {
         return new HandlerResult(false, handlerName, null, errorDetails);
+    }
+
+    private static String resolveMessage(Throwable error) {
+        if (error == null) {
+            return null;
+        }
+        Throwable rootCause = ExceptionUtils.getRootCause(error);
+        if (rootCause != null && rootCause.getMessage() != null) {
+            return rootCause.getMessage();
+        }
+        return error.getMessage();
     }
 }

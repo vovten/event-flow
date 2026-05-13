@@ -7,8 +7,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
-import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.transport.SendResult;
+import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.util.EventUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,16 +26,16 @@ import java.util.stream.Collectors;
 /**
  * Decorator for {@link EventPublisher} that adds structured logging when events are published.
  * <p>
- * Logs event publishing information at INFO level with machine-parseable JSON format:
+ * Logs event publishing information with machine-parseable JSON format:
  * <ul>
  *   <li>eventId - envelope identifier</li>
  *   <li>processId - process correlation identifier</li>
  *   <li>occurredAt - event timestamp</li>
  *   <li>channels - target channel names</li>
  *   <li>payload - event data with type discriminator and fields</li>
- *   <li>status - publishing result (success/partial/failed)</li>
- *   <li>deliveredTo - list of successful channels</li>
- *   <li>failedOn - list of failed channels (if partial)</li>
+ *   <li>status - publication result (published/partial/failed)</li>
+ *   <li>deliveredTo - list of successfully delivered destinations</li>
+ *   <li>failedOn - list of failed destinations (if partial/failure)</li>
  *   <li>traceId - distributed trace ID from MDC</li>
  *   <li>spanId - span ID from MDC</li>
  * </ul>
@@ -83,6 +83,7 @@ public class LoggingEventPublisher implements EventPublisher {
 
     @Override
     public CompletableFuture<SendResults> publish(Event event) {
+        Instant start = Instant.now();
         Map<String, String> mdcContext = MDC.getCopyOfContextMap();
 
         return origin.publish(event)
@@ -91,15 +92,15 @@ public class LoggingEventPublisher implements EventPublisher {
                         MDC.setContextMap(mdcContext);
                     }
                     try {
-                        logEvent(event, result, error);
+                        logEvent(event, result, error, start);
                     } finally {
                         MDC.clear();
                     }
                 });
     }
 
-    private void logEvent(Event event, SendResults result, Throwable error) {
-        String json = buildLogEntry(event, result, error);
+    private void logEvent(Event event, SendResults result, Throwable error, Instant start) {
+        String json = buildLogEntry(event, result, error, start);
 
         if (error != null) {
             log.error(json);
@@ -114,7 +115,7 @@ public class LoggingEventPublisher implements EventPublisher {
         }
     }
 
-    private String buildLogEntry(Event event, SendResults result, Throwable error) {
+    private String buildLogEntry(Event event, SendResults result, Throwable error, Instant start) {
         Map<String, Object> entry = new LinkedHashMap<>();
         buildTracingContext(entry);
         Map<String, Object> eventInfo = new LinkedHashMap<>();
@@ -126,7 +127,7 @@ public class LoggingEventPublisher implements EventPublisher {
         buildDeliveryInfo(eventInfo, result);
         buildErrorInfo(eventInfo, error);
         entry.put("event", eventInfo);
-        entry.put("@timestamp", Instant.now().toString());
+        entry.put("@timestamp", start.toString());
         return toJson(entry);
     }
 
@@ -138,10 +139,12 @@ public class LoggingEventPublisher implements EventPublisher {
     private void buildStatus(Map<String, Object> eventInfo, SendResults result, Throwable error) {
         if (error != null) {
             eventInfo.put("status", "failed");
-        } else if (result != null && result.isPartialSuccess()) {
-            eventInfo.put("status", "partial");
         } else if (result != null && result.isAllSuccess()) {
             eventInfo.put("status", "published");
+        } else if (result != null && result.isPartialSuccess()) {
+            eventInfo.put("status", "partial");
+        } else if (result != null && result.isAllFailure()) {
+            eventInfo.put("status", "failed");
         } else {
             eventInfo.put("status", "unknown");
         }
@@ -214,14 +217,16 @@ public class LoggingEventPublisher implements EventPublisher {
         }
         Map<String, Object> payloadInfo = new LinkedHashMap<>();
         payloadInfo.put("@class", payload.getClass().getName());
-
         try {
             String json = EventUtils.toJson(payload);
 
             if (json.length() > maxPayloadLength) {
                 payloadInfo.put("_truncated", true);
                 payloadInfo.put("_originalSize", json.length());
-                addPayloadFields(payloadInfo, json.substring(0, maxPayloadLength) + "...");
+                String truncated = json.substring(0, maxPayloadLength) + "...";
+                if (!addPayloadFields(payloadInfo, truncated)) {
+                    payloadInfo.put("data", truncated);
+                }
             } else {
                 if (!addPayloadFields(payloadInfo, json)) {
                     payloadInfo.put("data", json);
@@ -230,7 +235,6 @@ public class LoggingEventPublisher implements EventPublisher {
         } catch (Exception e) {
             payloadInfo.put("_raw", payload.toString());
         }
-
         return payloadInfo;
     }
 
