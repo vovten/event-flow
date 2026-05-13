@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.serialization.json;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -49,6 +50,7 @@ public class JsonEventSerializer implements EventSerializer {
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
                 .setPolymorphicTypeValidator(new EventPolymorphicTypeValidator())
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
                 .deactivateDefaultTyping();
     }
 

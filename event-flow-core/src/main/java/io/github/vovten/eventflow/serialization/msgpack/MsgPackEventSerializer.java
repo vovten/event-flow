@@ -1,6 +1,8 @@
 package io.github.vovten.eventflow.serialization.msgpack;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
@@ -40,6 +42,8 @@ public class MsgPackEventSerializer implements EventSerializer {
                 .registerModule(new JavaTimeModule()
                         .addSerializer(new InstantAsStringSerializer()))
                 .setPolymorphicTypeValidator(new EventPolymorphicTypeValidator())
+                .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .deactivateDefaultTyping();
     }
 
