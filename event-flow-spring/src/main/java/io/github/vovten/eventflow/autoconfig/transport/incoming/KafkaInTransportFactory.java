@@ -31,7 +31,8 @@ public class KafkaInTransportFactory implements InTransportFactory {
         return new KafkaInTransport(
             config.getServers(),
             config.getTopics(),
-            config.getConsumerGroup()
+            config.getConsumerGroup(),
+            serializerFactory
         );
     }
 
@@ -42,12 +43,14 @@ public class KafkaInTransportFactory implements InTransportFactory {
      * @param serializerFactory serializer factory to use
      * @return Kafka transport
      */
-    public InTransport createDispatcher(EventFlowProperties.TransportConfig config, EventSerializerFactory serializerFactory) {
+    public InTransport createDispatcher(EventFlowProperties.TransportConfig config,
+                                        EventSerializerFactory serializerFactory) {
         validate(config);
         return new KafkaInTransport(
             config.getServers(),
             config.getTopics(),
-            config.getConsumerGroup()
+            config.getConsumerGroup(),
+            serializerFactory
         );
     }
 
