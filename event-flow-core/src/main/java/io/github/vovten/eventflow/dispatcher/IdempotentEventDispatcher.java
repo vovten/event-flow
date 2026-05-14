@@ -65,20 +65,27 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
             return origin.dispatch(event);
         }
         UUID eventId = traceable.eventId();
-        Boolean existing = cache.getIfPresent(eventId);
-
-        if (existing != null) {
+        if (eventId == null) {
+            return origin.dispatch(event);
+        }
+        Boolean previous = cache.asMap().putIfAbsent(eventId, Boolean.TRUE);
+        if (previous != null) {
             if (warnOnDuplicate) {
                 log.warn("Duplicate event ignored: {}", eventId);
             }
             return CompletableFuture.completedFuture(HandlerResults.empty());
         }
-
         return origin.dispatch(event)
-                .thenApply(result -> {
-                    cache.put(eventId, Boolean.TRUE);
-                    log.debug("Event processed: {}", eventId);
-                    return result;
+                .whenComplete((results, throwable) -> {
+                    if (throwable != null) {
+                        cache.invalidate(eventId);
+                        log.debug("Event dispatch failed, removed from cache: {}", eventId);
+                    } else if (results != null && results.isAllFailure()) {
+                        cache.invalidate(eventId);
+                        log.debug("All handlers failed, removed from cache: {}", eventId);
+                    } else {
+                        log.debug("Event processed: {}", eventId);
+                    }
                 });
     }
 
