@@ -1,6 +1,5 @@
 package io.github.vovten.eventflow.dispatcher;
 
-import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
@@ -163,8 +162,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     @Override
     public CompletableFuture<HandlerResults> dispatch(Event event) {
-        Event eventToDispatch = resolveEvent(event);
-        List<EventHandler> handlers = handlerRegistry.getHandlers(eventToDispatch);
+        List<EventHandler> handlers = handlerRegistry.getHandlers(event);
         if (handlers.isEmpty()) {
             log.debug("No handlers found for event: {}", event);
             return CompletableFuture.completedFuture(HandlerResults.empty());
@@ -175,7 +173,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         for (EventHandler handler : handlers) {
             try {
                 CompletableFuture<HandlerResult> future = CompletableFuture
-                        .supplyAsync(() -> executeHandler(handler, eventToDispatch), executorService);
+                        .supplyAsync(() -> executeHandler(handler, event), executorService);
                 futures.add(future);
             } catch (RejectedExecutionException e) {
                 log.warn("Failed to submit handler {}: executor rejected task", handler.name(), e);
@@ -216,17 +214,6 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                 concurrencySemaphore.release();
             }
         }
-    }
-
-    private Event resolveEvent(Event event) {
-        if (!(event instanceof Envelope<?> envelope)) {
-            return event;
-        }
-        Object payload = envelope.payload();
-        if (payload instanceof Event eventPayload) {
-            return eventPayload;
-        }
-        return event;
     }
 
     @Override

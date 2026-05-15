@@ -35,13 +35,18 @@ class UnifiedEventDispatcherEnvelopeTest {
     }
 
     @Test
-    @DisplayName("Should unwrap Envelope and dispatch payload when payload implements Event")
-    void shouldUnwrapEnvelopeAndDispatchPayload() throws InterruptedException {
+    @DisplayName("Should pass Envelope through when payload implements Event")
+    void shouldPassEnvelopeThroughWhenPayloadImplementsEvent() throws InterruptedException {
         PayloadEventSubscriber subscriber = new PayloadEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
             Object event = invocation.getArgument(0);
-            if (event instanceof PlainDomainEvent) {
-                return List.of(subscriber);
+            // After CRIT-2 fix: event is the Envelope, not the unwrapped payload.
+            // Real EventListenerRegistry handles this via resolveEventType(),
+            // but with a mock we match the Envelope and unwrap in the handler.
+            if (event instanceof Envelope<?> envelope) {
+                if (envelope.payload() instanceof PlainDomainEvent) {
+                    return List.of(subscriber);
+                }
             }
             return List.of();
         });
@@ -56,8 +61,11 @@ class UnifiedEventDispatcherEnvelopeTest {
         Thread.sleep(100);
 
         assertThat(subscriber.receivedEvent).isNotNull();
-        assertThat(subscriber.receivedEvent).isInstanceOf(PlainDomainEvent.class);
-        assertThat(((PlainDomainEvent) subscriber.receivedEvent).orderId()).isEqualTo("order-123");
+        // Handler receives the Envelope (not unwrapped)
+        assertThat(subscriber.receivedEvent).isInstanceOf(Envelope.class);
+        Envelope<?> receivedEnvelope = (Envelope<?>) subscriber.receivedEvent;
+        assertThat(receivedEnvelope.payload()).isInstanceOf(PlainDomainEvent.class);
+        assertThat(((PlainDomainEvent) receivedEnvelope.payload()).orderId()).isEqualTo("order-123");
     }
 
     @Test
