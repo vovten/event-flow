@@ -25,7 +25,7 @@ public interface Event {
     /**
      * @return the event type
      */
-    Class<? extends Event> type();
+    Class<?> type();
 
     /**
      * List of channel classes this event should be published to.

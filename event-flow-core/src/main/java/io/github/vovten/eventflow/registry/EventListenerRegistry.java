@@ -2,6 +2,8 @@ package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventListener;
 
@@ -80,6 +82,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @see EventHandlerInvocationException
  */
 public class EventListenerRegistry implements EventHandlerRegistry {
+
+    private static final Logger log = LoggerFactory.getLogger(EventListenerRegistry.class);
 
     /**
      * Map of event types to event handlers.
@@ -167,6 +171,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
                 checkMethodSignature(method);
                 EventListener annotation = method.getAnnotation(EventListener.class);
                 Class<?> eventType = resolveListenerEventType(method, annotation);
+                warnIfAmbiguousChannels(eventType, method);
                 registerListener(bean, method, eventType);
             }
         }
@@ -323,18 +328,54 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * Requirements:
      * <ul>
      *   <li>Exactly one parameter</li>
-     *   <li>Parameter type is Event or subclass</li>
+     *   <li>Parameter type must be one of:
+     *     <ul>
+     *       <li>{@link Event} or its subclass (includes {@link Envelope})</li>
+     *       <li>a POJO annotated with {@link io.github.vovten.eventflow.event.annotation.Event @Event}</li>
+     *     </ul>
+     *   </li>
      * </ul>
      *
      * @param method the method to validate
      * @throws InvalidEventListenerMethodSignatureException if signature is invalid
      */
     protected void checkMethodSignature(Method method) {
-        var types = method.getParameterTypes();
+        Class<?>[] types = method.getParameterTypes();
         if (types.length != 1) {
             throw new InvalidEventListenerMethodSignatureException(
                     method.getDeclaringClass().getName(), method.getName());
         }
+        Class<?> paramType = types[0];
+        boolean isValid = Event.class.isAssignableFrom(paramType)
+                || paramType.isAnnotationPresent(io.github.vovten.eventflow.event.annotation.Event.class);
+        if (!isValid) {
+            throw new InvalidEventListenerMethodSignatureException(
+                    method.getDeclaringClass().getName(), method.getName());
+        }
+    }
+
+    /**
+     * Warn if the event class has both {@code @Event} annotation and implements {@link Event}.
+     * Using both can confuse which channels are actually applied — the annotation is used
+     * when wrapped in Envelope, the overridden method when dispatched directly.
+     *
+     * @param eventType      the resolved event type (payload class)
+     * @param listenerMethod the {@code @EventListener}-annotated method
+     */
+    private void warnIfAmbiguousChannels(Class<?> eventType, Method listenerMethod) {
+        if (!Event.class.isAssignableFrom(eventType)) {
+            return;
+        }
+        if (!eventType.isAnnotationPresent(io.github.vovten.eventflow.event.annotation.Event.class)) {
+            return;
+        }
+        log.warn("Class '{}' has both @Event annotation and implements Event interface. " +
+                        "To avoid confusion, use one approach: " +
+                        "either annotate with @Event (for POJO events) or implement Event interface. " +
+                        "Listener method: {}#{}",
+                eventType.getName(),
+                listenerMethod.getDeclaringClass().getSimpleName(),
+                listenerMethod.getName());
     }
 
     @Override

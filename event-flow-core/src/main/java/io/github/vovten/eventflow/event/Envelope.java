@@ -180,11 +180,11 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
-     * @return {@link Envelope} class as the event type
+     * @return the actual type of the wrapped payload
      */
     @Override
-    public Class<? extends Event> type() {
-        return Envelope.class;
+    public Class<?> type() {
+        return payload.getClass();
     }
 
     /**

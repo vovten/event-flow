@@ -1,15 +1,17 @@
 package io.github.vovten.eventflow.registry;
 
+import io.github.vovten.eventflow.EventListener;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.EventListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+
 
 /**
  * Tests for {@link EventListenerRegistry}.
@@ -380,7 +382,7 @@ class EventListenerRegistryTest {
     }
 
     /**
-     * Listener for POJO payloads that do not implement Event.
+     * Listener for POJO payloads annotated with {@code @Event}.
      */
     static final class PojoListener {
         Object capturedPayload;
@@ -392,8 +394,9 @@ class EventListenerRegistryTest {
     }
 
     /**
-     * POJO event class that does NOT implement Event interface.
+     * POJO event class annotated with {@code @Event}.
      */
+    @io.github.vovten.eventflow.event.annotation.Event
     static final class PojoEvent {
         private final String id;
 
@@ -454,3 +457,4 @@ class EventListenerRegistryTest {
         }
     }
 }
+
