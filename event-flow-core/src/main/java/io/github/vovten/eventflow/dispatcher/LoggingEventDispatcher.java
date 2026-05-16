@@ -146,7 +146,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
         } else {
             eventInfo.put("status", "skipped");
             if (results != null && results.getSkipReason() != null) {
-                eventInfo.put("skipReason", results.getSkipReason());
+                eventInfo.put("statusDesc", results.getSkipReason());
             }
         }
     }
@@ -155,6 +155,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
         if (error == null) {
             return;
         }
+        eventInfo.put("statusDesc", error.getMessage());
         Map<String, Object> errorInfo = new LinkedHashMap<>();
         errorInfo.put("message", error.getMessage());
         errorInfo.put("type", error.getClass().getSimpleName());

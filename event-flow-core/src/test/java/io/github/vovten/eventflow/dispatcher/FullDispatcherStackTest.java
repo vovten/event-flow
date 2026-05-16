@@ -101,7 +101,7 @@ class FullDispatcherStackTest {
 
             JsonNode log = MAPPER.readTree(duplicateLog);
             assertThat(log.path("event").path("status").asText()).isEqualTo("skipped");
-            assertThat(log.path("event").path("skipReason").asText()).isEqualTo("duplicate event");
+            assertThat(log.path("event").path("statusDesc").asText()).isEqualTo("duplicate event");
             assertThat(log.path("event").path("handlers").isEmpty()).isTrue();
         } finally {
             dispatcher.stop();
@@ -138,7 +138,7 @@ class FullDispatcherStackTest {
 
             JsonNode log = MAPPER.readTree(skippedLog);
             assertThat(log.path("event").path("status").asText()).isEqualTo("skipped");
-            assertThat(log.path("event").path("skipReason").asText()).isEqualTo("no handlers found");
+            assertThat(log.path("event").path("statusDesc").asText()).isEqualTo("no handlers found");
             assertThat(log.path("event").path("handlers").isEmpty()).isTrue();
         } finally {
             dispatcher.stop();

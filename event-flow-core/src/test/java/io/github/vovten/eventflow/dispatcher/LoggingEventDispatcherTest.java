@@ -164,7 +164,7 @@ class LoggingEventDispatcherTest {
     }
 
     @Test
-    @DisplayName("Should log skipped with skipReason when duplicate event")
+    @DisplayName("Should log skipped with statusDesc when duplicate event")
     void shouldLogSkippedWithDuplicateReason() {
         LoggingEventDispatcher underTest = new LoggingEventDispatcher(dispatcherThatReturns(
                 HandlerResults.duplicate()));
@@ -174,12 +174,12 @@ class LoggingEventDispatcherTest {
 
         JsonNode log = captureSingleLog();
         assertThat(log.path("event").path("status").asText()).isEqualTo("skipped");
-        assertThat(log.path("event").path("skipReason").asText()).isEqualTo("duplicate event");
+        assertThat(log.path("event").path("statusDesc").asText()).isEqualTo("duplicate event");
         assertThat(log.path("event").path("handlers").isEmpty()).isTrue();
     }
 
     @Test
-    @DisplayName("Should log skipped with skipReason when no handlers found")
+    @DisplayName("Should log skipped with statusDesc when no handlers found")
     void shouldLogSkippedWithNoHandlersReason() {
         LoggingEventDispatcher underTest = new LoggingEventDispatcher(dispatcherThatReturns(
                 HandlerResults.empty()));
@@ -189,7 +189,7 @@ class LoggingEventDispatcherTest {
 
         JsonNode log = captureSingleLog();
         assertThat(log.path("event").path("status").asText()).isEqualTo("skipped");
-        assertThat(log.path("event").path("skipReason").asText()).isEqualTo("no handlers found");
+        assertThat(log.path("event").path("statusDesc").asText()).isEqualTo("no handlers found");
         assertThat(log.path("event").path("handlers").isEmpty()).isTrue();
     }
 

@@ -50,7 +50,7 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
 
     @Override
     public void start(Consumer<Event> dispatchConsumer) {
-        origin.start(this::dispatch);
+        origin.start(dispatchConsumer);
     }
 
     @Override
