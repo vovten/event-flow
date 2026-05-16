@@ -86,29 +86,22 @@ public class LoggingEventDispatcher implements EventDispatcher {
         return origin.dispatch(event)
                 .whenComplete((results, throwable) -> {
                     long durationMs = System.currentTimeMillis() - startTime;
-                    if (mdcContext != null) {
-                        MDC.setContextMap(mdcContext);
-                    }
-                    try {
-                        if (throwable != null) {
-                            log.error("Event dispatch failed for {}: {}", event, throwable.getMessage(), throwable);
-                        } else {
-                            logEvent(event, results, durationMs);
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to log event dispatch for {}: {}", event, e.getMessage(), e);
-                    } finally {
-                        MDC.clear();
+                    if (throwable != null) {
+                        log.error("Event dispatch failed for {}: {}", event, throwable.getMessage(), throwable);
+                    } else {
+                        logEvent(event, results, durationMs, mdcContext);
                     }
                 });
     }
 
-    private void logEvent(Event event, HandlerResults results, long durationMs) {
-        String json = buildLogEntry(event, results, durationMs);
+    private void logEvent(Event event, HandlerResults results, long durationMs,
+                          Map<String, String> mdcContext) {
+        String json = buildLogEntry(event, results, durationMs, mdcContext);
         log.info(json);
     }
 
-    private String buildLogEntry(Event event, HandlerResults results, long durationMs) {
+    private String buildLogEntry(Event event, HandlerResults results, long durationMs,
+                                 Map<String, String> mdcContext) {
         Map<String, Object> eventInfo = new LinkedHashMap<>();
         buildStatus(eventInfo, results);
         buildEventId(eventInfo, event);
@@ -118,12 +111,18 @@ public class LoggingEventDispatcher implements EventDispatcher {
         eventInfo.put("durationMs", durationMs);
 
         Map<String, Object> entry = new LinkedHashMap<>();
-        addIfPresent(entry, "traceId", MDC.get("traceId"));
-        addIfPresent(entry, "spanId", MDC.get("spanId"));
+        buildTracingContext(entry, mdcContext);
         entry.put("event", eventInfo);
         entry.put("@timestamp", Instant.now().toString());
 
         return toJson(entry);
+    }
+
+    private void buildTracingContext(Map<String, Object> entry, Map<String, String> mdcContext) {
+        if (mdcContext != null) {
+            addIfPresent(entry, "traceId", mdcContext.get("traceId"));
+            addIfPresent(entry, "spanId", mdcContext.get("spanId"));
+        }
     }
 
     private void buildStatus(Map<String, Object> eventInfo, HandlerResults results) {

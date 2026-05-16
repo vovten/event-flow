@@ -85,22 +85,13 @@ public class LoggingEventPublisher implements EventPublisher {
     public CompletableFuture<SendResults> publish(Event event) {
         Instant start = Instant.now();
         Map<String, String> mdcContext = MDC.getCopyOfContextMap();
-
         return origin.publish(event)
-                .whenComplete((result, error) -> {
-                    if (mdcContext != null) {
-                        MDC.setContextMap(mdcContext);
-                    }
-                    try {
-                        logEvent(event, result, error, start);
-                    } finally {
-                        MDC.clear();
-                    }
-                });
+                .whenComplete((result, error) -> logEvent(event, result, error, start, mdcContext));
     }
 
-    private void logEvent(Event event, SendResults result, Throwable error, Instant start) {
-        String json = buildLogEntry(event, result, error, start);
+    private void logEvent(Event event, SendResults result, Throwable error,
+                          Instant start, Map<String, String> mdcContext) {
+        String json = buildLogEntry(event, result, error, start, mdcContext);
 
         if (error != null) {
             log.error(json);
@@ -115,9 +106,10 @@ public class LoggingEventPublisher implements EventPublisher {
         }
     }
 
-    private String buildLogEntry(Event event, SendResults result, Throwable error, Instant start) {
+    private String buildLogEntry(Event event, SendResults result, Throwable error,
+                                 Instant start, Map<String, String> mdcContext) {
         Map<String, Object> entry = new LinkedHashMap<>();
-        buildTracingContext(entry);
+        buildTracingContext(entry, mdcContext);
         Map<String, Object> eventInfo = new LinkedHashMap<>();
         buildStatus(eventInfo, result, error);
         buildEventId(eventInfo, event);
@@ -131,9 +123,11 @@ public class LoggingEventPublisher implements EventPublisher {
         return toJson(entry);
     }
 
-    private void buildTracingContext(Map<String, Object> entry) {
-        addIfPresent(entry, "traceId", MDC.get("traceId"));
-        addIfPresent(entry, "spanId", MDC.get("spanId"));
+    private void buildTracingContext(Map<String, Object> entry, Map<String, String> mdcContext) {
+        if (mdcContext != null) {
+            addIfPresent(entry, "traceId", mdcContext.get("traceId"));
+            addIfPresent(entry, "spanId", mdcContext.get("spanId"));
+        }
     }
 
     private void buildStatus(Map<String, Object> eventInfo, SendResults result, Throwable error) {
