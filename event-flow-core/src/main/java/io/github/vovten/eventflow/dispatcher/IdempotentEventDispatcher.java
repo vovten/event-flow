@@ -36,7 +36,7 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     private final Cache<UUID, Boolean> cache;
     private final boolean warnOnDuplicate;
 
-    IdempotentEventDispatcher(EventDispatcher origin,
+    public IdempotentEventDispatcher(EventDispatcher origin,
                               Duration ttl,
                               long maxSize,
                               boolean warnOnDuplicate) {

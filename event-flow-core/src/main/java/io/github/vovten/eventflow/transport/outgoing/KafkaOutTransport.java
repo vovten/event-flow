@@ -139,11 +139,8 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
         CompletableFuture<SendResult> future = new CompletableFuture<>();
         try {
             String key = null;
-            if (event instanceof TraceableEvent trEvent && trEvent.processId() != null) {
-                key = trEvent.processId().toString();
-            }
             byte[] value = serializer.serialize(event);
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, null, value);
             producer.send(record, createSendCallback(future, topic));
         } catch (Exception e) {
             future.completeExceptionally(e);
