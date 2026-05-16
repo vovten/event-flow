@@ -74,6 +74,10 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
         props.putIfAbsent(DELIVERY_TIMEOUT_MS_CONFIG, "30000");
         props.putIfAbsent(BUFFER_MEMORY_CONFIG, String.valueOf(DEFAULT_BUFFER_MEMORY));
         props.putIfAbsent(MAX_BLOCK_MS_CONFIG, String.valueOf(DEFAULT_MAX_BLOCK_MS));
+        props.putIfAbsent(BATCH_SIZE_CONFIG, "131072"); // 128KB
+        props.putIfAbsent(LINGER_MS_CONFIG, "20");
+        props.putIfAbsent(COMPRESSION_TYPE_CONFIG, "lz4");
+        props.putIfAbsent(MAX_REQUEST_SIZE_CONFIG, "5242880"); // 5MB
 
         this.producer = new KafkaProducer<>(props);
         this.topic = Objects.requireNonNull(topic, "Topic must not be null");
