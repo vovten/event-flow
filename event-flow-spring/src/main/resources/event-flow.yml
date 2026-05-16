@@ -129,7 +129,7 @@ event-flow:
       # Maximum number of entries in the cache
       max-size: 10000
       # Log warnings when duplicate events are received
-      warn-on-duplicate: true
+      warn-on-duplicate: false
 
     # Enable logging of dispatched events at INFO level
     # Logs include: eventId, handler, durationMs, payload, status
