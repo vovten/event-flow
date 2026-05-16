@@ -27,21 +27,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Performance benchmark for Kafka transport.
- * Requires a running Kafka instance (skip if not available).
+ * Performance benchmark for Kafka transport with default settings.
+ * Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -Dkafka.bootstrap.servers=192.168.1.39:9092 -DskipTests=false
  */
-@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest.java -DskipTests=false")
+@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -Dkafka.bootstrap.servers=192.168.1.39:9092 -DskipTests=false")
 @DisplayName("Kafka Benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KafkaBenchmarkTest {
 
-    private static final String BOOTSTRAP_SERVERS = System.getProperty("kafka.bootstrap.servers", "localhost:9092");
-    private static final String TOPIC = "ef-benchmark-" + System.currentTimeMillis();
-
-    private static final AtomicLong SENT_COUNT = new AtomicLong(0);
-    private static final AtomicLong RECEIVED_COUNT = new AtomicLong(0);
+    private static final String BOOTSTRAP_SERVERS = System.getProperty("kafka.bootstrap.servers", "192.168.1.39:9092");
+    private static final int EVENT_COUNT = 1_000_000;
 
     private ExecutorService dispatcherExecutor;
 
@@ -57,25 +55,7 @@ class KafkaBenchmarkTest {
     }
 
     static {
-        // Allow BenchmarkEvent for deserialization
         EventTypeRegistry.allowClass(BenchmarkEvent.class);
-    }
-
-    @BeforeAll
-    static void setupTopic() {
-        try {
-            Properties props = new Properties();
-            props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
-            props.setProperty(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "10000");
-            props.setProperty(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "10000");
-            
-            try (AdminClient admin = AdminClient.create(props)) {
-                admin.createTopics(List.of(new NewTopic(TOPIC, 1, (short) 1))).all().get(30, TimeUnit.SECONDS);
-                System.out.println("Topic ready: " + TOPIC);
-            }
-        } catch (Exception e) {
-            System.out.println("Topic setup: " + e.getMessage());
-        }
     }
 
     @AfterEach
@@ -83,161 +63,105 @@ class KafkaBenchmarkTest {
         if (dispatcherExecutor != null) {
             dispatcherExecutor.shutdownNow();
         }
-        System.out.println("Sent: " + SENT_COUNT.get() + ", Received: " + RECEIVED_COUNT.get());
     }
 
-    @Nested
-    @Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest.java#methodName -DskipTests=false")
-@DisplayName("Kafka Benchmark")
-    class KafkaTransportBenchmark {
-
-        @Test
-        @DisplayName("Should send 10 events and receive them back")
-        void shouldSendAndReceiveEventsThroughKafka() throws Exception {
-            int eventCount = 10;
-
-            // Use default JSON serializer
-            JsonEventSerializer serializer = new JsonEventSerializer();
-
-            // Create Kafka OUT transport
-            Properties outProps = new Properties();
-            outProps.setProperty("bootstrap.servers", BOOTSTRAP_SERVERS);
-            
-            try (KafkaOutTransport kafkaOutTransport = new KafkaOutTransport(outProps, TOPIC, serializer)) {
-                EventPublisher publisher = event -> kafkaOutTransport.send(event)
-                        .thenApply(r -> io.github.vovten.eventflow.transport.SendResults.of(List.of(r)));
-
-                // Handler
-                BenchmarkEventHandler handler = new BenchmarkEventHandler();
-                EventListenerRegistry registry = new EventListenerRegistry();
-                registry.register(handler);
-
-                // Create Kafka IN transport with same serializer
-                String groupId = "benchmark-group-" + System.currentTimeMillis();
-                try (KafkaInTransport kafkaInTransport = new KafkaInTransport(
-                        createConsumer(BOOTSTRAP_SERVERS, groupId),
-                        List.of(TOPIC),
-                        Executors.newSingleThreadExecutor(),
-                        new io.github.vovten.eventflow.serialization.EventSerializerFactory())) {
-                    
-                    dispatcherExecutor = Executors.newVirtualThreadPerTaskExecutor();
-                    UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
-                            dispatcherExecutor, registry, List.of(kafkaInTransport)
-                    );
-                    dispatcher.start(event -> dispatcher.dispatch(event));
-
-                    // Wait for consumer to be ready and committed offset
-                    Thread.sleep(3000);
-
-                    System.out.println("Starting to send " + eventCount + " events...");
-
-                    CountDownLatch latch = new CountDownLatch(eventCount);
-                    handler.setLatch(latch);
-                    handler.reset();
-
-                    long startTime = System.nanoTime();
-
-                    for (int i = 0; i < eventCount; i++) {
-                        publisher.publish(new BenchmarkEvent("id-" + i, "payload-" + i));
-                        SENT_COUNT.incrementAndGet();
-                        Thread.sleep(20);
-                    }
-
-                    // Wait up to 60 seconds for events
-                    boolean completed = latch.await(60, TimeUnit.SECONDS);
-                    long endTime = System.nanoTime();
-
-                    dispatcher.stop();
-
-                    double totalDuration = (endTime - startTime) / 1_000_000_000.0;
-
-                    System.out.println("\n========================================");
-                    System.out.println("Kafka Benchmark Results");
-                    System.out.println("========================================");
-                    System.out.printf("Total events:       %,d%n", eventCount);
-                    System.out.printf("Received:           %,d%n", handler.getProcessedCount());
-                    System.out.printf("Total duration:      %.3f seconds%n", totalDuration);
-                    if (handler.getProcessedCount() > 0) {
-                        System.out.printf("Throughput:          %,.0f events/second%n", eventCount / totalDuration);
-                    }
-                    System.out.println("========================================\n");
-
-                    assertEquals(eventCount, handler.getProcessedCount(), "All events should be processed");
-                }
-            }
+    private String createTopic() throws Exception {
+        Properties props = new Properties();
+        props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.setProperty(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000");
+        props.setProperty(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "30000");
+        
+        String topic = "benchmark-1m-" + System.nanoTime();
+        try (AdminClient admin = AdminClient.create(props)) {
+            admin.createTopics(List.of(new NewTopic(topic, 3, (short) 1))).all().get(30, TimeUnit.SECONDS);
         }
+        Thread.sleep(2000);
+        return topic;
+    }
 
-        @Test
-        @DisplayName("Should handle 1k events")
-        void shouldHandle1kEvents() throws Exception {
-            int eventCount = 1000;
+    @Test
+    @DisplayName("1M events throughput benchmark")
+    void shouldHandle1MEvents() throws Exception {
+        String topic = createTopic();
 
-            JsonEventSerializer serializer = new JsonEventSerializer();
+        System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
+        System.out.println("║          Kafka 1M Events Benchmark (Default Settings)       ║");
+        System.out.println("╠══════════════════════════════════════════════════════════════╣");
+        System.out.printf("║ Server:     %-46s║%n", BOOTSTRAP_SERVERS);
+        System.out.printf("║ Events:     %,d                                      ║%n", EVENT_COUNT);
+        System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
-            Properties outProps = new Properties();
-            outProps.setProperty("bootstrap.servers", BOOTSTRAP_SERVERS);
-            
-            String topic1k = TOPIC + "-1k";
-            try {
-                Properties adminProps = new Properties();
-                adminProps.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
-                try (AdminClient admin = AdminClient.create(adminProps)) {
-                    admin.createTopics(List.of(new NewTopic(topic1k, 1, (short) 1))).all().get(10, TimeUnit.SECONDS);
-                }
-            } catch (Exception e) { /* already exists */ }
-            
-            try (KafkaOutTransport kafkaOutTransport = new KafkaOutTransport(outProps, topic1k, serializer)) {
-                EventPublisher publisher = event -> kafkaOutTransport.send(event)
-                        .thenApply(r -> io.github.vovten.eventflow.transport.SendResults.of(List.of(r)));
+        // Default KafkaOutTransport settings (128KB batch, 20ms linger, lz4)
+        JsonEventSerializer serializer = new JsonEventSerializer();
 
-                BenchmarkEventHandler handler = new BenchmarkEventHandler();
-                EventListenerRegistry registry = new EventListenerRegistry();
-                registry.register(handler);
+        try (KafkaOutTransport kafkaOutTransport = new KafkaOutTransport(
+                new Properties() {{ setProperty("bootstrap.servers", BOOTSTRAP_SERVERS); }},
+                topic, serializer)) {
 
-                String groupId = "benchmark-group-1k-" + System.currentTimeMillis();
-                try (KafkaInTransport kafkaInTransport = new KafkaInTransport(
-                        createConsumer(BOOTSTRAP_SERVERS, groupId),
-                        List.of(topic1k),
-                        Executors.newSingleThreadExecutor(),
-                        new io.github.vovten.eventflow.serialization.EventSerializerFactory())) {
-                    
-                    dispatcherExecutor = Executors.newVirtualThreadPerTaskExecutor();
-                    UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
-                            dispatcherExecutor, registry, List.of(kafkaInTransport)
-                    );
-                    dispatcher.start(event -> dispatcher.dispatch(event));
+            EventPublisher publisher = event -> kafkaOutTransport.send(event)
+                    .thenApply(r -> io.github.vovten.eventflow.transport.SendResults.of(List.of(r)));
 
-                    Thread.sleep(3000);
+            BenchmarkEventHandler handler = new BenchmarkEventHandler();
+            EventListenerRegistry registry = new EventListenerRegistry();
+            registry.register(handler);
 
-                    CountDownLatch latch = new CountDownLatch(eventCount);
-                    handler.setLatch(latch);
-                    handler.reset();
+            String groupId = "benchmark-1m-" + System.nanoTime();
+            try (KafkaInTransport kafkaInTransport = new KafkaInTransport(
+                    createConsumer(BOOTSTRAP_SERVERS, groupId),
+                    List.of(topic),
+                    Executors.newSingleThreadExecutor(),
+                    new io.github.vovten.eventflow.serialization.EventSerializerFactory())) {
 
-                    long startTime = System.nanoTime();
+                dispatcherExecutor = Executors.newVirtualThreadPerTaskExecutor();
+                UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
+                        dispatcherExecutor, registry, List.of(kafkaInTransport)
+                );
+                dispatcher.start(event -> dispatcher.dispatch(event));
 
-                    for (int i = 0; i < eventCount; i++) {
-                        publisher.publish(new BenchmarkEvent("id-" + i, "payload-" + i));
+                // Wait for consumer to be ready
+                Thread.sleep(3000);
+
+                CountDownLatch latch = new CountDownLatch(EVENT_COUNT);
+                handler.setLatch(latch);
+                handler.reset();
+
+                long startTime = System.nanoTime();
+
+                System.out.println("  Publishing " + EVENT_COUNT + " events...");
+                for (int i = 0; i < EVENT_COUNT; i++) {
+                    publisher.publish(new BenchmarkEvent("id-" + i, "payload-" + i));
+                    if (i > 0 && i % 250000 == 0) {
+                        System.out.printf("    Published %,d...%n", i);
                     }
-
-                    boolean completed = latch.await(120, TimeUnit.SECONDS);
-                    long endTime = System.nanoTime();
-
-                    dispatcher.stop();
-
-                    double totalDuration = (endTime - startTime) / 1_000_000_000.0;
-                    double throughput = eventCount / totalDuration;
-
-                    System.out.println("\n========================================");
-                    System.out.println("Kafka 1k Events Benchmark");
-                    System.out.println("========================================");
-                    System.out.printf("Total events:       %,d%n", eventCount);
-                    System.out.printf("Received:           %,d%n", handler.getProcessedCount());
-                    System.out.printf("Total duration:      %.3f seconds%n", totalDuration);
-                    System.out.printf("Throughput:          %,.0f events/second%n", throughput);
-                    System.out.println("========================================\n");
-
-                    assertEquals(eventCount, handler.getProcessedCount(), "All events should be processed");
                 }
+
+                long publishEndTime = System.nanoTime();
+                System.out.printf("  Published in %.2f seconds%n", (publishEndTime - startTime) / 1_000_000_000.0);
+                System.out.println("  Waiting for consumer...");
+
+                boolean completed = latch.await(600, TimeUnit.SECONDS);
+                long endTime = System.nanoTime();
+
+                dispatcher.stop();
+
+                assertEquals(EVENT_COUNT, handler.getProcessedCount(), "All events should be processed");
+
+                double totalDuration = (endTime - startTime) / 1_000_000_000.0;
+                double publishDuration = (publishEndTime - startTime) / 1_000_000_000.0;
+                double processDuration = (endTime - publishEndTime) / 1_000_000_000.0;
+                double throughput = EVENT_COUNT / totalDuration;
+
+                System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
+                System.out.println("║                    Results                                   ║");
+                System.out.println("╠══════════════════════════════════════════════════════════════╣");
+                System.out.printf("║ Received:   %,12d                                      ║%n", handler.getProcessedCount());
+                System.out.printf("║ Throughput: %12.0f events/sec                         ║%n", throughput);
+                System.out.printf("║ Total time: %12.3f seconds                             ║%n", totalDuration);
+                System.out.printf("║ Publish:    %12.3f seconds                             ║%n", publishDuration);
+                System.out.printf("║ Process:    %12.3f seconds                             ║%n", processDuration);
+                System.out.println("╚══════════════════════════════════════════════════════════════╝");
+
+                assertTrue(completed, "All events should be processed within timeout");
             }
         }
     }
@@ -246,14 +170,11 @@ class KafkaBenchmarkTest {
         private String id;
         private String message;
 
-        public BenchmarkEvent() {
-            super();
-        }
-
-        public BenchmarkEvent(String id, String message) {
-            super();
-            this.id = id;
-            this.message = message;
+        public BenchmarkEvent() { super(); }
+        public BenchmarkEvent(String id, String message) { 
+            super(); 
+            this.id = id; 
+            this.message = message; 
         }
 
         public String getId() { return id; }
@@ -275,10 +196,9 @@ class KafkaBenchmarkTest {
 
         @EventListener
         public void onBenchmarkEvent(BenchmarkEvent event) {
-            processedCount.incrementAndGet();
-            RECEIVED_COUNT.incrementAndGet();
-            if (processedCount.get() <= 5) {
-                System.out.println(">>> Received event #" + processedCount.get() + ": " + event.getId());
+            long count = processedCount.incrementAndGet();
+            if (count % 250000 == 0) {
+                System.out.printf("    Processed %,d...%n", count);
             }
             if (latch != null) latch.countDown();
         }
