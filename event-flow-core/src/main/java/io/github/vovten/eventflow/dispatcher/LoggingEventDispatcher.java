@@ -97,7 +97,14 @@ public class LoggingEventDispatcher implements EventDispatcher {
     private void logEvent(Event event, HandlerResults results, long durationMs,
                           Map<String, String> mdcContext) {
         String json = buildLogEntry(event, results, durationMs, mdcContext);
-        log.info(json);
+
+        if (results != null && results.isAllFailure()) {
+            log.error(json);
+        } else if (results != null && results.isPartialSuccess()) {
+            log.warn(json);
+        } else {
+            log.info(json);
+        }
     }
 
     private String buildLogEntry(Event event, HandlerResults results, long durationMs,
