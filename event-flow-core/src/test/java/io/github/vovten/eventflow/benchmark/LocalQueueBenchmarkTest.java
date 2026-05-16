@@ -5,10 +5,12 @@ import io.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.registry.EventListenerRegistry;
+import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.transport.incoming.LocalQueueInTransport;
 import io.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
 import org.junit.jupiter.api.*;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,7 +60,7 @@ class LocalQueueBenchmarkTest {
         // OUT transport with shared queue
         LocalQueueOutTransport outTransport = new LocalQueueOutTransport(sharedQueue);
         EventPublisher publisher = event -> outTransport.send(event)
-            .thenApply(r -> io.github.vovten.eventflow.transport.SendResults.of(java.util.List.of(r)));
+            .thenApply(r -> SendResults.of(List.of(r)));
 
         // Handler using @EventListener
         BenchmarkEventHandler handler = new BenchmarkEventHandler();
@@ -69,7 +71,7 @@ class LocalQueueBenchmarkTest {
         LocalQueueInTransport inTransport = new LocalQueueInTransport(sharedQueue);
         dispatcherExecutor = Executors.newVirtualThreadPerTaskExecutor();
         UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
-            dispatcherExecutor, registry, java.util.List.of(inTransport)
+            dispatcherExecutor, registry, List.of(inTransport)
         );
         dispatcher.start(event -> dispatcher.dispatch(event));
 

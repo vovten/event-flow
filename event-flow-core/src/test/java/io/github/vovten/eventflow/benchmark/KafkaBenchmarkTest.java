@@ -5,8 +5,10 @@ import io.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.registry.EventListenerRegistry;
+import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.serialization.EventTypeRegistry;
 import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
+import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.transport.incoming.KafkaInTransport;
 import io.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -100,7 +102,7 @@ class KafkaBenchmarkTest {
                 topic, serializer)) {
 
             EventPublisher publisher = event -> kafkaOutTransport.send(event)
-                    .thenApply(r -> io.github.vovten.eventflow.transport.SendResults.of(List.of(r)));
+                    .thenApply(r -> SendResults.of(List.of(r)));
 
             BenchmarkEventHandler handler = new BenchmarkEventHandler();
             EventListenerRegistry registry = new EventListenerRegistry();
@@ -111,7 +113,7 @@ class KafkaBenchmarkTest {
                     createConsumer(BOOTSTRAP_SERVERS, groupId),
                     List.of(topic),
                     Executors.newSingleThreadExecutor(),
-                    new io.github.vovten.eventflow.serialization.EventSerializerFactory())) {
+                    new EventSerializerFactory())) {
 
                 dispatcherExecutor = Executors.newVirtualThreadPerTaskExecutor();
                 UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
