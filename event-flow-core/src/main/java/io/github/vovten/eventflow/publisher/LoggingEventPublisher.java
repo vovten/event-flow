@@ -109,7 +109,6 @@ public class LoggingEventPublisher implements EventPublisher {
     private String buildLogEntry(Event event, SendResults result, Throwable error,
                                  Instant start, Map<String, String> mdcContext) {
         Map<String, Object> entry = new LinkedHashMap<>();
-        buildTracingContext(entry, mdcContext);
         Map<String, Object> eventInfo = new LinkedHashMap<>();
         buildStatus(eventInfo, result, error);
         buildEventId(eventInfo, event);
@@ -119,6 +118,7 @@ public class LoggingEventPublisher implements EventPublisher {
         buildDeliveryInfo(eventInfo, result);
         buildErrorInfo(eventInfo, error);
         entry.put("event", eventInfo);
+        buildTracingContext(entry, mdcContext);
         entry.put("@timestamp", start.toString());
         return toJson(entry);
     }

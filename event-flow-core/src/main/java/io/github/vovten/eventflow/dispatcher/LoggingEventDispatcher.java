@@ -98,6 +98,8 @@ public class LoggingEventDispatcher implements EventDispatcher {
             log.error(json);
         } else if (results != null && results.isPartialSuccess()) {
             log.warn(json);
+        } else if (results != null && results.isEmpty()) {
+            log.warn(json);
         } else {
             log.info(json);
         }
@@ -112,11 +114,11 @@ public class LoggingEventDispatcher implements EventDispatcher {
         buildEnvelopeMetadata(eventInfo, event);
         buildHandlers(eventInfo, results);
         buildErrorInfo(eventInfo, error);
-        eventInfo.put("durationMs", durationMs);
 
         Map<String, Object> entry = new LinkedHashMap<>();
-        buildTracingContext(entry, mdcContext);
         entry.put("event", eventInfo);
+        buildTracingContext(entry, mdcContext);
+        eventInfo.put("durationMs", durationMs);
         entry.put("@timestamp", Instant.now().toString());
 
         return toJson(entry);
@@ -126,6 +128,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
         if (mdcContext != null) {
             addIfPresent(entry, "traceId", mdcContext.get("traceId"));
             addIfPresent(entry, "spanId", mdcContext.get("spanId"));
+            addIfPresent(entry, "deliveredFrom", mdcContext.get("deliveredFrom"));
         }
     }
 
@@ -141,7 +144,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
                 eventInfo.put("status", "failed");
             }
         } else {
-            eventInfo.put("status", "handled");
+            eventInfo.put("status", "skipped");
         }
     }
 
@@ -164,6 +167,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
 
     private void buildHandlers(Map<String, Object> eventInfo, HandlerResults results) {
         if (results == null || results.isEmpty()) {
+            eventInfo.put("handlers", List.of());
             return;
         }
         List<String> handlerNames = results.getSuccesses().stream()
