@@ -107,7 +107,7 @@ class KafkaOutTransportTest {
 
         ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
         assertThat(capturedRecord.topic()).isEqualTo("test-topic");
-        assertThat(capturedRecord.key()).isEqualTo(TestEvent.class.getName());
+        assertThat(capturedRecord.key()).isEqualTo(null);
         assertThat(capturedRecord.value()).isInstanceOf(byte[].class);
         assertThat(capturedRecord.value()).isNotEmpty();
         assertThat(capturedRecord.value()[0]).isEqualTo((byte) 0x01); // JSON magic byte
@@ -137,7 +137,7 @@ class KafkaOutTransportTest {
 
         ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
         assertThat(capturedRecord.topic()).isEqualTo("test-topic");
-        assertThat(capturedRecord.key()).isEqualTo(TestEvent.class.getName());
+        assertThat(capturedRecord.key()).isEqualTo(null);
         assertThat(capturedRecord.value()).isInstanceOf(byte[].class);
         assertThat(capturedRecord.value()).isNotEmpty();
         assertThat(capturedRecord.value()[0]).isEqualTo((byte) 0x02); // MessagePack magic byte

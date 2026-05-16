@@ -9,7 +9,8 @@ import ch.qos.logback.classic.Logger;
  */
 public final class BenchmarkLogConfig {
 
-    private BenchmarkLogConfig() {}
+    private BenchmarkLogConfig() {
+    }
 
     /**
      * Set INFO level for benchmark tests, WARN for other event-flow logging.
@@ -19,11 +20,11 @@ public final class BenchmarkLogConfig {
         // Set benchmark package to INFO
         Logger benchmark = (Logger) org.slf4j.LoggerFactory.getLogger("io.github.vovten.eventflow.benchmark");
         benchmark.setLevel(Level.INFO);
-        
+
         // Set main event-flow to WARN (reduce noise)
         Logger eventflow = (Logger) org.slf4j.LoggerFactory.getLogger("io.github.vovten.eventflow");
         eventflow.setLevel(Level.WARN);
-        
+
         // Keep Kafka INFO level
         Logger kafka = (Logger) org.slf4j.LoggerFactory.getLogger("org.apache.kafka");
         kafka.setLevel(Level.WARN);

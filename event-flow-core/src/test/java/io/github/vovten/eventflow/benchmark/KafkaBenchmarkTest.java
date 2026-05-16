@@ -73,7 +73,7 @@ class KafkaBenchmarkTest {
         props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         props.setProperty(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000");
         props.setProperty(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "30000");
-        
+
         String topic = "benchmark-1m-" + System.nanoTime();
         try (AdminClient admin = AdminClient.create(props)) {
             admin.createTopics(List.of(new NewTopic(topic, 3, (short) 1))).all().get(30, TimeUnit.SECONDS);
@@ -98,7 +98,11 @@ class KafkaBenchmarkTest {
         JsonEventSerializer serializer = new JsonEventSerializer();
 
         try (KafkaOutTransport kafkaOutTransport = new KafkaOutTransport(
-                new Properties() {{ setProperty("bootstrap.servers", BOOTSTRAP_SERVERS); }},
+                new Properties() {
+                    {
+                        setProperty("bootstrap.servers", BOOTSTRAP_SERVERS);
+                    }
+                },
                 topic, serializer)) {
 
             EventPublisher publisher = event -> kafkaOutTransport.send(event)
@@ -142,16 +146,13 @@ class KafkaBenchmarkTest {
                 System.out.printf("  Published in %.2f seconds%n", (publishEndTime - startTime) / 1_000_000_000.0);
                 System.out.println("  Waiting for consumer...");
 
-                boolean completed = latch.await(600, TimeUnit.SECONDS);
-                long endTime = System.nanoTime();
-
                 dispatcher.stop();
 
                 assertEquals(EVENT_COUNT, handler.getProcessedCount(), "All events should be processed");
 
-                double totalDuration = (endTime - startTime) / 1_000_000_000.0;
+                double totalDuration = (System.nanoTime() - startTime) / 1_000_000_000.0;
                 double publishDuration = (publishEndTime - startTime) / 1_000_000_000.0;
-                double processDuration = (endTime - publishEndTime) / 1_000_000_000.0;
+                double processDuration = (System.nanoTime() - publishEndTime) / 1_000_000_000.0;
                 double throughput = EVENT_COUNT / totalDuration;
 
                 System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
@@ -164,6 +165,7 @@ class KafkaBenchmarkTest {
                 System.out.printf("║ Process:    %12.3f seconds                             ║%n", processDuration);
                 System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
+                boolean completed = latch.await(600, TimeUnit.SECONDS);
                 assertTrue(completed, "All events should be processed within timeout");
             }
         }
@@ -173,29 +175,53 @@ class KafkaBenchmarkTest {
         private String id;
         private String message;
 
-        public BenchmarkEvent() { super(); }
-        public BenchmarkEvent(String id, String message) { 
-            super(); 
-            this.id = id; 
-            this.message = message; 
+        BenchmarkEvent() {
+            super();
         }
 
-        public String getId() { return id; }
-        public void setId(String id) { this.id = id; }
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
+        BenchmarkEvent(String id, String message) {
+            super();
+            this.id = id;
+            this.message = message;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
 
         @Override
-        public Class<?> type() { return BenchmarkEvent.class; }
+        public Class<?> type() {
+            return BenchmarkEvent.class;
+        }
     }
 
     public static class BenchmarkEventHandler {
         private final AtomicLong processedCount = new AtomicLong(0);
         private CountDownLatch latch;
 
-        public void setLatch(CountDownLatch latch) { this.latch = latch; }
-        public void reset() { processedCount.set(0); }
-        public long getProcessedCount() { return processedCount.get(); }
+        public void setLatch(CountDownLatch latch) {
+            this.latch = latch;
+        }
+
+        public void reset() {
+            processedCount.set(0);
+        }
+
+        public long getProcessedCount() {
+            return processedCount.get();
+        }
 
         @EventListener
         public void onBenchmarkEvent(BenchmarkEvent event) {

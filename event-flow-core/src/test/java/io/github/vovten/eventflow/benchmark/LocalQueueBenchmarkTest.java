@@ -54,13 +54,13 @@ class LocalQueueBenchmarkTest {
         System.out.println("╚══════════════════════════════════════════════════════════════╝");
 
         // SHARED queue - critical!
-        LinkedBlockingDeque<io.github.vovten.eventflow.event.Event> sharedQueue = 
-            new LinkedBlockingDeque<>(EVENT_COUNT * 2);
+        LinkedBlockingDeque<io.github.vovten.eventflow.event.Event> sharedQueue =
+                new LinkedBlockingDeque<>(EVENT_COUNT * 2);
 
         // OUT transport with shared queue
         LocalQueueOutTransport outTransport = new LocalQueueOutTransport(sharedQueue);
         EventPublisher publisher = event -> outTransport.send(event)
-            .thenApply(r -> SendResults.of(List.of(r)));
+                .thenApply(r -> SendResults.of(List.of(r)));
 
         // Handler using @EventListener
         BenchmarkEventHandler handler = new BenchmarkEventHandler();
@@ -71,7 +71,7 @@ class LocalQueueBenchmarkTest {
         LocalQueueInTransport inTransport = new LocalQueueInTransport(sharedQueue);
         dispatcherExecutor = Executors.newVirtualThreadPerTaskExecutor();
         UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
-            dispatcherExecutor, registry, List.of(inTransport)
+                dispatcherExecutor, registry, List.of(inTransport)
         );
         dispatcher.start(event -> dispatcher.dispatch(event));
 
@@ -90,13 +90,13 @@ class LocalQueueBenchmarkTest {
         }
 
         long publishEndTime = System.nanoTime();
-        System.out.printf("  Published %,d events in %.2f seconds%n", 
-            EVENT_COUNT, (publishEndTime - startTime) / 1_000_000_000.0);
+        System.out.printf("  Published %,d events in %.2f seconds%n",
+                EVENT_COUNT, (publishEndTime - startTime) / 1_000_000_000.0);
+
+        dispatcher.stop();
 
         boolean completed = latch.await(300, TimeUnit.SECONDS);
         long endTime = System.nanoTime();
-
-        dispatcher.stop();
 
         assertEquals(EVENT_COUNT, handler.getProcessedCount(), "All events should be processed");
 
@@ -120,29 +120,53 @@ class LocalQueueBenchmarkTest {
         private String id;
         private String message;
 
-        public BenchmarkEvent() { super(); }
-        public BenchmarkEvent(String id, String message) { 
-            super(); 
-            this.id = id; 
-            this.message = message; 
+        BenchmarkEvent() {
+            super();
         }
 
-        public String getId() { return id; }
-        public void setId(String id) { this.id = id; }
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
+        BenchmarkEvent(String id, String message) {
+            super();
+            this.id = id;
+            this.message = message;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
 
         @Override
-        public Class<?> type() { return BenchmarkEvent.class; }
+        public Class<?> type() {
+            return BenchmarkEvent.class;
+        }
     }
 
     public static class BenchmarkEventHandler {
         private final AtomicLong processedCount = new AtomicLong(0);
         private CountDownLatch latch;
 
-        public void setLatch(CountDownLatch latch) { this.latch = latch; }
-        public void reset() { processedCount.set(0); }
-        public long getProcessedCount() { return processedCount.get(); }
+        public void setLatch(CountDownLatch latch) {
+            this.latch = latch;
+        }
+
+        public void reset() {
+            processedCount.set(0);
+        }
+
+        public long getProcessedCount() {
+            return processedCount.get();
+        }
 
         @EventListener
         public void onBenchmarkEvent(BenchmarkEvent event) {
