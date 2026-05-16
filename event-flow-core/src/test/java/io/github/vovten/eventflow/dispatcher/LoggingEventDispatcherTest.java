@@ -163,6 +163,36 @@ class LoggingEventDispatcherTest {
         assertThat(log.path("spanId").asText()).isEqualTo("test-span-456");
     }
 
+    @Test
+    @DisplayName("Should log skipped with skipReason when duplicate event")
+    void shouldLogSkippedWithDuplicateReason() {
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(dispatcherThatReturns(
+                HandlerResults.duplicate()));
+
+        Envelope<String> envelope = Envelope.of("test");
+        underTest.dispatch(envelope).join();
+
+        JsonNode log = captureSingleLog();
+        assertThat(log.path("event").path("status").asText()).isEqualTo("skipped");
+        assertThat(log.path("event").path("skipReason").asText()).isEqualTo("duplicate event");
+        assertThat(log.path("event").path("handlers").isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should log skipped with skipReason when no handlers found")
+    void shouldLogSkippedWithNoHandlersReason() {
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(dispatcherThatReturns(
+                HandlerResults.empty()));
+
+        Envelope<String> envelope = Envelope.of("test");
+        underTest.dispatch(envelope).join();
+
+        JsonNode log = captureSingleLog();
+        assertThat(log.path("event").path("status").asText()).isEqualTo("skipped");
+        assertThat(log.path("event").path("skipReason").asText()).isEqualTo("no handlers found");
+        assertThat(log.path("event").path("handlers").isEmpty()).isTrue();
+    }
+
     private static EventDispatcher dispatcherThatReturns(HandlerResults results) {
         EventDispatcher mock = mock(EventDispatcher.class);
         when(mock.dispatch(null)).thenReturn(CompletableFuture.completedFuture(results));

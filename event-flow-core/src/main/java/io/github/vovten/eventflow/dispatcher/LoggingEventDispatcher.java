@@ -145,6 +145,9 @@ public class LoggingEventDispatcher implements EventDispatcher {
             }
         } else {
             eventInfo.put("status", "skipped");
+            if (results != null && results.getSkipReason() != null) {
+                eventInfo.put("skipReason", results.getSkipReason());
+            }
         }
     }
 

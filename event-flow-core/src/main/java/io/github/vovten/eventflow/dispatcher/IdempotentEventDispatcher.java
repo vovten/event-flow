@@ -73,7 +73,7 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
             if (warnOnDuplicate) {
                 log.warn("Duplicate event ignored: {}", eventId);
             }
-            return CompletableFuture.completedFuture(HandlerResults.empty());
+            return CompletableFuture.completedFuture(HandlerResults.duplicate());
         }
         return origin.dispatch(event)
                 .whenComplete((results, throwable) -> {

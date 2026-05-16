@@ -38,8 +38,9 @@ public final class HandlerResults {
     private final boolean allSuccess;
     private final boolean allFailure;
     private final boolean partialSuccess;
+    private final String skipReason;
 
-    private HandlerResults(List<HandlerResult> results) {
+    private HandlerResults(List<HandlerResult> results, String skipReason) {
         this.results = Collections.unmodifiableList(results);
         this.totalCount = results.size();
         this.successCount = results.stream().filter(HandlerResult::success).count();
@@ -47,6 +48,7 @@ public final class HandlerResults {
         this.allSuccess = successCount == totalCount && totalCount > 0;
         this.allFailure = failureCount == totalCount && totalCount > 0;
         this.partialSuccess = !allSuccess && !allFailure && totalCount > 0;
+        this.skipReason = skipReason;
     }
 
     /**
@@ -56,7 +58,7 @@ public final class HandlerResults {
      * @return HandlerResults instance
      */
     public static HandlerResults of(List<HandlerResult> results) {
-        return new HandlerResults(results != null ? results : List.of());
+        return new HandlerResults(results != null ? results : List.of(), null);
     }
 
     /**
@@ -65,14 +67,37 @@ public final class HandlerResults {
      * @return empty HandlerResults
      */
     public static HandlerResults empty() {
-        return new HandlerResults(List.of());
+        return new HandlerResults(List.of(), "no handlers found");
     }
 
     /**
-     * @return true if there are no results (no handlers found)
+     * Create HandlerResults for duplicate event.
+     *
+     * @return HandlerResults indicating duplicate event
+     */
+    public static HandlerResults duplicate() {
+        return new HandlerResults(List.of(), "duplicate event");
+    }
+
+    /**
+     * @return true if there are no results (no handlers found or duplicate)
      */
     public boolean isEmpty() {
         return results.isEmpty();
+    }
+
+    /**
+     * @return the reason for skipping, or null if not skipped
+     */
+    public String getSkipReason() {
+        return skipReason;
+    }
+
+    /**
+     * @return true if this is a duplicate event
+     */
+    public boolean isDuplicate() {
+        return "duplicate event".equals(skipReason);
     }
 
     /**
