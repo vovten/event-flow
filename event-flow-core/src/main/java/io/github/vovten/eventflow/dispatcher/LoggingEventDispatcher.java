@@ -84,21 +84,17 @@ public class LoggingEventDispatcher implements EventDispatcher {
         Map<String, String> mdcContext = MDC.getCopyOfContextMap();
 
         return origin.dispatch(event)
-                .whenComplete((results, throwable) -> {
+                .whenComplete((results, error) -> {
                     long durationMs = System.currentTimeMillis() - startTime;
-                    if (throwable != null) {
-                        log.error("Event dispatch failed for {}: {}", event, throwable.getMessage(), throwable);
-                    } else {
-                        logEvent(event, results, durationMs, mdcContext);
-                    }
+                    logEvent(event, results, error, durationMs, mdcContext);
                 });
     }
 
-    private void logEvent(Event event, HandlerResults results, long durationMs,
-                          Map<String, String> mdcContext) {
-        String json = buildLogEntry(event, results, durationMs, mdcContext);
+    private void logEvent(Event event, HandlerResults results, Throwable error,
+                          long durationMs, Map<String, String> mdcContext) {
+        String json = buildLogEntry(event, results, error, durationMs, mdcContext);
 
-        if (results != null && results.isAllFailure()) {
+        if (error != null || (results != null && results.isAllFailure())) {
             log.error(json);
         } else if (results != null && results.isPartialSuccess()) {
             log.warn(json);
@@ -107,14 +103,15 @@ public class LoggingEventDispatcher implements EventDispatcher {
         }
     }
 
-    private String buildLogEntry(Event event, HandlerResults results, long durationMs,
-                                 Map<String, String> mdcContext) {
+    private String buildLogEntry(Event event, HandlerResults results, Throwable error,
+                                 long durationMs, Map<String, String> mdcContext) {
         Map<String, Object> eventInfo = new LinkedHashMap<>();
-        buildStatus(eventInfo, results);
+        buildStatus(eventInfo, results, error);
         buildEventId(eventInfo, event);
         buildPayload(eventInfo, event);
         buildEnvelopeMetadata(eventInfo, event);
         buildHandlers(eventInfo, results);
+        buildErrorInfo(eventInfo, error);
         eventInfo.put("durationMs", durationMs);
 
         Map<String, Object> entry = new LinkedHashMap<>();
@@ -132,8 +129,10 @@ public class LoggingEventDispatcher implements EventDispatcher {
         }
     }
 
-    private void buildStatus(Map<String, Object> eventInfo, HandlerResults results) {
-        if (results != null && !results.isEmpty()) {
+    private void buildStatus(Map<String, Object> eventInfo, HandlerResults results, Throwable error) {
+        if (error != null) {
+            eventInfo.put("status", "failed");
+        } else if (results != null && !results.isEmpty()) {
             if (results.isAllSuccess()) {
                 eventInfo.put("status", "handled");
             } else if (results.isPartialSuccess()) {
@@ -144,6 +143,16 @@ public class LoggingEventDispatcher implements EventDispatcher {
         } else {
             eventInfo.put("status", "handled");
         }
+    }
+
+    private void buildErrorInfo(Map<String, Object> eventInfo, Throwable error) {
+        if (error == null) {
+            return;
+        }
+        Map<String, Object> errorInfo = new LinkedHashMap<>();
+        errorInfo.put("message", error.getMessage());
+        errorInfo.put("type", error.getClass().getSimpleName());
+        eventInfo.put("error", errorInfo);
     }
 
     private void buildEnvelopeMetadata(Map<String, Object> eventInfo, Event event) {
