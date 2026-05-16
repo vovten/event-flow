@@ -56,6 +56,7 @@ class KafkaBenchmarkTest {
 
     static {
         EventTypeRegistry.allowClass(BenchmarkEvent.class);
+        BenchmarkLogConfig.configureForBenchmarks();
     }
 
     @AfterEach

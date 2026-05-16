@@ -31,6 +31,10 @@ class LocalQueueBenchmarkTest {
     private static final int EVENT_COUNT = 1_000_000;
     private ExecutorService dispatcherExecutor;
 
+    static {
+        BenchmarkLogConfig.configureForBenchmarks();
+    }
+
     @AfterEach
     void tearDown() {
         if (dispatcherExecutor != null) {
