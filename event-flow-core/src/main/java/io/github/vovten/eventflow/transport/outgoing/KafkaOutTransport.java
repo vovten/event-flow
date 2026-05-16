@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.transport.outgoing;
 
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import io.github.vovten.eventflow.transport.OutTransport;
@@ -137,7 +138,10 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
         }
         CompletableFuture<SendResult> future = new CompletableFuture<>();
         try {
-            String key = event.type().getName();
+            String key = null;
+            if (event instanceof TraceableEvent trEvent && trEvent.processId() != null) {
+                key = trEvent.processId().toString();
+            }
             byte[] value = serializer.serialize(event);
             ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
             producer.send(record, createSendCallback(future, topic));
