@@ -21,12 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Performance benchmark for LocalQueue transport.
- * Run manually: mvn test -pl event-flow-core -Dtest=EventFlowBenchmarkTest -DskipTests=false
+ * Run manually: mvn test -pl event-flow-core -Dtest=mvn test -pl event-flow-core -Dtest=LocalQueueBenchmarkTest -DskipTests=false
  */
-@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=EventFlowBenchmarkTest -DskipTests=false")
+@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=LocalQueueBenchmarkTest -DskipTests=false")
 @DisplayName("LocalQueue Benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class EventFlowBenchmarkTest {
+class LocalQueueBenchmarkTest {
 
     private static final int EVENT_COUNT = 1_000_000;
     private ExecutorService dispatcherExecutor;
