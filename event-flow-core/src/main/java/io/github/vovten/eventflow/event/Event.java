@@ -43,7 +43,9 @@ public interface Event {
      * Used for logging purposes.
      *
      * @return the event as JSON
+     * @deprecated Use {@code toString()} instead. This method will be removed in a future version.
      */
+    @Deprecated(forRemoval = true)
     default String asJson() {
         return EventUtils.toJson(this);
     }
