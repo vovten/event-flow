@@ -5,12 +5,12 @@ import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
+import io.github.vovten.eventflow.util.JsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -34,15 +34,14 @@ import java.util.concurrent.CompletableFuture;
  * <p>
  * Logging is performed asynchronously after the publish operation completes,
  * allowing capture of the actual result status and channel delivery details.
- * MDC context is read at log time for tracing fields.
- * <p>
+ * MDC context is captured before the publish to ensure it reflects the caller's context.
  *
  * @author Vladimir Aleshkov
  * @see ChannelEventPublisher
  * @see RetryEventPublisher
  * @since 2026-05-11
  */
-public class LoggingEventPublisher implements EventPublisher {
+public final class LoggingEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventPublisher.class);
 
@@ -53,7 +52,7 @@ public class LoggingEventPublisher implements EventPublisher {
      * Create logging decorator with default settings.
      *
      * @param origin the delegate publisher to wrap
-     * @throws IllegalArgumentException if origin is null
+     * @throws NullPointerException if origin is null
      */
     public LoggingEventPublisher(EventPublisher origin) {
         this(origin, 1024);
@@ -64,7 +63,7 @@ public class LoggingEventPublisher implements EventPublisher {
      *
      * @param origin           the delegate publisher to wrap
      * @param maxPayloadLength maximum length of payload in log output
-     * @throws IllegalArgumentException if origin is null
+     * @throws NullPointerException if origin is null
      */
     public LoggingEventPublisher(EventPublisher origin, int maxPayloadLength) {
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
@@ -74,14 +73,17 @@ public class LoggingEventPublisher implements EventPublisher {
     @Override
     public CompletableFuture<SendResults> publish(Event event) {
         Instant start = Instant.now();
+        String traceId = MDC.get("traceId");
+        String spanId = MDC.get("spanId");
+        String deliveredFrom = MDC.get("deliveredFrom");
         return origin.publish(event)
                 .whenComplete((result, error) ->
-                        logEvent(event, result, error, start));
+                        logEvent(event, result, error, start, traceId, spanId, deliveredFrom));
     }
 
     private void logEvent(Event event, SendResults result, Throwable error,
-                          Instant start) {
-        String entry = buildLogEntry(event, result, error, start);
+                          Instant start, String traceId, String spanId, String deliveredFrom) {
+        String entry = buildLogEntry(event, result, error, start, traceId, spanId, deliveredFrom);
 
         if (error != null || (result != null && result.isAllFailure())) {
             log.error(entry);
@@ -93,178 +95,139 @@ public class LoggingEventPublisher implements EventPublisher {
     }
 
     private String buildLogEntry(Event event, SendResults result, Throwable error,
-                                 Instant start) {
-        StringBuilder sb = new StringBuilder(256 + maxPayloadLength);
-        sb.append("{\"event\":{");
-        appendStatus(sb, result, error);
-        appendEventId(sb, event);
-        appendPayload(sb, event);
-        appendEnvelopeMetadata(sb, event);
-        appendChannels(sb, event);
-        appendDeliveryResults(sb, result);
-        appendErrorInfo(sb, error);
-        sb.append("}");
-        appendRootContext(sb, start);
-        return sb.toString();
+                                  Instant start, String traceId, String spanId, String deliveredFrom) {
+        JsonBuilder jb = new JsonBuilder(256 + maxPayloadLength);
+        jb.beginObject();
+        jb.beginObject("event");
+        appendStatus(jb, result, error);
+        jb.appendString("eventId", extractEventId(event));
+        jb.appendString("payload", extractPayloadString(event));
+        appendEnvelopeMetadata(jb, event);
+        appendChannels(jb, event);
+        appendDeliveryResults(jb, result);
+        appendErrorInfo(jb, error);
+        jb.endObject();
+        appendRootContext(jb, start, traceId, spanId, deliveredFrom);
+        jb.endObject();
+        return jb.build();
     }
 
-    private void appendStatus(StringBuilder sb, SendResults result, Throwable error) {
-        sb.append("\"status\":\"");
+    private void appendStatus(JsonBuilder jb, SendResults result, Throwable error) {
+        jb.appendString("status", computeStatus(result, error));
+    }
+
+    private static String computeStatus(SendResults result, Throwable error) {
         if (error != null) {
-            sb.append("failed");
-        } else if (result != null && result.isAllSuccess()) {
-            sb.append("published");
-        } else if (result != null && result.isPartialSuccess()) {
-            sb.append("partial");
-        } else if (result != null && result.isAllFailure()) {
-            sb.append("failed");
-        } else {
-            sb.append("unknown");
+            return "failed";
         }
-        sb.append("\",");
-    }
-
-    private void appendEventId(StringBuilder sb, Event event) {
-        sb.append("\"eventId\":\"");
-        if (event instanceof TraceableEvent te && te.eventId() != null) {
-            sb.append(te.eventId());
-        } else {
-            sb.append("unknown");
-        }
-        sb.append("\",");
-    }
-
-    private void appendPayload(StringBuilder sb, Event event) {
-        sb.append("\"payload\":\"");
-        Object payloadObj = extractPayload(event);
-        if (payloadObj != null) {
-            String payloadStr = payloadObj.toString();
-            if (payloadStr.length() > maxPayloadLength) {
-                payloadStr = payloadStr.substring(0, maxPayloadLength) + "...";
+        if (result != null) {
+            if (result.isAllSuccess()) {
+                return "published";
             }
-            sb.append(escape(payloadStr));
+            if (result.isPartialSuccess()) {
+                return "partial";
+            }
+            if (result.isAllFailure()) {
+                return "failed";
+            }
         }
-        sb.append("\",");
+        return "unknown";
     }
 
-    private void appendEnvelopeMetadata(StringBuilder sb, Event event) {
+    private void appendEnvelopeMetadata(JsonBuilder jb, Event event) {
         if (event instanceof TraceableEvent te) {
             if (te.processId() != null) {
-                sb.append("\"processId\":\"");
-                sb.append(te.processId());
-                sb.append("\",");
+                jb.appendString("processId", te.processId().toString());
             }
             if (te.occurredAt() != null) {
-                sb.append("\"occurredAt\":\"");
-                sb.append(te.occurredAt());
-                sb.append("\",");
+                jb.appendString("occurredAt", te.occurredAt().toString());
             }
         }
     }
 
-    private void appendChannels(StringBuilder sb, Event event) {
-        sb.append("\"channels\":[");
+    private void appendChannels(JsonBuilder jb, Event event) {
         var channels = event.channels();
-        if (!channels.isEmpty()) {
-            for (int i = 0; i < channels.size(); i++) {
-                if (i > 0) sb.append(",");
-                sb.append("\"");
-                sb.append(channels.get(i).getSimpleName());
-                sb.append("\"");
-            }
+        jb.beginArray("channels");
+        for (var channel : channels) {
+            jb.appendArrayItem(channel.getSimpleName());
         }
-        sb.append("]");
+        jb.endArray();
     }
 
-    private void appendDeliveryResults(StringBuilder sb, SendResults result) {
+    private void appendDeliveryResults(JsonBuilder jb, SendResults result) {
         if (result == null || result.isEmpty()) {
             return;
         }
-        sb.append(",\"deliveredTo\":[");
-        List<SendResult> successes = result.getSuccesses();
-        for (int i = 0; i < successes.size(); i++) {
-            if (i > 0) sb.append(",");
-            sb.append("\"");
-            sb.append(successes.get(i).destination());
-            sb.append("\"");
+        jb.beginArray("deliveredTo");
+        for (SendResult s : result.getSuccesses()) {
+            jb.appendArrayItem(s.destination());
         }
-        sb.append("]");
+        jb.endArray();
+
         if (result.isPartialSuccess() || result.isAllFailure()) {
-            sb.append(",\"failedOn\":[");
-            List<SendResult> failures = result.getFailures();
-            for (int i = 0; i < failures.size(); i++) {
-                if (i > 0) sb.append(",");
-                sb.append("\"");
-                sb.append(failures.get(i).destination());
-                sb.append(": ");
-                String err = failures.get(i).errorDetails();
-                if (err != null) {
-                    sb.append(escape(err));
-                }
-                sb.append("\"");
+            jb.beginArray("failedOn");
+            for (SendResult f : result.getFailures()) {
+                jb.appendArrayItem(formatFailedDestination(f));
             }
-            sb.append("]");
+            jb.endArray();
         }
     }
 
-    private void appendErrorInfo(StringBuilder sb, Throwable error) {
+    private static String formatFailedDestination(SendResult f) {
+        String err = f.errorDetails();
+        if (err != null) {
+            return f.destination() + ": " + err;
+        }
+        return f.destination();
+    }
+
+    private void appendErrorInfo(JsonBuilder jb, Throwable error) {
         if (error == null) {
             return;
         }
-        sb.append(",\"error\":{\"message\":\"");
-        sb.append(escape(error.getMessage()));
-        sb.append("\",\"type\":\"");
-        sb.append(error.getClass().getSimpleName());
-        sb.append("\"}");
+        jb.beginObject("error");
+        jb.appendString("message", error.getMessage());
+        jb.appendString("type", error.getClass().getSimpleName());
+        jb.endObject();
     }
 
-    private void appendRootContext(StringBuilder sb, Instant start) {
-        String traceId = MDC.get("traceId");
+    private void appendRootContext(JsonBuilder jb, Instant start,
+                                    String traceId, String spanId, String deliveredFrom) {
         if (traceId != null) {
-            sb.append(",\"traceId\":\"");
-            sb.append(traceId);
-            sb.append("\"");
+            jb.appendString("traceId", traceId);
         }
-        String spanId = MDC.get("spanId");
         if (spanId != null) {
-            sb.append(",\"spanId\":\"");
-            sb.append(spanId);
-            sb.append("\"");
+            jb.appendString("spanId", spanId);
         }
-        String deliveredFrom = MDC.get("deliveredFrom");
         if (deliveredFrom != null) {
-            sb.append(",\"deliveredFrom\":\"");
-            sb.append(deliveredFrom);
-            sb.append("\"");
+            jb.appendString("deliveredFrom", deliveredFrom);
         }
-        sb.append(",\"@timestamp\":\"");
-        sb.append(start);
-        sb.append("\"}");
+        jb.appendString("@timestamp", start.toString());
     }
 
-    private Object extractPayload(Event event) {
+    private String extractPayloadString(Event event) {
+        Object payloadObj = extractPayload(event);
+        if (payloadObj == null) {
+            return "";
+        }
+        String payloadStr = payloadObj.toString();
+        if (payloadStr.length() > maxPayloadLength) {
+            return payloadStr.substring(0, maxPayloadLength) + "...";
+        }
+        return payloadStr;
+    }
+
+    private static String extractEventId(Event event) {
+        if (event instanceof TraceableEvent te && te.eventId() != null) {
+            return te.eventId().toString();
+        }
+        return "unknown";
+    }
+
+    private static Object extractPayload(Event event) {
         if (event instanceof Envelope<?> envelope) {
             return envelope.payload();
         }
         return event;
-    }
-
-    private String escape(String value) {
-        if (value == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(value.length() + 16);
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> sb.append(c);
-            }
-        }
-        return sb.toString();
     }
 }

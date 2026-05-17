@@ -3,12 +3,13 @@ package io.github.vovten.eventflow.dispatcher;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
+import io.github.vovten.eventflow.util.JsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -18,7 +19,7 @@ import java.util.function.Consumer;
  * <p>
  * Logs event handling information with machine-parseable JSON format:
  * <ul>
- *   <li>status - handling result (handled/partial/failed)</li>
+ *   <li>status - handling result (handled/partial/failed/skipped)</li>
  *   <li>eventId - envelope identifier</li>
  *   <li>payload - event payload as string (truncated if too long)</li>
  *   <li>occurredAt - event occurrence timestamp</li>
@@ -34,14 +35,13 @@ import java.util.function.Consumer;
  * </ul>
  * <p>
  * Logging is performed after the dispatch operation completes.
- * MDC context is read at log time for tracing fields.
- * <p>
+ * MDC context is captured before the dispatch to ensure it reflects the caller's context.
  *
  * @author Vladimir Aleshkov
  * @see IdempotentEventDispatcher
  * @since 2026-05-11
  */
-public class LoggingEventDispatcher implements EventDispatcher {
+public final class LoggingEventDispatcher implements EventDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventDispatcher.class);
 
@@ -52,7 +52,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
      * Create logging decorator with default settings.
      *
      * @param origin the delegate dispatcher to wrap
-     * @throws IllegalArgumentException if origin is null
+     * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin) {
         this(origin, 1024);
@@ -63,7 +63,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
      *
      * @param origin           the delegate dispatcher to wrap
      * @param maxPayloadLength maximum length of payload in log output
-     * @throws IllegalArgumentException if origin is null
+     * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin, int maxPayloadLength) {
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
@@ -72,20 +72,21 @@ public class LoggingEventDispatcher implements EventDispatcher {
 
     @Override
     public CompletableFuture<HandlerResults> dispatch(Event event) {
-        long startTime = System.currentTimeMillis();
+        Instant start = Instant.now();
         String traceId = MDC.get("traceId");
         String spanId = MDC.get("spanId");
         String deliveredFrom = MDC.get("deliveredFrom");
         return origin.dispatch(event)
                 .whenComplete((results, error) -> {
-                    long durationMs = System.currentTimeMillis() - startTime;
-                    logEvent(event, results, error, durationMs, traceId, spanId, deliveredFrom);
+                    long durationMs = Duration.between(start, Instant.now()).toMillis();
+                    logEvent(event, results, error, durationMs, start, traceId, spanId, deliveredFrom);
                 });
     }
 
     private void logEvent(Event event, HandlerResults results, Throwable error,
-                          long durationMs, String traceId, String spanId, String deliveredFrom) {
-        String entry = buildLogEntry(event, results, error, durationMs, traceId, spanId, deliveredFrom);
+                          long durationMs, Instant start,
+                          String traceId, String spanId, String deliveredFrom) {
+        String entry = buildLogEntry(event, results, error, durationMs, start, traceId, spanId, deliveredFrom);
 
         if (error != null || (results != null && results.isAllFailure())) {
             log.error(entry);
@@ -97,181 +98,147 @@ public class LoggingEventDispatcher implements EventDispatcher {
     }
 
     private String buildLogEntry(Event event, HandlerResults results, Throwable error,
-                                 long durationMs, String traceId, String spanId, String deliveredFrom) {
-        StringBuilder sb = new StringBuilder(256 + maxPayloadLength);
-        sb.append("{\"event\":{");
-        appendStatus(sb, results, error);
-        appendEventId(sb, event);
-        appendPayload(sb, event);
-        appendEnvelopeMetadata(sb, event);
-        appendHandlerResults(sb, results);
-        appendErrorInfo(sb, error);
-        appendDuration(sb, durationMs);
-        sb.append("}");
-        appendRootContext(sb, traceId, spanId, deliveredFrom);
-        return sb.toString();
+                                  long durationMs, Instant start,
+                                  String traceId, String spanId, String deliveredFrom) {
+        JsonBuilder jb = new JsonBuilder(256 + maxPayloadLength);
+        jb.beginObject();
+        jb.beginObject("event");
+        appendStatus(jb, results, error);
+        jb.appendString("eventId", extractEventId(event));
+        jb.appendString("payload", extractPayloadString(event));
+        appendEnvelopeMetadata(jb, event);
+        appendHandlerResults(jb, results);
+        appendErrorInfo(jb, error);
+        jb.appendNumber("durationMs", durationMs);
+        jb.endObject();
+        appendRootContext(jb, start, traceId, spanId, deliveredFrom);
+        jb.endObject();
+        return jb.build();
     }
 
-    private void appendStatus(StringBuilder sb, HandlerResults results, Throwable error) {
-        sb.append("\"status\":\"");
+    private void appendStatus(JsonBuilder jb, HandlerResults results, Throwable error) {
+        jb.appendString("status", computeStatus(results, error));
+        appendStatusDesc(jb, results);
+    }
+
+    private static String computeStatus(HandlerResults results, Throwable error) {
         if (error != null) {
-            sb.append("failed");
-        } else if (results != null && !results.isEmpty()) {
+            return "failed";
+        }
+        if (results != null && !results.isEmpty()) {
             if (results.isAllSuccess()) {
-                sb.append("handled");
-            } else if (results.isPartialSuccess()) {
-                sb.append("partial");
-            } else {
-                sb.append("failed");
+                return "handled";
             }
-        } else {
-            sb.append("skipped");
-        }
-        sb.append("\",");
-        if (results != null && !results.isEmpty() && results.getFailedCount() > 0) {
-            sb.append("\"statusDesc\":\"some handlers failed\",");
-        } else if (results != null && results.getSkipReason() != null) {
-            sb.append("\"statusDesc\":\"");
-            sb.append(results.getSkipReason());
-            sb.append("\",");
-        }
-    }
-
-    private void appendEventId(StringBuilder sb, Event event) {
-        sb.append("\"eventId\":\"");
-        if (event instanceof TraceableEvent te && te.eventId() != null) {
-            sb.append(te.eventId());
-        } else {
-            sb.append("unknown");
-        }
-        sb.append("\",");
-    }
-
-    private void appendPayload(StringBuilder sb, Event event) {
-        sb.append("\"payload\":\"");
-        Object payloadObj = extractPayload(event);
-        if (payloadObj != null) {
-            String payloadStr = payloadObj.toString();
-            if (payloadStr.length() > maxPayloadLength) {
-                payloadStr = payloadStr.substring(0, maxPayloadLength) + "...";
+            if (results.isPartialSuccess()) {
+                return "partial";
             }
-            sb.append(escape(payloadStr));
+            return "failed";
         }
-        sb.append("\",");
+        return "skipped";
     }
 
-    private void appendEnvelopeMetadata(StringBuilder sb, Event event) {
+    private static void appendStatusDesc(JsonBuilder jb, HandlerResults results) {
+        if (results == null) {
+            return;
+        }
+        if (!results.isEmpty() && results.getFailedCount() > 0) {
+            String desc = results.getFailures().getFirst().errorDetails();
+            if (desc != null) {
+                jb.appendString("statusDesc", "some handlers failed");
+            }
+        } else if (results.getSkipReason() != null) {
+            jb.appendString("statusDesc", results.getSkipReason());
+        }
+    }
+
+    private void appendEnvelopeMetadata(JsonBuilder jb, Event event) {
         if (event instanceof TraceableEvent te) {
             if (te.processId() != null) {
-                sb.append("\"processId\":\"");
-                sb.append(te.processId());
-                sb.append("\",");
+                jb.appendString("processId", te.processId().toString());
             }
             if (te.occurredAt() != null) {
-                sb.append("\"occurredAt\":\"");
-                sb.append(te.occurredAt());
-                sb.append("\",");
+                jb.appendString("occurredAt", te.occurredAt().toString());
             }
         }
     }
 
-    private void appendHandlerResults(StringBuilder sb, HandlerResults results) {
+    private void appendHandlerResults(JsonBuilder jb, HandlerResults results) {
         if (results == null || results.isEmpty()) {
             return;
         }
-        List<HandlerResult> successes = results.getSuccesses();
-        if (!successes.isEmpty()) {
-            sb.append("\"handlers\":[");
-            for (int i = 0; i < successes.size(); i++) {
-                if (i > 0) sb.append(",");
-                sb.append("\"");
-                sb.append(successes.get(i).handlerName());
-                sb.append("\"");
+        if (results.getSuccessfulCount() > 0) {
+            jb.beginArray("handlers");
+            for (HandlerResult r : results.getSuccesses()) {
+                jb.appendArrayItem(r.handlerName());
             }
-            sb.append("],");
+            jb.endArray();
         }
         if (results.getFailedCount() > 0) {
-            sb.append("\"failedHandlers\":[");
-            List<HandlerResult> failures = results.getFailures();
-            for (int i = 0; i < failures.size(); i++) {
-                if (i > 0) sb.append(",");
-                sb.append("\"");
-                sb.append(failures.get(i).handlerName());
-                String err = failures.get(i).errorDetails();
-                if (err != null) {
-                    sb.append(": ");
-                    sb.append(escape(err));
-                }
-                sb.append("\"");
+            jb.beginArray("failedHandlers");
+            for (HandlerResult r : results.getFailures()) {
+                jb.appendArrayItem(formatFailedHandler(r));
             }
-            sb.append("],");
-            sb.append("\"failedCount\":");
-            sb.append(results.getFailedCount());
-            sb.append(",");
+            jb.endArray();
+            jb.appendNumber("failedCount", results.getFailedCount());
         }
     }
 
-    private void appendErrorInfo(StringBuilder sb, Throwable error) {
+    private static String formatFailedHandler(HandlerResult r) {
+        String err = r.errorDetails();
+        if (err != null) {
+            return r.handlerName() + ": " + err;
+        }
+        return r.handlerName();
+    }
+
+    private void appendErrorInfo(JsonBuilder jb, Throwable error) {
         if (error == null) {
             return;
         }
-        sb.append("\"error\":{\"message\":\"");
-        sb.append(escape(error.getMessage()));
-        sb.append("\",\"type\":\"");
-        sb.append(error.getClass().getSimpleName());
-        sb.append("\"},");
+        jb.beginObject("error");
+        jb.appendString("message", error.getMessage());
+        jb.appendString("type", error.getClass().getSimpleName());
+        jb.endObject();
     }
 
-    private void appendDuration(StringBuilder sb, long durationMs) {
-        sb.append("\"durationMs\":");
-        sb.append(durationMs);
-    }
-
-    private void appendRootContext(StringBuilder sb, String traceId, String spanId, String deliveredFrom) {
+    private void appendRootContext(JsonBuilder jb, Instant start,
+                                    String traceId, String spanId, String deliveredFrom) {
         if (traceId != null) {
-            sb.append(",\"traceId\":\"");
-            sb.append(traceId);
-            sb.append("\"");
+            jb.appendString("traceId", traceId);
         }
         if (spanId != null) {
-            sb.append(",\"spanId\":\"");
-            sb.append(spanId);
-            sb.append("\"");
+            jb.appendString("spanId", spanId);
         }
         if (deliveredFrom != null) {
-            sb.append(",\"deliveredFrom\":\"");
-            sb.append(deliveredFrom);
-            sb.append("\"");
+            jb.appendString("deliveredFrom", deliveredFrom);
         }
-        sb.append(",\"@timestamp\":\"");
-        sb.append(Instant.now());
-        sb.append("\"}");
+        jb.appendString("@timestamp", start.toString());
     }
 
-    private Object extractPayload(Event event) {
+    private String extractPayloadString(Event event) {
+        Object payloadObj = extractPayload(event);
+        if (payloadObj == null) {
+            return "";
+        }
+        String payloadStr = payloadObj.toString();
+        if (payloadStr.length() > maxPayloadLength) {
+            return payloadStr.substring(0, maxPayloadLength) + "...";
+        }
+        return payloadStr;
+    }
+
+    private static String extractEventId(Event event) {
+        if (event instanceof TraceableEvent te && te.eventId() != null) {
+            return te.eventId().toString();
+        }
+        return "unknown";
+    }
+
+    private static Object extractPayload(Event event) {
         if (event instanceof Envelope<?> envelope) {
             return envelope.payload();
         }
         return event;
-    }
-
-    private String escape(String value) {
-        if (value == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(value.length() + 16);
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> sb.append(c);
-            }
-        }
-        return sb.toString();
     }
 
     @Override
