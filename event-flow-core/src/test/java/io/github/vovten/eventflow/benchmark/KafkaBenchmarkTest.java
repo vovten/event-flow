@@ -1,14 +1,18 @@
 package io.github.vovten.eventflow.benchmark;
 
 import io.github.vovten.eventflow.EventListener;
+import io.github.vovten.eventflow.channel.EventChannel;
+import io.github.vovten.eventflow.channel.ExternalEventChannel;
 import io.github.vovten.eventflow.dispatcher.UnifiedEventDispatcher;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.publisher.LoggingEventPublisher;
+import io.github.vovten.eventflow.publisher.RetryEventPublisher;
 import io.github.vovten.eventflow.registry.EventListenerRegistry;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.serialization.EventTypeRegistry;
 import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
-import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.transport.incoming.KafkaInTransport;
 import io.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -18,7 +22,10 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.util.List;
 import java.util.Properties;
@@ -35,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Performance benchmark for Kafka transport with default settings.
  * Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -Dkafka.bootstrap.servers=192.168.1.39:9092 -DskipTests=false
  */
-@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -DskipTests=false")
+//@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -DskipTests=false")
 @DisplayName("Kafka Benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KafkaBenchmarkTest {
@@ -100,10 +107,11 @@ class KafkaBenchmarkTest {
         try (KafkaOutTransport kafkaOutTransport = new KafkaOutTransport(
                 createProperties(),
                 topic, serializer)) {
-
-            EventPublisher publisher = event -> kafkaOutTransport.send(event)
-                    .thenApply(r -> SendResults.of(List.of(r)));
-
+            EventPublisher publisher = new LoggingEventPublisher(
+                    new RetryEventPublisher(
+                            new ChannelEventPublisher(List.of(new ExternalEventChannel(kafkaOutTransport)))
+                    )
+            );
             BenchmarkEventHandler handler = new BenchmarkEventHandler();
             EventListenerRegistry registry = new EventListenerRegistry();
             registry.register(handler);
@@ -214,9 +222,14 @@ class KafkaBenchmarkTest {
         public Class<?> type() {
             return BenchmarkEvent.class;
         }
+
+        @Override
+        public List<Class<? extends EventChannel>> channels() {
+            return List.of(ExternalEventChannel.class);
+        }
     }
 
-    static class BenchmarkEventHandler {
+    public static class BenchmarkEventHandler {
         private final AtomicLong processedCount = new AtomicLong(0);
         private CountDownLatch latch;
 
