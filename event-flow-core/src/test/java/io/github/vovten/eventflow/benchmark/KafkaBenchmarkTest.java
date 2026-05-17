@@ -150,9 +150,9 @@ class KafkaBenchmarkTest {
 
                 assertEquals(EVENT_COUNT, handler.getProcessedCount(), "All events should be processed");
 
-                double totalDuration = (endTime - startTime) / 1_000_000_000.0;
+                double totalDuration = (System.nanoTime() - startTime) / 1_000_000_000.0;
                 double publishDuration = (publishEndTime - startTime) / 1_000_000_000.0;
-                double processDuration = (endTime - publishEndTime) / 1_000_000_000.0;
+                double processDuration = (System.nanoTime() - publishEndTime) / 1_000_000_000.0;
                 double throughput = EVENT_COUNT / totalDuration;
 
                 printResult(handler, throughput, totalDuration, publishDuration, processDuration);

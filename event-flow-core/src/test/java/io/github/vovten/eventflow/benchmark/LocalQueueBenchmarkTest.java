@@ -93,10 +93,10 @@ class LocalQueueBenchmarkTest {
         System.out.printf("  Published %,d events in %.2f seconds%n",
                 EVENT_COUNT, (publishEndTime - startTime) / 1_000_000_000.0);
 
+        dispatcher.stop();
+
         boolean completed = latch.await(300, TimeUnit.SECONDS);
         long endTime = System.nanoTime();
-
-        dispatcher.stop();
 
         assertEquals(EVENT_COUNT, handler.getProcessedCount(), "All events should be processed");
 

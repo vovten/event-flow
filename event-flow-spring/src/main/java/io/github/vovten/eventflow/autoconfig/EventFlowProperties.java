@@ -326,7 +326,7 @@ public class EventFlowProperties {
         private boolean enabled = false;
         private Duration ttl = Duration.ofMinutes(10);
         private long maxSize = 10_000;
-        private boolean warnOnDuplicate = true;
+        private boolean warnOnDuplicate = false;
 
         public boolean isEnabled() {
             return enabled;
