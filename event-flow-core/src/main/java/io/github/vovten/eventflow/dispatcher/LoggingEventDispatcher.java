@@ -1,23 +1,18 @@
 package io.github.vovten.eventflow.dispatcher;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
-import io.github.vovten.eventflow.util.EventUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -41,6 +36,8 @@ import java.util.function.Consumer;
  * <p>
  * Logging is performed after the dispatch operation completes.
  * MDC context is preserved across async boundaries.
+ * <p>
+ * Optimized: StringBuilder for outer structure, cached reflection for payload fields.
  *
  * @author Vladimir Aleshkov
  * @see IdempotentEventDispatcher
@@ -49,21 +46,18 @@ import java.util.function.Consumer;
 public class LoggingEventDispatcher implements EventDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventDispatcher.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private final EventDispatcher origin;
     private final int maxPayloadLength;
 
     /**
-     * Create logging decorator with default max payload length (500).
+     * Create logging decorator with default settings.
      *
      * @param origin the delegate dispatcher to wrap
      * @throws IllegalArgumentException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin) {
-        this(origin, 500);
+        this(origin, 1024);
     }
 
     /**
@@ -81,116 +75,235 @@ public class LoggingEventDispatcher implements EventDispatcher {
     @Override
     public CompletableFuture<HandlerResults> dispatch(Event event) {
         long startTime = System.currentTimeMillis();
-        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+        String traceId = MDC.get("traceId");
+        String spanId = MDC.get("spanId");
 
         return origin.dispatch(event)
                 .whenComplete((results, error) -> {
                     long durationMs = System.currentTimeMillis() - startTime;
-                    logEvent(event, results, error, durationMs, mdcContext);
+                    logEvent(event, results, error, durationMs, traceId, spanId);
                 });
     }
 
     private void logEvent(Event event, HandlerResults results, Throwable error,
-                          long durationMs, Map<String, String> mdcContext) {
-        String json = buildLogEntry(event, results, error, durationMs, mdcContext);
+                          long durationMs, String traceId, String spanId) {
+        String entry = buildLogEntry(event, results, error, durationMs, traceId, spanId);
 
         if (error != null || (results != null && results.isAllFailure())) {
-            log.error(json);
+            log.error(entry);
         } else if (results != null && results.isPartialSuccess()) {
-            log.warn(json);
+            log.warn(entry);
         } else {
-            log.info(json);
+            log.info(entry);
         }
     }
 
     private String buildLogEntry(Event event, HandlerResults results, Throwable error,
-                                 long durationMs, Map<String, String> mdcContext) {
-        Map<String, Object> eventInfo = new LinkedHashMap<>();
-        buildStatus(eventInfo, results, error);
-        buildEventId(eventInfo, event);
-        buildPayload(eventInfo, event);
-        buildEnvelopeMetadata(eventInfo, event);
-        buildHandlers(eventInfo, results);
-        buildErrorInfo(eventInfo, error);
-        eventInfo.put("durationMs", durationMs);
+                                 long durationMs, String traceId, String spanId) {
+        StringBuilder sb = new StringBuilder(512);
 
-        Map<String, Object> entry = new LinkedHashMap<>();
-        buildTracingContext(entry, mdcContext);
-        entry.put("event", eventInfo);
-        entry.put("@timestamp", Instant.now().toString());
+        // tracing
+        sb.append("{\"traceId\":");
+        appendNullable(sb, traceId);
+        sb.append(",\"spanId\":");
+        appendNullable(sb, spanId);
 
-        return toJson(entry);
-    }
+        sb.append(",\"event\":{");
 
-    private void buildTracingContext(Map<String, Object> entry, Map<String, String> mdcContext) {
-        if (mdcContext != null) {
-            addIfPresent(entry, "traceId", mdcContext.get("traceId"));
-            addIfPresent(entry, "spanId", mdcContext.get("spanId"));
-        }
-    }
-
-    private void buildStatus(Map<String, Object> eventInfo, HandlerResults results, Throwable error) {
+        // status
+        sb.append("\"status\":\"");
         if (error != null) {
-            eventInfo.put("status", "failed");
+            sb.append("failed");
         } else if (results != null && !results.isEmpty()) {
             if (results.isAllSuccess()) {
-                eventInfo.put("status", "handled");
+                sb.append("handled");
             } else if (results.isPartialSuccess()) {
-                eventInfo.put("status", "partial");
+                sb.append("partial");
             } else {
-                eventInfo.put("status", "failed");
+                sb.append("failed");
             }
         } else {
-            eventInfo.put("status", "handled");
+            sb.append("handled");
         }
-    }
+        sb.append("\",");
 
-    private void buildErrorInfo(Map<String, Object> eventInfo, Throwable error) {
-        if (error == null) {
-            return;
-        }
-        Map<String, Object> errorInfo = new LinkedHashMap<>();
-        errorInfo.put("message", error.getMessage());
-        errorInfo.put("type", error.getClass().getSimpleName());
-        eventInfo.put("error", errorInfo);
-    }
-
-    private void buildEnvelopeMetadata(Map<String, Object> eventInfo, Event event) {
-        if (event instanceof TraceableEvent te) {
-            addIfPresent(eventInfo, "processId", te.processId());
-            addIfPresent(eventInfo, "occurredAt", te.occurredAt());
-        }
-    }
-
-    private void buildHandlers(Map<String, Object> eventInfo, HandlerResults results) {
-        if (results == null || results.isEmpty()) {
-            return;
-        }
-        List<String> handlerNames = results.getSuccesses().stream()
-                .map(HandlerResult::handlerName)
-                .toList();
-        if (!handlerNames.isEmpty()) {
-            eventInfo.put("handlers", handlerNames);
-        }
-
-        if (results.getFailedCount() > 0) {
-            List<String> failedHandlers = results.getFailures().stream()
-                    .map(f -> f.handlerName() + ": " + f.errorDetails())
-                    .toList();
-            eventInfo.put("failedHandlers", failedHandlers);
-            eventInfo.put("failedCount", results.getFailedCount());
-        }
-    }
-
-    private void buildEventId(Map<String, Object> eventInfo, Event event) {
+        // eventId
+        sb.append("\"eventId\":\"");
         if (event instanceof TraceableEvent te && te.eventId() != null) {
-            eventInfo.put("eventId", te.eventId().toString());
+            sb.append(te.eventId());
+        } else {
+            sb.append("unknown");
+        }
+        sb.append("\",");
+
+        // processId
+        if (event instanceof TraceableEvent te && te.processId() != null) {
+            sb.append("\"processId\":\"");
+            sb.append(te.processId());
+            sb.append("\",");
+        }
+
+        // occurredAt
+        if (event instanceof TraceableEvent te && te.occurredAt() != null) {
+            sb.append("\"occurredAt\":\"");
+            sb.append(te.occurredAt());
+            sb.append("\",");
+        }
+
+        // handlers
+        if (results != null && !results.isEmpty()) {
+            List<HandlerResult> successes = results.getSuccesses();
+            if (!successes.isEmpty()) {
+                sb.append("\"handlers\":[");
+                for (int i = 0; i < successes.size(); i++) {
+                    if (i > 0) sb.append(",");
+                    sb.append("\"");
+                    sb.append(successes.get(i).handlerName());
+                    sb.append("\"");
+                }
+                sb.append("],");
+            }
+
+            if (results.getFailedCount() > 0) {
+                sb.append("\"failedHandlers\":[");
+                List<HandlerResult> failures = results.getFailures();
+                for (int i = 0; i < failures.size(); i++) {
+                    if (i > 0) sb.append(",");
+                    sb.append("\"");
+                    sb.append(failures.get(i).handlerName());
+                    String err = failures.get(i).errorDetails();
+                    if (err != null) {
+                        sb.append(": ");
+                        sb.append(escape(err));
+                    }
+                    sb.append("\"");
+                }
+                sb.append("],");
+                sb.append("\"failedCount\":");
+                sb.append(results.getFailedCount());
+                sb.append(",");
+            }
+        }
+
+        // payload
+        buildPayload(sb, event);
+
+        // duration
+        sb.append(",\"durationMs\":");
+        sb.append(durationMs);
+
+        // error
+        if (error != null) {
+            sb.append(",\"error\":{\"message\":\"");
+            sb.append(escape(error.getMessage()));
+            sb.append("\",\"type\":\"");
+            sb.append(error.getClass().getSimpleName());
+            sb.append("\"}");
+        }
+
+        sb.append("},\"@timestamp\":\"");
+        sb.append(Instant.now());
+        sb.append("\"}");
+
+        return sb.toString();
+    }
+
+    private void buildPayload(StringBuilder sb, Event event) {
+        Object payload = extractPayload(event);
+        sb.append("\"payload\":{");
+
+        if (payload == null) {
+            sb.append("\"@class\":\"null\"}");
+            return;
+        }
+
+        sb.append("\"@class\":\"");
+        sb.append(payload.getClass().getName());
+        sb.append("\",");
+
+        // Use cached reflection for payload fields
+        Class<?> payloadClass = payload.getClass();
+        PayloadCache cache = PAYLOAD_CACHE.computeIfAbsent(payloadClass, PayloadCache::create);
+
+        if (cache.fields.length > 0) {
+            StringBuilder fieldsSb = new StringBuilder();
+            appendPayloadFields(fieldsSb, payload, cache);
+            String fieldsJson = fieldsSb.toString();
+
+            if (fieldsJson.length() > maxPayloadLength) {
+                sb.append("\"_truncated\":true,");
+                sb.append("\"_originalSize\":");
+                sb.append(fieldsJson.length());
+                sb.append(",\"data\":\"");
+                sb.append(escape(fieldsJson.substring(0, maxPayloadLength)));
+                sb.append("...\"}");
+            } else {
+                sb.append(fieldsJson);
+                sb.append("}");
+            }
+        } else {
+            // Fallback: use EventUtils.toJson for types without getters
+            try {
+                String json = io.github.vovten.eventflow.util.EventUtils.toJson(payload);
+                if (json.length() > maxPayloadLength) {
+                    sb.append("\"_truncated\":true,");
+                    sb.append("\"_originalSize\":");
+                    sb.append(json.length());
+                    sb.append(",\"data\":\"");
+                    sb.append(escape(json.substring(0, maxPayloadLength)));
+                    sb.append("...\"}");
+                } else {
+                    sb.append("\"data\":");
+                    sb.append(json);
+                    sb.append("}");
+                }
+            } catch (Exception e) {
+                sb.append("\"_raw\":\"");
+                sb.append(escape(payload.toString()));
+                sb.append("\"}");
+            }
         }
     }
 
-    private void buildPayload(Map<String, Object> eventInfo, Event event) {
-        Object payload = extractPayload(event);
-        eventInfo.put("payload", processPayload(payload));
+    private void appendPayloadFields(StringBuilder sb, Object payload, PayloadCache cache) {
+        for (int i = 0; i < cache.fields.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"");
+            sb.append(cache.fields[i]);
+            sb.append("\":");
+            try {
+                Object value = cache.getters[i].invoke(payload);
+                appendValue(sb, value);
+            } catch (Exception e) {
+                sb.append("null");
+            }
+        }
+    }
+
+    private void appendValue(StringBuilder sb, Object value) {
+        if (value == null) {
+            sb.append("null");
+        } else if (value instanceof String s) {
+            sb.append("\"");
+            sb.append(escape(s));
+            sb.append("\"");
+        } else if (value instanceof Number n) {
+            sb.append(n.toString());
+        } else if (value instanceof Boolean b) {
+            sb.append(b.toString());
+        } else if (value instanceof java.util.UUID uuid) {
+            sb.append("\"");
+            sb.append(uuid.toString());
+            sb.append("\"");
+        } else if (value instanceof Instant i) {
+            sb.append("\"");
+            sb.append(i.toString());
+            sb.append("\"");
+        } else {
+            sb.append("\"");
+            sb.append(escape(value.toString()));
+            sb.append("\"");
+        }
     }
 
     private Object extractPayload(Event event) {
@@ -200,66 +313,88 @@ public class LoggingEventDispatcher implements EventDispatcher {
         return event;
     }
 
-    private Object processPayload(Object payload) {
-        if (payload == null) {
-            return null;
-        }
-        Map<String, Object> payloadInfo = new LinkedHashMap<>();
-        payloadInfo.put("@class", payload.getClass().getName());
-        try {
-            String json = EventUtils.toJson(payload);
-
-            if (json.length() > maxPayloadLength) {
-                payloadInfo.put("_truncated", true);
-                payloadInfo.put("_originalSize", json.length());
-                String truncated = json.substring(0, maxPayloadLength) + "...";
-                if (!addPayloadFields(payloadInfo, truncated)) {
-                    payloadInfo.put("data", truncated);
-                }
-            } else {
-                if (!addPayloadFields(payloadInfo, json)) {
-                    payloadInfo.put("data", json);
-                }
-            }
-        } catch (Exception e) {
-            payloadInfo.put("_raw", payload.toString());
-        }
-        return payloadInfo;
-    }
-
-    private boolean addPayloadFields(Map<String, Object> payloadInfo, String json) {
-        Map<String, Object> fields = parseJsonToMap(json);
-        if (fields != null) {
-            fields.forEach((key, value) -> {
-                if (!"@class".equals(key)) {
-                    payloadInfo.put(key, value);
-                }
-            });
-            return true;
-        }
-        return false;
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseJsonToMap(String json) {
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private void addIfPresent(Map<String, Object> map, String key, Object value) {
+    private void appendNullable(StringBuilder sb, String value) {
         if (value != null) {
-            map.put(key, value instanceof UUID uuid ? uuid.toString() : value);
+            sb.append("\"");
+            sb.append(value);
+            sb.append("\"");
+        } else {
+            sb.append("null");
         }
     }
 
-    private String toJson(Object obj) {
-        try {
-            return EventUtils.toJson(obj);
-        } catch (Exception e) {
-            return "{\"error\":\"Failed to serialize log: " + e.getMessage() + "\"}";
+    private String escape(String value) {
+        if (value == null) return "";
+        StringBuilder sb = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    // Cache for payload class reflection data
+    private static final Map<Class<?>, PayloadCache> PAYLOAD_CACHE = new ConcurrentHashMap<>();
+
+    private static class PayloadCache {
+        final String[] fields;
+        final Method[] getters;
+
+        private PayloadCache(String[] fields, Method[] getters) {
+            this.fields = fields;
+            this.getters = getters;
+        }
+
+        static PayloadCache create(Class<?> clazz) {
+            var fieldNames = new java.util.ArrayList<String>();
+            var getterMethods = new java.util.ArrayList<Method>();
+
+            Class<?> current = clazz;
+            while (current != null && current != Object.class) {
+                if (current.getName().startsWith("io.github.vovten.eventflow.event")) {
+                    current = current.getSuperclass();
+                    continue;
+                }
+
+                for (java.lang.reflect.Field field : current.getDeclaredFields()) {
+                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) ||
+                        java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
+                        continue;
+                    }
+
+                    String fieldName = field.getName();
+                    String getterName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
+                    Method getter = null;
+
+                    try {
+                        getter = clazz.getMethod("get" + getterName);
+                    } catch (NoSuchMethodException e) {
+                        if (field.getType() == boolean.class) {
+                            try {
+                                getter = clazz.getMethod("is" + getterName);
+                            } catch (NoSuchMethodException ignored) {}
+                        }
+                    }
+
+                    if (getter != null) {
+                        fieldNames.add(fieldName);
+                        getterMethods.add(getter);
+                    }
+                }
+                current = current.getSuperclass();
+            }
+
+            return new PayloadCache(
+                fieldNames.toArray(new String[0]),
+                getterMethods.toArray(new Method[0])
+            );
         }
     }
 
