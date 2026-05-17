@@ -142,10 +142,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
             return;
         }
         if (!results.isEmpty() && results.getFailedCount() > 0) {
-            String desc = results.getFailures().getFirst().errorDetails();
-            if (desc != null) {
-                jb.appendString("statusDesc", "some handlers failed");
-            }
+            jb.appendString("statusDesc", "some handlers failed");
         } else if (results.getSkipReason() != null) {
             jb.appendString("statusDesc", results.getSkipReason());
         }

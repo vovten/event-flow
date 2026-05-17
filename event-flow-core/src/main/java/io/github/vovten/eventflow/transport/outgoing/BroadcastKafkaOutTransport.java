@@ -159,22 +159,27 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
             int totalPartitions,
             List<PartitionSendResult> failedPartitions
     ) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format(
-                "Failed to broadcast event %s to any partition of topic '%s' (0/%d successful)",
-                event.type().getSimpleName(), topic, totalPartitions
-        ));
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("Failed to broadcast event ")
+                .append(event.type().getSimpleName())
+                .append(" to any partition of topic '")
+                .append(topic)
+                .append("' (0/")
+                .append(totalPartitions)
+                .append(" successful)");
         if (!failedPartitions.isEmpty()) {
             sb.append(". Failures:");
             for (PartitionSendResult result : failedPartitions) {
-                sb.append(String.format(
-                        " [partition=%d: %s]",
-                        result.partitionId(),
-                        result.exception() != null ? result.exception().getMessage() : result.sendResult().errorDetails()
-                ));
+                String error = result.exception() != null
+                        ? result.exception().getMessage()
+                        : result.sendResult().errorDetails();
+                sb.append(" [partition=")
+                        .append(result.partitionId())
+                        .append(": ")
+                        .append(error)
+                        .append("]");
             }
         }
-
         return sb.toString();
     }
 
@@ -184,19 +189,27 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
             List<Integer> successfulPartitions,
             List<PartitionSendResult> failedPartitions
     ) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format(
-                "Partial broadcast of event %s to topic '%s' (%d/%d successful)",
-                event.type().getSimpleName(), topic, successfulPartitions.size(), totalPartitions
-        ));
-        sb.append(String.format(". Successful partitions: %s", successfulPartitions));
-        sb.append(". Failed partitions:");
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("Partial broadcast of event ")
+                .append(event.type().getSimpleName())
+                .append(" to topic '")
+                .append(topic)
+                .append("' (")
+                .append(successfulPartitions.size())
+                .append("/")
+                .append(totalPartitions)
+                .append(" successful). Successful partitions: ")
+                .append(successfulPartitions)
+                .append(". Failed partitions:");
         for (PartitionSendResult result : failedPartitions) {
-            sb.append(String.format(
-                    " [partition=%d: %s]",
-                    result.partitionId(),
-                    result.exception() != null ? result.exception().getMessage() : result.sendResult().errorDetails()
-            ));
+            String error = result.exception() != null
+                    ? result.exception().getMessage()
+                    : result.sendResult().errorDetails();
+            sb.append(" [partition=")
+                    .append(result.partitionId())
+                    .append(": ")
+                    .append(error)
+                    .append("]");
         }
         return sb.toString();
     }

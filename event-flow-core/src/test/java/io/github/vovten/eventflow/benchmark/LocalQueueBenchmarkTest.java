@@ -156,7 +156,7 @@ class LocalQueueBenchmarkTest {
         }
     }
 
-    static class BenchmarkEventHandler {
+    public static class BenchmarkEventHandler {
         private final AtomicLong processedCount = new AtomicLong(0);
         private CountDownLatch latch;
 
