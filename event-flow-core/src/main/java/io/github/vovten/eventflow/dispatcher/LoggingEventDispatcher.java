@@ -120,9 +120,18 @@ public class LoggingEventDispatcher implements EventDispatcher {
                 sb.append("failed");
             }
         } else {
-            sb.append("handled");
+            sb.append("skipped");
         }
         sb.append("\",");
+        if (error != null) {
+            sb.append("\"statusDesc\":\"");
+            sb.append(escape(error.getMessage()));
+            sb.append("\",");
+        } else if (results != null && results.getSkipReason() != null) {
+            sb.append("\"statusDesc\":\"");
+            sb.append(results.getSkipReason());
+            sb.append("\",");
+        }
     }
 
     private void appendEventId(StringBuilder sb, Event event) {
