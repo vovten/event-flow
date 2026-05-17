@@ -156,7 +156,7 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
      */
     protected Callback createSendCallback(CompletableFuture<SendResult> future, String topic) {
         return (metadata, exception) -> {
-            String destination = topic + (metadata != null ? "-p" + metadata.partition() : "");
+            String destination = name() + "-" + topic + (metadata != null ? "-p" + metadata.partition() : "");
             if (exception != null) {
                 future.complete(SendResult.failure(destination, exception, buildMetaData(metadata)));
             } else {

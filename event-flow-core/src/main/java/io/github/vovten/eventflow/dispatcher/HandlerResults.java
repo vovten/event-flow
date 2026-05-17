@@ -80,7 +80,7 @@ public final class HandlerResults {
     }
 
     /**
-     * @return true if there are no results (no handlers found)
+     * @return true if there are no results (no handlers found or duplicate)
      */
     public boolean isEmpty() {
         return results.isEmpty();

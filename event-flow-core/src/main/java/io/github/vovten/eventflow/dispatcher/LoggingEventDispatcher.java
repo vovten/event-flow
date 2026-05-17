@@ -73,15 +73,19 @@ public class LoggingEventDispatcher implements EventDispatcher {
     @Override
     public CompletableFuture<HandlerResults> dispatch(Event event) {
         long startTime = System.currentTimeMillis();
+        String traceId = MDC.get("traceId");
+        String spanId = MDC.get("spanId");
+        String deliveredFrom = MDC.get("deliveredFrom");
         return origin.dispatch(event)
                 .whenComplete((results, error) -> {
                     long durationMs = System.currentTimeMillis() - startTime;
-                    logEvent(event, results, error, durationMs);
+                    logEvent(event, results, error, durationMs, traceId, spanId, deliveredFrom);
                 });
     }
 
-    private void logEvent(Event event, HandlerResults results, Throwable error, long durationMs) {
-        String entry = buildLogEntry(event, results, error, durationMs);
+    private void logEvent(Event event, HandlerResults results, Throwable error,
+                          long durationMs, String traceId, String spanId, String deliveredFrom) {
+        String entry = buildLogEntry(event, results, error, durationMs, traceId, spanId, deliveredFrom);
 
         if (error != null || (results != null && results.isAllFailure())) {
             log.error(entry);
@@ -92,7 +96,8 @@ public class LoggingEventDispatcher implements EventDispatcher {
         }
     }
 
-    private String buildLogEntry(Event event, HandlerResults results, Throwable error, long durationMs) {
+    private String buildLogEntry(Event event, HandlerResults results, Throwable error,
+                                 long durationMs, String traceId, String spanId, String deliveredFrom) {
         StringBuilder sb = new StringBuilder(256 + maxPayloadLength);
         sb.append("{\"event\":{");
         appendStatus(sb, results, error);
@@ -103,7 +108,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
         appendErrorInfo(sb, error);
         appendDuration(sb, durationMs);
         sb.append("}");
-        appendRootContext(sb);
+        appendRootContext(sb, traceId, spanId, deliveredFrom);
         return sb.toString();
     }
 
@@ -123,10 +128,8 @@ public class LoggingEventDispatcher implements EventDispatcher {
             sb.append("skipped");
         }
         sb.append("\",");
-        if (error != null) {
-            sb.append("\"statusDesc\":\"");
-            sb.append(escape(error.getMessage()));
-            sb.append("\",");
+        if (results != null && !results.isEmpty() && results.getFailedCount() > 0) {
+            sb.append("\"statusDesc\":\"some handlers failed\",");
         } else if (results != null && results.getSkipReason() != null) {
             sb.append("\"statusDesc\":\"");
             sb.append(results.getSkipReason());
@@ -224,20 +227,17 @@ public class LoggingEventDispatcher implements EventDispatcher {
         sb.append(durationMs);
     }
 
-    private void appendRootContext(StringBuilder sb) {
-        String traceId = MDC.get("traceId");
+    private void appendRootContext(StringBuilder sb, String traceId, String spanId, String deliveredFrom) {
         if (traceId != null) {
             sb.append(",\"traceId\":\"");
             sb.append(traceId);
             sb.append("\"");
         }
-        String spanId = MDC.get("spanId");
         if (spanId != null) {
             sb.append(",\"spanId\":\"");
             sb.append(spanId);
             sb.append("\"");
         }
-        String deliveredFrom = MDC.get("deliveredFrom");
         if (deliveredFrom != null) {
             sb.append(",\"deliveredFrom\":\"");
             sb.append(deliveredFrom);

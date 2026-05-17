@@ -101,7 +101,7 @@ class KafkaOutTransportTest {
         SendResult result = future.join();
 
         assertThat(result.success()).isTrue();
-        assertThat(result.destination()).isEqualTo("test-topic-p0");
+        assertThat(result.destination()).isEqualTo("kafka-test-topic-p0");
         assertThat(result.metadata()).containsEntry("partition", 0);
         assertThat(result.metadata()).containsEntry("offset", 100L);
 
@@ -131,7 +131,7 @@ class KafkaOutTransportTest {
         SendResult result = future.join();
 
         assertThat(result.success()).isTrue();
-        assertThat(result.destination()).isEqualTo("test-topic-p1");
+        assertThat(result.destination()).isEqualTo("kafka-test-topic-p1");
         assertThat(result.metadata()).containsEntry("partition", 1);
 
         ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
@@ -160,7 +160,7 @@ class KafkaOutTransportTest {
         SendResult result = future.join();
 
         assertThat(result.success()).isFalse();
-        assertThat(result.destination()).isEqualTo("test-topic-p0");
+        assertThat(result.destination()).isEqualTo("kafka-test-topic-p0");
         assertThat(result.error()).isInstanceOf(NetworkException.class);
         assertThat(result.errorDetails()).isEqualTo("Network error");
     }

@@ -73,12 +73,11 @@ import java.util.concurrent.Semaphore;
  * <ol>
  *   <li>Base {@link UnifiedEventDispatcher}</li>
  *   <li>Custom decorators (applied in order added)</li>
- *   <li>{@link IdempotentEventDispatcher} (if enabled)</li>
  * </ol>
  * <p>
  * <b>Event flow:</b>
  * <pre>{@code
- * Transport → IdempotentEventDispatcher → [CustomDecorators] → UnifiedEventDispatcher → Handlers
+ * Transport → [CustomDecorators] → LoggingEventDispatcher → IdempotentEventDispatcher → UnifiedEventDispatcher → Handlers
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -287,15 +286,7 @@ public final class EventDispatcherBuilder {
         EventDispatcher dispatcher = new UnifiedEventDispatcher(
                 executorService, handlerRegistry, transports, semaphore
         );
-        if (loggable) {
-            dispatcher = new LoggingEventDispatcher(dispatcher, logMaxPayloadLength);
-            log.debug("Applied logging decorator with maxPayloadLength={}", logMaxPayloadLength);
-        }
-        // Apply custom decorators
-        for (DecoratorFunction decorator : decorators) {
-            dispatcher = decorator.apply(dispatcher);
-            log.debug("Applied custom decorator: {}", decorator.getClass().getSimpleName());
-        }
+        // Apply idempotent decorator
         if (idempotent) {
             dispatcher = new IdempotentEventDispatcher(
                     dispatcher,
@@ -305,6 +296,16 @@ public final class EventDispatcherBuilder {
             );
             log.debug("Applied idempotent decorator with ttl={}, maxSize={}, warnOnDuplicate={}",
                     idempotentTtl, idempotentMaxSize, idempotentWarnOnDuplicate);
+        }
+        // Apply custom decorators
+        for (DecoratorFunction decorator : decorators) {
+            dispatcher = decorator.apply(dispatcher);
+            log.debug("Applied custom decorator: {}", decorator.getClass().getSimpleName());
+        }
+        // Apply logging decorator
+        if (loggable) {
+            dispatcher = new LoggingEventDispatcher(dispatcher, logMaxPayloadLength);
+            log.debug("Applied logging decorator with maxPayloadLength={}", logMaxPayloadLength);
         }
         if (concurrencyLimit != null) {
             log.info("Concurrency limit applied: max {} concurrent handler executions", concurrencyLimit);

@@ -13,6 +13,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.time.Duration;
 import java.util.List;
@@ -233,6 +234,7 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
             byte[] data = record.value();
             EventSerializer serializer = serializerFactory.getByData(data);
             Event event = serializer.deserialize(data, Event.class);
+            MDC.put("deliveredFrom", name() + "-" + record.topic() + "-p" + record.partition());
             eventConsumer.accept(event);
             if (log.isDebugEnabled()) {
                 String payloadType = event instanceof Envelope<?> envelope
@@ -243,6 +245,8 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
             }
         } catch (Exception e) {
             log.error("Failed to deliver event from topic: {}, key: {}", record.topic(), record.key(), e);
+        } finally {
+            MDC.remove("deliveredFrom");
         }
     }
 
