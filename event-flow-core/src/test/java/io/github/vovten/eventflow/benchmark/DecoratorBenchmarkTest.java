@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Performance benchmark for LocalQueue transport with decorators.
  * Run manually: mvn test -pl event-flow-core -Dtest=DecoratorBenchmarkTest -DskipTests=false
  */
-@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=DecoratorBenchmarkTest -DskipTests=false")
+// @Disabled(" mvn test -pl event-flow-core -Dtest=DecoratorBenchmarkTest -DskipTests=false")
 @DisplayName("Decorator Benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DecoratorBenchmarkTest {

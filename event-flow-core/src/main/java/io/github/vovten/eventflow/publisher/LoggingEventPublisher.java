@@ -1,27 +1,21 @@
 package io.github.vovten.eventflow.publisher;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
-import io.github.vovten.eventflow.util.EventUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
  * Decorator for {@link EventPublisher} that adds structured logging when events are published.
@@ -43,6 +37,9 @@ import java.util.stream.Collectors;
  * Logging is performed asynchronously after the publish operation completes,
  * allowing capture of the actual result status and channel delivery details.
  * MDC context is preserved across async boundaries.
+ * <p>
+ * Optimized implementation: uses StringBuilder for outer structure, and
+ * cached reflection for payload field extraction (reflection happens once per payload type).
  *
  * @author Vladimir Aleshkov
  * @see ChannelEventPublisher
@@ -52,21 +49,19 @@ import java.util.stream.Collectors;
 public class LoggingEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventPublisher.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private static final int MAX_PAYLOAD_LENGTH = 1024;
 
     private final EventPublisher origin;
     private final int maxPayloadLength;
 
     /**
-     * Create logging decorator with default max payload length (500).
+     * Create logging decorator with default settings.
      *
      * @param origin the delegate publisher to wrap
      * @throws IllegalArgumentException if origin is null
      */
     public LoggingEventPublisher(EventPublisher origin) {
-        this(origin, 500);
+        this(origin, 1024);
     }
 
     /**
@@ -84,118 +79,205 @@ public class LoggingEventPublisher implements EventPublisher {
     @Override
     public CompletableFuture<SendResults> publish(Event event) {
         Instant start = Instant.now();
-        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+        String traceId = MDC.get("traceId");
+        String spanId = MDC.get("spanId");
         return origin.publish(event)
-                .whenComplete((result, error) -> logEvent(event, result, error, start, mdcContext));
+                .whenComplete((result, error) -> logEvent(event, result, error, start, traceId, spanId));
     }
 
     private void logEvent(Event event, SendResults result, Throwable error,
-                          Instant start, Map<String, String> mdcContext) {
-        String json = buildLogEntry(event, result, error, start, mdcContext);
+                          Instant start, String traceId, String spanId) {
+        String entry = buildLogEntry(event, result, error, start, traceId, spanId);
 
-        if (error != null) {
-            log.error(json);
+        if (error != null || (result != null && result.isAllFailure())) {
+            log.error(entry);
         } else if (result != null && result.isPartialSuccess()) {
-            log.warn(json);
-        } else if (result != null && result.isAllSuccess()) {
-            log.info(json);
-        } else if (result != null && result.isAllFailure()) {
-            log.error(json);
+            log.warn(entry);
         } else {
-            log.info(json);
+            log.info(entry);
         }
     }
 
     private String buildLogEntry(Event event, SendResults result, Throwable error,
-                                 Instant start, Map<String, String> mdcContext) {
-        Map<String, Object> entry = new LinkedHashMap<>();
-        buildTracingContext(entry, mdcContext);
-        Map<String, Object> eventInfo = new LinkedHashMap<>();
-        buildStatus(eventInfo, result, error);
-        buildEventId(eventInfo, event);
-        buildPayload(eventInfo, event);
-        buildEnvelopeMetadata(eventInfo, event);
-        buildChannels(eventInfo, event);
-        buildDeliveryInfo(eventInfo, result);
-        buildErrorInfo(eventInfo, error);
-        entry.put("event", eventInfo);
-        entry.put("@timestamp", start.toString());
-        return toJson(entry);
-    }
+                                 Instant start, String traceId, String spanId) {
+        StringBuilder sb = new StringBuilder(512);
 
-    private void buildTracingContext(Map<String, Object> entry, Map<String, String> mdcContext) {
-        if (mdcContext != null) {
-            addIfPresent(entry, "traceId", mdcContext.get("traceId"));
-            addIfPresent(entry, "spanId", mdcContext.get("spanId"));
-        }
-    }
+        // traceId
+        sb.append("{\"traceId\":");
+        appendNullable(sb, traceId);
+        sb.append(",\"spanId\":");
+        appendNullable(sb, spanId);
 
-    private void buildStatus(Map<String, Object> eventInfo, SendResults result, Throwable error) {
+        sb.append(",\"event\":{");
+
+        // status
+        sb.append("\"status\":\"");
         if (error != null) {
-            eventInfo.put("status", "failed");
+            sb.append("failed");
         } else if (result != null && result.isAllSuccess()) {
-            eventInfo.put("status", "published");
+            sb.append("published");
         } else if (result != null && result.isPartialSuccess()) {
-            eventInfo.put("status", "partial");
+            sb.append("partial");
         } else if (result != null && result.isAllFailure()) {
-            eventInfo.put("status", "failed");
+            sb.append("failed");
         } else {
-            eventInfo.put("status", "unknown");
+            sb.append("unknown");
         }
-    }
+        sb.append("\",");
 
-    private void buildEventId(Map<String, Object> eventInfo, Event event) {
+        // eventId
+        sb.append("\"eventId\":\"");
         if (event instanceof TraceableEvent te && te.eventId() != null) {
-            eventInfo.put("eventId", te.eventId().toString());
+            sb.append(te.eventId());
+        } else {
+            sb.append("unknown");
         }
+        sb.append("\",");
+
+        // processId
+        if (event instanceof TraceableEvent te && te.processId() != null) {
+            sb.append("\"processId\":\"");
+            sb.append(te.processId());
+            sb.append("\",");
+        }
+
+        // occurredAt
+        if (event instanceof TraceableEvent te && te.occurredAt() != null) {
+            sb.append("\"occurredAt\":\"");
+            sb.append(te.occurredAt());
+            sb.append("\",");
+        }
+
+        // channels
+        sb.append("\"channels\":[");
+        var channels = event.channels();
+        if (!channels.isEmpty()) {
+            for (int i = 0; i < channels.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append("\"");
+                sb.append(channels.get(i).getClass().getSimpleName());
+                sb.append("\"");
+            }
+        }
+        sb.append("],");
+
+        // payload
+        buildPayload(sb, event);
+
+        // deliveredTo
+        if (result != null && !result.isEmpty()) {
+            sb.append(",\"deliveredTo\":[");
+            List<SendResult> successes = result.getSuccesses();
+            for (int i = 0; i < successes.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append("\"");
+                sb.append(successes.get(i).destination());
+                sb.append("\"");
+            }
+            sb.append("]");
+
+            if (result.isPartialSuccess() || result.isAllFailure()) {
+                sb.append(",\"failedOn\":[");
+                List<SendResult> failures = result.getFailures();
+                for (int i = 0; i < failures.size(); i++) {
+                    if (i > 0) sb.append(",");
+                    sb.append("\"");
+                    sb.append(failures.get(i).destination());
+                    sb.append(": ");
+                    String err = failures.get(i).errorDetails();
+                    if (err != null) sb.append(escape(err));
+                    sb.append("\"");
+                }
+                sb.append("]");
+            }
+        }
+
+        // error
+        if (error != null) {
+            sb.append(",\"error\":{\"message\":\"");
+            sb.append(escape(error.getMessage()));
+            sb.append("\",\"type\":\"");
+            sb.append(error.getClass().getSimpleName());
+            sb.append("\"}");
+        }
+
+        sb.append("},");
+        sb.append("\"@timestamp\":\"");
+        sb.append(start);
+        sb.append("\"}");
+
+        return sb.toString();
     }
 
-    private void buildEnvelopeMetadata(Map<String, Object> eventInfo, Event event) {
-        if (event instanceof TraceableEvent te) {
-            addIfPresent(eventInfo, "processId", te.processId());
-            addIfPresent(eventInfo, "occurredAt", te.occurredAt());
-        }
-    }
-
-    private void buildChannels(Map<String, Object> eventInfo, Event event) {
-        List<String> channelNames = event.channels().isEmpty()
-                ? List.of()
-                : event.channels().stream()
-                        .map(Class::getSimpleName)
-                        .collect(Collectors.toList());
-        eventInfo.put("channels", channelNames);
-    }
-
-    private void buildDeliveryInfo(Map<String, Object> eventInfo, SendResults result) {
-        if (result == null || result.isEmpty()) {
-            return;
-        }
-        List<String> deliveredTo = result.getSuccesses().stream()
-                .map(SendResult::destination)
-                .collect(Collectors.toList());
-        eventInfo.put("deliveredTo", deliveredTo);
-
-        if (result.isPartialSuccess() || result.isAllFailure()) {
-            List<String> failedOn = result.getFailures().stream()
-                    .map(f -> f.destination() + ": " + f.errorDetails())
-                    .collect(Collectors.toList());
-            eventInfo.put("failedOn", failedOn);
-        }
-    }
-
-    private void buildPayload(Map<String, Object> eventInfo, Event event) {
+    private void buildPayload(StringBuilder sb, Event event) {
         Object payload = extractPayload(event);
-        eventInfo.put("payload", processPayload(payload));
-    }
+        sb.append("\"payload\":{");
 
-    private void buildErrorInfo(Map<String, Object> eventInfo, Throwable error) {
-        if (error == null) {
+        if (payload == null) {
+            sb.append("\"@class\":\"null\"}");
             return;
         }
-        Map<String, Object> errorInfo = new LinkedHashMap<>();
-        errorInfo.put("message", error.getMessage());
-        errorInfo.put("type", error.getClass().getSimpleName());
-        eventInfo.put("error", errorInfo);
+
+        sb.append("\"@class\":\"");
+        sb.append(payload.getClass().getName());
+        sb.append("\",");
+
+        // Use cached reflection for payload fields
+        Class<?> payloadClass = payload.getClass();
+        PayloadCache cache = PAYLOAD_CACHE.computeIfAbsent(payloadClass, PayloadCache::create);
+
+        if (cache.fields.length > 0) {
+            appendPayloadFields(sb, payload, cache);
+        } else {
+            sb.append("\"_raw\":\"");
+            sb.append(escape(payload.toString()));
+            sb.append("\"}");
+            return;
+        }
+
+        sb.append("}");
+    }
+
+    private void appendPayloadFields(StringBuilder sb, Object payload, PayloadCache cache) {
+        for (int i = 0; i < cache.fields.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"");
+            sb.append(cache.fields[i]);
+            sb.append("\":");
+
+            try {
+                Object value = cache.getters[i].invoke(payload);
+                appendValue(sb, value);
+            } catch (Exception e) {
+                sb.append("null");
+            }
+        }
+    }
+
+    private void appendValue(StringBuilder sb, Object value) {
+        if (value == null) {
+            sb.append("null");
+        } else if (value instanceof String s) {
+            sb.append("\"");
+            sb.append(escape(s));
+            sb.append("\"");
+        } else if (value instanceof Number n) {
+            sb.append(n.toString());
+        } else if (value instanceof Boolean b) {
+            sb.append(b.toString());
+        } else if (value instanceof java.util.UUID uuid) {
+            sb.append("\"");
+            sb.append(uuid.toString());
+            sb.append("\"");
+        } else if (value instanceof Instant i) {
+            sb.append("\"");
+            sb.append(i.toString());
+            sb.append("\"");
+        } else {
+            sb.append("\"");
+            sb.append(escape(value.toString()));
+            sb.append("\"");
+        }
     }
 
     private Object extractPayload(Event event) {
@@ -205,66 +287,93 @@ public class LoggingEventPublisher implements EventPublisher {
         return event;
     }
 
-    private Object processPayload(Object payload) {
-        if (payload == null) {
-            return null;
-        }
-        Map<String, Object> payloadInfo = new LinkedHashMap<>();
-        payloadInfo.put("@class", payload.getClass().getName());
-        try {
-            String json = EventUtils.toJson(payload);
-
-            if (json.length() > maxPayloadLength) {
-                payloadInfo.put("_truncated", true);
-                payloadInfo.put("_originalSize", json.length());
-                String truncated = json.substring(0, maxPayloadLength) + "...";
-                if (!addPayloadFields(payloadInfo, truncated)) {
-                    payloadInfo.put("data", truncated);
-                }
-            } else {
-                if (!addPayloadFields(payloadInfo, json)) {
-                    payloadInfo.put("data", json);
-                }
-            }
-        } catch (Exception e) {
-            payloadInfo.put("_raw", payload.toString());
-        }
-        return payloadInfo;
-    }
-
-    private boolean addPayloadFields(Map<String, Object> payloadInfo, String json) {
-        Map<String, Object> fields = parseJsonToMap(json);
-        if (fields != null) {
-            fields.forEach((key, value) -> {
-                if (!"@class".equals(key)) {
-                    payloadInfo.put(key, value);
-                }
-            });
-            return true;
-        }
-        return false;
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseJsonToMap(String json) {
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private void addIfPresent(Map<String, Object> map, String key, Object value) {
+    private void appendNullable(StringBuilder sb, String value) {
         if (value != null) {
-            map.put(key, value instanceof UUID uuid ? uuid.toString() : value);
+            sb.append("\"");
+            sb.append(value);
+            sb.append("\"");
+        } else {
+            sb.append("null");
         }
     }
 
-    private String toJson(Object obj) {
-        try {
-            return EventUtils.toJson(obj);
-        } catch (Exception e) {
-            return "{\"error\":\"Failed to serialize log: " + e.getMessage() + "\"}";
+    private String escape(String value) {
+        if (value == null) return "";
+        StringBuilder sb = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    // Cache for payload class reflection data
+    private static final Map<Class<?>, PayloadCache> PAYLOAD_CACHE = new ConcurrentHashMap<>();
+
+    private static class PayloadCache {
+        final String[] fields;
+        final Method[] getters;
+
+        private PayloadCache(String[] fields, Method[] getters) {
+            this.fields = fields;
+            this.getters = getters;
+        }
+
+        static PayloadCache create(Class<?> clazz) {
+            // Collect getters for fields
+            var fieldNames = new java.util.ArrayList<String>();
+            var getterMethods = new java.util.ArrayList<Method>();
+
+            // Get fields from class and superclasses (excluding Event/TraceableEvent base classes)
+            Class<?> current = clazz;
+            while (current != null && current != Object.class) {
+                // Skip event infrastructure classes
+                if (current.getName().startsWith("io.github.vovten.eventflow.event")) {
+                    current = current.getSuperclass();
+                    continue;
+                }
+
+                for (java.lang.reflect.Field field : current.getDeclaredFields()) {
+                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || 
+                        java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
+                        continue;
+                    }
+
+                    String fieldName = field.getName();
+                    
+                    // Try getter method (getXxx or isXxx for boolean)
+                    String getterName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
+                    Method getter = null;
+                    
+                    try {
+                        getter = clazz.getMethod("get" + getterName);
+                    } catch (NoSuchMethodException e) {
+                        if (field.getType() == boolean.class) {
+                            try {
+                                getter = clazz.getMethod("is" + getterName);
+                            } catch (NoSuchMethodException ignored) {}
+                        }
+                    }
+
+                    if (getter != null) {
+                        fieldNames.add(fieldName);
+                        getterMethods.add(getter);
+                    }
+                }
+                current = current.getSuperclass();
+            }
+
+            return new PayloadCache(
+                fieldNames.toArray(new String[0]),
+                getterMethods.toArray(new Method[0])
+            );
         }
     }
 }
