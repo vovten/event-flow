@@ -6,8 +6,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
-import io.github.vovten.eventflow.util.EventUtils;
-
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -224,13 +222,7 @@ public final class Envelope<T> implements TraceableEvent {
 
     @Override
     public String toString() {
-        String payloadJson;
-        try {
-            payloadJson = EventUtils.toJson(payload);
-        } catch (Exception e) {
-            payloadJson = payload.getClass().getSimpleName();
-        }
         return String.format("Envelope{eventId=%s, processId=%s, occurredAt=%s, payload=%s}",
-                eventId, processId, occurredAt, payloadJson);
+                eventId, processId, occurredAt, payload);
     }
 }
