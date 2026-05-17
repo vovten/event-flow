@@ -9,12 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -26,20 +23,19 @@ import java.util.concurrent.CompletableFuture;
  *   <li>processId - process correlation identifier</li>
  *   <li>occurredAt - event timestamp</li>
  *   <li>channels - target channel names</li>
- *   <li>payload - event data with type discriminator and fields</li>
+ *   <li>payload - event payload as string (truncated if too long)</li>
  *   <li>status - publication result (published/partial/failed)</li>
  *   <li>deliveredTo - list of successfully delivered destinations</li>
  *   <li>failedOn - list of failed destinations (if partial/failure)</li>
  *   <li>traceId - distributed trace ID from MDC</li>
  *   <li>spanId - span ID from MDC</li>
+ *   <li>deliveredFrom - source identifier from MDC</li>
  * </ul>
  * <p>
  * Logging is performed asynchronously after the publish operation completes,
  * allowing capture of the actual result status and channel delivery details.
- * MDC context is preserved across async boundaries.
+ * MDC context is read at log time for tracing fields.
  * <p>
- * Optimized implementation: uses StringBuilder for outer structure, and
- * cached reflection for payload field extraction (reflection happens once per payload type).
  *
  * @author Vladimir Aleshkov
  * @see ChannelEventPublisher
@@ -49,7 +45,6 @@ import java.util.concurrent.CompletableFuture;
 public class LoggingEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventPublisher.class);
-    private static final int MAX_PAYLOAD_LENGTH = 1024;
 
     private final EventPublisher origin;
     private final int maxPayloadLength;
@@ -79,15 +74,14 @@ public class LoggingEventPublisher implements EventPublisher {
     @Override
     public CompletableFuture<SendResults> publish(Event event) {
         Instant start = Instant.now();
-        String traceId = MDC.get("traceId");
-        String spanId = MDC.get("spanId");
         return origin.publish(event)
-                .whenComplete((result, error) -> logEvent(event, result, error, start, traceId, spanId));
+                .whenComplete((result, error) ->
+                        logEvent(event, result, error, start));
     }
 
     private void logEvent(Event event, SendResults result, Throwable error,
-                          Instant start, String traceId, String spanId) {
-        String entry = buildLogEntry(event, result, error, start, traceId, spanId);
+                          Instant start) {
+        String entry = buildLogEntry(event, result, error, start);
 
         if (error != null || (result != null && result.isAllFailure())) {
             log.error(entry);
@@ -99,18 +93,22 @@ public class LoggingEventPublisher implements EventPublisher {
     }
 
     private String buildLogEntry(Event event, SendResults result, Throwable error,
-                                 Instant start, String traceId, String spanId) {
-        StringBuilder sb = new StringBuilder(512);
+                                 Instant start) {
+        StringBuilder sb = new StringBuilder(256 + maxPayloadLength);
+        sb.append("{\"event\":{");
+        appendStatus(sb, result, error);
+        appendEventId(sb, event);
+        appendPayload(sb, event);
+        appendEnvelopeMetadata(sb, event);
+        appendChannels(sb, event);
+        appendDeliveryResults(sb, result);
+        appendErrorInfo(sb, error);
+        sb.append("}");
+        appendRootContext(sb, start);
+        return sb.toString();
+    }
 
-        // traceId
-        sb.append("{\"traceId\":");
-        appendNullable(sb, traceId);
-        sb.append(",\"spanId\":");
-        appendNullable(sb, spanId);
-
-        sb.append(",\"event\":{");
-
-        // status
+    private void appendStatus(StringBuilder sb, SendResults result, Throwable error) {
         sb.append("\"status\":\"");
         if (error != null) {
             sb.append("failed");
@@ -124,8 +122,9 @@ public class LoggingEventPublisher implements EventPublisher {
             sb.append("unknown");
         }
         sb.append("\",");
+    }
 
-        // eventId
+    private void appendEventId(StringBuilder sb, Event event) {
         sb.append("\"eventId\":\"");
         if (event instanceof TraceableEvent te && te.eventId() != null) {
             sb.append(te.eventId());
@@ -133,153 +132,114 @@ public class LoggingEventPublisher implements EventPublisher {
             sb.append("unknown");
         }
         sb.append("\",");
+    }
 
-        // processId
-        if (event instanceof TraceableEvent te && te.processId() != null) {
-            sb.append("\"processId\":\"");
-            sb.append(te.processId());
-            sb.append("\",");
+    private void appendPayload(StringBuilder sb, Event event) {
+        sb.append("\"payload\":\"");
+        Object payloadObj = extractPayload(event);
+        if (payloadObj != null) {
+            String payloadStr = payloadObj.toString();
+            if (payloadStr.length() > maxPayloadLength) {
+                payloadStr = payloadStr.substring(0, maxPayloadLength) + "...";
+            }
+            sb.append(escape(payloadStr));
         }
+        sb.append("\",");
+    }
 
-        // occurredAt
-        if (event instanceof TraceableEvent te && te.occurredAt() != null) {
-            sb.append("\"occurredAt\":\"");
-            sb.append(te.occurredAt());
-            sb.append("\",");
+    private void appendEnvelopeMetadata(StringBuilder sb, Event event) {
+        if (event instanceof TraceableEvent te) {
+            if (te.processId() != null) {
+                sb.append("\"processId\":\"");
+                sb.append(te.processId());
+                sb.append("\",");
+            }
+            if (te.occurredAt() != null) {
+                sb.append("\"occurredAt\":\"");
+                sb.append(te.occurredAt());
+                sb.append("\",");
+            }
         }
+    }
 
-        // channels
+    private void appendChannels(StringBuilder sb, Event event) {
         sb.append("\"channels\":[");
         var channels = event.channels();
         if (!channels.isEmpty()) {
             for (int i = 0; i < channels.size(); i++) {
                 if (i > 0) sb.append(",");
                 sb.append("\"");
-                sb.append(channels.get(i).getClass().getSimpleName());
+                sb.append(channels.get(i).getSimpleName());
                 sb.append("\"");
             }
         }
-        sb.append("],");
+        sb.append("]");
+    }
 
-        // payload
-        buildPayload(sb, event);
-
-        // deliveredTo
-        if (result != null && !result.isEmpty()) {
-            sb.append(",\"deliveredTo\":[");
-            List<SendResult> successes = result.getSuccesses();
-            for (int i = 0; i < successes.size(); i++) {
+    private void appendDeliveryResults(StringBuilder sb, SendResults result) {
+        if (result == null || result.isEmpty()) {
+            return;
+        }
+        sb.append(",\"deliveredTo\":[");
+        List<SendResult> successes = result.getSuccesses();
+        for (int i = 0; i < successes.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"");
+            sb.append(successes.get(i).destination());
+            sb.append("\"");
+        }
+        sb.append("]");
+        if (result.isPartialSuccess() || result.isAllFailure()) {
+            sb.append(",\"failedOn\":[");
+            List<SendResult> failures = result.getFailures();
+            for (int i = 0; i < failures.size(); i++) {
                 if (i > 0) sb.append(",");
                 sb.append("\"");
-                sb.append(successes.get(i).destination());
+                sb.append(failures.get(i).destination());
+                sb.append(": ");
+                String err = failures.get(i).errorDetails();
+                if (err != null) {
+                    sb.append(escape(err));
+                }
                 sb.append("\"");
             }
             sb.append("]");
-
-            if (result.isPartialSuccess() || result.isAllFailure()) {
-                sb.append(",\"failedOn\":[");
-                List<SendResult> failures = result.getFailures();
-                for (int i = 0; i < failures.size(); i++) {
-                    if (i > 0) sb.append(",");
-                    sb.append("\"");
-                    sb.append(failures.get(i).destination());
-                    sb.append(": ");
-                    String err = failures.get(i).errorDetails();
-                    if (err != null) sb.append(escape(err));
-                    sb.append("\"");
-                }
-                sb.append("]");
-            }
         }
+    }
 
-        // error
-        if (error != null) {
-            sb.append(",\"error\":{\"message\":\"");
-            sb.append(escape(error.getMessage()));
-            sb.append("\",\"type\":\"");
-            sb.append(error.getClass().getSimpleName());
-            sb.append("\"}");
+    private void appendErrorInfo(StringBuilder sb, Throwable error) {
+        if (error == null) {
+            return;
         }
+        sb.append(",\"error\":{\"message\":\"");
+        sb.append(escape(error.getMessage()));
+        sb.append("\",\"type\":\"");
+        sb.append(error.getClass().getSimpleName());
+        sb.append("\"}");
+    }
 
-        sb.append("},");
-        sb.append("\"@timestamp\":\"");
+    private void appendRootContext(StringBuilder sb, Instant start) {
+        String traceId = MDC.get("traceId");
+        if (traceId != null) {
+            sb.append(",\"traceId\":\"");
+            sb.append(traceId);
+            sb.append("\"");
+        }
+        String spanId = MDC.get("spanId");
+        if (spanId != null) {
+            sb.append(",\"spanId\":\"");
+            sb.append(spanId);
+            sb.append("\"");
+        }
+        String deliveredFrom = MDC.get("deliveredFrom");
+        if (deliveredFrom != null) {
+            sb.append(",\"deliveredFrom\":\"");
+            sb.append(deliveredFrom);
+            sb.append("\"");
+        }
+        sb.append(",\"@timestamp\":\"");
         sb.append(start);
         sb.append("\"}");
-
-        return sb.toString();
-    }
-
-    private void buildPayload(StringBuilder sb, Event event) {
-        Object payload = extractPayload(event);
-        sb.append("\"payload\":{");
-
-        if (payload == null) {
-            sb.append("\"@class\":\"null\"}");
-            return;
-        }
-
-        sb.append("\"@class\":\"");
-        sb.append(payload.getClass().getName());
-        sb.append("\",");
-
-        // Use cached reflection for payload fields
-        Class<?> payloadClass = payload.getClass();
-        PayloadCache cache = PayloadCache.create(payloadClass);
-
-        if (cache.fields.length > 0) {
-            appendPayloadFields(sb, payload, cache);
-        } else {
-            sb.append("\"_raw\":\"");
-            sb.append(escape(payload.toString()));
-            sb.append("\"}");
-            return;
-        }
-
-        sb.append("}");
-    }
-
-    private void appendPayloadFields(StringBuilder sb, Object payload, PayloadCache cache) {
-        for (int i = 0; i < cache.fields.length; i++) {
-            if (i > 0) sb.append(",");
-            sb.append("\"");
-            sb.append(cache.fields[i]);
-            sb.append("\":");
-
-            try {
-                Object value = cache.getters[i].invoke(payload);
-                appendValue(sb, value);
-            } catch (Exception e) {
-                sb.append("null");
-            }
-        }
-    }
-
-    private void appendValue(StringBuilder sb, Object value) {
-        switch (value) {
-            case null -> sb.append("null");
-            case String s -> {
-                sb.append("\"");
-                sb.append(escape(s));
-                sb.append("\"");
-            }
-            case Number n -> sb.append(n.toString());
-            case Boolean b -> sb.append(b.toString());
-            case java.util.UUID uuid -> {
-                sb.append("\"");
-                sb.append(uuid.toString());
-                sb.append("\"");
-            }
-            case Instant i -> {
-                sb.append("\"");
-                sb.append(i.toString());
-                sb.append("\"");
-            }
-            default -> {
-                sb.append("\"");
-                sb.append(escape(value.toString()));
-                sb.append("\"");
-            }
-        }
     }
 
     private Object extractPayload(Event event) {
@@ -289,18 +249,10 @@ public class LoggingEventPublisher implements EventPublisher {
         return event;
     }
 
-    private void appendNullable(StringBuilder sb, String value) {
-        if (value != null) {
-            sb.append("\"");
-            sb.append(value);
-            sb.append("\"");
-        } else {
-            sb.append("null");
-        }
-    }
-
     private String escape(String value) {
-        if (value == null) return "";
+        if (value == null) {
+            return "";
+        }
         StringBuilder sb = new StringBuilder(value.length() + 16);
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
@@ -314,71 +266,5 @@ public class LoggingEventPublisher implements EventPublisher {
             }
         }
         return sb.toString();
-    }
-
-    private static final class PayloadCache {
-        private static final Map<Class<?>, PayloadCache> CACHE = new ConcurrentHashMap<>();
-
-        final String[] fields;
-        final Method[] getters;
-
-        private PayloadCache(Class<?> clazz) {
-            // Collect getters for fields
-            var fieldNames = new java.util.ArrayList<String>();
-            var getterMethods = new java.util.ArrayList<Method>();
-
-            // Get fields from class and superclasses (excluding Event/TraceableEvent base classes)
-            Class<?> current = clazz;
-            while (current != null && current != Object.class) {
-                // Skip event infrastructure classes
-                if (current.getName().startsWith("io.github.vovten.eventflow.event")) {
-                    current = current.getSuperclass();
-                    continue;
-                }
-
-                for (java.lang.reflect.Field field : current.getDeclaredFields()) {
-                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) ||
-                            java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
-                        continue;
-                    }
-
-                    String fieldName = field.getName();
-
-                    // Try getter method (getXxx or isXxx for boolean)
-                    String getterName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-                    Method getter = null;
-
-                    try {
-                        getter = clazz.getMethod("get" + getterName);
-                    } catch (NoSuchMethodException e) {
-                        if (field.getType() == boolean.class) {
-                            try {
-                                getter = clazz.getMethod("is" + getterName);
-                            } catch (NoSuchMethodException ex) {
-                                // ignored
-                            }
-                        }
-                    }
-
-                    if (getter != null) {
-                        fieldNames.add(fieldName);
-                        getterMethods.add(getter);
-                    }
-                }
-                current = current.getSuperclass();
-            }
-
-            this.fields = fieldNames.toArray(new String[0]);
-            this.getters = getterMethods.toArray(new Method[0]);
-        }
-
-        private PayloadCache(String[] fields, Method[] getters) {
-            this.fields = fields;
-            this.getters = getters;
-        }
-
-        static PayloadCache create(Class<?> clazz) {
-            return CACHE.computeIfAbsent(clazz, PayloadCache::new);
-        }
     }
 }

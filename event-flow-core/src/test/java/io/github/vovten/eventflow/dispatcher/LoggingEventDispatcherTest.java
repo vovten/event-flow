@@ -128,8 +128,8 @@ class LoggingEventDispatcherTest {
     }
 
     @Test
-    @DisplayName("Should truncate large JSON object payload with data fallback")
-    void shouldTruncateLargeJsonObject() {
+    @DisplayName("Should truncate large payload using toString with maxPayloadLength")
+    void shouldTruncateLargePayload() {
         LoggingEventDispatcher underTest = new LoggingEventDispatcher(
                 dispatcherThatReturns(HandlerResults.empty()), 100);
 
@@ -142,8 +142,10 @@ class LoggingEventDispatcherTest {
         underTest.dispatch(envelope).join();
 
         JsonNode log = captureSingleLog();
-        assertThat(log.path("event").path("payload").path("_truncated").asBoolean()).isTrue();
-        assertThat(log.path("event").path("payload").path("data").asText()).isNotEmpty();
+        // payload is now a plain string via toString(), truncated to 100 chars + "..."
+        String payload = log.path("event").path("payload").asText();
+        assertThat(payload).endsWith("...");
+        assertThat(payload.length()).isLessThanOrEqualTo(103); // 100 + "..."
     }
 
     @Test
@@ -161,6 +163,34 @@ class LoggingEventDispatcherTest {
         JsonNode log = captureSingleLog();
         assertThat(log.path("traceId").asText()).isEqualTo("test-trace-123");
         assertThat(log.path("spanId").asText()).isEqualTo("test-span-456");
+    }
+
+    @Test
+    @DisplayName("Should include deliveredFrom from MDC context")
+    void shouldIncludeDeliveredFrom() {
+        MDC.put("deliveredFrom", "test-source");
+
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(dispatcherThatReturns(
+                HandlerResults.empty()));
+
+        Envelope<String> envelope = Envelope.of("test");
+        underTest.dispatch(envelope).join();
+
+        JsonNode log = captureSingleLog();
+        assertThat(log.path("deliveredFrom").asText()).isEqualTo("test-source");
+    }
+
+    @Test
+    @DisplayName("Should omit deliveredFrom when not set in MDC")
+    void shouldOmitDeliveredFromWhenNotSet() {
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(dispatcherThatReturns(
+                HandlerResults.empty()));
+
+        Envelope<String> envelope = Envelope.of("test");
+        underTest.dispatch(envelope).join();
+
+        JsonNode log = captureSingleLog();
+        assertThat(log.path("deliveredFrom").isMissingNode()).isTrue();
     }
 
     private static EventDispatcher dispatcherThatReturns(HandlerResults results) {

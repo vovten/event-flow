@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.time.Instant;
 import java.util.List;
@@ -41,6 +42,7 @@ class LoggingEventPublisherTest {
     @AfterEach
     void tearDown() {
         logger.detachAppender(listAppender);
+        MDC.clear();
     }
 
     @Test
@@ -175,6 +177,36 @@ class LoggingEventPublisherTest {
         assertThat(log.path("event").path("status").asText()).isEqualTo("failed");
         assertThat(log.path("event").path("error").path("message").asText()).isEqualTo("broker down");
         assertThat(log.path("event").path("error").path("type").asText()).isEqualTo("RuntimeException");
+    }
+
+    @Test
+    @DisplayName("Should include deliveredFrom from MDC context")
+    void shouldIncludeDeliveredFrom() {
+        MDC.put("deliveredFrom", "test-source");
+
+        LoggingEventPublisher underTest = new LoggingEventPublisher(e ->
+                CompletableFuture.completedFuture(SendResults.empty()));
+
+        Envelope<String> envelope = Envelope.of("test");
+        underTest.publish(envelope).join();
+
+        JsonNode log = captureSingleLog();
+        assertThat(log.path("deliveredFrom").asText()).isEqualTo("test-source");
+
+        MDC.clear();
+    }
+
+    @Test
+    @DisplayName("Should omit deliveredFrom when not set in MDC")
+    void shouldOmitDeliveredFromWhenNotSet() {
+        LoggingEventPublisher underTest = new LoggingEventPublisher(e ->
+                CompletableFuture.completedFuture(SendResults.empty()));
+
+        Envelope<String> envelope = Envelope.of("test");
+        underTest.publish(envelope).join();
+
+        JsonNode log = captureSingleLog();
+        assertThat(log.path("deliveredFrom").isMissingNode()).isTrue();
     }
 
     @Test
