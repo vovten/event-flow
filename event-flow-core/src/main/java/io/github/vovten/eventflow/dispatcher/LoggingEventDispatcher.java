@@ -47,7 +47,9 @@ public class LoggingEventDispatcher implements EventDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingEventDispatcher.class);
 
+    // Cache for payload class reflection data
     private final EventDispatcher origin;
+
     private final int maxPayloadLength;
 
     /**
@@ -223,7 +225,7 @@ public class LoggingEventDispatcher implements EventDispatcher {
 
         // Use cached reflection for payload fields
         Class<?> payloadClass = payload.getClass();
-        PayloadCache cache = PAYLOAD_CACHE.computeIfAbsent(payloadClass, PayloadCache::create);
+        PayloadCache cache = PayloadCache.create(payloadClass);
 
         if (cache.fields.length > 0) {
             StringBuilder fieldsSb = new StringBuilder();
@@ -340,64 +342,6 @@ public class LoggingEventDispatcher implements EventDispatcher {
         return sb.toString();
     }
 
-    // Cache for payload class reflection data
-    private static final Map<Class<?>, PayloadCache> PAYLOAD_CACHE = new ConcurrentHashMap<>();
-
-    private static class PayloadCache {
-        final String[] fields;
-        final Method[] getters;
-
-        private PayloadCache(String[] fields, Method[] getters) {
-            this.fields = fields;
-            this.getters = getters;
-        }
-
-        static PayloadCache create(Class<?> clazz) {
-            var fieldNames = new java.util.ArrayList<String>();
-            var getterMethods = new java.util.ArrayList<Method>();
-
-            Class<?> current = clazz;
-            while (current != null && current != Object.class) {
-                if (current.getName().startsWith("io.github.vovten.eventflow.event")) {
-                    current = current.getSuperclass();
-                    continue;
-                }
-
-                for (java.lang.reflect.Field field : current.getDeclaredFields()) {
-                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) ||
-                        java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
-                        continue;
-                    }
-
-                    String fieldName = field.getName();
-                    String getterName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-                    Method getter = null;
-
-                    try {
-                        getter = clazz.getMethod("get" + getterName);
-                    } catch (NoSuchMethodException e) {
-                        if (field.getType() == boolean.class) {
-                            try {
-                                getter = clazz.getMethod("is" + getterName);
-                            } catch (NoSuchMethodException ignored) {}
-                        }
-                    }
-
-                    if (getter != null) {
-                        fieldNames.add(fieldName);
-                        getterMethods.add(getter);
-                    }
-                }
-                current = current.getSuperclass();
-            }
-
-            return new PayloadCache(
-                fieldNames.toArray(new String[0]),
-                getterMethods.toArray(new Method[0])
-            );
-        }
-    }
-
     @Override
     public void register(Object listener) {
         origin.register(listener);
@@ -416,5 +360,66 @@ public class LoggingEventDispatcher implements EventDispatcher {
     @Override
     public void stop() {
         origin.stop();
+    }
+
+    private static final class PayloadCache {
+        private static final Map<Class<?>, PayloadCache> CACHE = new ConcurrentHashMap<>();
+
+        final String[] fields;
+        final Method[] getters;
+
+        private PayloadCache(Class<?> clazz) {
+            var fieldNames = new java.util.ArrayList<String>();
+            var getterMethods = new java.util.ArrayList<Method>();
+
+            Class<?> current = clazz;
+            while (current != null && current != Object.class) {
+                if (current.getName().startsWith("io.github.vovten.eventflow.event")) {
+                    current = current.getSuperclass();
+                    continue;
+                }
+
+                for (java.lang.reflect.Field field : current.getDeclaredFields()) {
+                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) ||
+                            java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
+                        continue;
+                    }
+
+                    String fieldName = field.getName();
+                    String getterName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
+                    Method getter = null;
+
+                    try {
+                        getter = clazz.getMethod("get" + getterName);
+                    } catch (NoSuchMethodException e) {
+                        if (field.getType() == boolean.class) {
+                            try {
+                                getter = clazz.getMethod("is" + getterName);
+                            } catch (NoSuchMethodException ex) {
+                                // ignored
+                            }
+                        }
+                    }
+
+                    if (getter != null) {
+                        fieldNames.add(fieldName);
+                        getterMethods.add(getter);
+                    }
+                }
+                current = current.getSuperclass();
+            }
+
+            this.fields = fieldNames.toArray(new String[0]);
+            this.getters = getterMethods.toArray(new Method[0]);
+        }
+
+        private PayloadCache(String[] fields, Method[] getters) {
+            this.fields = fields;
+            this.getters = getters;
+        }
+
+        static PayloadCache create(Class<?> clazz) {
+            return CACHE.computeIfAbsent(clazz, PayloadCache::new);
+        }
     }
 }

@@ -1,7 +1,6 @@
 package io.github.vovten.eventflow.transport.outgoing;
 
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import io.github.vovten.eventflow.transport.OutTransport;

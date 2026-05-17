@@ -73,7 +73,7 @@ class KafkaBenchmarkTest {
         props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         props.setProperty(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000");
         props.setProperty(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "30000");
-        
+
         String topic = "benchmark-1m-" + System.nanoTime();
         try (AdminClient admin = AdminClient.create(props)) {
             admin.createTopics(List.of(new NewTopic(topic, 3, (short) 1))).all().get(30, TimeUnit.SECONDS);
@@ -98,7 +98,7 @@ class KafkaBenchmarkTest {
         JsonEventSerializer serializer = new JsonEventSerializer();
 
         try (KafkaOutTransport kafkaOutTransport = new KafkaOutTransport(
-                new Properties() {{ setProperty("bootstrap.servers", BOOTSTRAP_SERVERS); }},
+                createProperties(),
                 topic, serializer)) {
 
             EventPublisher publisher = event -> kafkaOutTransport.send(event)
@@ -142,8 +142,9 @@ class KafkaBenchmarkTest {
                 System.out.printf("  Published in %.2f seconds%n", (publishEndTime - startTime) / 1_000_000_000.0);
                 System.out.println("  Waiting for consumer...");
 
-                boolean completed = latch.await(600, TimeUnit.SECONDS);
+                boolean completedFinal = latch.await(600, TimeUnit.SECONDS);
                 long endTime = System.nanoTime();
+                boolean completed = completedFinal;
 
                 dispatcher.stop();
 
@@ -154,48 +155,82 @@ class KafkaBenchmarkTest {
                 double processDuration = (endTime - publishEndTime) / 1_000_000_000.0;
                 double throughput = EVENT_COUNT / totalDuration;
 
-                System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
-                System.out.println("║                    Results                                   ║");
-                System.out.println("╠══════════════════════════════════════════════════════════════╣");
-                System.out.printf("║ Received:   %,12d                                      ║%n", handler.getProcessedCount());
-                System.out.printf("║ Throughput: %12.0f events/sec                         ║%n", throughput);
-                System.out.printf("║ Total time: %12.3f seconds                             ║%n", totalDuration);
-                System.out.printf("║ Publish:    %12.3f seconds                             ║%n", publishDuration);
-                System.out.printf("║ Process:    %12.3f seconds                             ║%n", processDuration);
-                System.out.println("╚══════════════════════════════════════════════════════════════╝");
+                printResult(handler, throughput, totalDuration, publishDuration, processDuration);
 
                 assertTrue(completed, "All events should be processed within timeout");
             }
         }
     }
 
-    public static class BenchmarkEvent extends AbstractTraceableEvent {
+    private Properties createProperties() {
+        Properties properties = new Properties();
+        properties.setProperty("bootstrap.servers", BOOTSTRAP_SERVERS);
+        return properties;
+    }
+
+    private void printResult(BenchmarkEventHandler handler, double throughput, double totalDuration, double publishDuration, double processDuration) {
+        System.out.println("\n╔══════════════════════════════════════════════════════════════╗");
+        System.out.println("║                    Results                                   ║");
+        System.out.println("╠══════════════════════════════════════════════════════════════╣");
+        System.out.printf("║ Received:   %,12d                                      ║%n", handler.getProcessedCount());
+        System.out.printf("║ Throughput: %12.0f events/sec                         ║%n", throughput);
+        System.out.printf("║ Total time: %12.3f seconds                             ║%n", totalDuration);
+        System.out.printf("║ Publish:    %12.3f seconds                             ║%n", publishDuration);
+        System.out.printf("║ Process:    %12.3f seconds                             ║%n", processDuration);
+        System.out.println("╚══════════════════════════════════════════════════════════════╝");
+    }
+
+    static class BenchmarkEvent extends AbstractTraceableEvent {
         private String id;
         private String message;
 
-        public BenchmarkEvent() { super(); }
-        public BenchmarkEvent(String id, String message) { 
-            super(); 
-            this.id = id; 
-            this.message = message; 
+        BenchmarkEvent() {
+            super();
         }
 
-        public String getId() { return id; }
-        public void setId(String id) { this.id = id; }
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
+        BenchmarkEvent(String id, String message) {
+            super();
+            this.id = id;
+            this.message = message;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
 
         @Override
-        public Class<?> type() { return BenchmarkEvent.class; }
+        public Class<?> type() {
+            return BenchmarkEvent.class;
+        }
     }
 
-    public static class BenchmarkEventHandler {
+    static class BenchmarkEventHandler {
         private final AtomicLong processedCount = new AtomicLong(0);
         private CountDownLatch latch;
 
-        public void setLatch(CountDownLatch latch) { this.latch = latch; }
-        public void reset() { processedCount.set(0); }
-        public long getProcessedCount() { return processedCount.get(); }
+        public void setLatch(CountDownLatch latch) {
+            this.latch = latch;
+        }
+
+        public void reset() {
+            processedCount.set(0);
+        }
+
+        public long getProcessedCount() {
+            return processedCount.get();
+        }
 
         @EventListener
         public void onBenchmarkEvent(BenchmarkEvent event) {
@@ -203,7 +238,9 @@ class KafkaBenchmarkTest {
             if (count % 250000 == 0) {
                 System.out.printf("    Processed %,d...%n", count);
             }
-            if (latch != null) latch.countDown();
+            if (latch != null) {
+                latch.countDown();
+            }
         }
     }
 }

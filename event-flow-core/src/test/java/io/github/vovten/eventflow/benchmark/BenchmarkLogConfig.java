@@ -9,7 +9,8 @@ import ch.qos.logback.classic.Logger;
  */
 public final class BenchmarkLogConfig {
 
-    private BenchmarkLogConfig() {}
+    private BenchmarkLogConfig() {
+    }
 
     /**
      * Set INFO level for benchmark tests, WARN for other event-flow logging.

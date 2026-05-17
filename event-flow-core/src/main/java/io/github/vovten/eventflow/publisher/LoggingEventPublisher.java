@@ -67,7 +67,7 @@ public class LoggingEventPublisher implements EventPublisher {
     /**
      * Create logging decorator with custom max payload length.
      *
-     * @param origin the delegate publisher to wrap
+     * @param origin           the delegate publisher to wrap
      * @param maxPayloadLength maximum length of payload in log output
      * @throws IllegalArgumentException if origin is null
      */
@@ -224,7 +224,7 @@ public class LoggingEventPublisher implements EventPublisher {
 
         // Use cached reflection for payload fields
         Class<?> payloadClass = payload.getClass();
-        PayloadCache cache = PAYLOAD_CACHE.computeIfAbsent(payloadClass, PayloadCache::create);
+        PayloadCache cache = PayloadCache.create(payloadClass);
 
         if (cache.fields.length > 0) {
             appendPayloadFields(sb, payload, cache);
@@ -255,28 +255,30 @@ public class LoggingEventPublisher implements EventPublisher {
     }
 
     private void appendValue(StringBuilder sb, Object value) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String s) {
-            sb.append("\"");
-            sb.append(escape(s));
-            sb.append("\"");
-        } else if (value instanceof Number n) {
-            sb.append(n.toString());
-        } else if (value instanceof Boolean b) {
-            sb.append(b.toString());
-        } else if (value instanceof java.util.UUID uuid) {
-            sb.append("\"");
-            sb.append(uuid.toString());
-            sb.append("\"");
-        } else if (value instanceof Instant i) {
-            sb.append("\"");
-            sb.append(i.toString());
-            sb.append("\"");
-        } else {
-            sb.append("\"");
-            sb.append(escape(value.toString()));
-            sb.append("\"");
+        switch (value) {
+            case null -> sb.append("null");
+            case String s -> {
+                sb.append("\"");
+                sb.append(escape(s));
+                sb.append("\"");
+            }
+            case Number n -> sb.append(n.toString());
+            case Boolean b -> sb.append(b.toString());
+            case java.util.UUID uuid -> {
+                sb.append("\"");
+                sb.append(uuid.toString());
+                sb.append("\"");
+            }
+            case Instant i -> {
+                sb.append("\"");
+                sb.append(i.toString());
+                sb.append("\"");
+            }
+            default -> {
+                sb.append("\"");
+                sb.append(escape(value.toString()));
+                sb.append("\"");
+            }
         }
     }
 
@@ -314,19 +316,13 @@ public class LoggingEventPublisher implements EventPublisher {
         return sb.toString();
     }
 
-    // Cache for payload class reflection data
-    private static final Map<Class<?>, PayloadCache> PAYLOAD_CACHE = new ConcurrentHashMap<>();
+    private static final class PayloadCache {
+        private static final Map<Class<?>, PayloadCache> CACHE = new ConcurrentHashMap<>();
 
-    private static class PayloadCache {
         final String[] fields;
         final Method[] getters;
 
-        private PayloadCache(String[] fields, Method[] getters) {
-            this.fields = fields;
-            this.getters = getters;
-        }
-
-        static PayloadCache create(Class<?> clazz) {
+        private PayloadCache(Class<?> clazz) {
             // Collect getters for fields
             var fieldNames = new java.util.ArrayList<String>();
             var getterMethods = new java.util.ArrayList<Method>();
@@ -341,24 +337,26 @@ public class LoggingEventPublisher implements EventPublisher {
                 }
 
                 for (java.lang.reflect.Field field : current.getDeclaredFields()) {
-                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || 
-                        java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
+                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) ||
+                            java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
                         continue;
                     }
 
                     String fieldName = field.getName();
-                    
+
                     // Try getter method (getXxx or isXxx for boolean)
                     String getterName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
                     Method getter = null;
-                    
+
                     try {
                         getter = clazz.getMethod("get" + getterName);
                     } catch (NoSuchMethodException e) {
                         if (field.getType() == boolean.class) {
                             try {
                                 getter = clazz.getMethod("is" + getterName);
-                            } catch (NoSuchMethodException ignored) {}
+                            } catch (NoSuchMethodException ex) {
+                                // ignored
+                            }
                         }
                     }
 
@@ -370,10 +368,17 @@ public class LoggingEventPublisher implements EventPublisher {
                 current = current.getSuperclass();
             }
 
-            return new PayloadCache(
-                fieldNames.toArray(new String[0]),
-                getterMethods.toArray(new Method[0])
-            );
+            this.fields = fieldNames.toArray(new String[0]);
+            this.getters = getterMethods.toArray(new Method[0]);
+        }
+
+        private PayloadCache(String[] fields, Method[] getters) {
+            this.fields = fields;
+            this.getters = getters;
+        }
+
+        static PayloadCache create(Class<?> clazz) {
+            return CACHE.computeIfAbsent(clazz, PayloadCache::new);
         }
     }
 }
