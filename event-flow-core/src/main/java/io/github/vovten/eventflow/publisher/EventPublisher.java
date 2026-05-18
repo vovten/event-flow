@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.EventBuilder;
 import io.github.vovten.eventflow.transport.SendResults;
 
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -34,7 +35,7 @@ public interface EventPublisher {
      * The payload is automatically wrapped in an Envelope with:
      * <ul>
      *   <li>eventId - randomly generated UUID</li>
-     *   <li>processId - null (use {@link #prepare(Object)} to set)</li>
+     *   <li>processId - null (use {@link #prepare(Object)} or {@link #publish(UUID, Object)} to set)</li>
      *   <li>occurredAt - current timestamp</li>
      * </ul>
      *
@@ -44,6 +45,28 @@ public interface EventPublisher {
      */
     default <T> CompletableFuture<SendResults> publish(T payload) {
         return publish(Envelope.of(payload));
+    }
+
+    /**
+     * Publish any Object as an event with a specific processId.
+     * <p>
+     * Convenience method that wraps the payload in an {@link Envelope} with
+     * the given processId, auto-generated eventId, and current timestamp.
+     * Equivalent to {@code publish(Envelope.of(payload, processId))}.
+     * <p>
+     * Example:
+     * <pre>{@code
+     * UUID sagaId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+     * publisher.publish(sagaId, new OrderCreated(orderId, email));
+     * }</pre>
+     *
+     * @param <T>       the payload type (any Object)
+     * @param processId the process identifier (e.g., saga ID) for correlation
+     * @param payload   the object to publish as an event
+     * @return CompletableFuture that completes with SendResults
+     */
+    default <T> CompletableFuture<SendResults> publish(UUID processId, T payload) {
+        return publish(Envelope.of(payload, processId));
     }
 
     /**

@@ -1,6 +1,6 @@
 # Event Flow Core
 
-Detailed documentation for the core Event Flow library — framework-agnostic, pure Java 21+.
+Detailed documentation for the core Event Flow module — framework-agnostic, pure Java 21+.
 
 ## 📖 Table of Contents
 

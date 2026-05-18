@@ -3,7 +3,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Java](https://img.shields.io/badge/Java-21-blue)](https://openjdk.java.net/)
 
-**Event Flow** is a lightweight Java library for building event-driven architectures. It provides a flexible event publishing and processing system that works equally well in simple standalone applications and complex projects using DI frameworks.
+**Event Flow** is a lightweight Java framework for building event-driven applications. It provides the structural backbone for publishing, routing, and processing events — so you can focus on business logic instead of wiring infrastructure.
 
 ## 📖 Table of Contents
 
@@ -19,16 +19,14 @@
 
 ## ✨ Features
 
-- **Typed Events** — Events with JSON serialization and polymorphic deserialization
 - **Flexible Routing** — Event channels with configurable transports
-- **Multiple Transports** — LocalQueue (in-JVM) and Apache Kafka out of the box
+- **Multiple Transports** — LocalQueue (in-JVM) and Apache Kafka out of the box, with extension points for custom transports
 - **Annotation-Based** — Event handling via `@EventListener`
 - **Interface-Based** — Event handling via `EventSubscriber` interface
 - **POJO Events** — Support for plain Java objects without `Event` interface
-- **Envelope Support** — Technical metadata wrapper (eventId, processId, occurredAt)
-- **Envelope Handling** — Handle the entire envelope including metadata in handlers
 - **Idempotency** — Event deduplication based on UID
 - **Transactional Publishing** — Send events after transaction commit
+- **Structured Logging** — Decorators for publisher and dispatcher with machine-parseable JSON output
 - **Retry Mechanism** — Exponential backoff with configurable parameters
 - **Extensible Serialization** — JSON and MessagePack with support for custom formats
 
@@ -172,7 +170,7 @@
 
 | Module | Description | Documentation |
 |--------|-------------|---------------|
-| **event-flow-core** | Core library — framework-agnostic, pure Java 21+ | [README](event-flow-core/README.md) |
+| **event-flow-core** | Core module — framework-agnostic, pure Java 21+ | [README](event-flow-core/README.md) |
 | **event-flow-spring** | Spring Boot auto-configuration with YAML | [README](event-flow-spring/README.md) |
 
 ## 📦 Installation
@@ -865,7 +863,7 @@ Implement `OutTransport` or `InTransport` interfaces to add custom transport typ
 
 ## 📚 Documentation
 
-- **[Event Flow Core](event-flow-core/README.md)** — Detailed core library documentation
+- **[Event Flow Core](event-flow-core/README.md)** — Detailed core module documentation
 - **[Event Flow Spring](event-flow-spring/README.md)** — Spring Boot auto-configuration
 - [Javadoc](https://github.com/vovten/event-flow/javadoc)
 - [Source Code](https://github.com/vovten/event-flow)
