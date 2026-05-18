@@ -272,6 +272,9 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, 1000);
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1000);
+        props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 524288);
+        props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 500);
         return new KafkaConsumer<>(props);
     }
 
@@ -281,6 +284,9 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
         props.putIfAbsent(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.putIfAbsent(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.putIfAbsent(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.putIfAbsent(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1000);
+        props.putIfAbsent(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 524288);
+        props.putIfAbsent(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 500);
         return new KafkaConsumer<>(props);
     }
 

@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Performance benchmark for Kafka transport with default settings.
  * Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -Dkafka.bootstrap.servers=192.168.1.39:9092 -DskipTests=false
  */
-@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -DskipTests=false")
+//@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -DskipTests=false")
 @DisplayName("Kafka Benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KafkaBenchmarkTest {

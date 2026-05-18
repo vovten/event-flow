@@ -36,7 +36,7 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaOutTransport.class);
 
-    private static final long DEFAULT_BUFFER_MEMORY = 33_554_432;
+    private static final long DEFAULT_BUFFER_MEMORY = 67_108_864;
     private static final long DEFAULT_MAX_BLOCK_MS = 5000;
 
     protected KafkaProducer<String, byte[]> producer;
@@ -75,8 +75,8 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
         props.putIfAbsent(BUFFER_MEMORY_CONFIG, String.valueOf(DEFAULT_BUFFER_MEMORY));
         props.putIfAbsent(MAX_BLOCK_MS_CONFIG, String.valueOf(DEFAULT_MAX_BLOCK_MS));
         props.putIfAbsent(BATCH_SIZE_CONFIG, "131072"); // 128KB
-        props.putIfAbsent(LINGER_MS_CONFIG, "20");
-        props.putIfAbsent(COMPRESSION_TYPE_CONFIG, "lz4");
+        props.putIfAbsent(LINGER_MS_CONFIG, "10");
+        props.putIfAbsent(COMPRESSION_TYPE_CONFIG, "snappy");
         props.putIfAbsent(MAX_REQUEST_SIZE_CONFIG, "5242880"); // 5MB
 
         this.producer = new KafkaProducer<>(props);
