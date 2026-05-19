@@ -102,22 +102,24 @@ class EventPublisherGenericMethodsTest {
     }
 
     @Test
-    @DisplayName("Should publish via builder with custom processId")
-    void shouldPublishViaBuilderWithCustomProcessId() {
+    @DisplayName("Should publish via builder with custom eventId and processId")
+    void shouldPublishViaBuilderWithCustomEventIdAndProcessId() {
         OutTransport transport = mock(OutTransport.class);
         when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
-        UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        UUID customEventId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        UUID customProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         publisher.prepare(event)
+                .withEventId(customEventId)
                 .withProcessId(customProcessId)
                 .publish()
                 .join();
 
         verify(transport).send(argThat((Envelope<?> e) ->
-                customProcessId.equals(e.processId())));
+                customEventId.equals(e.eventId()) && customProcessId.equals(e.processId())));
     }
 
     @Test

@@ -30,6 +30,21 @@ public interface EventBuilder<T> {
     EventBuilder<T> withProcessId(UUID processId);
 
     /**
+     * Set custom event ID.
+     * <p>
+     * By default, a random UUID is generated automatically. Use this method
+     * to override the event ID, for example when replaying events or
+     * maintaining consistency across systems.
+     *
+     * @param eventId the event identifier
+     * @return this builder
+     * @throws UnsupportedOperationException if implementation does not support setting event ID
+     */
+    default EventBuilder<T> withEventId(UUID eventId) {
+        throw new UnsupportedOperationException("withEventId not implemented in " + getClass().getSimpleName());
+    }
+
+    /**
      * Set custom occurrence timestamp.
      *
      * @param occurredAt the event timestamp

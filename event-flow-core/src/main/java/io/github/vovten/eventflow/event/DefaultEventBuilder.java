@@ -22,6 +22,7 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
 
     private final EventPublisher publisher;
     private final T payload;
+    private UUID eventId;
     private UUID processId;
     private Instant occurredAt;
     private final Map<String, String> metadata;
@@ -35,25 +36,34 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     }
 
     @Override
+    public EventBuilder<T> withEventId(UUID eventId) {
+        this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
+        return this;
+    }
+
+    @Override
     public EventBuilder<T> withProcessId(UUID processId) {
-        this.processId = processId;
+        this.processId = Objects.requireNonNull(processId, "processId must not be null");
         return this;
     }
 
     @Override
     public EventBuilder<T> withOccurredAt(Instant occurredAt) {
-        this.occurredAt = occurredAt;
+        this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
         return this;
     }
 
     @Override
     public EventBuilder<T> withMetadata(String key, String value) {
-        this.metadata.put(key, value);
+        this.metadata.put(
+                Objects.requireNonNull(key, "metadata key must not be null"),
+                value);
         return this;
     }
 
     @Override
     public EventBuilder<T> withMetadata(Map<String, String> metadata) {
+        Objects.requireNonNull(metadata, "metadata map must not be null");
         this.metadata.putAll(metadata);
         return this;
     }
@@ -70,7 +80,7 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
     @Override
     public CompletableFuture<SendResults> publish() {
         Envelope<T> envelope = new Envelope<>(
-                UUID.randomUUID(),
+                eventId != null ? eventId : UUID.randomUUID(),
                 processId,
                 occurredAt,
                 payload,
