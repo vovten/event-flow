@@ -15,10 +15,17 @@ import java.util.UUID;
  * This class implements the {@link TraceableEvent} interface and provides ready-to-use
  * fields for event tracing, correlation, and timing. It's designed to be extended by
  * concrete event classes, reducing boilerplate code and ensuring consistent event structure.
+ * <p>
+ * <b>Deprecated:</b> Use {@link Envelope} instead. Prefer composition over inheritance —
+ * wrap your POJO/record payloads with {@link Envelope} to get automatic eventId, processId,
+ * and timestamp generation without extending a base class.
  *
  * @author Vladimir Aleshkov
  * @since 1.0.0
+ * @deprecated Use {@link Envelope} instead of extending this class.
+ *     Will be removed in a future version.
  */
+@Deprecated(forRemoval = true, since = "1.1.0")
 public abstract class AbstractTraceableEvent implements TraceableEvent {
 
     private final UUID eventId;
