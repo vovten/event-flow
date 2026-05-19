@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.registry;
 
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventSubscriber;
@@ -117,22 +118,49 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
     @Override
     public List<EventHandler> getHandlers(Event event) {
         List<EventHandler> handlers = new ArrayList<>();
+        Class<?> eventType = resolveEventType(event);
+        Class<?> actualClass = event.getClass();
+        addAllSubscribers(handlers, eventType);
 
-        Class<?> eventClass = event.getClass();
-
-        // Get subscribers for specific event type (thread-safe snapshot)
-        List<EventSubscriber> specific = eventSubscribers.get(eventClass);
-        if (specific != null) {
-            handlers.addAll(new ArrayList<>(specific));
+        if (!actualClass.equals(eventType)) {
+            addAllSubscribers(handlers, actualClass);
         }
-
-        // Get subscribers for generic Event.class (thread-safe snapshot)
-        List<EventSubscriber> generic = eventSubscribers.get(Event.class);
-        if (generic != null) {
-            handlers.addAll(new ArrayList<>(generic));
-        }
-
+        addAllSubscribers(handlers, Event.class);
         return handlers;
+    }
+
+    /**
+     * Add all subscribers registered for the given type to the handler list,
+     * skipping any that are already present (to avoid duplicates).
+     *
+     * @param handlers the target handler list (modified in-place)
+     * @param type     the event type to look up subscribers for
+     */
+    private void addAllSubscribers(List<EventHandler> handlers, Class<?> type) {
+        List<EventSubscriber> subscribers = eventSubscribers.get(type);
+        if (subscribers == null) {
+            return;
+        }
+        for (EventSubscriber subscriber : subscribers) {
+            if (!handlers.contains(subscriber)) {
+                handlers.add(subscriber);
+            }
+        }
+    }
+
+    /**
+     * Resolve the effective event type for handler lookup.
+     * If the event is an Envelope, resolve to the payload type.
+     * Otherwise, use the event's class.
+     *
+     * @param event the event to resolve
+     * @return the resolved event type class
+     */
+    private static Class<?> resolveEventType(Event event) {
+        if (event instanceof Envelope<?> envelope) {
+            return envelope.payload().getClass();
+        }
+        return event.getClass();
     }
 
     /**
