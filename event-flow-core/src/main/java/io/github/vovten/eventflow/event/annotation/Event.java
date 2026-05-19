@@ -10,9 +10,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation for marking POJO classes as event payloads and configuring their publishing metadata.
+ * Annotation for marking POJO/record classes as event payloads and configuring their publishing metadata.
  * <p>
- * When a POJO is wrapped in an {@link io.github.vovten.eventflow.event.Envelope}, this annotation
+ * When a POJO/record is wrapped in an {@link io.github.vovten.eventflow.event.Envelope}, this annotation
  * provides default configuration for event publication, such as target channels.
  * <p>
  * <b>Configuration parameters:</b>

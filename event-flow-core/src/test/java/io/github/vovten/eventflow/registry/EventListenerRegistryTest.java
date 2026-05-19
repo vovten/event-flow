@@ -83,7 +83,7 @@ class EventListenerRegistryTest {
     }
 
     @Test
-    @DisplayName("Should register listener for POJO payload that does not implement Event")
+    @DisplayName("Should register listener for POJO/record payload that does not implement Event")
     void shouldRegisterListenerForPojoPayload() {
         // Arrange
         PojoListener listener = new PojoListener();
@@ -98,7 +98,7 @@ class EventListenerRegistryTest {
         var handlers = registry.getHandlers(envelope);
         assertEquals(1, handlers.size());
 
-        // Verify onEvent unwraps and passes POJO payload
+        // Verify onEvent unwraps and passes POJO/record payload
         assertFalse(handlers.isEmpty());
         handlers.forEach(handler -> handler.onEvent(envelope));
         assertNotNull(listener.capturedPayload);
@@ -382,7 +382,7 @@ class EventListenerRegistryTest {
     }
 
     /**
-     * Listener for POJO payloads annotated with {@code @Event}.
+     * Listener for POJO/record payloads annotated with {@code @Event}.
      */
     static final class PojoListener {
         Object capturedPayload;
@@ -394,7 +394,7 @@ class EventListenerRegistryTest {
     }
 
     /**
-     * POJO event class annotated with {@code @Event}.
+     * POJO/record event class annotated with {@code @Event}.
      */
     @io.github.vovten.eventflow.event.annotation.Event
     static final class PojoEvent {

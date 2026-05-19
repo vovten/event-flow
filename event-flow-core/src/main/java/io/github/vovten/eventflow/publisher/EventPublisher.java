@@ -31,7 +31,7 @@ public interface EventPublisher {
     /**
      * Publish any Object as an event wrapped in an {@link Envelope} with auto-generated metadata.
      * <p>
-     * Allows publishing plain Java objects (POJO) directly without any annotations.
+     * Allows publishing plain Java objects (POJO/record) directly without any annotations.
      * The payload is automatically wrapped in an Envelope with:
      * <ul>
      *   <li>eventId - randomly generated UUID</li>

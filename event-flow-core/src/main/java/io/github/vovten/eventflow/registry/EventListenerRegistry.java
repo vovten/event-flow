@@ -331,7 +331,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      *   <li>Parameter type must be one of:
      *     <ul>
      *       <li>{@link Event} or its subclass (includes {@link Envelope})</li>
-     *       <li>a POJO annotated with {@link io.github.vovten.eventflow.event.annotation.Event @Event}</li>
+     *       <li>a POJO/record annotated with {@link io.github.vovten.eventflow.event.annotation.Event @Event}</li>
      *     </ul>
      *   </li>
      * </ul>
@@ -371,7 +371,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         }
         log.warn("Class '{}' has both @Event annotation and implements Event interface. " +
                         "To avoid confusion, use one approach: " +
-                        "either annotate with @Event (for POJO events) or implement Event interface. " +
+                        "either annotate with @Event (for POJO/record events) or implement Event interface. " +
                         "Listener method: {}#{}",
                 eventType.getName(),
                 listenerMethod.getDeclaringClass().getSimpleName(),

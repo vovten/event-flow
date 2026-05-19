@@ -23,7 +23,7 @@
 - **Multiple Transports** — LocalQueue (in-JVM) and Apache Kafka out of the box, with extension points for custom transports
 - **Annotation-Based** — Event handling via `@EventListener`
 - **Interface-Based** — Event handling via `EventSubscriber` interface
-- **POJO Events** — Support for plain Java objects without `Event` interface
+- **POJO/Record Events** — Support for plain Java objects without `Event` interface
 - **Idempotency** — Event deduplication based on UID
 - **Transactional Publishing** — Send events after transaction commit
 - **Structured Logging** — Decorators for publisher and dispatcher with machine-parseable JSON output
@@ -349,7 +349,7 @@ Envelope<OrderCreatedEvent> envelope = Envelope.of(
 ```
 
 **Channels from `@Event` Annotation:**
-POJO classes can use the `@Event` annotation to specify default channels:
+POJO/record classes can use the `@Event` annotation to specify default channels:
 
 ```java
 @Event(channels = ExternalEventChannel.class)
@@ -522,7 +522,7 @@ Event Flow provides multiple ways to publish events:
 | `implements Event` | ❌ No | From event | Minimal | ⚡ Smallest |
 | `prepare().publish()` | ✅ Auto | Custom | Custom | Medium |
 
-> **Note:** When POJO or `prepare()` is used, an `Envelope` is automatically created wrapping the payload with additional metadata (eventId, processId, occurredAt). This increases message size but adds correlation/tracing capabilities.
+> **Note:** When POJO/record or `prepare()` is used, an `Envelope` is automatically created wrapping the payload with additional metadata (eventId, processId, occurredAt). This increases message size but adds correlation/tracing capabilities.
 
 ### Recommended: `@Event` Annotation + `prepare()` Builder
 
@@ -568,7 +568,7 @@ eventPublisher.publish(new OrderCreatedEvent("order-123", "user@example.com"));
 
 **Use cases:** High-throughput scenarios, microservice-to-microservice communication, Kafka topics.
 
-### 2. POJO Publishing (Enveloped)
+### 2. POJO/Record Publishing (Enveloped)
 
 Publish any Java object directly — Envelope is created automatically:
 
@@ -614,9 +614,9 @@ eventPublisher.prepare(new OrderCreated("order-123", "user@example.com"))
 - `withOccurredAt(Instant)` — custom event timestamp
 - `publish()` — send the event
 
-### 4. POJO with `@Event` Annotation
+### 4. POJO/Record with `@Event` Annotation
 
-Specify default channels on the POJO class:
+Specify default channels on the POJO/record class:
 
 ```java
 @Event(channels = ExternalEventChannel.class)
@@ -633,8 +633,8 @@ eventPublisher.publish(new OrderShipped("order-123", Instant.now()));
 | Approach | Best For | Envelope | Message Size |
 |----------|----------|----------|--------------|
 | `implements Event` | High throughput, Kafka, microservices | ❌ | Smallest |
-| `publish(POJO)` | Simple notifications, internal events | ✅ | Medium |
-| `publish(POJO) + @Event` | Default routing configuration | ✅ | Medium |
+| `publish(POJO/record)` | Simple notifications, internal events | ✅ | Medium |
+| `publish(POJO/record) + @Event` | Default routing configuration | ✅ | Medium |
 | `prepare().publish()` | Custom metadata, dynamic routing | ✅ | Medium |
 
 ### Event with Multiple Channels
