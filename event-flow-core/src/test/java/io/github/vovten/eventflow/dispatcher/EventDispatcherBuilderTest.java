@@ -314,6 +314,73 @@ class EventDispatcherBuilderTest {
         }
     }
 
+    @Test
+    @DisplayName("Chain should build dispatcher with required parameters")
+    void chainShouldBuildDispatcherWithRequiredParameters() {
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
+                .executor(executorService)
+                .handlerRegistry(handlerRegistry)
+                .transports(List.of(transport))
+                .chain()
+                .build();
+
+        assertNotNull(dispatcher);
+        assertInstanceOf(UnifiedEventDispatcher.class, dispatcher);
+    }
+
+    @Test
+    @DisplayName("Chain should apply decorators in added order")
+    void chainShouldApplyDecoratorsInAddedOrder() {
+        AtomicBoolean firstApplied = new AtomicBoolean(false);
+        AtomicBoolean secondApplied = new AtomicBoolean(false);
+
+        EventDispatcherBuilder.DecoratorFunction first = d -> {
+            firstApplied.set(true);
+            assertInstanceOf(UnifiedEventDispatcher.class, d);
+            return d;
+        };
+        EventDispatcherBuilder.DecoratorFunction second = d -> {
+            secondApplied.set(true);
+            assertTrue(firstApplied.get(), "First decorator should have been applied before second");
+            return d;
+        };
+
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
+                .executor(executorService)
+                .handlerRegistry(handlerRegistry)
+                .transports(List.of(transport))
+                .chain()
+                .add(first)
+                .add(second)
+                .build();
+
+        assertNotNull(dispatcher);
+        assertTrue(firstApplied.get());
+        assertTrue(secondApplied.get());
+    }
+
+    @Test
+    @DisplayName("Chain should detect missing executor")
+    void chainShouldDetectMissingExecutor() {
+        assertThrows(IllegalStateException.class, () ->
+                EventDispatcherBuilder.create()
+                        .handlerRegistry(handlerRegistry)
+                        .transports(List.of(transport))
+                        .chain()
+                        .build());
+    }
+
+    @Test
+    @DisplayName("Chain should detect missing handler registry")
+    void chainShouldDetectMissingHandlerRegistry() {
+        assertThrows(IllegalStateException.class, () ->
+                EventDispatcherBuilder.create()
+                        .executor(executorService)
+                        .transports(List.of(transport))
+                        .chain()
+                        .build());
+    }
+
     /**
      * Test event.
      */

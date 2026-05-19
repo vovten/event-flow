@@ -66,19 +66,37 @@ import java.util.concurrent.Semaphore;
  *     .withDecorator(dispatcher -> new MetricsEventDispatcher(dispatcher, metricsRegistry))
  *     .build();
  * dispatcher.start(dispatcher::dispatch);
+ *
+ * // Explicit decorator chain (full control over order)
+ * EventDispatcher dispatcher = EventDispatcherBuilder.create()
+ *     .executor(executorService)
+ *     .handlerRegistry(registry)
+ *     .transports(transports)
+ *     .chain()
+ *     .add(IdempotentEventDispatcher::new)
+ *     .add(d -> new MetricsEventDispatcher(d, metricsRegistry))
+ *     .add(LoggingEventDispatcher::new)
+ *     .build();
+ * dispatcher.start(dispatcher::dispatch);
  * }</pre>
  * <p>
- * <b>Order of decorators:</b>
+ * <b>Order of decorators (standard mode):</b>
  * The builder applies decorators in the following order (from innermost to outermost):
  * <ol>
  *   <li>Base {@link UnifiedEventDispatcher}</li>
+ *   <li>{@link IdempotentEventDispatcher} (if enabled)</li>
  *   <li>Custom decorators (applied in order added)</li>
+ *   <li>{@link LoggingEventDispatcher} (if enabled)</li>
  * </ol>
  * <p>
- * <b>Event flow:</b>
+ * <b>Event flow (standard mode):</b>
  * <pre>{@code
  * Transport → [CustomDecorators] → LoggingEventDispatcher → IdempotentEventDispatcher → UnifiedEventDispatcher → Handlers
  * }</pre>
+ * <p>
+ * <b>Explicit chain mode:</b>
+ * Use {@link #chain()} for full control over decorator order. Decorators are applied
+ * in the exact order they are added via {@link Chain#add(DecoratorFunction)}.
  *
  * @author Vladimir Aleshkov
  * @since 1.0.0
@@ -329,6 +347,102 @@ public final class EventDispatcherBuilder {
                 concurrencyInfo
         );
         return dispatcher;
+    }
+
+    /**
+     * Switch to explicit decorator chain mode.
+     * <p>
+     * Unlike the standard builder which applies decorators in a fixed order
+     * ({@code Unified → Idempotent → custom → Logging}), the chain mode lets you
+     * specify decorators in the exact order you want.
+     * <p>
+     * <b>Usage example:</b>
+     * <pre>{@code
+     * EventDispatcher dispatcher = EventDispatcherBuilder.create()
+     *     .executor(executorService)
+     *     .handlerRegistry(registry)
+     *     .transports(transports)
+     *     .chain()
+     *     .add(IdempotentEventDispatcher::new)
+     *     .add(myCustomDecorator)
+     *     .add(LoggingEventDispatcher::new)
+     *     .build();
+     * }</pre>
+     *
+     * @return a new {@link Chain} with the builder's base configuration
+     */
+    public Chain chain() {
+        Chain chain = new Chain();
+        chain.executorService = this.executorService;
+        chain.handlerRegistry = this.handlerRegistry;
+        chain.transports.addAll(this.transports);
+        chain.concurrencyLimit = this.concurrencyLimit;
+        return chain;
+    }
+
+    /**
+     * Explicit decorator chain builder.
+     * <p>
+     * Unlike the parent {@link EventDispatcherBuilder}, this builder does not impose
+     * a fixed order for built-in decorators. Instead, you add decorators via
+     * {@link #add(DecoratorFunction)} in the exact order they should wrap the base
+     * dispatcher. The base {@link UnifiedEventDispatcher} is always innermost.
+     * <p>
+     * <b>Thread-safety:</b> This class is not thread-safe. Build a new instance
+     * for each dispatcher configuration.
+     */
+    public static final class Chain {
+
+        private static final Logger log = LoggerFactory.getLogger(Chain.class);
+
+        private ExecutorService executorService;
+        private EventHandlerRegistry handlerRegistry;
+        private final List<InTransport> transports = new ArrayList<>();
+        private Integer concurrencyLimit = null;
+        private final List<DecoratorFunction> decorators = new ArrayList<>();
+
+        private Chain() {
+        }
+
+        /**
+         * Add a decorator to the chain.
+         * Decorators are applied in the order they are added,
+         * from innermost (closest to UnifiedEventDispatcher) to outermost.
+         *
+         * @param decorator the decorator function
+         * @return this chain
+         */
+        public Chain add(DecoratorFunction decorator) {
+            this.decorators.add(decorator);
+            return this;
+        }
+
+        /**
+         * Build the EventDispatcher with the configured decorator chain.
+         *
+         * @return configured EventDispatcher
+         * @throws IllegalStateException if required parameters are not set
+         */
+        public EventDispatcher build() {
+            if (executorService == null) {
+                throw new IllegalStateException("ExecutorService must be configured");
+            }
+            if (handlerRegistry == null) {
+                throw new IllegalStateException("EventHandlerRegistry must be configured");
+            }
+            Semaphore semaphore = concurrencyLimit != null ? new Semaphore(concurrencyLimit) : null;
+            EventDispatcher dispatcher = new UnifiedEventDispatcher(
+                    executorService, handlerRegistry, transports, semaphore
+            );
+            for (DecoratorFunction decorator : decorators) {
+                dispatcher = decorator.apply(dispatcher);
+                log.debug("Applied decorator: {}", decorator.getClass().getSimpleName());
+            }
+            if (concurrencyLimit != null) {
+                log.info("Concurrency limit applied: max {} concurrent handler executions", concurrencyLimit);
+            }
+            return dispatcher;
+        }
     }
 
     /**
