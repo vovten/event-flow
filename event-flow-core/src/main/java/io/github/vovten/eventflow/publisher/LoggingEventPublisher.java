@@ -1,10 +1,9 @@
 package io.github.vovten.eventflow.publisher;
 
-import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
+import io.github.vovten.eventflow.util.EventLogUtils;
 import io.github.vovten.eventflow.util.JsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,14 +99,14 @@ public final class LoggingEventPublisher implements EventPublisher {
         jb.beginObject();
         jb.beginObject("event");
         appendStatus(jb, result, error);
-        jb.appendString("eventId", extractEventId(event));
-        jb.appendString("payload", extractPayloadString(event));
-        appendEnvelopeMetadata(jb, event);
+        jb.appendString("eventId", EventLogUtils.extractEventId(event));
+        jb.appendString("payload", EventLogUtils.extractPayloadString(event, maxPayloadLength));
+        EventLogUtils.appendEnvelopeMetadata(jb, event);
         appendChannels(jb, event);
         appendDeliveryResults(jb, result);
-        appendErrorInfo(jb, error);
+        EventLogUtils.appendErrorInfo(jb, error);
         jb.endObject();
-        appendRootContext(jb, start, traceId, spanId, deliveredFrom);
+        EventLogUtils.appendRootContext(jb, start, traceId, spanId, deliveredFrom);
         jb.endObject();
         return jb.build();
     }
@@ -132,17 +131,6 @@ public final class LoggingEventPublisher implements EventPublisher {
             }
         }
         return "unknown";
-    }
-
-    private void appendEnvelopeMetadata(JsonBuilder jb, Event event) {
-        if (event instanceof TraceableEvent te) {
-            if (te.processId() != null) {
-                jb.appendString("processId", te.processId().toString());
-            }
-            if (te.occurredAt() != null) {
-                jb.appendString("occurredAt", te.occurredAt().toString());
-            }
-        }
     }
 
     private void appendChannels(JsonBuilder jb, Event event) {
@@ -179,55 +167,5 @@ public final class LoggingEventPublisher implements EventPublisher {
             return f.destination() + ": " + err;
         }
         return f.destination();
-    }
-
-    private void appendErrorInfo(JsonBuilder jb, Throwable error) {
-        if (error == null) {
-            return;
-        }
-        jb.beginObject("error");
-        jb.appendString("message", error.getMessage());
-        jb.appendString("type", error.getClass().getSimpleName());
-        jb.endObject();
-    }
-
-    private void appendRootContext(JsonBuilder jb, Instant start,
-                                    String traceId, String spanId, String deliveredFrom) {
-        if (traceId != null) {
-            jb.appendString("traceId", traceId);
-        }
-        if (spanId != null) {
-            jb.appendString("spanId", spanId);
-        }
-        if (deliveredFrom != null) {
-            jb.appendString("deliveredFrom", deliveredFrom);
-        }
-        jb.appendString("@timestamp", start.toString());
-    }
-
-    private String extractPayloadString(Event event) {
-        Object payloadObj = extractPayload(event);
-        if (payloadObj == null) {
-            return "";
-        }
-        String payloadStr = payloadObj.toString();
-        if (payloadStr.length() > maxPayloadLength) {
-            return payloadStr.substring(0, maxPayloadLength) + "...";
-        }
-        return payloadStr;
-    }
-
-    private static String extractEventId(Event event) {
-        if (event instanceof TraceableEvent te && te.eventId() != null) {
-            return te.eventId().toString();
-        }
-        return "unknown";
-    }
-
-    private static Object extractPayload(Event event) {
-        if (event instanceof Envelope<?> envelope) {
-            return envelope.payload();
-        }
-        return event;
     }
 }
