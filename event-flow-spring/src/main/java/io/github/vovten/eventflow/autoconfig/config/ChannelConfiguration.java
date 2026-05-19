@@ -31,7 +31,7 @@ import static java.util.stream.Collectors.toMap;
  * Creates publisher transports for each channel from transport configurations.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 @Configuration(proxyBeanMethods = false)
 @DependsOn("serializerRegistrationComplete")

@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
  * Publishing is always asynchronous to avoid blocking the caller.
  *
  * @author Vladimir Aleshkov
- * @since 2024-11-20
+ * @since 1.0.0
  */
 public interface EventPublisher {
 

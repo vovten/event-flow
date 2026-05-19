@@ -26,7 +26,7 @@ import java.util.function.Consumer;
  * This ensures events flow through the decorator before reaching the origin dispatcher.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 public final class IdempotentEventDispatcher implements EventDispatcher {
 

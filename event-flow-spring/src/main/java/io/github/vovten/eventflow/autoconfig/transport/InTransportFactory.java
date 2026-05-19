@@ -11,7 +11,7 @@ import io.github.vovten.eventflow.transport.InTransport;
  * automatically discovered by {@link DispatcherConfiguration}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 public interface InTransportFactory {
 

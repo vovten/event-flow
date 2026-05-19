@@ -14,7 +14,7 @@ import io.github.vovten.eventflow.event.Event;
  * - 0x02: MessagePack
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 public interface EventSerializer {
 

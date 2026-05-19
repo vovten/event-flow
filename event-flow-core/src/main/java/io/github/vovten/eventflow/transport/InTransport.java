@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-06
+ * @since 1.0.0
  */
 public interface InTransport {
 

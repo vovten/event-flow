@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for JsonEventSerializer.
+ * @since 1.0.0
  */
 @DisplayName("JsonEventSerializer Tests")
 class JsonEventSerializerTest {

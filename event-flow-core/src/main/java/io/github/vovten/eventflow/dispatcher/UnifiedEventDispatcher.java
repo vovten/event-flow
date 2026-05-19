@@ -56,7 +56,7 @@ import static java.util.stream.Collectors.joining;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-06
+ * @since 1.0.0
  */
 public class UnifiedEventDispatcher implements EventDispatcher {
 

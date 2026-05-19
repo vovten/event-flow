@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link EventPublisherConfigException}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @DisplayName("EventPublisherConfigException Tests")
 class EventPublisherConfigExceptionTest {

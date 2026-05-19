@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for thread safety of registry implementations.
+ * @since 1.0.0
  */
 @DisplayName("Concurrent Registry Tests")
 class ConcurrentRegistryTest {

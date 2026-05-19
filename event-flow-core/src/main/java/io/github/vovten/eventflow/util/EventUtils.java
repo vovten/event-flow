@@ -15,7 +15,7 @@ import io.github.vovten.eventflow.serialization.EventSerializationException;
  * Utilities for working with events
  *
  * @author Vladimir Aleshkov
- * @since 2024-11-21
+ * @since 1.0.0
  */
 public final class EventUtils {
 

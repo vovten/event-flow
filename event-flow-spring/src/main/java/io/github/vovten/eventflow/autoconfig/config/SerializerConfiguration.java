@@ -39,7 +39,7 @@ import java.util.Map;
  * and is activated when {@code event-flow.enabled=true}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-04-03
+ * @since 1.0.0
  * @see EventSerializer
  * @see EventSerializerFactory
  * @see EventTypeRegistry

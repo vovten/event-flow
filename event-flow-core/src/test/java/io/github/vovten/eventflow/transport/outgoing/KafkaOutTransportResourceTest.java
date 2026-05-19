@@ -22,6 +22,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Tests for KafkaOutTransport resource management (AutoCloseable)
+ * @since 1.0.0
  */
 @DisplayName("KafkaOutTransport Resource Management Tests")
 class KafkaOutTransportResourceTest {

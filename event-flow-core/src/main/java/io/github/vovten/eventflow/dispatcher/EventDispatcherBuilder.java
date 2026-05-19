@@ -81,7 +81,7 @@ import java.util.concurrent.Semaphore;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 public final class EventDispatcherBuilder {
 

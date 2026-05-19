@@ -29,6 +29,8 @@ import static org.mockito.Mockito.*;
  * Defect CRIT-3: The idempotent check (cache.getIfPresent) and store (cache.put)
  * are not atomic. Between the check and the put, a duplicate event can also
  * pass the check, resulting in duplicate processing.
+ *
+ * @since 1.1.0
  */
 @DisplayName("IdempotentEventDispatcher Race Condition Tests")
 class IdempotentEventDispatcherDefectTest {

@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for EventHandlerRegistry implementations
+ * @since 1.0.0
  */
 @SpringBootTest(classes = EventFlowTestApplication.class, properties = "event-flow.enabled=false")
 @ImportAutoConfiguration(exclude = EventFlowDisabledAutoConfiguration.class)

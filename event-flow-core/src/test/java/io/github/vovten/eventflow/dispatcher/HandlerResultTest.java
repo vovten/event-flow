@@ -13,6 +13,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * @since 1.1.0
+*/
 class HandlerResultTest {
 
     @Test

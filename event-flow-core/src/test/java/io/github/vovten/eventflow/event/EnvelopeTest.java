@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link Envelope}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-05-05
+ * @since 1.1.0
  */
 @DisplayName("Envelope Tests")
 class EnvelopeTest {

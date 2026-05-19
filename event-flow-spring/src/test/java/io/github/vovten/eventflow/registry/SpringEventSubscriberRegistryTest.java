@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for SpringEventSubscriberRegistry.
+ * @since 1.0.0
  */
 @DisplayName("SpringEventSubscriberRegistry Tests")
 class SpringEventSubscriberRegistryTest {

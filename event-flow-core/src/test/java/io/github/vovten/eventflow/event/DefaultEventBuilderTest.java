@@ -23,6 +23,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * @since 1.1.0
+ */
 @DisplayName("DefaultEventBuilder Tests")
 class DefaultEventBuilderTest {
 

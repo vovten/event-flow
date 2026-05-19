@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for {@link EventFlowDisabledAutoConfiguration}.
+ * @since 1.0.0
  */
 class EventFlowDisabledAutoConfigurationTest {
 

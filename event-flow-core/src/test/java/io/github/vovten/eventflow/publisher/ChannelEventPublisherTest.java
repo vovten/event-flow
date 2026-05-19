@@ -20,6 +20,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for ChannelEventPublisher.
+ * @since 1.0.0
  */
 @DisplayName("ChannelEventPublisher Tests")
 class ChannelEventPublisherTest {

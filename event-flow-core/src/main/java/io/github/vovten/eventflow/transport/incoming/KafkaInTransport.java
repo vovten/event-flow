@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * </ul>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-06
+ * @since 1.0.0
  * @see EventSerializerFactory
  */
 public class KafkaInTransport implements InTransport, AutoCloseable {

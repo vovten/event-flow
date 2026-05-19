@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for Event interface and implementations
+ * @since 1.0.0
  */
 class EventIntegrationTest {
 

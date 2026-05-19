@@ -16,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
  * Default implementation of {@link EventBuilder}.
  *
  * @param <T> the payload type
+ * @since 1.1.0
  */
 public final class DefaultEventBuilder<T> implements EventBuilder<T> {
 

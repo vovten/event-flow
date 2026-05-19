@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for secure deserialization with type validation
+ * @since 1.0.0
  */
 @DisplayName("Secure Deserialization Tests")
 class SecureDeserializationTest {

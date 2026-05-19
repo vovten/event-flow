@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Performance benchmark for LocalQueue transport.
  * Run manually: mvn test -pl event-flow-core -Dtest=mvn test -pl event-flow-core -Dtest=LocalQueueBenchmarkTest -DskipTests=false
+ *
+ * @since 1.1.0
  */
 @Disabled("Run manually: mvn test -pl event-flow-core -Dtest=LocalQueueBenchmarkTest -DskipTests=false")
 @DisplayName("LocalQueue Benchmark")

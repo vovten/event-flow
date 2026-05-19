@@ -11,7 +11,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
  * @param errorDetails  error message if handler failed, null otherwise
  *
  * @author Vladimir Aleshkov
- * @since 2026-05-11
+ * @since 1.1.0
  */
 public record HandlerResult(
         boolean success,

@@ -46,7 +46,7 @@ import java.util.List;
  * or {@code .get()} inside {@code @Transactional} methods.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-31
+ * @since 1.0.0
  * @see EventPublisherBuilder
  * @see TransactionalEventPublisher
  */

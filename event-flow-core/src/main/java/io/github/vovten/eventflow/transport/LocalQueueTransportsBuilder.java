@@ -27,7 +27,7 @@ import java.util.concurrent.Executors;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 public class LocalQueueTransportsBuilder {
 

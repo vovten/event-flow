@@ -18,6 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * @since 1.1.0
+ */
 @DisplayName("UnifiedEventDispatcher Envelope Handling Tests")
 class UnifiedEventDispatcherEnvelopeTest {
 

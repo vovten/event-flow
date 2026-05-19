@@ -22,6 +22,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for UnifiedEventDispatcher.
+ * @since 1.0.0
  */
 @DisplayName("UnifiedEventDispatcher Tests")
 class UnifiedEventDispatcherTest {

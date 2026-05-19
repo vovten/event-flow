@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
  * Unit tests for {@link EventDispatcherBuilder}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 @DisplayName("EventDispatcherBuilder Tests")
 class EventDispatcherBuilderTest {

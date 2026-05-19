@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Tests that expose defects in the current implementation.
  * These tests are expected to FAIL until the defects are fixed.
+ * @since 1.1.0
  */
 @DisplayName("UnifiedEventDispatcher Defect Tests")
 class UnifiedEventDispatcherDefectTest {

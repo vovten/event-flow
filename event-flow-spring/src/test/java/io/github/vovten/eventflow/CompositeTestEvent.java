@@ -13,6 +13,7 @@ import java.util.UUID;
 
 /**
  * Test event for both internal and external buses
+ * @since 1.1.0
  */
 public class CompositeTestEvent extends AbstractTraceableEvent {
 

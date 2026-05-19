@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for EventSerializerFactory.
+ * @since 1.0.0
  */
 @DisplayName("EventSerializerFactory Tests")
 class EventSerializerFactoryTest {

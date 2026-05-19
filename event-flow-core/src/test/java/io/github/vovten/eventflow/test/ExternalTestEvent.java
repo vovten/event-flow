@@ -12,6 +12,7 @@ import java.util.UUID;
 
 /**
  * Test event for external bus (Kafka)
+ * @since 1.0.0
  */
 public class ExternalTestEvent extends AbstractTraceableEvent {
 

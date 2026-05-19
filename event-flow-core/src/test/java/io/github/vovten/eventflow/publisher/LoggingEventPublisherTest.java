@@ -25,6 +25,9 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * @since 1.1.0
+*/
 class LoggingEventPublisherTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

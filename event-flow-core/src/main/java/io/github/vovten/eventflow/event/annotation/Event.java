@@ -39,7 +39,7 @@ import java.lang.annotation.Target;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-05-05
+ * @since 1.1.0
  * @see EventChannel
  * @see io.github.vovten.eventflow.event.Envelope
  */

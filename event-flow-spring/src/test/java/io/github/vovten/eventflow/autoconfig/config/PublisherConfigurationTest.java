@@ -22,6 +22,7 @@ import static org.springframework.test.context.support.TestPropertySourceUtils.a
 
 /**
  * Unit tests for {@link PublisherConfiguration}.
+ * @since 1.0.0
  */
 class PublisherConfigurationTest {
 

@@ -11,7 +11,7 @@ import io.github.vovten.eventflow.transport.OutTransport;
  * automatically discovered by {@link ChannelConfiguration}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 public interface OutTransportFactory {
 

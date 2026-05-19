@@ -9,7 +9,7 @@ import java.util.UUID;
  * and establishing event chronology.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 public interface TraceableEvent extends Event {
 

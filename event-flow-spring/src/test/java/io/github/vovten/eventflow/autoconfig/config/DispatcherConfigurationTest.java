@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link DispatcherConfiguration}.
+ * @since 1.0.0
  */
 class DispatcherConfigurationTest {
 

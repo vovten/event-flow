@@ -10,7 +10,7 @@ import java.util.function.Consumer;
  * <p>Receives an event from the bus and delivers it to listeners.
  *
  * @author Vladimir Aleshkov
- * @since 2024-11-20
+ * @since 1.0.0
  */
 public interface EventDispatcher {
 

@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for EventUtils.
+ * @since 1.0.0
  */
 @DisplayName("EventUtils Tests")
 class EventUtilsTest {

@@ -18,6 +18,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Tests for backpressure handling in UnifiedEventDispatcher
+ * @since 1.0.0
  */
 @DisplayName("UnifiedEventDispatcher Backpressure Tests")
 class UnifiedEventDispatcherBackpressureTest {

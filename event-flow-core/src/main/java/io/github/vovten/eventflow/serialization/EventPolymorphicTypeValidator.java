@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * not {@link #validateBaseType} which is called for the target type (e.g., Event.class).
  *
  * @author Vladimir Aleshkov
- * @since 2026-04-05
+ * @since 1.0.0
  */
 public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base {
 

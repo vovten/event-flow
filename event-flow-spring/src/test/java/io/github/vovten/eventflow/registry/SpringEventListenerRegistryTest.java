@@ -17,6 +17,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for SpringEventListenerRegistry.
+ * @since 1.0.0
  */
 @DisplayName("SpringEventListenerRegistry Tests")
 class SpringEventListenerRegistryTest {

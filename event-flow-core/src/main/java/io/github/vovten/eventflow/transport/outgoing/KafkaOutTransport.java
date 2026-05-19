@@ -30,7 +30,7 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * Buffer memory (32MB) and max block time (5s) provide backpressure support.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public class KafkaOutTransport implements OutTransport, AutoCloseable {
 

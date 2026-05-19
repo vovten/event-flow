@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for LocalQueueDispatcherTransport.
+ * @since 1.0.0
  */
 @DisplayName("LocalQueueDispatcherTransport Tests")
 class LocalQueueInTransportTest {

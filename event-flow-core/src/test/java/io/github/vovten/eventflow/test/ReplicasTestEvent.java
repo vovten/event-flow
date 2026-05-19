@@ -12,6 +12,7 @@ import java.util.UUID;
 
 /**
  * Test event for replicas dispatcher
+ * @since 1.0.0
  */
 public class ReplicasTestEvent extends AbstractTraceableEvent {
 

@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for {@link LocalQueueOutTransport}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @DisplayName("LocalQueuePublisherTransport Tests")
 class LocalQueueOutTransportTest {

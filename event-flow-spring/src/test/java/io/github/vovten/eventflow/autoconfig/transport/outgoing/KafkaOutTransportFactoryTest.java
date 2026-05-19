@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for Kafka publisher transport factory.
+ * @since 1.0.0
  */
 class KafkaOutTransportFactoryTest {
 

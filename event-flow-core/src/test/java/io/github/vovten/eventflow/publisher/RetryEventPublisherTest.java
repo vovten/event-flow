@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link RetryEventPublisher}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @DisplayName("RetryEventPublisher Tests")
 class RetryEventPublisherTest {

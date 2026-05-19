@@ -27,7 +27,7 @@ import java.util.Optional;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-05-11
+ * @since 1.1.0
  */
 public final class HandlerResults {
 

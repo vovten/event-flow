@@ -12,6 +12,7 @@ import java.util.UUID;
 
 /**
  * Base test event for unit and integration tests
+ * @since 1.0.0
  */
 public class TestEvent extends AbstractTraceableEvent {
 

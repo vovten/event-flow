@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for MsgPackEventSerializer.
+ * @since 1.0.0
  */
 @DisplayName("MsgPackEventSerializer Tests")
 class MsgPackEventSerializerTest {

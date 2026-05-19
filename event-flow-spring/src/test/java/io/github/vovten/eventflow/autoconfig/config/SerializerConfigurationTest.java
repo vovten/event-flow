@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for {@link SerializerConfiguration}.
  * Verifies that custom event serializers are properly registered and available
  * before transport factories create transports that depend on them.
+ * @since 1.0.0
  */
 @SpringBootTest(
         classes = {

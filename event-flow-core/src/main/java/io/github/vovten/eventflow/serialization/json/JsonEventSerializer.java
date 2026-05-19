@@ -33,7 +33,7 @@ import java.util.Arrays;
  * by validating class names against a whitelist of allowed packages/classes.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 public class JsonEventSerializer implements EventSerializer {
 

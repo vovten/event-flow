@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
  * Tests for concurrency limiting in UnifiedEventDispatcher.
  *
  * @author Vladimir Aleshkov
- * @since 2026-04-07
+ * @since 1.0.0
  */
 @DisplayName("UnifiedEventDispatcher Concurrency Limit Tests")
 class UnifiedEventDispatcherConcurrencyLimitTest {

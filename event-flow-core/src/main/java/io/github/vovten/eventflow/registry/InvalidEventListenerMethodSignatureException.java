@@ -5,7 +5,7 @@ package io.github.vovten.eventflow.registry;
  * an event does not meet the requirements
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-06
+ * @since 1.0.0
  */
 public class InvalidEventListenerMethodSignatureException extends RuntimeException {
 

@@ -16,7 +16,7 @@ import io.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
  * - "msgpack": Compact binary format for better performance
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 public class KafkaOutTransportFactory implements OutTransportFactory {
 

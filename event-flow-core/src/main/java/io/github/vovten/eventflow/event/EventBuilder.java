@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * @param <T> the type of the payload being built
  * @author Vladimir Aleshkov
- * @since 2026-05-03
+ * @since 1.1.0
  */
 public interface EventBuilder<T> {
 

@@ -32,7 +32,7 @@ import static org.mockito.Mockito.lenient;
  * Tests for {@link KafkaOutTransport}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("KafkaOutTransport Tests")

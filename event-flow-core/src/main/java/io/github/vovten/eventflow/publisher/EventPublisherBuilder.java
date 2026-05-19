@@ -51,7 +51,7 @@ import java.util.List;
  *
  * @param <T> the concrete builder type (CRTP pattern for fluent interface)
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 

@@ -7,7 +7,7 @@ package io.github.vovten.eventflow.transport;
  * broker unavailability, serialization errors, or timeouts.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public class TransportException extends RuntimeException {
 

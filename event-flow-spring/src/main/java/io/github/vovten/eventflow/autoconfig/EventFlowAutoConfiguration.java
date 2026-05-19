@@ -53,7 +53,7 @@ import org.springframework.context.annotation.Import;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @AutoConfiguration
 @ConditionalOnClass(EventPublisher.class)

@@ -30,6 +30,8 @@ import static org.mockito.Mockito.*;
  * Integration tests for EventDispatcherBuilder with all decorators.
  * Verifies that LoggingEventDispatcher properly logs events including duplicates
  * when IdempotentEventDispatcher is inside the logging decorator.
+ *
+ * @since 1.1.0
  */
 @DisplayName("Full Dispatcher Stack Integration Tests")
 class FullDispatcherStackTest {

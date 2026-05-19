@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  *
  * @author Vladimir Aleshkov
  * @see IdempotentEventDispatcher
- * @since 2026-05-11
+ * @since 1.1.0
  */
 public final class LoggingEventDispatcher implements EventDispatcher {
 

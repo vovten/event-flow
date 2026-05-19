@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for EventDispatcherException.
+ * @since 1.0.0
  */
 @DisplayName("EventDispatcherException Tests")
 class EventDispatcherExceptionTest {

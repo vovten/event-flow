@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for EventChannel interface default methods.
+ * @since 1.0.0
  */
 @DisplayName("EventChannel Tests")
 class EventChannelTest {

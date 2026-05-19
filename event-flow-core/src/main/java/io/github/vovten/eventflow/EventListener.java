@@ -21,7 +21,7 @@ import java.lang.annotation.Target;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-06
+ * @since 1.0.0
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)

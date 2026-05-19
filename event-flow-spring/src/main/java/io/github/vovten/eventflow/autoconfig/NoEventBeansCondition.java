@@ -12,6 +12,7 @@ import java.util.Objects;
 
 /**
  * Custom Spring condition that checks for the absence of both EventPublisher and EventDispatcher beans
+ * @since 1.0.0
  */
 public class NoEventBeansCondition implements Condition {
 

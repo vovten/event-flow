@@ -17,7 +17,7 @@ import java.util.List;
  * Events are routed to channels based on {@link #channels()}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-02
+ * @since 1.0.0
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 public interface Event {

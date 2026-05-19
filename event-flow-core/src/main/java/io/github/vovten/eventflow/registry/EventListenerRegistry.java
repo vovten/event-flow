@@ -75,7 +75,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * {@link EventHandlerInvocationException} wraps the underlying exception.
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  * @see EventListener
  * @see Event
  * @see InvalidEventListenerMethodSignatureException

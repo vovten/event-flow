@@ -14,7 +14,7 @@ import io.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutTransport;
  * that send events to all partitions of a Kafka topic.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  * @see BroadcastKafkaOutTransport
  */
 public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {

@@ -17,7 +17,7 @@ import java.util.UUID;
  * concrete event classes, reducing boilerplate code and ensuring consistent event structure.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 public abstract class AbstractTraceableEvent implements TraceableEvent {
 

@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Unit tests for {@link BroadcastKafkaOutTransportFactory}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 @DisplayName("BroadcastKafkaPublisherTransportFactory Tests")
 class BroadcastKafkaOutTransportFactoryTest {

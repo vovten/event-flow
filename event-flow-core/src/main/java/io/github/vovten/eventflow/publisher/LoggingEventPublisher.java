@@ -39,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
  * @author Vladimir Aleshkov
  * @see ChannelEventPublisher
  * @see RetryEventPublisher
- * @since 2026-05-11
+ * @since 1.1.0
  */
 public final class LoggingEventPublisher implements EventPublisher {
 

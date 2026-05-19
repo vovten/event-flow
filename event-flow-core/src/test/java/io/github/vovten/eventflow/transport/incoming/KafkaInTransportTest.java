@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
  * Tests for {@link KafkaInTransport}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("KafkaInTransport Tests")

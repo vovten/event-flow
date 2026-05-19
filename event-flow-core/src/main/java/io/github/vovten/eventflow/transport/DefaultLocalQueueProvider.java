@@ -14,7 +14,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  * All queues are bounded with the same capacity specified at provider creation.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-11
+ * @since 1.0.0
  */
 public class DefaultLocalQueueProvider implements LocalQueueProvider {
 

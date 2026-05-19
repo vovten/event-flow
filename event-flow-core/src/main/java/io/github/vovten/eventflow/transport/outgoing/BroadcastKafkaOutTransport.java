@@ -21,7 +21,7 @@ import java.util.concurrent.CompletableFuture;
  * If some partitions fail, a warning is logged and the first successful result is returned.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 public class BroadcastKafkaOutTransport extends KafkaOutTransport {
 

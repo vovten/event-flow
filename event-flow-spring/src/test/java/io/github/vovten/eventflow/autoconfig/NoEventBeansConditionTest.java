@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for {@link NoEventBeansCondition}.
+ * @since 1.0.0
  */
 class NoEventBeansConditionTest {
 

@@ -15,7 +15,7 @@ import java.util.Map;
  * @param errorDetails  error message if send failed, null otherwise
  *
  * @author Vladimir Aleshkov
- * @since 2026-04-08
+ * @since 1.0.0
  */
 public record SendResult(
         boolean success,

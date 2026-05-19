@@ -6,6 +6,7 @@ import ch.qos.logback.classic.Logger;
 /**
  * Benchmark logging utilities.
  * Controls log levels for benchmark tests.
+ * @since 1.1.0
  */
 public final class BenchmarkLogConfig {
 

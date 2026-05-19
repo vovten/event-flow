@@ -10,7 +10,7 @@ import io.github.vovten.eventflow.transport.incoming.KafkaInTransport;
  * Factory for creating Kafka-based dispatcher event transports.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 public class KafkaInTransportFactory implements InTransportFactory {
 

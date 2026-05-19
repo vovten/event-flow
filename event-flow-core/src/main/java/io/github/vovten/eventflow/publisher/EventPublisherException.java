@@ -4,7 +4,7 @@ package io.github.vovten.eventflow.publisher;
  * Error in event publisher operation
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-20
+ * @since 1.0.0
  */
 public class EventPublisherException extends RuntimeException {
     public EventPublisherException(String message) {

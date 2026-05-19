@@ -58,7 +58,7 @@ import java.util.List;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @ConfigurationProperties(prefix = "event-flow")
 public class EventFlowProperties {

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration tests for EventPublisher with all decorators.
+ * @since 1.1.0
  */
 @DisplayName("EventPublisher Integration Tests")
 class PublisherIntegrationTest {

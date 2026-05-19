@@ -8,6 +8,8 @@ import java.util.Deque;
  * <p>
  * Uses {@link StringBuilder} internally — no reflection, no Jackson.
  * Tracks comma state across nested objects and arrays automatically.
+ *
+ * @since 1.1.0
  */
 public final class JsonBuilder {
 

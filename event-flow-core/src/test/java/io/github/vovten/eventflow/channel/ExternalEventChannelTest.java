@@ -11,6 +11,7 @@ import static org.mockito.Mockito.mock;
 
 /**
  * Unit tests for ExternalEventChannel.
+ * @since 1.0.0
  */
 @DisplayName("ExternalEventChannel Tests")
 class ExternalEventChannelTest {

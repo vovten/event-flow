@@ -25,7 +25,7 @@ import java.util.UUID;
  *
  * @param <T> the type of the wrapped payload
  * @author Vladimir Aleshkov
- * @since 2026-05-03
+ * @since 1.1.0
  */
 public final class Envelope<T> implements TraceableEvent {
 

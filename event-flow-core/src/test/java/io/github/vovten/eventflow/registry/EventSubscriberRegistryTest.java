@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link EventSubscriberRegistry}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @DisplayName("EventSubscriberRegistry Tests")
 class EventSubscriberRegistryTest {
