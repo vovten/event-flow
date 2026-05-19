@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * @since 1.1.0
  */
-//@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -DskipTests=false")
+@Disabled("Run manually: mvn test -pl event-flow-core -Dtest=KafkaBenchmarkTest -DskipTests=false")
 @DisplayName("Kafka Benchmark")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KafkaBenchmarkTest {
