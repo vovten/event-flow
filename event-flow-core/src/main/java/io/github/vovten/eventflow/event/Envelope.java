@@ -50,7 +50,7 @@ public final class Envelope<T> implements TraceableEvent {
         this.processId = processId;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
         this.payload = Objects.requireNonNull(payload, "payload must not be null");
-        this.metadata = Map.copyOf(metadata);
+        this.metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
         this.targetChannels = null;
     }
 
@@ -65,7 +65,7 @@ public final class Envelope<T> implements TraceableEvent {
         this.processId = processId;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
         this.payload = Objects.requireNonNull(payload, "payload must not be null");
-        this.metadata = Map.copyOf(metadata);
+        this.metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
         this.targetChannels = targetChannels;
     }
 

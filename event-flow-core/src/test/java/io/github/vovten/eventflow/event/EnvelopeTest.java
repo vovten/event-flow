@@ -1,5 +1,8 @@
 package io.github.vovten.eventflow.event;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.vovten.eventflow.channel.BroadcastEventChannel;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.ExternalEventChannel;
@@ -127,11 +130,91 @@ class EnvelopeTest {
         );
     }
 
+    @Test
+    @DisplayName("Should handle null metadata in constructor")
+    void shouldHandleNullMetadataInConstructor() {
+        Envelope<String> envelope = new Envelope<>(
+                UUID.randomUUID(),
+                null,
+                java.time.Instant.now(),
+                "test",
+                null,   // metadata = null
+                null    // channels = null
+        );
+
+        assertNotNull(envelope);
+        assertTrue(envelope.metadata().isEmpty());
+        assertEquals("test", envelope.payload());
+    }
+
+    @Test
+    @DisplayName("Should deserialize from JSON without metadata field via ObjectMapper")
+    void shouldDeserializeFromJsonWithoutMetadataField() throws Exception {
+        // Simulate Jackson deserialization when "metadata" field is absent from JSON
+        ObjectMapper mapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
+        UUID eventId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        String json = String.format("""
+                {
+                    "@class": "io.github.vovten.eventflow.event.Envelope",
+                    "eventId": "%s",
+                    "processId": null,
+                    "occurredAt": "2026-05-20T12:00:00Z",
+                    "payload": {"@class": "io.github.vovten.eventflow.event.EnvelopeTest$PojoEvent", "data": "test-payload"}
+                }
+                """, eventId);
+
+        Envelope<?> envelope = mapper.readValue(json, Envelope.class);
+
+        assertNotNull(envelope);
+        assertEquals(eventId, envelope.eventId());
+        assertTrue(envelope.metadata().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should deserialize from JSON with null metadata field via ObjectMapper")
+    void shouldDeserializeFromJsonWithNullMetadataField() throws Exception {
+        ObjectMapper mapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
+        UUID eventId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        String json = String.format("""
+                {
+                    "@class": "io.github.vovten.eventflow.event.Envelope",
+                    "eventId": "%s",
+                    "processId": null,
+                    "occurredAt": "2026-05-20T12:00:00Z",
+                    "payload": {"@class": "io.github.vovten.eventflow.event.EnvelopeTest$PojoEvent", "data": "test-payload"},
+                    "metadata": null
+                }
+                """, eventId);
+
+        Envelope<?> envelope = mapper.readValue(json, Envelope.class);
+
+        assertNotNull(envelope);
+        assertEquals(eventId, envelope.eventId());
+        assertTrue(envelope.metadata().isEmpty());
+    }
+
     private static final class PojoEvent {
 
-        private final String data;
+        private String data;
+
+        PojoEvent() {
+        }
 
         PojoEvent(String data) {
+            this.data = data;
+        }
+
+        public String getData() {
+            return data;
+        }
+
+        public void setData(String data) {
             this.data = data;
         }
     }
