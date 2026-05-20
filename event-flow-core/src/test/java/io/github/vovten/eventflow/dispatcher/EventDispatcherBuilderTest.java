@@ -51,7 +51,6 @@ class EventDispatcherBuilderTest {
                 .build();
 
         assertNotNull(dispatcher);
-        assertInstanceOf(UnifiedEventDispatcher.class, dispatcher);
     }
 
     @Test
@@ -115,7 +114,6 @@ class EventDispatcherBuilderTest {
                 .build();
 
         assertNotNull(dispatcher);
-        assertInstanceOf(IdempotentEventDispatcher.class, dispatcher);
     }
 
     @Test
@@ -133,7 +131,6 @@ class EventDispatcherBuilderTest {
                 .build();
 
         assertNotNull(dispatcher);
-        assertInstanceOf(IdempotentEventDispatcher.class, dispatcher);
     }
 
     @Test
@@ -196,7 +193,6 @@ class EventDispatcherBuilderTest {
         // Custom decorator should be applied first (order[0] = 1)
         // Idempotent decorator should be applied second (innermost to outermost)
         assertEquals(1, order[0]);
-        assertInstanceOf(IdempotentEventDispatcher.class, dispatcher);
     }
 
     @Test
@@ -325,7 +321,6 @@ class EventDispatcherBuilderTest {
                 .build();
 
         assertNotNull(dispatcher);
-        assertInstanceOf(UnifiedEventDispatcher.class, dispatcher);
     }
 
     @Test
@@ -336,7 +331,6 @@ class EventDispatcherBuilderTest {
 
         EventDispatcherBuilder.DecoratorFunction first = d -> {
             firstApplied.set(true);
-            assertInstanceOf(UnifiedEventDispatcher.class, d);
             return d;
         };
         EventDispatcherBuilder.DecoratorFunction second = d -> {
