@@ -87,7 +87,7 @@ class ExternalPublisherDispatcherIntegrationTest {
         dispatcher.start(event -> dispatcher.dispatch(event));
 
         // Wait for consumer to subscribe to Kafka topic
-        Thread.sleep(3000);
+        Thread.sleep(2000);
     }
 
     private CompositeEventHandlerRegistry createEventHandlerRegistry() {
