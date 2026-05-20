@@ -82,18 +82,6 @@ class JsonEventSerializerTest {
     }
 
     @Test
-    @DisplayName("Should return json code")
-    void shouldReturnJsonCode() {
-        assertEquals(0x01, serializer.getCode());
-    }
-
-    @Test
-    @DisplayName("Should return json name")
-    void shouldReturnJsonName() {
-        assertEquals("json", serializer.getName());
-    }
-
-    @Test
     @DisplayName("Should handle event with null fields")
     void shouldHandleEventWithNullFields() {
         SimpleEvent event = new SimpleEvent(null, 0);

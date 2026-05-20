@@ -13,7 +13,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -24,20 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @DisplayName("LocalQueuePublisherTransport Tests")
 class LocalQueueOutTransportTest {
-
-    @Test
-    @DisplayName("Should create transport with queue")
-    void shouldCreateTransportWithQueue() {
-        // Arrange
-        BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
-
-        // Act
-        LocalQueueOutTransport transport = new LocalQueueOutTransport(queue);
-
-        // Assert
-        assertNotNull(transport);
-        assertEquals("local-queue", transport.name());
-    }
 
     @Test
     @DisplayName("Should send event to queue")

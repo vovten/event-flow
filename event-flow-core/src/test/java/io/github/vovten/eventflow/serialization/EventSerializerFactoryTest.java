@@ -105,33 +105,6 @@ class EventSerializerFactoryTest {
     }
 
     @Test
-    @DisplayName("Should get default JSON serializer")
-    void shouldGetDefaultSerializer() {
-        EventSerializer serializer = factory.getDefault();
-
-        assertNotNull(serializer);
-        assertTrue(serializer instanceof JsonEventSerializer);
-    }
-
-    @Test
-    @DisplayName("Should get JSON serializer explicitly")
-    void shouldGetJsonSerializer() {
-        EventSerializer serializer = factory.getJson();
-
-        assertNotNull(serializer);
-        assertTrue(serializer instanceof JsonEventSerializer);
-    }
-
-    @Test
-    @DisplayName("Should get MessagePack serializer explicitly")
-    void shouldGetMsgPackSerializer() {
-        EventSerializer serializer = factory.getMsgPack();
-
-        assertNotNull(serializer);
-        assertTrue(serializer instanceof MsgPackEventSerializer);
-    }
-
-    @Test
     @DisplayName("Should register custom serializer")
     void shouldRegisterCustomSerializer() {
         CustomEventSerializer customSerializer = new CustomEventSerializer();

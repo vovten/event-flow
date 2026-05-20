@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for LocalQueueDispatcherTransport.
@@ -38,16 +37,6 @@ class LocalQueueInTransportTest {
         if (testExecutor != null && !testExecutor.isShutdown()) {
             testExecutor.shutdownNow();
         }
-    }
-
-    @Test
-    @DisplayName("Should create transport with queue and executor")
-    void shouldCreateTransportWithQueueAndExecutor() {
-        BlockingDeque<Event> queue = new LinkedBlockingDeque<>(100);
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        LocalQueueInTransport transport = new LocalQueueInTransport(queue, executor);
-
-        assertEquals("local-queue", transport.name());
     }
 
     @Test

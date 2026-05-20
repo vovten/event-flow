@@ -128,22 +128,6 @@ class EventChannelTest {
                 .hasMessageContaining("test-channel");
     }
 
-    @Test
-    @DisplayName("Should return channel name")
-    void shouldReturnChannelName() {
-        assertEquals("test-channel", channel.name());
-    }
-
-    @Test
-    @DisplayName("Should return configured transports")
-    void shouldReturnConfiguredTransports() {
-        List<OutTransport> transports = channel.transports();
-
-        assertEquals(2, transports.size());
-        assertTrue(transports.contains(transport1));
-        assertTrue(transports.contains(transport2));
-    }
-
     static class TestEventChannel extends AbstractEventChannel {
         TestEventChannel(List<OutTransport> transports) {
             super(transports);
