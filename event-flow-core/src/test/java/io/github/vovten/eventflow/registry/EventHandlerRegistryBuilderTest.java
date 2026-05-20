@@ -33,6 +33,7 @@ class EventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(EventListenerRegistry.class, registry);
     }
 
     @Test
@@ -43,6 +44,7 @@ class EventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(EventSubscriberRegistry.class, registry);
     }
 
     @Test
@@ -54,6 +56,7 @@ class EventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -87,6 +90,7 @@ class EventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -98,6 +102,7 @@ class EventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(EventListenerRegistry.class, registry);
     }
 
     @Test
@@ -109,6 +114,7 @@ class EventHandlerRegistryBuilderTest {
                 .buildAndLog();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test

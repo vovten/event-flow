@@ -50,6 +50,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(SpringEventListenerRegistry.class, registry);
     }
 
     @Test
@@ -76,6 +77,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(SpringEventSubscriberRegistry.class, registry);
     }
 
     @Test
@@ -87,6 +89,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -120,6 +123,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -131,6 +135,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(SpringEventListenerRegistry.class, registry);
     }
 
     @Test
@@ -142,6 +147,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .buildAndLog();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -155,6 +161,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -168,6 +175,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -180,6 +188,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     @Test
@@ -195,6 +204,7 @@ class SpringEventHandlerRegistryBuilderTest {
                 .build();
 
         assertNotNull(registry);
+        assertInstanceOf(CompositeEventHandlerRegistry.class, registry);
     }
 
     static class TestEventSubscriber implements EventSubscriber {

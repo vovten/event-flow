@@ -40,6 +40,7 @@ class EventPublisherBuilderTest {
     void shouldBuildPublisherWithChannel() {
         EventPublisher publisher = EventPublisherBuilder.create(channel).build();
         assertNotNull(publisher);
+        assertInstanceOf(ChannelEventPublisher.class, publisher);
     }
 
     @Test
@@ -47,6 +48,7 @@ class EventPublisherBuilderTest {
     void shouldBuildPublisherWithMultipleChannels() {
         EventPublisher publisher = EventPublisherBuilder.create(channel, channel).build();
         assertNotNull(publisher);
+        assertInstanceOf(ChannelEventPublisher.class, publisher);
     }
 
     @Test
@@ -57,6 +59,7 @@ class EventPublisherBuilderTest {
                 .build();
 
         assertNotNull(publisher);
+        assertInstanceOf(RetryEventPublisher.class, publisher);
     }
 
     @Test
@@ -67,6 +70,7 @@ class EventPublisherBuilderTest {
                 .build();
 
         assertNotNull(publisher);
+        assertInstanceOf(RetryEventPublisher.class, publisher);
     }
 
     @Test

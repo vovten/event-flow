@@ -145,6 +145,7 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
                 .build();
 
         assertNotNull(dispatcher);
+        assertInstanceOf(UnifiedEventDispatcher.class, dispatcher);
     }
 
     @Test
