@@ -6,17 +6,16 @@ import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.EventBuilder;
 import io.github.vovten.eventflow.transport.OutTransport;
-import io.github.vovten.eventflow.transport.SendResult;
+import io.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 /**
  * @since 1.1.0
@@ -27,71 +26,72 @@ class EventPublisherGenericMethodsTest {
     @Test
     @DisplayName("Should wrap plain object in Envelope when publishing")
     void shouldWrapPlainObjectInEnvelope() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenAnswer(invocation -> {
-            Event argument = invocation.getArgument(0);
-            assertThat(argument).isInstanceOf(Envelope.class);
-            Envelope<?> envelope = (Envelope<?>) argument;
-            assertThat(envelope.payload()).isInstanceOf(PlainDomainEvent.class);
-            return CompletableFuture.completedFuture(SendResult.success("dest"));
-        });
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
         publisher.publish(event).join();
 
-        verify(transport).send(any(Envelope.class));
+        Envelope<?> envelope = (Envelope<?>) queue.poll();
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.payload()).isInstanceOf(PlainDomainEvent.class);
     }
 
     @Test
     @DisplayName("Should auto-generate eventId for plain object")
     void shouldAutoGenerateEventIdForPlainObject() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
         publisher.publish(event).join();
 
-        verify(transport).send(argThat((Envelope<?> e) -> e.eventId() != null));
+        Envelope<?> envelope = (Envelope<?>) queue.poll();
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.eventId()).isNotNull();
     }
 
     @Test
     @DisplayName("Should auto-generate occurredAt for plain object")
     void shouldAutoGenerateOccurredAtForPlainObject() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
         publisher.publish(event).join();
 
-        verify(transport).send(argThat((Envelope<?> e) -> e.occurredAt() != null));
+        Envelope<?> envelope = (Envelope<?>) queue.poll();
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.occurredAt()).isNotNull();
     }
 
     @Test
     @DisplayName("Should store payload type in metadata")
     void shouldStorePayloadTypeInMetadata() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
         PlainDomainEvent event = new PlainDomainEvent("order-123", "test@mail.ru");
         publisher.publish(event).join();
 
-        verify(transport).send(argThat((Envelope<?> e) ->
-                e.payload().getClass().equals(PlainDomainEvent.class)));
+        Envelope<?> envelope = (Envelope<?>) queue.poll();
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.payload().getClass()).isEqualTo(PlainDomainEvent.class);
     }
 
     @Test
     @DisplayName("Should create builder for plain object")
     void shouldCreateBuilderForPlainObject() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
@@ -104,8 +104,8 @@ class EventPublisherGenericMethodsTest {
     @Test
     @DisplayName("Should publish via builder with custom eventId and processId")
     void shouldPublishViaBuilderWithCustomEventIdAndProcessId() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
@@ -118,15 +118,17 @@ class EventPublisherGenericMethodsTest {
                 .publish()
                 .join();
 
-        verify(transport).send(argThat((Envelope<?> e) ->
-                customEventId.equals(e.eventId()) && customProcessId.equals(e.processId())));
+        Envelope<?> envelope = (Envelope<?>) queue.poll();
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.eventId()).isEqualTo(customEventId);
+        assertThat(envelope.processId()).isEqualTo(customProcessId);
     }
 
     @Test
     @DisplayName("Should allow fluent chaining with builder")
     void shouldAllowFluentChainingWithBuilder() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
         EventPublisher publisher = new ChannelEventPublisher(List.of(channel));
 
@@ -138,9 +140,11 @@ class EventPublisherGenericMethodsTest {
                 .publish()
                 .join();
 
-        verify(transport).send(argThat((Envelope<?> e) ->
-                processId.equals(e.processId()) &&
-                        e.metadata().get("source").equals("order-service")));
+        Envelope<?> envelope = (Envelope<?>) queue.poll();
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.processId()).isEqualTo(processId);
+        assertThat(envelope.metadata())
+                .containsEntry("source", "order-service");
     }
 
     record PlainDomainEvent(String orderId, String customerEmail) {}

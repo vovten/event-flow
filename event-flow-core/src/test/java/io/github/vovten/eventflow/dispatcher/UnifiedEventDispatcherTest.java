@@ -11,7 +11,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -165,12 +167,13 @@ class UnifiedEventDispatcherTest {
     void shouldReleaseSemaphoreWhenHandlerThrowsException() {
         Semaphore semaphore = new Semaphore(1);
 
-        EventHandler failingHandler = mock(EventHandler.class);
-        doThrow(new RuntimeException("Handler failed!")).when(failingHandler).onEvent(any());
+        Map<Class<?>, List<EventHandler>> handlerMap = new HashMap<>();
+        handlerMap.put(TestEvent.class, List.of(event -> {
+            throw new RuntimeException("Handler failed!");
+        }));
+        EventHandlerRegistry localRegistry = new MapBasedHandlerRegistry(handlerMap);
 
-        when(handlerRegistry.getHandlers(any())).thenReturn(List.of(failingHandler));
-
-        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport1), semaphore);
+        dispatcher = new UnifiedEventDispatcher(executorService, localRegistry, List.of(transport1), semaphore);
 
         assertEquals(1, semaphore.availablePermits());
 

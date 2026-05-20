@@ -2,23 +2,23 @@ package io.github.vovten.eventflow.dispatcher;
 
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
-import io.github.vovten.eventflow.transport.InTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 /**
  * @since 1.1.0
@@ -28,35 +28,23 @@ class UnifiedEventDispatcherEnvelopeTest {
 
     private ExecutorService executorService;
     private EventHandlerRegistry handlerRegistry;
-    private InTransport transport;
     private UnifiedEventDispatcher dispatcher;
+    private Map<Class<?>, List<EventHandler>> handlerMap;
 
     @BeforeEach
     void setUp() {
         executorService = Executors.newFixedThreadPool(2);
-        handlerRegistry = mock(EventHandlerRegistry.class);
-        transport = mock(InTransport.class);
-        when(transport.name()).thenReturn("test-transport");
+        handlerMap = new HashMap<>();
+        handlerRegistry = new MapBasedHandlerRegistry(handlerMap);
     }
 
     @Test
     @DisplayName("Should pass Envelope through when payload implements Event")
     void shouldPassEnvelopeThroughWhenPayloadImplementsEvent() {
         PayloadEventSubscriber subscriber = new PayloadEventSubscriber();
-        when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
-            Object event = invocation.getArgument(0);
-            // After CRIT-2 fix: event is the Envelope, not the unwrapped payload.
-            // Real EventListenerRegistry handles this via resolveEventType(),
-            // but with a mock we match the Envelope and unwrap in the handler.
-            if (event instanceof Envelope<?> envelope) {
-                if (envelope.payload() instanceof PlainDomainEvent) {
-                    return List.of(subscriber);
-                }
-            }
-            return List.of();
-        });
+        handlerMap.put(PlainDomainEvent.class, List.of(subscriber));
 
-        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of());
 
         PlainDomainEvent payload = new PlainDomainEvent("order-123", "test@mail.ru");
         UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
@@ -76,15 +64,9 @@ class UnifiedEventDispatcherEnvelopeTest {
     void shouldDispatchEnvelopeWhenPayloadNotEvent() {
         NonEventPayload payload = new NonEventPayload("data-123");
         NonEventSubscriber subscriber = new NonEventSubscriber();
-        when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
-            Object event = invocation.getArgument(0);
-            if (event instanceof Envelope) {
-                return List.of(subscriber);
-            }
-            return List.of();
-        });
+        handlerMap.put(NonEventPayload.class, List.of(subscriber));
 
-        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of(transport));
+        dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, List.of());
 
         UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         Envelope<NonEventPayload> envelope = Envelope.of(payload, processId);
@@ -132,7 +114,7 @@ class UnifiedEventDispatcherEnvelopeTest {
         }
     }
 
-    static class PayloadEventSubscriber implements EventSubscriber {
+    static class PayloadEventSubscriber implements EventSubscriber, EventHandler {
         volatile Event receivedEvent;
 
         @Override
@@ -146,13 +128,8 @@ class UnifiedEventDispatcherEnvelopeTest {
         }
     }
 
-    static class NonEventSubscriber implements EventSubscriber {
+    static class NonEventSubscriber implements EventHandler {
         volatile Object receivedEvent;
-
-        @Override
-        public List<Class<?>> events() {
-            return List.of(Envelope.class);
-        }
 
         @Override
         public void onEvent(Event event) {
