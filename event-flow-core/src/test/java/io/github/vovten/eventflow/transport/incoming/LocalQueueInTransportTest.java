@@ -7,12 +7,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -49,7 +52,7 @@ class LocalQueueInTransportTest {
 
     @Test
     @DisplayName("Should deliver events when started")
-    void shouldDeliverEventsWhenStarted() throws InterruptedException {
+    void shouldDeliverEventsWhenStarted() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         LocalQueueInTransport transport = new LocalQueueInTransport(queue, testExecutor);
         AtomicInteger deliveredCount = new AtomicInteger(0);
@@ -62,10 +65,9 @@ class LocalQueueInTransportTest {
         });
 
         queue.offer(event);
-        Thread.sleep(100);
 
-        assertEquals(42, receivedValue.get(), "Event value should be delivered");
-        assertEquals(1, deliveredCount.get());
+        await().atMost(Duration.ofSeconds(2)).until(() -> deliveredCount.get() == 1);
+        assertThat(receivedValue.get()).as("Event value should be delivered").isEqualTo(42);
 
         transport.stop();
     }
@@ -84,23 +86,23 @@ class LocalQueueInTransportTest {
 
     @Test
     @DisplayName("Should stop processing after stop is called")
-    void shouldStopProcessingAfterStopIsCalled() throws InterruptedException {
+    void shouldStopProcessingAfterStopIsCalled() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         LocalQueueInTransport transport = new LocalQueueInTransport(queue, testExecutor);
         AtomicInteger deliveredCount = new AtomicInteger(0);
 
         transport.start(e -> deliveredCount.incrementAndGet());
-        Thread.sleep(50);
 
         queue.offer(new TestEvent(1));
-        Thread.sleep(100);
+        await().atMost(Duration.ofSeconds(2)).until(() -> deliveredCount.get() >= 1);
 
         transport.stop();
-        Thread.sleep(50);
-        queue.offer(new TestEvent(2));
-        Thread.sleep(100);
 
-        assertEquals(1, deliveredCount.get(), "Only first event should be delivered");
+        queue.offer(new TestEvent(2));
+        await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1))
+                .until(() -> deliveredCount.get() == 1);
+
+        assertThat(deliveredCount.get()).as("Only first event should be delivered").isEqualTo(1);
     }
 
     @Test
@@ -127,7 +129,7 @@ class LocalQueueInTransportTest {
 
     @Test
     @DisplayName("Should deliver multiple events in order")
-    void shouldDeliverMultipleEventsInOrder() throws InterruptedException {
+    void shouldDeliverMultipleEventsInOrder() {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         LocalQueueInTransport transport = new LocalQueueInTransport(queue, testExecutor);
         java.util.List<Integer> deliveredValues = new java.util.concurrent.CopyOnWriteArrayList<>();
@@ -138,12 +140,11 @@ class LocalQueueInTransportTest {
         queue.offer(new TestEvent(2));
         queue.offer(new TestEvent(3));
 
-        Thread.sleep(200);
+        await().atMost(Duration.ofSeconds(2)).until(() -> deliveredValues.size() == 3);
 
-        assertEquals(3, deliveredValues.size());
-        assertEquals(1, deliveredValues.get(0));
-        assertEquals(2, deliveredValues.get(1));
-        assertEquals(3, deliveredValues.get(2));
+        assertThat(deliveredValues.get(0)).isEqualTo(1);
+        assertThat(deliveredValues.get(1)).isEqualTo(2);
+        assertThat(deliveredValues.get(2)).isEqualTo(3);
 
         transport.stop();
     }

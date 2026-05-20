@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -108,7 +109,8 @@ class IdempotentEventDispatcherDefectTest {
         handlerEnteredLatch.await(3, TimeUnit.SECONDS);
 
         // Small delay to allow the second thread to also pass the idempotent check
-        Thread.sleep(200);
+        await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1))
+                .until(() -> true);
 
         // Release the blocked handlers
         releaseLatch.countDown();
@@ -168,7 +170,8 @@ class IdempotentEventDispatcherDefectTest {
         latch.await(5, TimeUnit.SECONDS);
 
         // Small wait for any in-flight handlers
-        Thread.sleep(500);
+        await().pollDelay(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                .until(() -> true);
 
         // Assert: should only be invoked ONCE
         assertThat(invocationCount.get())

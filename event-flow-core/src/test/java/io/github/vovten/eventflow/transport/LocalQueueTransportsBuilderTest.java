@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
@@ -15,6 +16,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -98,7 +101,7 @@ class LocalQueueTransportsBuilderTest {
 
     @Test
     @DisplayName("Should share the same queue between dispatcher and publisher transports")
-    void shouldShareSameQueueBetweenTransports() throws InterruptedException {
+    void shouldShareSameQueueBetweenTransports() {
         // Arrange
         LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queueSize(10)
@@ -107,21 +110,20 @@ class LocalQueueTransportsBuilderTest {
 
         // Act
         transports.dispatcher().start(e -> receivedValue.set(((TestEvent) e).getValue()));
-        Thread.sleep(50);
 
         TestEvent event = new TestEvent(42);
         transports.publisher().send(event);
-        Thread.sleep(100);
+        await().atMost(Duration.ofSeconds(2)).until(() -> receivedValue.get() == 42);
 
         // Assert
-        assertEquals(42, receivedValue.get(), "Event should be delivered through shared queue");
+        assertThat(receivedValue.get()).as("Event should be delivered through shared queue").isEqualTo(42);
 
         transports.dispatcher().stop();
     }
 
     @Test
     @DisplayName("Should deliver multiple events through shared queue")
-    void shouldDeliverMultipleEventsThroughSharedQueue() throws InterruptedException {
+    void shouldDeliverMultipleEventsThroughSharedQueue() {
         // Arrange
         LocalQueueTransportsBuilder.LocalQueueTransports transports = new LocalQueueTransportsBuilder()
                 .queueSize(10)
@@ -130,18 +132,16 @@ class LocalQueueTransportsBuilderTest {
 
         // Act
         transports.dispatcher().start(e -> deliveredValues.add(((TestEvent) e).getValue()));
-        Thread.sleep(50);
 
         transports.publisher().send(new TestEvent(1));
         transports.publisher().send(new TestEvent(2));
         transports.publisher().send(new TestEvent(3));
-        Thread.sleep(200);
+        await().atMost(Duration.ofSeconds(2)).until(() -> deliveredValues.size() == 3);
 
         // Assert
-        assertEquals(3, deliveredValues.size());
-        assertEquals(1, deliveredValues.get(0));
-        assertEquals(2, deliveredValues.get(1));
-        assertEquals(3, deliveredValues.get(2));
+        assertThat(deliveredValues.get(0)).isEqualTo(1);
+        assertThat(deliveredValues.get(1)).isEqualTo(2);
+        assertThat(deliveredValues.get(2)).isEqualTo(3);
 
         transports.dispatcher().stop();
     }
@@ -167,7 +167,7 @@ class LocalQueueTransportsBuilderTest {
 
     @Test
     @DisplayName("Should build multiple independent transport pairs")
-    void shouldBuildMultipleIndependentTransportPairs() throws InterruptedException {
+    void shouldBuildMultipleIndependentTransportPairs() {
         // Arrange
         LocalQueueTransportsBuilder.LocalQueueTransports transports1 = new LocalQueueTransportsBuilder()
                 .queueSize(10)
@@ -181,15 +181,14 @@ class LocalQueueTransportsBuilderTest {
 
         transports1.dispatcher().start(e -> receivedValue1.set(((TestEvent) e).getValue()));
         transports2.dispatcher().start(e -> receivedValue2.set(((TestEvent) e).getValue()));
-        Thread.sleep(50);
 
         // Act - send event to first transport pair
         transports1.publisher().send(new TestEvent(100));
-        Thread.sleep(100);
+        await().atMost(Duration.ofSeconds(2)).until(() -> receivedValue1.get() == 100);
 
         // Assert - only first transport should receive the event
-        assertEquals(100, receivedValue1.get());
-        assertEquals(0, receivedValue2.get());
+        assertThat(receivedValue1.get()).isEqualTo(100);
+        assertThat(receivedValue2.get()).as("Second transport should not receive event").isEqualTo(0);
 
         transports1.dispatcher().stop();
         transports2.dispatcher().stop();

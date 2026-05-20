@@ -9,12 +9,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -39,7 +41,7 @@ class UnifiedEventDispatcherEnvelopeTest {
 
     @Test
     @DisplayName("Should pass Envelope through when payload implements Event")
-    void shouldPassEnvelopeThroughWhenPayloadImplementsEvent() throws InterruptedException {
+    void shouldPassEnvelopeThroughWhenPayloadImplementsEvent() {
         PayloadEventSubscriber subscriber = new PayloadEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
             Object event = invocation.getArgument(0);
@@ -61,9 +63,7 @@ class UnifiedEventDispatcherEnvelopeTest {
         Envelope<PlainDomainEvent> envelope = Envelope.of(payload, processId);
         dispatcher.dispatch(envelope);
 
-        Thread.sleep(100);
-
-        assertThat(subscriber.receivedEvent).isNotNull();
+        await().atMost(Duration.ofSeconds(2)).until(() -> subscriber.receivedEvent != null);
         // Handler receives the Envelope (not unwrapped)
         assertThat(subscriber.receivedEvent).isInstanceOf(Envelope.class);
         Envelope<?> receivedEnvelope = (Envelope<?>) subscriber.receivedEvent;
@@ -73,7 +73,7 @@ class UnifiedEventDispatcherEnvelopeTest {
 
     @Test
     @DisplayName("Should dispatch Envelope when payload does not implement Event")
-    void shouldDispatchEnvelopeWhenPayloadNotEvent() throws InterruptedException {
+    void shouldDispatchEnvelopeWhenPayloadNotEvent() {
         NonEventPayload payload = new NonEventPayload("data-123");
         NonEventSubscriber subscriber = new NonEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenAnswer(invocation -> {
@@ -90,9 +90,7 @@ class UnifiedEventDispatcherEnvelopeTest {
         Envelope<NonEventPayload> envelope = Envelope.of(payload, processId);
         dispatcher.dispatch(envelope);
 
-        Thread.sleep(100);
-
-        assertThat(subscriber.receivedEvent).isNotNull();
+        await().atMost(Duration.ofSeconds(2)).until(() -> subscriber.receivedEvent != null);
         assertThat(subscriber.receivedEvent).isInstanceOf(Envelope.class);
         Envelope<?> receivedEnvelope = (Envelope<?>) subscriber.receivedEvent;
         assertThat(receivedEnvelope.processId()).isEqualTo(processId);

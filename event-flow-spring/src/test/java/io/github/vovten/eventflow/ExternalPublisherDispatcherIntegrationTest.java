@@ -72,6 +72,7 @@ class ExternalPublisherDispatcherIntegrationTest {
 
         publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
         dispatcherExecutor = Executors.newFixedThreadPool(2);
+
         KafkaInTransport kafkaInTransport = new KafkaInTransport(
                 createDispatcherConsumer(),
                 List.of("test-events"),
@@ -85,7 +86,7 @@ class ExternalPublisherDispatcherIntegrationTest {
         );
         dispatcher.start(event -> dispatcher.dispatch(event));
 
-        // Wait for consumer to subscribe
+        // Wait for consumer to subscribe to Kafka topic
         Thread.sleep(3000);
     }
 

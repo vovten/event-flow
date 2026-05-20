@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.dispatcher;
 
 import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +25,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.*;
 
 /**
@@ -128,8 +130,10 @@ class FullDispatcherStackTest {
         try {
             dispatcher.dispatch(event).join();
 
-            // Give time for async logging
-            Thread.sleep(100);
+            // Wait for async logging
+            await().atMost(Duration.ofSeconds(2)).until(() ->
+                    listAppender.list.stream().anyMatch(msg ->
+                            msg.getFormattedMessage().contains("no handlers found")));
 
             // Find the log entry for skipped (should have skipReason = no handlers found)
             String skippedLog = listAppender.list.stream()
@@ -212,18 +216,20 @@ class FullDispatcherStackTest {
         dispatcher.start(dispatcher::dispatch);
 
         try {
-            // Give time for transport to start
-            Thread.sleep(100);
-
             // Publish event to transport queue - this goes through transport
             queue.put(event);
 
             latch.await(1, TimeUnit.SECONDS);
-            Thread.sleep(100);
+
+            // Wait for async logging of deliveredFrom
+            await().atMost(Duration.ofSeconds(2)).until(() ->
+                    listAppender.list.stream().anyMatch(msg ->
+                            msg.getFormattedMessage().contains("deliveredFrom")
+                                    && msg.getFormattedMessage().contains("\"handled\"")));
 
             // Find the log entry with deliveredFrom
             String deliveredLog = listAppender.list.stream()
-                    .map(e -> e.getFormattedMessage())
+                    .map(ILoggingEvent::getFormattedMessage)
                     .filter(msg -> msg.contains("deliveredFrom"))
                     .filter(msg -> msg.contains("\"handled\""))
                     .findFirst()

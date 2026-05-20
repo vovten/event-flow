@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -17,6 +18,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -111,7 +113,7 @@ class UnifiedEventDispatcherTest {
 
     @Test
     @DisplayName("Should execute handler asynchronously")
-    void shouldExecuteHandlerAsynchronously() throws InterruptedException {
+    void shouldExecuteHandlerAsynchronously() {
         TestEventSubscriber subscriber = new TestEventSubscriber();
         when(handlerRegistry.getHandlers(any())).thenReturn(List.of(subscriber));
 
@@ -119,8 +121,7 @@ class UnifiedEventDispatcherTest {
         TestEvent event = new TestEvent();
         dispatcher.dispatch(event);
 
-        Thread.sleep(500);
-        assertTrue(subscriber.wasCalled());
+        await().atMost(Duration.ofSeconds(2)).until(subscriber::wasCalled);
     }
 
     @Test
@@ -161,7 +162,7 @@ class UnifiedEventDispatcherTest {
 
     @Test
     @DisplayName("Should release semaphore when handler throws exception")
-    void shouldReleaseSemaphoreWhenHandlerThrowsException() throws InterruptedException {
+    void shouldReleaseSemaphoreWhenHandlerThrowsException() {
         Semaphore semaphore = new Semaphore(1);
 
         EventHandler failingHandler = mock(EventHandler.class);
@@ -176,9 +177,7 @@ class UnifiedEventDispatcherTest {
         TestEvent event = new TestEvent();
         dispatcher.dispatch(event);
 
-        Thread.sleep(200);
-
-        assertEquals(1, semaphore.availablePermits());
+        await().atMost(Duration.ofSeconds(2)).until(() -> semaphore.availablePermits() == 1);
     }
 
     static class TestEvent extends AbstractTraceableEvent {
