@@ -18,10 +18,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Tests for concurrency limiting in UnifiedEventDispatcher.
@@ -35,15 +33,12 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
     private ExecutorService executorService;
     private ExecutorService dispatcherExecutor;
     private EventHandlerRegistry handlerRegistry;
-    private InTransport transport;
 
     @BeforeEach
     void setUp() {
         executorService = Executors.newVirtualThreadPerTaskExecutor();
         dispatcherExecutor = Executors.newVirtualThreadPerTaskExecutor();
         handlerRegistry = new EventSubscriberRegistry();
-        transport = mock(InTransport.class);
-        when(transport.name()).thenReturn("test-transport");
     }
 
     @AfterEach
@@ -72,17 +67,16 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
         SlowHandler handler = new SlowHandler(handlerSleepMs, currentConcurrent, maxConcurrent, allHandlersStarted);
         handlerRegistry.register(handler);
 
+        List<Event> events = java.util.stream.IntStream.range(0, numEvents)
+                .mapToObj(ConcurrencyTestEvent::new)
+                .map(e -> (Event) e)
+                .toList();
+
+        InTransport transport = new FeedingInTransport("test-transport", events);
+
         Semaphore semaphore = new Semaphore(concurrencyLimit);
         UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
                 executorService, handlerRegistry, List.of(transport), semaphore);
-
-        doAnswer(invocation -> {
-            Consumer<Event> consumer = invocation.getArgument(0);
-            for (int i = 0; i < numEvents; i++) {
-                consumer.accept(new ConcurrencyTestEvent(i));
-            }
-            return null;
-        }).when(transport).start(any(Consumer.class));
 
         dispatcher.start(dispatcher::dispatch);
 
@@ -110,17 +104,16 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
         SlowHandler handler = new SlowHandler(handlerSleepMs, currentConcurrent, maxConcurrent, allHandlersStarted);
         handlerRegistry.register(handler);
 
+        List<Event> events = java.util.stream.IntStream.range(0, numEvents)
+                .mapToObj(ConcurrencyTestEvent::new)
+                .map(e -> (Event) e)
+                .toList();
+
+        InTransport transport = new FeedingInTransport("test-transport", events);
+
         // No semaphore -- null
         UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
                 executorService, handlerRegistry, List.of(transport), null);
-
-        doAnswer(invocation -> {
-            Consumer<Event> consumer = invocation.getArgument(0);
-            for (int i = 0; i < numEvents; i++) {
-                consumer.accept(new ConcurrencyTestEvent(i));
-            }
-            return null;
-        }).when(transport).start(any(Consumer.class));
 
         dispatcher.start(dispatcher::dispatch);
 
@@ -137,6 +130,7 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
     @Test
     @DisplayName("Should build dispatcher with concurrency limit via builder")
     void shouldBuildDispatcherWithConcurrencyLimit() {
+        InTransport transport = new FeedingInTransport("test", List.of());
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
@@ -151,6 +145,7 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
     @Test
     @DisplayName("Should throw when concurrency limit is zero")
     void shouldThrowWhenConcurrencyLimitIsZero() {
+        InTransport transport = new FeedingInTransport("test", List.of());
         assertThrows(IllegalArgumentException.class, () ->
                 EventDispatcherBuilder.create()
                         .executor(executorService)
@@ -163,6 +158,7 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
     @Test
     @DisplayName("Should throw when concurrency limit is negative")
     void shouldThrowWhenConcurrencyLimitIsNegative() {
+        InTransport transport = new FeedingInTransport("test", List.of());
         assertThrows(IllegalArgumentException.class, () ->
                 EventDispatcherBuilder.create()
                         .executor(executorService)
@@ -173,6 +169,32 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
     }
 
     // ==================== Test Helpers ====================
+
+    static class FeedingInTransport implements InTransport {
+        final String name;
+        final List<Event> events;
+
+        FeedingInTransport(String name, List<Event> events) {
+            this.name = name;
+            this.events = events;
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        @Override
+        public void start(java.util.function.Consumer<Event> eventConsumer) {
+            for (Event event : events) {
+                eventConsumer.accept(event);
+            }
+        }
+
+        @Override
+        public void stop() {
+        }
+    }
 
     static class ConcurrencyTestEvent extends AbstractTraceableEvent {
         private final int index;

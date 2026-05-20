@@ -4,8 +4,10 @@ import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Simple {@link EventHandlerRegistry} backed by a {@link Map} of event class → handler list.
@@ -17,6 +19,7 @@ import java.util.Map;
 class MapBasedHandlerRegistry implements EventHandlerRegistry {
 
     private final Map<Class<?>, List<EventHandler>> handlerMap;
+    private final Set<Object> registeredHandlers = new HashSet<>();
 
     MapBasedHandlerRegistry(Map<Class<?>, List<EventHandler>> handlerMap) {
         this.handlerMap = handlerMap;
@@ -29,16 +32,17 @@ class MapBasedHandlerRegistry implements EventHandlerRegistry {
 
     @Override
     public void register(Object eventHandler) {
+        registeredHandlers.add(eventHandler);
     }
 
     @Override
     public boolean unregister(Object eventHandler) {
-        return false;
+        return registeredHandlers.remove(eventHandler);
     }
 
     @Override
     public boolean isRegistered(Object eventHandler) {
-        return false;
+        return registeredHandlers.contains(eventHandler);
     }
 
     @Override

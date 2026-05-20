@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -26,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.Mockito.*;
 
 /**
  * Integration tests for EventDispatcherBuilder with all decorators.
@@ -43,6 +44,7 @@ class FullDispatcherStackTest {
     private ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> listAppender;
     private Logger logger;
     private EventHandlerRegistry handlerRegistry;
+    private Map<Class<?>, List<EventHandler>> handlerMap;
 
     @BeforeEach
     void setUp() {
@@ -50,7 +52,8 @@ class FullDispatcherStackTest {
         listAppender = new ListAppender<>();
         listAppender.start();
         logger.addAppender(listAppender);
-        handlerRegistry = mock(EventHandlerRegistry.class);
+        handlerMap = new HashMap<>();
+        handlerRegistry = new MapBasedHandlerRegistry(handlerMap);
         MDC.clear();
     }
 
@@ -67,7 +70,7 @@ class FullDispatcherStackTest {
         TestEventHandler handler = new TestEventHandler();
         CountDownLatch latch = new CountDownLatch(1);
         handler.latch = latch;
-        when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
+        handlerMap.put(TestEvent.class, List.of(handler));
 
         // Build dispatcher with idempotent AND logging
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
@@ -116,7 +119,7 @@ class FullDispatcherStackTest {
     @DisplayName("Should log no handlers found when handlers are not registered")
     void shouldLogNoHandlersFoundWithFullStack() throws Exception {
         TestEvent event = new TestEvent("test-data");
-        when(handlerRegistry.getHandlers(event)).thenReturn(List.of());
+        // No handlers registered — empty by default
 
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(Executors.newSingleThreadExecutor())
@@ -158,7 +161,7 @@ class FullDispatcherStackTest {
         TestEventHandler handler = new TestEventHandler();
         CountDownLatch latch = new CountDownLatch(1);
         handler.latch = latch;
-        when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
+        handlerMap.put(TestEvent.class, List.of(handler));
 
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(Executors.newSingleThreadExecutor())
@@ -197,7 +200,7 @@ class FullDispatcherStackTest {
         TestEventHandler handler = new TestEventHandler();
         CountDownLatch latch = new CountDownLatch(1);
         handler.latch = latch;
-        when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
+        handlerMap.put(TestEvent.class, List.of(handler));
 
         // Use LocalQueueInTransport to set deliveredFrom in MDC
         LinkedBlockingDeque<Event> queue = new LinkedBlockingDeque<>();

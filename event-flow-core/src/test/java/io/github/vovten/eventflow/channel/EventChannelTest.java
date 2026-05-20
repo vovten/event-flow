@@ -20,8 +20,6 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for EventChannel interface default methods.
@@ -30,8 +28,6 @@ import static org.mockito.Mockito.*;
 @DisplayName("EventChannel Tests")
 class EventChannelTest {
 
-    private OutTransport transport1;
-    private OutTransport transport2;
     private TestEventChannel channel;
     private TestEvent testEvent;
 
@@ -40,11 +36,6 @@ class EventChannelTest {
 
     @BeforeEach
     void setUp() {
-        transport1 = mock(OutTransport.class, "mock-transport-1");
-        transport2 = mock(OutTransport.class, "mock-transport-2");
-        when(transport1.name()).thenReturn("mock-transport-1");
-        when(transport2.name()).thenReturn("mock-transport-2");
-        channel = new TestEventChannel(List.of(transport1, transport2));
         testEvent = new TestEvent();
 
         channelLogger = (Logger) LoggerFactory.getLogger(AbstractEventChannel.class);
@@ -61,23 +52,23 @@ class EventChannelTest {
     @Test
     @DisplayName("Should send event to all transports")
     void shouldSendEventToAllTransports() {
-        when(transport1.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest1")));
-        when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
+        OutTransport transport1 = new SucceedingOutTransport("mock-transport-1");
+        OutTransport transport2 = new SucceedingOutTransport("mock-transport-2");
+        channel = new TestEventChannel(List.of(transport1, transport2));
 
         CompletableFuture<SendResults> future = channel.send(testEvent);
         SendResults results = future.join();
 
         assertThat(results.isAllSuccess()).isTrue();
         assertThat(results.getTotalCount()).isEqualTo(2);
-        verify(transport1).send(testEvent);
-        verify(transport2).send(testEvent);
     }
 
     @Test
     @DisplayName("Should complete exceptionally when transport fails")
     void shouldCompleteExceptionallyWhenTransportFails() {
-        when(transport1.send(testEvent)).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Transport failed")));
-        when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
+        OutTransport transport1 = new FailingOutTransport("mock-transport-1", "Transport failed");
+        OutTransport transport2 = new SucceedingOutTransport("mock-transport-2");
+        channel = new TestEventChannel(List.of(transport1, transport2));
 
         CompletableFuture<SendResults> future = channel.send(testEvent);
         SendResults results = future.join();
@@ -90,8 +81,9 @@ class EventChannelTest {
     @DisplayName("Should log warning when one transport fails")
     void shouldLogWarningWhenOneTransportFails() {
         // Arrange
-        when(transport1.send(testEvent)).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Connection refused")));
-        when(transport2.send(testEvent)).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest2")));
+        OutTransport transport1 = new FailingOutTransport("mock-transport-1", "Connection refused");
+        OutTransport transport2 = new SucceedingOutTransport("mock-transport-2");
+        channel = new TestEventChannel(List.of(transport1, transport2));
 
         // Act
         CompletableFuture<SendResults> future = channel.send(testEvent);
@@ -126,6 +118,44 @@ class EventChannelTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must have at least one transport")
                 .hasMessageContaining("test-channel");
+    }
+
+    static class SucceedingOutTransport implements OutTransport {
+        private final String name;
+
+        SucceedingOutTransport(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        @Override
+        public CompletableFuture<SendResult> send(Event event) {
+            return CompletableFuture.completedFuture(SendResult.success(name));
+        }
+    }
+
+    static class FailingOutTransport implements OutTransport {
+        private final String name;
+        private final String errorMessage;
+
+        FailingOutTransport(String name, String errorMessage) {
+            this.name = name;
+            this.errorMessage = errorMessage;
+        }
+
+        @Override
+        public String name() {
+            return name;
+        }
+
+        @Override
+        public CompletableFuture<SendResult> send(Event event) {
+            return CompletableFuture.failedFuture(new RuntimeException(errorMessage));
+        }
     }
 
     static class TestEventChannel extends AbstractEventChannel {

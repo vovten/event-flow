@@ -3,7 +3,6 @@ package io.github.vovten.eventflow.dispatcher;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
-import io.github.vovten.eventflow.transport.InTransport;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,7 +10,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -21,8 +22,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 /**
  * Tests that expose the TOCTOU race condition in IdempotentEventDispatcher.
@@ -38,7 +37,7 @@ class IdempotentEventDispatcherDefectTest {
 
     private ExecutorService executor;
     private EventHandlerRegistry handlerRegistry;
-    private InTransport transport;
+    private Map<Class<?>, List<EventHandler>> handlerMap;
     private EventDispatcher baseDispatcher;
     private CountDownLatch handlerEnteredLatch;
     private CountDownLatch releaseLatch;
@@ -46,9 +45,8 @@ class IdempotentEventDispatcherDefectTest {
     @BeforeEach
     void setUp() {
         executor = Executors.newCachedThreadPool();
-        handlerRegistry = mock(EventHandlerRegistry.class);
-        transport = mock(InTransport.class);
-        when(transport.name()).thenReturn("test");
+        handlerMap = new HashMap<>();
+        handlerRegistry = new MapBasedHandlerRegistry(handlerMap);
 
         handlerEnteredLatch = new CountDownLatch(1);
         releaseLatch = new CountDownLatch(1);
@@ -85,10 +83,10 @@ class IdempotentEventDispatcherDefectTest {
             }
         };
 
-        when(handlerRegistry.getHandlers(any())).thenReturn(List.of(blockingHandler));
+        handlerMap.put(TestTraceableEvent.class, List.of(blockingHandler));
 
         // Create base dispatcher + idempotent wrapper
-        baseDispatcher = new UnifiedEventDispatcher(executor, handlerRegistry, List.of(transport));
+        baseDispatcher = new UnifiedEventDispatcher(executor, handlerRegistry, List.of());
         IdempotentEventDispatcher idempotentDispatcher = new IdempotentEventDispatcher(
                 baseDispatcher, Duration.ofMinutes(10), 10_000, false
         );
@@ -148,9 +146,9 @@ class IdempotentEventDispatcherDefectTest {
             }
         };
 
-        when(handlerRegistry.getHandlers(any())).thenReturn(List.of(countingHandler));
+        handlerMap.put(TestTraceableEvent.class, List.of(countingHandler));
 
-        baseDispatcher = new UnifiedEventDispatcher(executor, handlerRegistry, List.of(transport));
+        baseDispatcher = new UnifiedEventDispatcher(executor, handlerRegistry, List.of());
         IdempotentEventDispatcher idempotentDispatcher = new IdempotentEventDispatcher(
                 baseDispatcher, Duration.ofMinutes(10), 10_000, false
         );

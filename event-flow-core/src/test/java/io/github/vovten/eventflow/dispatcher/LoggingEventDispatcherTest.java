@@ -22,11 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * @since 1.1.0
@@ -197,10 +195,7 @@ class LoggingEventDispatcherTest {
     }
 
     private static EventDispatcher dispatcherThatReturns(HandlerResults results) {
-        EventDispatcher mock = mock(EventDispatcher.class);
-        when(mock.dispatch(null)).thenReturn(CompletableFuture.completedFuture(results));
-        when(mock.dispatch(any())).thenReturn(CompletableFuture.completedFuture(results));
-        return mock;
+        return new FixedResultsDispatcher(results);
     }
 
     private JsonNode captureSingleLog() {
@@ -238,6 +233,36 @@ class LoggingEventDispatcherTest {
         @Override
         public Instant occurredAt() {
             return Instant.now();
+        }
+    }
+
+    private static class FixedResultsDispatcher implements EventDispatcher {
+        private final HandlerResults results;
+
+        FixedResultsDispatcher(HandlerResults results) {
+            this.results = results;
+        }
+
+        @Override
+        public CompletableFuture<HandlerResults> dispatch(Event event) {
+            return CompletableFuture.completedFuture(results);
+        }
+
+        @Override
+        public void register(Object listener) {
+        }
+
+        @Override
+        public boolean isRegistered(Object listener) {
+            return false;
+        }
+
+        @Override
+        public void start(Consumer<Event> dispatchConsumer) {
+        }
+
+        @Override
+        public void stop() {
         }
     }
 }
