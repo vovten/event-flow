@@ -55,8 +55,10 @@ public class PersistentStoreConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public EventStore eventStore(DataSource dataSource) {
-        log.info("Creating JdbcEventStore");
-        return new JdbcEventStore(dataSource);
+        EventFlowProperties.PersistentPublisherConfig config = properties.getPublisher().getPersistent();
+        log.info("Creating JdbcEventStore with table name: {}, auto-init-schema: {}",
+                config.getTableName(), config.isAutoInitSchema());
+        return new JdbcEventStore(dataSource, config.getTableName(), config.isAutoInitSchema());
     }
 
     /**

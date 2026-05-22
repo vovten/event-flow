@@ -1,0 +1,34 @@
+-- ============================================================================
+-- Event Store schema — for use with Flyway, Liquibase, or manual setup.
+--
+-- This script is shipped as a classpath resource. To disable automatic
+-- schema initialization via application code, set:
+--   event-flow.publisher.persistent.auto-init-schema: false
+-- and manage this DDL through your regular migration tooling.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS event_store (
+    event_id        UUID PRIMARY KEY,
+    event_type      VARCHAR(512) NOT NULL,
+    payload         TEXT NOT NULL,
+    process_id      UUID,
+    status          SMALLINT NOT NULL DEFAULT 0,
+    retry_count     INT DEFAULT 0 NOT NULL,
+    created_at      TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP NOT NULL,
+    error_details   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_store_status
+    ON event_store(status, updated_at);
+
+COMMENT ON TABLE event_store IS 'Event store for persistent event lifecycle tracking';
+COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
+COMMENT ON COLUMN event_store.event_type IS 'Fully qualified event class name';
+COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
+COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
+COMMENT ON COLUMN event_store.status IS 'Lifecycle status: 0=NEW, 1=PUBLISHED, 2=HANDLED, 3=PUBLISH_FAILED, 4=HANDLE_FAILED';
+COMMENT ON COLUMN event_store.retry_count IS 'Number of retry attempts for failed events';
+COMMENT ON COLUMN event_store.created_at IS 'Timestamp when the event was first stored';
+COMMENT ON COLUMN event_store.updated_at IS 'Timestamp of the last status update';
+COMMENT ON COLUMN event_store.error_details IS 'Error description for failed events';

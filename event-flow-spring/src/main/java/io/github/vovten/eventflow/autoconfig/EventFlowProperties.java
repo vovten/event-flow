@@ -177,6 +177,8 @@ public class EventFlowProperties {
         private Duration retryInterval = Duration.ofSeconds(30);
         private Duration minAge = Duration.ofSeconds(10);
         private String service = "";
+        private String tableName = "event_store";
+        private boolean autoInitSchema = true;
 
         public boolean isEnabled() {
             return enabled;
@@ -224,6 +226,22 @@ public class EventFlowProperties {
 
         public void setService(String service) {
             this.service = service;
+        }
+
+        public String getTableName() {
+            return tableName;
+        }
+
+        public void setTableName(String tableName) {
+            this.tableName = tableName;
+        }
+
+        public boolean isAutoInitSchema() {
+            return autoInitSchema;
+        }
+
+        public void setAutoInitSchema(boolean autoInitSchema) {
+            this.autoInitSchema = autoInitSchema;
         }
     }
 
