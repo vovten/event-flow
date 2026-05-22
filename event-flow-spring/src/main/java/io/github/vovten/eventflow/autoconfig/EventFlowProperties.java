@@ -110,6 +110,7 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private LoggingConfig logging = new LoggingConfig();
         private RetryConfig retry = new RetryConfig();
+        private PersistentPublisherConfig persistent = new PersistentPublisherConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
         public boolean isEnabled() {
@@ -144,12 +145,85 @@ public class EventFlowProperties {
             this.retry = retry;
         }
 
+        public PersistentPublisherConfig getPersistent() {
+            return persistent;
+        }
+
+        public void setPersistent(PersistentPublisherConfig persistent) {
+            this.persistent = persistent;
+        }
+
         public List<ChannelConfig> getChannels() {
             return channels;
         }
 
         public void setChannels(List<ChannelConfig> channels) {
             this.channels = channels;
+        }
+    }
+
+    /**
+     * Persistent publisher configuration for event lifecycle tracking.
+     * <p>
+     * When enabled, events are persisted to an {@code EventStore} before publication
+     * and their lifecycle status is tracked through acknowledgment events.
+     * <p>
+     * Requires a {@code DataSource} bean to be present in the application context.
+     */
+    public static class PersistentPublisherConfig {
+        private boolean enabled = false;
+        private boolean retryEnabled = true;
+        private int maxRetries = 3;
+        private Duration retryInterval = Duration.ofSeconds(30);
+        private Duration minAge = Duration.ofSeconds(10);
+        private String service = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public boolean isRetryEnabled() {
+            return retryEnabled;
+        }
+
+        public void setRetryEnabled(boolean retryEnabled) {
+            this.retryEnabled = retryEnabled;
+        }
+
+        public int getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(int maxRetries) {
+            this.maxRetries = maxRetries;
+        }
+
+        public Duration getRetryInterval() {
+            return retryInterval;
+        }
+
+        public void setRetryInterval(Duration retryInterval) {
+            this.retryInterval = retryInterval;
+        }
+
+        public Duration getMinAge() {
+            return minAge;
+        }
+
+        public void setMinAge(Duration minAge) {
+            this.minAge = minAge;
+        }
+
+        public String getService() {
+            return service;
+        }
+
+        public void setService(String service) {
+            this.service = service;
         }
     }
 
@@ -261,6 +335,7 @@ public class EventFlowProperties {
         private IdempotentConfig idempotent = new IdempotentConfig();
         private LoggingConfig logging = new LoggingConfig();
         private DeserializationConfig deserialization = new DeserializationConfig();
+        private LifecycleTrackingConfig lifecycleTracking = new LifecycleTrackingConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -316,6 +391,33 @@ public class EventFlowProperties {
 
         public void setDeserialization(DeserializationConfig deserialization) {
             this.deserialization = deserialization;
+        }
+
+        public LifecycleTrackingConfig getLifecycleTracking() {
+            return lifecycleTracking;
+        }
+
+        public void setLifecycleTracking(LifecycleTrackingConfig lifecycleTracking) {
+            this.lifecycleTracking = lifecycleTracking;
+        }
+    }
+
+    /**
+     * Lifecycle tracking configuration for the dispatcher.
+     * <p>
+     * When enabled, the dispatcher publishes {@code SuccessAck} or
+     * {@code FailureAck} acknowledgment events back to the source channels
+     * after handler execution, enabling the publisher to track event lifecycle.
+     */
+    public static class LifecycleTrackingConfig {
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
     }
 

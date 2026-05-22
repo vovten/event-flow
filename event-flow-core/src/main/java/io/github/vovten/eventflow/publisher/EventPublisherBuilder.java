@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.channel.EventChannel;
+import io.github.vovten.eventflow.store.EventStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,8 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     private static final Logger log = LoggerFactory.getLogger(EventPublisherBuilder.class);
 
     private RetryConfig retryConfig;
+    private EventStore persistentStore;
+    private String persistentService;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
 
@@ -148,6 +151,38 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     }
 
     /**
+     * Enable persistent event storage with lifecycle tracking.
+     * <p>
+     * When enabled, every published event is persisted to the {@link EventStore}
+     * before publishing and its status is updated after publishing completes.
+     * Failed events are eligible for retry via {@code EventRetryScheduler}.
+     *
+     * @param eventStore the event store for persistence
+     * @return this builder
+     */
+    @SuppressWarnings("unchecked")
+    public T persistent(EventStore eventStore) {
+        this.persistentStore = eventStore;
+        return (T) this;
+    }
+
+    /**
+     * Sets the service name for ack filtering.
+     * <p>
+     * When set, events published through the persistent publisher will be stamped
+     * with this service name in their metadata, allowing acknowledgment events
+     * to be filtered by the originating service.
+     *
+     * @param service the service name
+     * @return this builder
+     */
+    @SuppressWarnings("unchecked")
+    public T service(String service) {
+        this.persistentService = service;
+        return (T) this;
+    }
+
+    /**
      * Add a custom decorator to the publisher chain.
      * Decorators are applied in the order they are added.
      *
@@ -192,6 +227,12 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
                     retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
         }
 
+        // Apply persistent storage if configured (wraps retry, so save/status update happens once)
+        if (persistentStore != null) {
+            publisher = new PersistentEventPublisher(publisher, persistentStore, persistentService);
+            log.debug("Applied persistent event storage decorator");
+        }
+
         // Allow subclasses to add additional decorations (e.g., transactional, logging) — always outermost
         publisher = decorate(publisher);
         return publisher;
@@ -216,9 +257,10 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      */
     public EventPublisher buildAndLog() {
         EventPublisher publisher = build();
-        log.info("Built EventPublisher with configuration: channels={}, retry={}, customDecorators={}",
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, persistent={}, customDecorators={}",
                 channels.size(),
                 retryConfig != null ? "enabled" : "disabled",
+                persistentStore != null ? "enabled" : "disabled",
                 decorators.size()
         );
         return publisher;

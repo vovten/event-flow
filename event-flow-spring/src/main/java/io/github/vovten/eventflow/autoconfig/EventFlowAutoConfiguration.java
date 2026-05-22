@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
  *   <li>{@link CommonConfiguration} - executor service and local-queue transports</li>
  *   <li>{@link ChannelConfiguration} - event channels</li>
  *   <li>{@link PublisherConfiguration} - event publisher</li>
+ *   <li>{@link PersistentStoreConfiguration} - persistent event store and lifecycle tracking</li>
  *   <li>{@link DispatcherConfiguration} - event dispatcher</li>
  * </ul>
  * <p>
@@ -65,6 +66,7 @@ import org.springframework.context.annotation.Import;
     CommonConfiguration.class,
     ChannelConfiguration.class,
     PublisherConfiguration.class,
+    PersistentStoreConfiguration.class,
     DispatcherConfiguration.class
 })
 public class EventFlowAutoConfiguration {

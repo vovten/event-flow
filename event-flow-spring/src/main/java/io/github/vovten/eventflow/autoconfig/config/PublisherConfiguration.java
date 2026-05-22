@@ -4,9 +4,12 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.publisher.PersistentEventPublisher;
 import io.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
+import io.github.vovten.eventflow.store.EventStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -45,12 +48,14 @@ public class PublisherConfiguration {
      * Creates event publisher with all configured channels.
      *
      * @param eventChannels list of event channels to configure
+     * @param eventStore    optional event store for persistent publishing (auto-injected)
      * @return configured event publisher
      */
     @Bean
     @ConditionalOnMissingBean(name = "eventPublisher")
     @ConditionalOnProperty(prefix = "event-flow.publisher", name = "enabled", havingValue = "true")
-    public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
+    public EventPublisher eventPublisher(List<EventChannel> eventChannels,
+                                         @Autowired(required = false) EventStore eventStore) {
         if (eventChannels.isEmpty()) {
             log.warn("""
 
@@ -72,16 +77,16 @@ public class PublisherConfiguration {
         }
         logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
-        
+
         // Use Spring-aware builder
         SpringEventPublisherBuilder builder = SpringEventPublisherBuilder.create(eventChannels);
-        
+
         // Apply retry if enabled
         var retry = publisherConfig.getRetry();
         if (retry.isEnabled()) {
             builder.retryable(retry.getMaxAttempts(), retry.getInitialDelay(), retry.getMultiplier());
         }
-        
+
         // Apply transactional if enabled
         if (publisherConfig.isTransactional()) {
             builder.transactional();
@@ -93,7 +98,23 @@ public class PublisherConfiguration {
             builder.loggable(loggingConfig.getMaxPayloadLength());
         }
 
-        return builder.buildAndLog();
+        EventPublisher publisher = builder.build();
+
+        // Wrap with persistent event publisher if enabled
+        if (eventStore != null && publisherConfig.getPersistent().isEnabled()) {
+            String service = publisherConfig.getPersistent().getService();
+            publisher = new PersistentEventPublisher(publisher, eventStore, service);
+            log.info("Wrapped EventPublisher with PersistentEventPublisher (service: {})",
+                    service.isEmpty() ? "none" : service);
+        }
+
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, persistent={}, customDecorators={}",
+                eventChannels.size(),
+                retry.isEnabled() ? "enabled" : "disabled",
+                publisherConfig.getPersistent().isEnabled() ? "enabled" : "disabled",
+                "0"
+        );
+        return publisher;
     }
 
     private static void logInfo(List<EventChannel> eventChannels) {

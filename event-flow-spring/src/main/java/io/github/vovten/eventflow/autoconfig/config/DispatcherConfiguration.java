@@ -4,10 +4,13 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.InTransportFactory;
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
 import io.github.vovten.eventflow.dispatcher.EventDispatcherBuilder;
+import io.github.vovten.eventflow.event.lifecycle.EventLifecycleDispatcher;
+import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 import io.github.vovten.eventflow.transport.InTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -52,7 +55,8 @@ public class DispatcherConfiguration {
      *
      * @param dispatcherExecutor      executor service for dispatcher
      * @param eventHandlerRegistry    event handler registry
-     * @param inTransports    list of dispatcher transports
+     * @param inTransports            list of dispatcher transports
+     * @param ackPublisher            optional publisher for lifecycle ack events
      * @return event dispatcher instance
      */
     @Bean(destroyMethod = "stop")
@@ -60,7 +64,8 @@ public class DispatcherConfiguration {
     @ConditionalOnProperty(prefix = "event-flow.dispatcher", name = "enabled", havingValue = "true")
     public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
                                            @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
-                                           @Qualifier("dispatcherTransports") List<InTransport> inTransports) {
+                                           @Qualifier("dispatcherTransports") List<InTransport> inTransports,
+                                           @Autowired(required = false) EventPublisher ackPublisher) {
         EventDispatcherBuilder builder = EventDispatcherBuilder.create()
                 .executor(dispatcherExecutor)
                 .handlerRegistry(eventHandlerRegistry)
@@ -77,7 +82,22 @@ public class DispatcherConfiguration {
         if (loggingConfig.isEnabled()) {
             builder.loggable(loggingConfig.getMaxPayloadLength());
         }
-        EventDispatcher dispatcher = builder.buildAndLog();
+        EventDispatcher dispatcher = builder.build();
+
+        // Wrap with lifecycle tracking if enabled and ack publisher is available
+        if (ackPublisher != null && properties.getDispatcher().getLifecycleTracking().isEnabled()) {
+            dispatcher = new EventLifecycleDispatcher(dispatcher, ackPublisher);
+            log.info("Wrapped EventDispatcher with EventLifecycleDispatcher (ack publisher available)");
+        } else if (properties.getDispatcher().getLifecycleTracking().isEnabled()) {
+            log.warn("Lifecycle tracking enabled but no EventPublisher available for ack events");
+        }
+
+        log.info("Built EventDispatcher with configuration: transports={}, idempotent={}, logging={}, lifecycleTracking={}",
+                inTransports.size(),
+                properties.getDispatcher().getIdempotent().isEnabled() ? "enabled" : "disabled",
+                properties.getDispatcher().getLogging().isEnabled() ? "enabled" : "disabled",
+                properties.getDispatcher().getLifecycleTracking().isEnabled() ? "enabled" : "disabled"
+        );
         dispatcher.start(dispatcher::dispatch);
         return dispatcher;
     }
