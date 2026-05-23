@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.event.lifecycle.EventLifecycle;
 import io.github.vovten.eventflow.serialization.EventPolymorphicTypeValidator;
 import io.github.vovten.eventflow.serialization.EventSerializationException;
 
@@ -80,5 +81,19 @@ public final class EventUtils {
         } catch (JsonProcessingException e) {
             throw new EventSerializationException("Error converting json to object", e);
         }
+    }
+
+    /**
+     * Resolves the {@link EventLifecycle} for the given event based on its
+     * {@link io.github.vovten.eventflow.event.annotation.Event @Event} annotation.
+     * <p>
+     * If the annotation is not present, returns the default value {@link EventLifecycle#PUBLISH}.
+     *
+     * @param event the event instance
+     * @return the resolved lifecycle level
+     */
+    public static EventLifecycle lifecycle(Event event) {
+        var ann = event.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
+        return ann != null ? ann.lifecycle() : EventLifecycle.PUBLISH;
     }
 }

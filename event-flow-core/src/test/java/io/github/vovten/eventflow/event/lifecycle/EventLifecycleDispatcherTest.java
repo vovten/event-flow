@@ -97,6 +97,23 @@ class EventLifecycleDispatcherTest {
     }
 
     @Test
+    @DisplayName("Should not publish ack for event without FULL lifecycle")
+    void shouldNotPublishAckForNonFullLifecycle() {
+        EventDispatcher origin = successDispatcher();
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+        Event nonFullEvent = new Event() {
+            @Override
+            public Class<?> type() {
+                return Event.class;
+            }
+        };
+
+        dispatcher.dispatch(nonFullEvent).join();
+
+        assertThat(publishedAck.get()).isNull();
+    }
+
+    @Test
     @DisplayName("Should delegate all dispatcher methods")
     void shouldDelegateMethods() {
         EventDispatcher origin = successDispatcher();
@@ -149,6 +166,7 @@ class EventLifecycleDispatcherTest {
         }
     }
 
+    @io.github.vovten.eventflow.event.annotation.Event(lifecycle = EventLifecycle.FULL)
     private static class TestEvent extends AbstractTraceableEvent {
         private final String data;
 

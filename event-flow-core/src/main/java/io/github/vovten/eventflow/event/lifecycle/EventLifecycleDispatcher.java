@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.util.EventUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,23 +62,40 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
         }
         String originalService = extractOriginalService(event);
         return origin.dispatch(event)
-                .whenComplete((results, error) -> {
-                    // Only publish lifecycle acks for events with a traceable ID
-                    if (!(event instanceof TraceableEvent)) {
-                        return;
-                    }
-                    if (error != null) {
-                        publishFailedAck(event, originalService, error.getMessage());
-                    } else if (results != null && !results.isEmpty() && !results.isAllSuccess()) {
-                        String errorMsg = results.getFirstError()
-                                .map(Throwable::getMessage)
-                                .filter(Objects::nonNull)
-                                .orElse("Handler execution failed");
-                        publishFailedAck(event, originalService, errorMsg);
-                    } else {
-                        publishSuccessAck(event, originalService);
-                    }
-                });
+                .whenComplete((results, error) ->
+                        publishLifecycleAck(event, originalService, results, error));
+    }
+
+    private void publishLifecycleAck(Event event, String originalService,
+                                     HandlerResults results, Throwable error) {
+        if (shouldSkipLifecycleAck(event)) {
+            return;
+        }
+        if (error != null) {
+            publishFailedAck(event, originalService, error.getMessage());
+            return;
+        }
+        if (hasHandlerFailures(results)) {
+            publishFailedAck(event, originalService, extractErrorSummary(results));
+            return;
+        }
+        publishSuccessAck(event, originalService);
+    }
+
+    private boolean shouldSkipLifecycleAck(Event event) {
+        return !(event instanceof TraceableEvent)
+                || EventUtils.lifecycle(event) != EventLifecycle.FULL;
+    }
+
+    private boolean hasHandlerFailures(HandlerResults results) {
+        return results != null && !results.isEmpty() && !results.isAllSuccess();
+    }
+
+    private String extractErrorSummary(HandlerResults results) {
+        return results.getFirstError()
+                .map(Throwable::getMessage)
+                .filter(Objects::nonNull)
+                .orElse("Handler execution failed");
     }
 
     private void publishSuccessAck(Event event, String originalService) {

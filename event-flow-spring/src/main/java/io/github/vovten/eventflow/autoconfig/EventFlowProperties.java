@@ -175,7 +175,7 @@ public class EventFlowProperties {
         private boolean retryEnabled = true;
         private int maxRetries = 3;
         private Duration retryInterval = Duration.ofSeconds(30);
-        private Duration minAge = Duration.ofSeconds(10);
+        private Duration minAge = Duration.ofSeconds(30);
         private String service = "";
         private String tableName = "event_store";
         private boolean autoInitSchema = true;

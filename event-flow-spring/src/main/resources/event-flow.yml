@@ -45,6 +45,31 @@ event-flow:
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
 
+    # ---------------------------------------------------------------------------
+    # Persistent publisher (event lifecycle tracking)
+    # ---------------------------------------------------------------------------
+    persistent:
+      # Enable or disable persistent event storage and lifecycle tracking
+      enabled: false
+      # Service name stamped on outgoing events for ack filtering
+      service: ""
+      # Name of the database table for event storage
+      table-name: event_store
+      # Automatically create the table on startup (requires DDL privileges)
+      # Set to false in production and manage schema via Flyway/Liquibase.
+      # A ready-to-use DDL script is available in the classpath at:
+      #   io/github/vovten/eventflow/store/event-store.sql
+      auto-init-schema: true
+      # Enable or disable automatic retry of failed events
+      retry-enabled: true
+      # Maximum number of retry attempts for failed events
+      max-retries: 3
+      # Interval between retry cycles
+      retry-interval: 30s
+      # Base backoff interval for retries (delay = min-age × 2^retryCount, grows exponentially)
+      # Examples with 30s: 1st retry=30s, 2nd=60s, 3rd=120s
+      min-age: 30s
+
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
     # Transport name identifies the type (e.g., "local-queue", "kafka", "broadcast-kafka")
@@ -138,3 +163,10 @@ event-flow:
       enabled: false
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
+
+    # Lifecycle tracking configuration
+    # When enabled, the dispatcher publishes SuccessAck / FailureAck events
+    # back to the source channels after handler execution
+    lifecycle-tracking:
+      # Enable or disable ack-based lifecycle tracking
+      enabled: false

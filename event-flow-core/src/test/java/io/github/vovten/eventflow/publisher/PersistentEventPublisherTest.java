@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.event.lifecycle.EventLifecycle;
 import io.github.vovten.eventflow.event.lifecycle.SuccessAck;
 import io.github.vovten.eventflow.event.lifecycle.LifecycleAckEvent;
 import io.github.vovten.eventflow.store.EventStatus;
@@ -76,6 +77,18 @@ class PersistentEventPublisherTest {
     }
 
     @Test
+    @DisplayName("Should skip persistence for NONE lifecycle event")
+    void shouldSkipPersistenceForNoneLifecycle() {
+        EventPublisher origin = e -> CompletableFuture.completedFuture(
+                SendResults.of(List.of(SendResult.success("dest"))));
+        PersistentEventPublisher publisher = new PersistentEventPublisher(origin, eventStore, "test-service");
+
+        publisher.publish(new NoneLifecycleEvent()).join();
+
+        assertThat(eventStore.findById(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should skip persistence for LifecycleAckEvent")
     void shouldSkipAckEvents() {
         SuccessAck ack = new SuccessAck(
@@ -136,6 +149,14 @@ class PersistentEventPublisherTest {
 
         public String getData() {
             return data;
+        }
+    }
+
+    @io.github.vovten.eventflow.event.annotation.Event(lifecycle = EventLifecycle.NONE)
+    private static final class NoneLifecycleEvent implements Event {
+        @Override
+        public Class<?> type() {
+            return NoneLifecycleEvent.class;
         }
     }
 }

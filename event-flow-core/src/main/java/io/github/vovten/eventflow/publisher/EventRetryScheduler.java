@@ -28,6 +28,10 @@ import java.util.concurrent.TimeUnit;
  *   <li>Event deserialized from JSON and re-published</li>
  * </ol>
  * <p>
+ * The delay between retry attempts increases exponentially:
+ * {@code minAge × 2^retryCount}. The first retry waits {@code minAge},
+ * the second waits {@code 2 × minAge}, the third {@code 4 × minAge}, and so on.
+ * <p>
  * Implements {@link AutoCloseable} for resource management.
  *
  * @author Vladimir Aleshkov
@@ -50,7 +54,7 @@ public final class EventRetryScheduler implements AutoCloseable {
      * @param eventStore the event store to scan for failed events
      * @param publisher  the publisher for re-publishing failed events
      * @param interval   delay between retry cycles
-     * @param minAge     minimum age for events to be eligible for retry
+     * @param minAge     base backoff interval for retries (delay = minAge × 2^retryCount)
      * @param maxRetries maximum number of retry attempts before giving up
      */
     public EventRetryScheduler(EventStore eventStore,
@@ -104,7 +108,7 @@ public final class EventRetryScheduler implements AutoCloseable {
     /**
      * Performs a single retry cycle: scans for failed events and retries eligible ones.
      */
-    private void retryCycle() {
+    void retryCycle() {
         try {
             Instant deadline = Instant.now().minus(minAge);
             List<StoredEvent> failedEvents = eventStore.findByStatus(EventStatus.PUBLISH_FAILED, deadline);
@@ -120,6 +124,9 @@ public final class EventRetryScheduler implements AutoCloseable {
                 if (event.retryCount() >= maxRetries) {
                     log.warn("Event {} exceeded max retries ({}/{}), skipping",
                             event.eventId(), event.retryCount(), maxRetries);
+                    continue;
+                }
+                if (!isBackoffElapsed(event)) {
                     continue;
                 }
                 retryEvent(event);
@@ -138,6 +145,27 @@ public final class EventRetryScheduler implements AutoCloseable {
         } catch (Exception e) {
             log.error("Failed to retry event id={}: {}", stored.eventId(), e.getMessage());
         }
+    }
+
+    /**
+     * Checks whether the exponential backoff period has elapsed for this event.
+     * <p>
+     * The delay grows with each attempt: {@code minAge × 2^retryCount}.
+     * The timer starts from the event's {@link StoredEvent#updatedAt()} timestamp,
+     * which is refreshed after each failed attempt.
+     *
+     * @param event the failed event
+     * @return true if enough time has passed to retry
+     */
+    private boolean isBackoffElapsed(StoredEvent event) {
+        Duration backoff = minAge.multipliedBy(1L << event.retryCount());
+        Instant retryAt = event.updatedAt().plus(backoff);
+        boolean elapsed = !Instant.now().isBefore(retryAt);
+        if (!elapsed) {
+            log.trace("Backoff not elapsed for event {}, retry #{}, retryAt={}",
+                    event.eventId(), event.retryCount() + 1, retryAt);
+        }
+        return elapsed;
     }
 
     @Override

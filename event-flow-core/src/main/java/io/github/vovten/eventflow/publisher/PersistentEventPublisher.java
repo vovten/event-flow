@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.event.lifecycle.EventLifecycle;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.event.lifecycle.LifecycleAckEvent;
 import io.github.vovten.eventflow.store.EventStatus;
@@ -31,9 +32,9 @@ import java.util.concurrent.CompletableFuture;
  *   <li>On failure: updates status to {@link EventStatus#PUBLISH_FAILED}</li>
  * </ul>
  * <p>
- * If configured with a {@code service} name, it stamps the service identity into
- * the event's {@link Envelope} metadata ({@code publisherService}) so that
- * acknowledgment events can be filtered by the originating service.
+ * If configured with a {@code service} name, it enriches the event's
+ * {@link Envelope} metadata with the service identity ({@code publisherService})
+ * so that acknowledgment events can be filtered by the originating service.
  * <p>
  * {@link LifecycleAckEvent} instances are passed through without persistence
  * (they are technical events used for lifecycle tracking, not business events).
@@ -68,43 +69,61 @@ public final class PersistentEventPublisher implements EventPublisher {
     public CompletableFuture<SendResults> publish(Event event) {
         Objects.requireNonNull(event, "event must not be null");
 
-        if (event instanceof LifecycleAckEvent) {
-            log.trace("Skipping persistence for lifecycle ack event: {}", event);
+        if (shouldSkipPersistence(event)) {
             return origin.publish(event);
         }
-        event = stampService(event);
-        UUID eventId = resolveEventId(event);
-        UUID processId = resolveProcessId(event);
-        String eventType = event.getClass().getName();
-
-        Optional<StoredEvent> existing = eventStore.findById(eventId);
-        if (existing.isEmpty()) {
-            String payload = EventUtils.toJson(event);
-            StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId);
-            eventStore.save(stored);
-            log.debug("Saved new event to store: {} ({})", eventId, eventType);
-        } else {
-            eventStore.updateStatus(eventId, EventStatus.NEW, null);
-            log.debug("Reset event status for retry: {} ({})", eventId, eventType);
-        }
-
-        return origin.publish(event)
-                .whenComplete((result, error) -> {
-                    if (error != null) {
-                        eventStore.updateStatus(eventId, EventStatus.PUBLISH_FAILED, error.getMessage());
-                        log.warn("Event publication failed: {} — {}", eventId, error.getMessage());
-                    } else if (result == null || result.isAllFailure()) {
-                        String errorMsg = result != null ? result.getSummary() : "null result";
-                        eventStore.updateStatus(eventId, EventStatus.PUBLISH_FAILED, errorMsg);
-                        log.warn("Event publication failed: {} — {}", eventId, errorMsg);
-                    } else {
-                        eventStore.updateStatus(eventId, EventStatus.PUBLISHED, null);
-                        log.debug("Event published successfully: {}", eventId);
-                    }
-                });
+        Event enriched = enrichWithService(event);
+        UUID eventId = resolveEventId(enriched);
+        persistOrReset(eventId, enriched);
+        return origin.publish(enriched)
+                .whenComplete((result, error) -> updatePublishResult(eventId, result, error));
     }
 
-    private Event stampService(Event event) {
+    private boolean shouldSkipPersistence(Event event) {
+        if (event instanceof LifecycleAckEvent) {
+            log.trace("Skipping persistence for lifecycle ack event: {}", event);
+            return true;
+        }
+        EventLifecycle lifecycle = EventUtils.lifecycle(event);
+        if (lifecycle == EventLifecycle.NONE) {
+            log.trace("Skipping persistence for NONE lifecycle event: {}", event);
+            return true;
+        }
+        return false;
+    }
+
+    private void persistOrReset(UUID eventId, Event event) {
+        String eventType = event.getClass().getName();
+        Optional<StoredEvent> existing = eventStore.findById(eventId);
+        if (existing.isPresent()) {
+            eventStore.updateStatus(eventId, EventStatus.NEW, null);
+            log.debug("Reset event status for retry: {} ({})", eventId, eventType);
+            return;
+        }
+        UUID processId = resolveProcessId(event);
+        String payload = EventUtils.toJson(event);
+        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId);
+        eventStore.save(stored);
+        log.debug("Saved new event to store: {} ({})", eventId, eventType);
+    }
+
+    private void updatePublishResult(UUID eventId, SendResults result, Throwable error) {
+        if (error != null) {
+            eventStore.updateStatus(eventId, EventStatus.PUBLISH_FAILED, error.getMessage());
+            log.warn("Event publication failed: {} — {}", eventId, error.getMessage());
+            return;
+        }
+        if (result == null || result.isAllFailure()) {
+            String errorMsg = result != null ? result.getSummary() : "null result";
+            eventStore.updateStatus(eventId, EventStatus.PUBLISH_FAILED, errorMsg);
+            log.warn("Event publication failed: {} — {}", eventId, errorMsg);
+            return;
+        }
+        eventStore.updateStatus(eventId, EventStatus.PUBLISHED, null);
+        log.debug("Event published successfully: {}", eventId);
+    }
+
+    private Event enrichWithService(Event event) {
         if (StringUtils.isEmpty(service) || !(event instanceof Envelope<?> env)) {
             return event;
         }
