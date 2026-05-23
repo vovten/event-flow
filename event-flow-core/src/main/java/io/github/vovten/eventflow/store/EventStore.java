@@ -19,7 +19,7 @@ import java.util.UUID;
  * </ul>
  *
  * @author Vladimir Aleshkov
- * @since 1.2.0
+ * @since 1.3.0
  */
 public interface EventStore {
 

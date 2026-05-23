@@ -25,7 +25,7 @@ import java.util.UUID;
  * the filtering is done purely by service identity.
  *
  * @author Vladimir Aleshkov
- * @since 1.2.0
+ * @since 1.3.0
  */
 public final class AckHandler implements EventSubscriber {
 

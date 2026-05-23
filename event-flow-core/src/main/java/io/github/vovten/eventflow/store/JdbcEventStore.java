@@ -37,7 +37,7 @@ import java.util.UUID;
  * The {@code payload} column uses {@code TEXT} for JSON-serialized event data.
  *
  * @author Vladimir Aleshkov
- * @since 1.2.0
+ * @since 1.3.0
  */
 public class JdbcEventStore implements EventStore {
 

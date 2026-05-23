@@ -40,7 +40,7 @@ import java.util.concurrent.CompletableFuture;
  * (they are technical events used for lifecycle tracking, not business events).
  *
  * @author Vladimir Aleshkov
- * @since 1.2.0
+ * @since 1.3.0
  */
 public final class PersistentEventPublisher implements EventPublisher {
 

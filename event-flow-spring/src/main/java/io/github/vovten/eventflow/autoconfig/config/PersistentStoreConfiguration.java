@@ -31,7 +31,7 @@ import javax.sql.DataSource;
  * wrapped in a {@link PersistentEventPublisher} when persistent storage is enabled.
  *
  * @author Vladimir Aleshkov
- * @since 1.2.0
+ * @since 1.3.0
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(DataSource.class)

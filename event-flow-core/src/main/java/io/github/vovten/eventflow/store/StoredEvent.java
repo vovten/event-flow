@@ -19,7 +19,7 @@ import java.util.UUID;
  * @param updatedAt     timestamp when the event was last updated
  * @param errorDetails  error details from the last failure, or null if none
  * @author Vladimir Aleshkov
- * @since 1.2.0
+ * @since 1.3.0
  */
 public record StoredEvent(
         UUID eventId,

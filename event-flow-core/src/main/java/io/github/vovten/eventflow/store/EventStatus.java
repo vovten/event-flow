@@ -17,7 +17,7 @@ import java.util.Arrays;
  * Each status has a numeric code used for efficient storage in the database.
  *
  * @author Vladimir Aleshkov
- * @since 1.2.0
+ * @since 1.3.0
  */
 public enum EventStatus {
 
