@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.event;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.github.vovten.eventflow.channel.EventChannel;
@@ -37,6 +38,7 @@ public final class Envelope<T> implements TraceableEvent {
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
     private final T payload;
 
+    @JsonIgnore
     private final transient List<Class<? extends EventChannel>> targetChannels;
 
     @JsonCreator

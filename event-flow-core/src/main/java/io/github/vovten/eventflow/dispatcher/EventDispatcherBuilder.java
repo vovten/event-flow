@@ -356,6 +356,12 @@ public final class EventDispatcherBuilder {
      * ({@code Unified → Idempotent → custom → Logging}), the chain mode lets you
      * specify decorators in the exact order you want.
      * <p>
+     * <b>Note:</b> Only {@code executorService}, {@code handlerRegistry},
+     * {@code transports}, and {@code concurrencyLimit} from the parent builder
+     * are carried over into the chain. Idempotent, logging, and custom decorators
+     * configured via the parent builder are ignored — you must add them explicitly
+     * via {@link Chain#add(DecoratorFunction)}.
+     * <p>
      * <b>Usage example:</b>
      * <pre>{@code
      * EventDispatcher dispatcher = EventDispatcherBuilder.create()
