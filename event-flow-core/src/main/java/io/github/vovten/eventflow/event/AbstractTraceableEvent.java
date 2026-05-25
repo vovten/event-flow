@@ -26,7 +26,7 @@ import java.util.UUID;
  * @deprecated Use {@link Envelope} instead of extending this class.
  *     Will be removed in a future version.
  */
-@Deprecated(forRemoval = true, since = "1.1.0")
+@Deprecated(since = "1.1.0")
 public abstract class AbstractTraceableEvent implements TraceableEvent {
 
     private final UUID eventId;
