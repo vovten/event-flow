@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link CompositeEventHandlerRegistry}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @DisplayName("CompositeEventHandlerRegistry Tests")
 class CompositeEventHandlerRegistryTest {
@@ -136,7 +136,7 @@ class CompositeEventHandlerRegistryTest {
      */
     private static final class TestEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class);
         }
 

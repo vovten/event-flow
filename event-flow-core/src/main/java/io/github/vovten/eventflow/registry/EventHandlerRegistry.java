@@ -65,7 +65,7 @@ import java.util.List;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  * @see EventHandler
  * @see EventSubscriber
  * @see Event

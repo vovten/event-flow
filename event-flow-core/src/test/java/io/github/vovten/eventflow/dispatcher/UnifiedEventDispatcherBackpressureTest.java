@@ -10,14 +10,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Tests for backpressure handling in UnifiedEventDispatcher
+ * @since 1.0.0
  */
 @DisplayName("UnifiedEventDispatcher Backpressure Tests")
 class UnifiedEventDispatcherBackpressureTest {
@@ -26,11 +28,13 @@ class UnifiedEventDispatcherBackpressureTest {
     private EventHandlerRegistry handlerRegistry;
     private UnifiedEventDispatcher dispatcher;
     private List<InTransport> transports;
+    private Map<Class<?>, List<EventHandler>> handlerMap;
 
     @BeforeEach
     void setUp() {
         executorService = Executors.newFixedThreadPool(2);
-        handlerRegistry = mock(EventHandlerRegistry.class);
+        handlerMap = new HashMap<>();
+        handlerRegistry = new MapBasedHandlerRegistry(handlerMap);
         transports = List.of();
     }
 
@@ -56,21 +60,22 @@ class UnifiedEventDispatcherBackpressureTest {
         List<String> executionLog = new ArrayList<>();
 
         // Create a slow handler that will block the executor
-        EventHandler slowHandler = mock(EventHandler.class);
-        doAnswer(invocation -> {
+        EventHandler slowHandler = event -> {
             executionLog.add("handler-started");
             handlerStarted.countDown();
-            canFinish.await(5, TimeUnit.SECONDS);
+            try {
+                canFinish.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             executionLog.add("handler-finished");
-            return null;
-        }).when(slowHandler).onEvent(any());
+        };
 
         // Create a test event
-        Event testEvent = mock(Event.class);
-        when(testEvent.type()).thenReturn((Class) TestEvent.class);
+        Event testEvent = new TestEvent();
 
         // Register the handler
-        when(handlerRegistry.getHandlers(testEvent)).thenReturn(List.of(slowHandler));
+        handlerMap.put(TestEvent.class, List.of(slowHandler));
 
         // Submit first event - will occupy the executor
         Thread dispatcherThread = new Thread(() -> dispatcher.dispatch(testEvent));
@@ -100,11 +105,10 @@ class UnifiedEventDispatcherBackpressureTest {
 
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, transports);
 
-        EventHandler handler1 = mock(EventHandler.class);
-        EventHandler handler2 = mock(EventHandler.class);
-        Event testEvent = mock(Event.class);
-        when(testEvent.type()).thenReturn((Class) TestEvent.class);
-        when(handlerRegistry.getHandlers(testEvent)).thenReturn(List.of(handler1, handler2));
+        EventHandler handler1 = event -> {};
+        EventHandler handler2 = event -> {};
+        Event testEvent = new TestEvent();
+        handlerMap.put(TestEvent.class, List.of(handler1, handler2));
 
         // Should not throw, but should log warning
         assertDoesNotThrow(() -> dispatcher.dispatch(testEvent));
@@ -115,15 +119,13 @@ class UnifiedEventDispatcherBackpressureTest {
     void shouldContinueDispatchingWhenOneHandlerFails() {
         dispatcher = new UnifiedEventDispatcher(executorService, handlerRegistry, transports);
 
-        EventHandler failingHandler = mock(EventHandler.class);
-        EventHandler successHandler = mock(EventHandler.class);
+        EventHandler failingHandler = event -> {
+            throw new RuntimeException("Handler failed");
+        };
+        EventHandler successHandler = event -> {};
 
-        doThrow(new RuntimeException("Handler failed")).when(failingHandler).onEvent(any());
-        doNothing().when(successHandler).onEvent(any());
-
-        Event testEvent = mock(Event.class);
-        when(testEvent.type()).thenReturn((Class) TestEvent.class);
-        when(handlerRegistry.getHandlers(testEvent)).thenReturn(List.of(failingHandler, successHandler));
+        Event testEvent = new TestEvent();
+        handlerMap.put(TestEvent.class, List.of(failingHandler, successHandler));
 
         // Should not throw - both handlers should be submitted
         assertDoesNotThrow(() -> dispatcher.dispatch(testEvent));
@@ -138,4 +140,5 @@ class UnifiedEventDispatcherBackpressureTest {
             return TestEvent.class;
         }
     }
+
 }

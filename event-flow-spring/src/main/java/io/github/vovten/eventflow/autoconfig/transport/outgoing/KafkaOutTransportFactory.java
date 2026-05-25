@@ -16,7 +16,7 @@ import io.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
  * - "msgpack": Compact binary format for better performance
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 public class KafkaOutTransportFactory implements OutTransportFactory {
 
@@ -37,7 +37,7 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
         EventSerializer serializer = createSerializer(config.getSerialization());
         return new KafkaOutTransport(
             config.getServers(),
-            config.getTopic(),
+            config.getTopics(),
             serializer
         );
     }
@@ -64,9 +64,9 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
                     "Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
-        if (config.getTopic() == null) {
+        if (config.getTopics() == null) {
             throw new IllegalStateException(
-                    "Kafka transport requires topic configuration"
+                    "Kafka transport requires topics configuration"
             );
         }
     }

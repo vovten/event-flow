@@ -82,7 +82,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * This ensures that misconfigurations are detected early.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  * @see EventChannel
  * @see RetryEventPublisher
  */

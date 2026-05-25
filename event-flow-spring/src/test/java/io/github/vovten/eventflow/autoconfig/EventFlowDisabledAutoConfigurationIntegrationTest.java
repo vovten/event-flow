@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration tests for {@link EventFlowDisabledAutoConfiguration}.
  * Verifies that the disabled configuration loads correctly.
+ * @since 1.0.0
  */
 @SpringBootTest(classes = EventFlowDisabledAutoConfigurationIntegrationTest.TestConfig.class)
 @TestPropertySource(properties = {

@@ -46,7 +46,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
  *     }
  *
  *     @Override
- *     public List<Class<? extends Event>> events() {
+ *     public List<Class<?>> events() {
  *         return List.of(OrderCreatedEvent.class);
  *     }
  *
@@ -80,7 +80,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  * @see EventSubscriberRegistry
  * @see SpringEventListenerRegistry
  * @see EventSubscriber

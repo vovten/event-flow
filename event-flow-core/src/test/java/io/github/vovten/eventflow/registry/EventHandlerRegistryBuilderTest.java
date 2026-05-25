@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for EventHandlerRegistryBuilder.
+ * @since 1.0.0
  */
 @DisplayName("EventHandlerRegistryBuilder Tests")
 class EventHandlerRegistryBuilderTest {
@@ -150,7 +151,7 @@ class EventHandlerRegistryBuilderTest {
 
     static class TestEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(Event.class);
         }
 

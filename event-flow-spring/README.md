@@ -17,7 +17,7 @@
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -453,4 +453,4 @@ public EventChannel customChannel() {
 ## See Also
 
 - [event-flow.yml](src/main/resources/event-flow.yml) - Complete configuration reference
-- [Event Flow Core](../event-flow-core/README.md) - Core library documentation
+- [Event Flow Core](../event-flow-core/README.md) - Core module documentation

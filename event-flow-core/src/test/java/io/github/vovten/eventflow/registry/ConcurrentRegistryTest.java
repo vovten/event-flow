@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.EventHandler;
+import io.github.vovten.eventflow.EventListener;
 import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.test.TestEvent;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for thread safety of registry implementations.
+ * @since 1.0.0
  */
 @DisplayName("Concurrent Registry Tests")
 class ConcurrentRegistryTest {
@@ -42,12 +44,12 @@ class ConcurrentRegistryTest {
                     for (int i = 0; i < iterations; i++) {
                         // Register a listener
                         Object listener = new Object() {
-                            @io.github.vovten.eventflow.EventListener
+                            @EventListener
                             public void handleTestEvent(TestEvent event) {
                                 // Handle event
                             }
 
-                            @io.github.vovten.eventflow.EventListener
+                            @EventListener
                             public void handleGenericEvent(Event event) {
                                 // Handle generic event
                             }
@@ -96,7 +98,7 @@ class ConcurrentRegistryTest {
                         // Register a subscriber
                         EventSubscriber subscriber = new EventSubscriber() {
                             @Override
-                            public List<Class<? extends Event>> events() {
+                            public List<Class<?>> events() {
                                 return List.of(TestEvent.class, Event.class);
                             }
 
@@ -187,7 +189,7 @@ class ConcurrentRegistryTest {
             final int id = i;
             registry.register(new EventSubscriber() {
                 @Override
-                public List<Class<? extends Event>> events() {
+                public List<Class<?>> events() {
                     return List.of(TestEvent.class);
                 }
 
@@ -212,7 +214,7 @@ class ConcurrentRegistryTest {
                     // Register new subscriber
                     registry.register(new EventSubscriber() {
                         @Override
-                        public List<Class<? extends Event>> events() {
+                        public List<Class<?>> events() {
                             return List.of(TestEvent.class);
                         }
 

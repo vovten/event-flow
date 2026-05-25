@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Unit tests for {@link BroadcastKafkaOutTransportFactory}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 @DisplayName("BroadcastKafkaPublisherTransportFactory Tests")
 class BroadcastKafkaOutTransportFactoryTest {
@@ -43,7 +43,7 @@ class BroadcastKafkaOutTransportFactoryTest {
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("broadcast-kafka-publisher");
         config.setServers("localhost:9092");
-        config.setTopic("test-topic");
+        config.setTopics("test-topic");
 
         // when
         OutTransport transport = factory.createPublisher(config);
@@ -60,7 +60,7 @@ class BroadcastKafkaOutTransportFactoryTest {
         BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-        config.setTopic("test-topic");
+        config.setTopics("test-topic");
 
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
@@ -69,8 +69,8 @@ class BroadcastKafkaOutTransportFactoryTest {
     }
 
     @Test
-    @DisplayName("BroadcastKafkaPublisherTransportFactory should throw exception when topic is missing")
-    void broadcastKafkaPublisherTransportFactoryShouldThrowExceptionWhenTopicIsMissing() {
+    @DisplayName("BroadcastKafkaPublisherTransportFactory should throw exception when topics is missing")
+    void broadcastKafkaPublisherTransportFactoryShouldThrowExceptionWhenTopicsIsMissing() {
         // given
         BroadcastKafkaOutTransportFactory factory = new BroadcastKafkaOutTransportFactory(serializerFactory);
 
@@ -80,7 +80,7 @@ class BroadcastKafkaOutTransportFactoryTest {
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Broadcast Kafka transport requires topic configuration");
+                .hasMessageContaining("Broadcast Kafka transport requires topics configuration");
     }
 
     @Test
@@ -92,7 +92,7 @@ class BroadcastKafkaOutTransportFactoryTest {
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("broadcast-kafka");
         config.setServers("localhost:9092");
-        config.setTopic("test-topic");
+        config.setTopics("test-topic");
 
         // when & then - should not throw any exception
         org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> factory.validate(config));

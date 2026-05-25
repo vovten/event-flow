@@ -24,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public interface OutTransport {
 

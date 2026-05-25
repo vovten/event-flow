@@ -1,0 +1,28 @@
+name: Mirror to GitVerse
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.GITVERSE_SSH_PRIVATE_KEY }}
+
+      - name: Add GitVerse to known_hosts
+        run: ssh-keyscan -H gitverse.ru >> ~/.ssh/known_hosts
+
+      - name: Push to GitVerse
+        run: |
+          git remote add gitverse git@gitverse.ru:vovten/event-flow.git
+          git push --force gitverse --all
+          git push --force gitverse --tags

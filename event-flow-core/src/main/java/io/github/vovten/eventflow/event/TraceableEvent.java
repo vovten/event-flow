@@ -9,21 +9,21 @@ import java.util.UUID;
  * and establishing event chronology.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 public interface TraceableEvent extends Event {
 
     /**
      * Returns the unique identifier of the event.
      *
-     * @return the unique trace identifier
+     * @return the unique event identifier
      */
-    UUID uid();
+    UUID eventId();
 
     /**
-     * @return correlation ID that groups related events together (e.g., business process ID)
+     * @return process ID that groups related events together (e.g., business process/saga ID)
      */
-    UUID traceId();
+    UUID processId();
 
     /**
      * Returns the timestamp when the event occurred.

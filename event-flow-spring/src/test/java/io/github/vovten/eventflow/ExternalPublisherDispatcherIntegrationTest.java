@@ -9,7 +9,6 @@ import io.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import io.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import io.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
-import io.github.vovten.eventflow.test.ExternalTestEvent;
 import io.github.vovten.eventflow.transport.incoming.KafkaInTransport;
 import io.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
 import io.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
@@ -73,6 +72,7 @@ class ExternalPublisherDispatcherIntegrationTest {
 
         publisher = new ChannelEventPublisher(List.of(internalChannel, externalChannel));
         dispatcherExecutor = Executors.newFixedThreadPool(2);
+
         KafkaInTransport kafkaInTransport = new KafkaInTransport(
                 createDispatcherConsumer(),
                 List.of("test-events"),
@@ -84,10 +84,10 @@ class ExternalPublisherDispatcherIntegrationTest {
                 createEventHandlerRegistry(),
                 List.of(kafkaInTransport)
         );
-        dispatcher.start(dispatcher::dispatch);
+        dispatcher.start(event -> dispatcher.dispatch(event));
 
-        // Wait for consumer to subscribe
-        Thread.sleep(3000);
+        // Wait for consumer to subscribe to Kafka topic
+        Thread.sleep(2000);
     }
 
     private CompositeEventHandlerRegistry createEventHandlerRegistry() {
@@ -122,7 +122,7 @@ class ExternalPublisherDispatcherIntegrationTest {
     void shouldPublishEventToKafkaTopic() throws InterruptedException {
         // arrange
         ExternalTestEvent testEvent = new ExternalTestEvent("test-id-123", "test-payload");
-        eventListener.setLatch(new CountDownLatch(1));
+        eventListener.setLatch(new CountDownLatch(2));
 
         // act
         publisher.publish(testEvent).join();

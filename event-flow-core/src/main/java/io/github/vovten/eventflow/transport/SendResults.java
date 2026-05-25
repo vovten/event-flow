@@ -26,7 +26,7 @@ import java.util.Optional;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-04-10
+ * @since 1.0.0
  */
 public final class SendResults {
 

@@ -13,6 +13,7 @@ import java.util.UUID;
 
 /**
  * Test event for both internal and external buses
+ * @since 1.0.0
  */
 public class CompositeTestEvent extends AbstractTraceableEvent {
 
@@ -20,7 +21,9 @@ public class CompositeTestEvent extends AbstractTraceableEvent {
     private String content;
 
     public CompositeTestEvent() {
-        this(UUID.randomUUID().toString(), "Composite test event content");
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.content = "Composite test event content";
     }
 
     public CompositeTestEvent(String id, String content) {
@@ -29,14 +32,14 @@ public class CompositeTestEvent extends AbstractTraceableEvent {
         this.content = content;
     }
 
-    public CompositeTestEvent(UUID uid, UUID traceId, String id, String content, Instant timestamp) {
-        super(uid, traceId, timestamp);
+    public CompositeTestEvent(UUID uid, UUID processId, String id, String content, Instant timestamp) {
+        super(uid, processId, timestamp);
         this.id = id;
         this.content = content;
     }
 
     public CompositeTestEvent(String id, String content, Instant timestamp) {
-        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
+        super(null, timestamp);
         this.id = id;
         this.content = content;
     }
@@ -100,7 +103,7 @@ public class CompositeTestEvent extends AbstractTraceableEvent {
         return "CompositeTestEvent{" +
                 "id='" + id + '\'' +
                 ", content='" + content + '\'' +
-                ", uid=" + uid() +
+                ", eventId=" + eventId() +
                 ", timestamp=" + this.occurredAt() +
                 '}';
     }

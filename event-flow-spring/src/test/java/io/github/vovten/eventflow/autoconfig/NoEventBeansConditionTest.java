@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.autoconfig;
 
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
+import io.github.vovten.eventflow.dispatcher.HandlerResults;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.transport.SendResults;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for {@link NoEventBeansCondition}.
+ * @since 1.0.0
  */
 class NoEventBeansConditionTest {
 
@@ -122,7 +124,8 @@ class NoEventBeansConditionTest {
     static class TestEventDispatcher implements EventDispatcher {
 
         @Override
-        public void dispatch(Event event) {
+        public CompletableFuture<HandlerResults> dispatch(Event event) {
+            return CompletableFuture.completedFuture(HandlerResults.empty());
         }
 
         @Override

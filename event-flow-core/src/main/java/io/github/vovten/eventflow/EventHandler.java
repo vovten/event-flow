@@ -9,7 +9,7 @@ import io.github.vovten.eventflow.event.Event;
  * for processing events.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  * @see EventSubscriber
  */
 public interface EventHandler {
@@ -20,4 +20,14 @@ public interface EventHandler {
      * @param event the event to process
      */
     void onEvent(Event event);
+
+    /**
+     * Returns the name of this handler for logging/tracing purposes.
+     * Default implementation returns the simple class name.
+     *
+     * @return the handler name
+     */
+    default String name() {
+        return getClass().getSimpleName();
+    }
 }

@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Integration tests for {@link SerializerConfiguration}.
  * Verifies that custom event serializers are properly registered and available
  * before transport factories create transports that depend on them.
+ * @since 1.0.0
  */
 @SpringBootTest(
         classes = {
@@ -34,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
     "event-flow.publisher.channels[0].name=test-channel",
     "event-flow.publisher.channels[0].transports[0].name=kafka",
     "event-flow.publisher.channels[0].transports[0].servers=localhost:9092",
-    "event-flow.publisher.channels[0].transports[0].topic=test-topic",
+    "event-flow.publisher.channels[0].transports[0].topics=test-topic",
     "event-flow.publisher.channels[0].transports[0].serialization=custom-protobuf"
 })
 class SerializerConfigurationTest {

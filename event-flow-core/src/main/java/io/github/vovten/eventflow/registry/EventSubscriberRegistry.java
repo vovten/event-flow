@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.registry;
 
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventSubscriber;
@@ -30,7 +31,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * public class OrderCreatedSubscriber implements EventSubscriber {
  *
  *     @Override
- *     public List<Class<? extends Event>> events() {
+ *     public List<Class<?>> events() {
  *         return List.of(OrderCreatedEvent.class);
  *     }
  *
@@ -52,7 +53,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * public class MultiEventSubscriber implements EventSubscriber {
  *
  *     @Override
- *     public List<Class<? extends Event>> events() {
+ *     public List<Class<?>> events() {
  *         return List.of(
  *             OrderCreatedEvent.class,
  *             OrderUpdatedEvent.class,
@@ -78,7 +79,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * </ul>
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  * @see EventSubscriber
  * @see Event
  * @see EventListenerRegistry
@@ -87,12 +88,12 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
 
     /**
      * Map of event types to subscribers.
-     * Key: Event class
+     * Key: Event class (can be any class, not just Event implementations)
      * Value: List of EventSubscriber instances
      * <p>
      * Thread-safe: uses ConcurrentHashMap + CopyOnWriteArrayList for read-heavy workload.
      */
-    private final Map<Class<? extends Event>, List<EventSubscriber>> eventSubscribers;
+    private final Map<Class<?>, List<EventSubscriber>> eventSubscribers;
 
     /**
      * Creates a new interface-based event subscriber registry.
@@ -117,20 +118,49 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
     @Override
     public List<EventHandler> getHandlers(Event event) {
         List<EventHandler> handlers = new ArrayList<>();
+        Class<?> eventType = resolveEventType(event);
+        Class<?> actualClass = event.getClass();
+        addAllSubscribers(handlers, eventType);
 
-        // Get subscribers for specific event type (thread-safe snapshot)
-        List<EventSubscriber> specific = eventSubscribers.get(event.getClass());
-        if (specific != null) {
-            handlers.addAll(new ArrayList<>(specific));
+        if (!actualClass.equals(eventType)) {
+            addAllSubscribers(handlers, actualClass);
         }
-
-        // Get subscribers for generic Event.class (thread-safe snapshot)
-        List<EventSubscriber> generic = eventSubscribers.get(Event.class);
-        if (generic != null) {
-            handlers.addAll(new ArrayList<>(generic));
-        }
-
+        addAllSubscribers(handlers, Event.class);
         return handlers;
+    }
+
+    /**
+     * Add all subscribers registered for the given type to the handler list,
+     * skipping any that are already present (to avoid duplicates).
+     *
+     * @param handlers the target handler list (modified in-place)
+     * @param type     the event type to look up subscribers for
+     */
+    private void addAllSubscribers(List<EventHandler> handlers, Class<?> type) {
+        List<EventSubscriber> subscribers = eventSubscribers.get(type);
+        if (subscribers == null) {
+            return;
+        }
+        for (EventSubscriber subscriber : subscribers) {
+            if (!handlers.contains(subscriber)) {
+                handlers.add(subscriber);
+            }
+        }
+    }
+
+    /**
+     * Resolve the effective event type for handler lookup.
+     * If the event is an Envelope, resolve to the payload type.
+     * Otherwise, use the event's class.
+     *
+     * @param event the event to resolve
+     * @return the resolved event type class
+     */
+    private static Class<?> resolveEventType(Event event) {
+        if (event instanceof Envelope<?> envelope) {
+            return envelope.payload().getClass();
+        }
+        return event.getClass();
     }
 
     /**
@@ -217,9 +247,10 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      */
     protected void registerSubscriber(EventSubscriber subscriber) {
         // Defensive copy to prevent external modification of subscriber.events()
-        List<Class<? extends Event>> eventTypes = List.copyOf(subscriber.events());
+        List<Class<?>> eventTypes = List.copyOf(subscriber.events());
 
-        for (Class<? extends Event> event : eventTypes) {
+        for (Class<?> event : eventTypes) {
+            @SuppressWarnings("unchecked")
             var subscribers = eventSubscribers.computeIfAbsent(event, k -> new CopyOnWriteArrayList<>());
             if (!subscribers.contains(subscriber)) {
                 subscribers.add(subscriber);

@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * This class is thread-safe and designed for use in multi-threaded environments.
  *
  * @author Vladimir Aleshkov
- * @since 2026-04-05
+ * @since 1.0.0
  */
 public final class EventTypeRegistry {
 

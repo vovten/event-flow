@@ -4,7 +4,7 @@ package io.github.vovten.eventflow.serialization;
  * Exception thrown when event serialization or deserialization fails.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 public class EventSerializationException extends RuntimeException {
 

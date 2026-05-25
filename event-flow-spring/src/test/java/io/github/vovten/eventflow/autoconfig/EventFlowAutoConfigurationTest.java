@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Integration tests for {@link EventFlowAutoConfiguration}.
  * Verifies that auto-configuration properly loads all beans into Spring context.
+ * @since 1.0.0
  */
 @SpringBootTest(classes = EventFlowAutoConfiguration.class)
 @TestPropertySource(properties = {

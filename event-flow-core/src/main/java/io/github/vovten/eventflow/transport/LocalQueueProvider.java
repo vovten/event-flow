@@ -9,6 +9,7 @@ import java.util.concurrent.BlockingDeque;
  * <p>
  * Allows getting a shared queue by transport name,
  * which provides communication between publisher and dispatcher.
+ * @since 1.0.0
  */
 public interface LocalQueueProvider {
 

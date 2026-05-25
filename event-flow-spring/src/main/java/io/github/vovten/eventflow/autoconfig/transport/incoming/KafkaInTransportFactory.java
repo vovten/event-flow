@@ -10,7 +10,7 @@ import io.github.vovten.eventflow.transport.incoming.KafkaInTransport;
  * Factory for creating Kafka-based dispatcher event transports.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 public class KafkaInTransportFactory implements InTransportFactory {
 
@@ -30,8 +30,9 @@ public class KafkaInTransportFactory implements InTransportFactory {
         validate(config);
         return new KafkaInTransport(
             config.getServers(),
-            config.getTopic(),
-            config.getConsumerGroup()
+            config.getTopics(),
+            config.getConsumerGroup(),
+            serializerFactory
         );
     }
 
@@ -42,12 +43,14 @@ public class KafkaInTransportFactory implements InTransportFactory {
      * @param serializerFactory serializer factory to use
      * @return Kafka transport
      */
-    public InTransport createDispatcher(EventFlowProperties.TransportConfig config, EventSerializerFactory serializerFactory) {
+    public InTransport createDispatcher(EventFlowProperties.TransportConfig config,
+                                        EventSerializerFactory serializerFactory) {
         validate(config);
         return new KafkaInTransport(
             config.getServers(),
-            config.getTopic(),
-            config.getConsumerGroup()
+            config.getTopics(),
+            config.getConsumerGroup(),
+            serializerFactory
         );
     }
 
@@ -58,9 +61,9 @@ public class KafkaInTransportFactory implements InTransportFactory {
                     "Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
-        if (config.getTopic() == null) {
+        if (config.getTopics() == null) {
             throw new IllegalStateException(
-                    "Kafka transport requires topic configuration"
+                    "Kafka transport requires topics configuration"
             );
         }
     }

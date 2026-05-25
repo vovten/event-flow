@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for EventTypeRegistry security validation
+ * @since 1.0.0
  */
 @DisplayName("EventTypeRegistry Security Tests")
 class EventTypeRegistryTest {

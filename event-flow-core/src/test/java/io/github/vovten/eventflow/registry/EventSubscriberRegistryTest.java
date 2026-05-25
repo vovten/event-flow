@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventSubscriber;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link EventSubscriberRegistry}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @DisplayName("EventSubscriberRegistry Tests")
 class EventSubscriberRegistryTest {
@@ -165,6 +166,53 @@ class EventSubscriberRegistryTest {
         assertEquals(2, handlers.size());
     }
 
+    @Test
+    @DisplayName("Should find subscriber for payload type when event is Envelope")
+    void shouldFindSubscriberForPayloadTypeWhenEventIsEnvelope() {
+        // Arrange: subscriber registered for TestEvent.class
+        TestEventSubscriber subscriber = new TestEventSubscriber();
+        registry.register(subscriber);
+
+        // Act: dispatch Envelope<TestEvent>
+        List<EventHandler> handlers = registry.getHandlers(Envelope.of(new TestEvent("test")));
+
+        // Assert: subscriber should be found by payload type (TestEvent)
+        assertEquals(1, handlers.size(),
+                "Subscriber for TestEvent.class should be found when event is Envelope<TestEvent>");
+        assertTrue(handlers.contains(subscriber),
+                "The TestEventSubscriber should be in the handler list");
+    }
+
+    @Test
+    @DisplayName("Generic Event subscriber should be found for Envelope event")
+    void shouldFindGenericEventSubscriberForEnvelopeEvent() {
+        // Arrange: generic subscriber for Event.class
+        GenericEventSubscriber subscriber = new GenericEventSubscriber();
+        registry.register(subscriber);
+
+        // Act: dispatch Envelope<TestEvent>
+        List<EventHandler> handlers = registry.getHandlers(Envelope.of(new TestEvent("test")));
+
+        // Assert: generic subscriber should always be found
+        assertEquals(1, handlers.size(),
+                "Generic subscriber for Event.class should be found for Envelope<TestEvent>");
+    }
+
+    @Test
+    @DisplayName("Should find subscriber registered for Envelope class directly")
+    void shouldFindSubscriberForEnvelopeClassDirectly() {
+        // Arrange: subscriber registered for Envelope.class
+        var subscriber = new EnvelopeEventSubscriber();
+        registry.register(subscriber);
+
+        // Act: dispatch Envelope<TestEvent>
+        List<EventHandler> handlers = registry.getHandlers(Envelope.of(new TestEvent("test")));
+
+        // Assert: this works even before the fix
+        assertEquals(1, handlers.size(),
+                "Subscriber for Envelope.class should be found for Envelope event");
+    }
+
     /**
      * Test event class.
      */
@@ -214,7 +262,7 @@ class EventSubscriberRegistryTest {
      */
     private static final class TestEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class);
         }
 
@@ -228,7 +276,7 @@ class EventSubscriberRegistryTest {
      */
     private static final class AnotherEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(AnotherEvent.class);
         }
 
@@ -242,7 +290,7 @@ class EventSubscriberRegistryTest {
      */
     private static final class MultiEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class, AnotherEvent.class);
         }
 
@@ -256,8 +304,22 @@ class EventSubscriberRegistryTest {
      */
     private static final class GenericEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(Event.class);
+        }
+
+        @Override
+        public void onEvent(Event event) {
+        }
+    }
+
+    /**
+     * Subscriber registered for Envelope class directly.
+     */
+    private static final class EnvelopeEventSubscriber implements EventSubscriber {
+        @Override
+        public List<Class<?>> events() {
+            return List.of(Envelope.class);
         }
 
         @Override

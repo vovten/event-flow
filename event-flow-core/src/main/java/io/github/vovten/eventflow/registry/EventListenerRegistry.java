@@ -1,6 +1,9 @@
 package io.github.vovten.eventflow.registry;
 
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventListener;
 
@@ -72,7 +75,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * {@link EventHandlerInvocationException} wraps the underlying exception.
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  * @see EventListener
  * @see Event
  * @see InvalidEventListenerMethodSignatureException
@@ -80,24 +83,26 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class EventListenerRegistry implements EventHandlerRegistry {
 
+    private static final Logger log = LoggerFactory.getLogger(EventListenerRegistry.class);
+
     /**
      * Map of event types to event handlers.
-     * Key: Event class
+     * Key: Event class (or any class for non-Event payloads)
      * Value: List of EventHandler instances
      * <p>
      * Thread-safe: uses ConcurrentHashMap + CopyOnWriteArrayList for read-heavy workload.
      * EventHandler wrappers are created once during registration and reused.
      */
-    private final Map<Class<? extends Event>, List<EventHandler>> eventListeners;
+    private final Map<Class<?>, List<EventHandler>> eventListeners;
 
     /**
      * Cache for combined handler lists to avoid reallocation on repeated getHandlers() calls.
-     * Key: Event class (specific event type)
+     * Key: Event class (or any class for non-Event payloads)
      * Value: Unmodifiable combined list (generic + specific handlers)
      * <p>
      * Cache is invalidated on register/unregister operations.
      */
-    private final Map<Class<? extends Event>, List<EventHandler>> combinedHandlersCache;
+    private final Map<Class<?>, List<EventHandler>> combinedHandlersCache;
 
     /**
      * Creates a new annotation-based event listener registry.
@@ -122,7 +127,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     @Override
     public List<EventHandler> getHandlers(Event event) {
-        Class<? extends Event> eventType = event.getClass();
+        Class<?> eventType = resolveEventType(event);
         List<EventHandler> genericHandlers = eventListeners.get(Event.class);
         List<EventHandler> specificHandlers = eventListeners.get(eventType);
 
@@ -136,6 +141,93 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         }
         return combinedHandlersCache.computeIfAbsent(eventType,
                 key -> buildCombinedList(genericHandlers, specificHandlers));
+    }
+
+    /**
+     * Resolve the event type to search for handlers.
+     * If the event is an Envelope, resolves to the payload type.
+     *
+     * @param event the event or envelope
+     * @return resolved event type
+     */
+    private Class<?> resolveEventType(Event event) {
+        if (event instanceof Envelope<?> envelope) {
+            return envelope.payload().getClass();
+        }
+        return event.getClass();
+    }
+
+    /**
+     * <p>
+     * Scans all public methods and registers those with the annotation.
+     *
+     * @param bean the listener object to scan
+     * @throws InvalidEventListenerMethodSignatureException if method signature is invalid
+     */
+    protected void registerIfAnnotationPresent(Object bean) {
+        Method[] methods = bean.getClass().getMethods();
+        for (Method method : methods) {
+            if (method.isAnnotationPresent(EventListener.class)) {
+                checkMethodSignature(method);
+                EventListener annotation = method.getAnnotation(EventListener.class);
+                Class<?> eventType = resolveListenerEventType(method, annotation);
+                warnIfAmbiguousChannels(eventType, method);
+                registerListener(bean, method, eventType);
+            }
+        }
+    }
+
+    /**
+     * Resolve the event type for listener registration.
+     * If method parameter is Envelope and annotation value is not specified,
+     * throws exception requiring explicit domain event type.
+     *
+     * @param method the annotated method
+     * @param annotation the annotation
+     * @return the event type to register
+     * @throws IllegalArgumentException if Envelope is used without annotation value
+     */
+    private Class<?> resolveListenerEventType(Method method, EventListener annotation) {
+        Class<?> annotationValue = annotation.value();
+        Class<?> paramType = method.getParameterTypes()[0];
+        if (Envelope.class.isAssignableFrom(paramType)) {
+            if (annotationValue == null || annotationValue.equals(Event.class)) {
+                throw new IllegalArgumentException(
+                        "Listener '" + method.getDeclaringClass().getSimpleName() + "." + method.getName() +
+                                "()': When method parameter is Envelope, annotation value must specify domain event type. " +
+                                "Use @EventListener(YourDomainEvent.class) instead of @EventListener");
+            }
+            return annotationValue;
+        }
+        if (annotationValue != null && !annotationValue.equals(Event.class)) {
+            return annotationValue;
+        }
+        return paramType;
+    }
+
+    /**
+     * Register a specific method as an event listener.
+     * <p>
+     * The method's first parameter determines the event type it will handle.
+     * Duplicate registrations (same bean and method) are ignored.
+     *
+     * @param bean the listener object
+     * @param method the method to register
+     * @param eventType the event type to register for
+     */
+    protected void registerListener(Object bean, Method method, Class<?> eventType) {
+        var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
+        var newHandler = new MethodInvokingEventHandler(bean, method);
+        boolean exists = handlers.stream()
+                .filter(h -> h instanceof MethodInvokingEventHandler mih)
+                .anyMatch(h -> {
+                    MethodInvokingEventHandler mih = (MethodInvokingEventHandler) h;
+                    return mih.object().equals(bean) && mih.method().equals(method);
+                });
+        if (!exists) {
+            handlers.add(newHandler);
+            combinedHandlersCache.clear();
+        }
     }
 
     private List<EventHandler> buildCombinedList(List<EventHandler> genericHandlers,
@@ -231,67 +323,59 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     }
 
     /**
-     * Register a listener if its methods have @EventListener annotation.
-     * <p>
-     * Scans all public methods and registers those with the annotation.
-     *
-     * @param bean the listener object to scan
-     * @throws InvalidEventListenerMethodSignatureException if method signature is invalid
-     */
-    protected void registerIfAnnotationPresent(Object bean) {
-        Method[] methods = bean.getClass().getMethods();
-        for (Method method : methods) {
-            if (method.isAnnotationPresent(EventListener.class)) {
-                checkMethodSignature(method);
-                registerListener(bean, method);
-            }
-        }
-    }
-
-    /**
-     * Register a specific method as an event listener.
-     * <p>
-     * The method's first parameter determines the event type it will handle.
-     * Duplicate registrations (same bean and method) are ignored.
-     *
-     * @param bean the listener object
-     * @param method the method to register
-     */
-    protected void registerListener(Object bean, Method method) {
-        var eventType = (Class<? extends Event>) method.getParameterTypes()[0];
-        var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
-        var newHandler = new MethodInvokingEventHandler(bean, method);
-        // Check for duplicate (same bean and method)
-        boolean exists = handlers.stream()
-                .filter(h -> h instanceof MethodInvokingEventHandler mih)
-                .anyMatch(h -> {
-                    MethodInvokingEventHandler mih = (MethodInvokingEventHandler) h;
-                    return mih.object().equals(bean) && mih.method().equals(method);
-                });
-        if (!exists) {
-            handlers.add(newHandler);
-            combinedHandlersCache.clear();
-        }
-    }
-
-    /**
      * Validate that a method has a valid listener signature.
      * <p>
      * Requirements:
      * <ul>
      *   <li>Exactly one parameter</li>
-     *   <li>Parameter type is Event or subclass</li>
+     *   <li>Parameter type must be one of:
+     *     <ul>
+     *       <li>{@link Event} or its subclass (includes {@link Envelope})</li>
+     *       <li>a POJO/record annotated with {@link io.github.vovten.eventflow.event.annotation.Event @Event}</li>
+     *     </ul>
+     *   </li>
      * </ul>
      *
      * @param method the method to validate
      * @throws InvalidEventListenerMethodSignatureException if signature is invalid
      */
     protected void checkMethodSignature(Method method) {
-        var types = method.getParameterTypes();
-        if (types.length != 1 || !Event.class.isAssignableFrom(types[0])) {
+        Class<?>[] types = method.getParameterTypes();
+        if (types.length != 1) {
             throw new InvalidEventListenerMethodSignatureException(
                     method.getDeclaringClass().getName(), method.getName());
         }
+        Class<?> paramType = types[0];
+        boolean isValid = Event.class.isAssignableFrom(paramType)
+                || paramType.isAnnotationPresent(io.github.vovten.eventflow.event.annotation.Event.class);
+        if (!isValid) {
+            throw new InvalidEventListenerMethodSignatureException(
+                    method.getDeclaringClass().getName(), method.getName());
+        }
+    }
+
+    /**
+     * Warn if the event class has both {@code @Event} annotation and implements {@link Event}.
+     * Using both can confuse which channels are actually applied — the annotation is used
+     * when wrapped in Envelope, the overridden method when dispatched directly.
+     *
+     * @param eventType      the resolved event type (payload class)
+     * @param listenerMethod the {@code @EventListener}-annotated method
+     */
+    private void warnIfAmbiguousChannels(Class<?> eventType, Method listenerMethod) {
+        if (!Event.class.isAssignableFrom(eventType)) {
+            return;
+        }
+        if (!eventType.isAnnotationPresent(io.github.vovten.eventflow.event.annotation.Event.class)) {
+            return;
+        }
+        log.warn("Class '{}' has both @Event annotation and implements Event interface. " +
+                        "To avoid confusion, use one approach: " +
+                        "either annotate with @Event (for POJO/record events) or implement Event interface. " +
+                        "Listener method: {}#{}",
+                eventType.getName(),
+                listenerMethod.getDeclaringClass().getSimpleName(),
+                listenerMethod.getName());
     }
 
     @Override
@@ -313,10 +397,26 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         @Override
         public void onEvent(Event event) {
             try {
-                method.invoke(object, event);
+                Object arg = adaptEventToMethodParameter(event, method.getParameterTypes()[0]);
+                method.invoke(object, arg);
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new EventHandlerInvocationException(object, event, e);
             }
+        }
+
+        @Override
+        public String name() {
+            return object.getClass().getSimpleName();
+        }
+
+        private Object adaptEventToMethodParameter(Event event, Class<?> expectedType) {
+            if (event instanceof Envelope<?> envelope) {
+                if (expectedType.isAssignableFrom(Envelope.class)) {
+                    return envelope;
+                }
+                return envelope.payload();
+            }
+            return event;
         }
     }
 }

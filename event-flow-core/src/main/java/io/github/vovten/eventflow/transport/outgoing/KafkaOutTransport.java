@@ -30,13 +30,13 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * Buffer memory (32MB) and max block time (5s) provide backpressure support.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public class KafkaOutTransport implements OutTransport, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaOutTransport.class);
 
-    private static final long DEFAULT_BUFFER_MEMORY = 33_554_432;
+    private static final long DEFAULT_BUFFER_MEMORY = 67_108_864;
     private static final long DEFAULT_MAX_BLOCK_MS = 5000;
 
     protected KafkaProducer<String, byte[]> producer;
@@ -71,9 +71,13 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
         props.putIfAbsent(ACKS_CONFIG, "all");
         props.putIfAbsent(ENABLE_IDEMPOTENCE_CONFIG, "true");
         props.putIfAbsent(RETRIES_CONFIG, "3");
-        props.putIfAbsent(DELIVERY_TIMEOUT_MS_CONFIG, "30000");
+        props.putIfAbsent(DELIVERY_TIMEOUT_MS_CONFIG, "35000");
         props.putIfAbsent(BUFFER_MEMORY_CONFIG, String.valueOf(DEFAULT_BUFFER_MEMORY));
         props.putIfAbsent(MAX_BLOCK_MS_CONFIG, String.valueOf(DEFAULT_MAX_BLOCK_MS));
+        props.putIfAbsent(BATCH_SIZE_CONFIG, "131072"); // 128KB
+        props.putIfAbsent(LINGER_MS_CONFIG, "10");
+        props.putIfAbsent(COMPRESSION_TYPE_CONFIG, "snappy");
+        props.putIfAbsent(MAX_REQUEST_SIZE_CONFIG, "5242880"); // 5MB
 
         this.producer = new KafkaProducer<>(props);
         this.topic = Objects.requireNonNull(topic, "Topic must not be null");
@@ -133,9 +137,9 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
         }
         CompletableFuture<SendResult> future = new CompletableFuture<>();
         try {
-            String key = event.type().getName();
+            String key = null;
             byte[] value = serializer.serialize(event);
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, null, value);
             producer.send(record, createSendCallback(future, topic));
         } catch (Exception e) {
             future.completeExceptionally(e);
@@ -152,7 +156,7 @@ public class KafkaOutTransport implements OutTransport, AutoCloseable {
      */
     protected Callback createSendCallback(CompletableFuture<SendResult> future, String topic) {
         return (metadata, exception) -> {
-            String destination = topic + (metadata != null ? "-p" + metadata.partition() : "");
+            String destination = name() + "-" + topic + (metadata != null ? "-p" + metadata.partition() : "");
             if (exception != null) {
                 future.complete(SendResult.failure(destination, exception, buildMetaData(metadata)));
             } else {

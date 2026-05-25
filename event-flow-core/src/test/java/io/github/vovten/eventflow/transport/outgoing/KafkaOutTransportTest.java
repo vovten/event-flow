@@ -32,7 +32,7 @@ import static org.mockito.Mockito.lenient;
  * Tests for {@link KafkaOutTransport}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("KafkaOutTransport Tests")
@@ -101,13 +101,12 @@ class KafkaOutTransportTest {
         SendResult result = future.join();
 
         assertThat(result.success()).isTrue();
-        assertThat(result.destination()).isEqualTo("test-topic-p0");
+        assertThat(result.destination()).isEqualTo("kafka-test-topic-p0");
         assertThat(result.metadata()).containsEntry("partition", 0);
         assertThat(result.metadata()).containsEntry("offset", 100L);
 
         ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
         assertThat(capturedRecord.topic()).isEqualTo("test-topic");
-        assertThat(capturedRecord.key()).isEqualTo(TestEvent.class.getName());
         assertThat(capturedRecord.value()).isInstanceOf(byte[].class);
         assertThat(capturedRecord.value()).isNotEmpty();
         assertThat(capturedRecord.value()[0]).isEqualTo((byte) 0x01); // JSON magic byte
@@ -132,12 +131,11 @@ class KafkaOutTransportTest {
         SendResult result = future.join();
 
         assertThat(result.success()).isTrue();
-        assertThat(result.destination()).isEqualTo("test-topic-p1");
+        assertThat(result.destination()).isEqualTo("kafka-test-topic-p1");
         assertThat(result.metadata()).containsEntry("partition", 1);
 
         ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
         assertThat(capturedRecord.topic()).isEqualTo("test-topic");
-        assertThat(capturedRecord.key()).isEqualTo(TestEvent.class.getName());
         assertThat(capturedRecord.value()).isInstanceOf(byte[].class);
         assertThat(capturedRecord.value()).isNotEmpty();
         assertThat(capturedRecord.value()[0]).isEqualTo((byte) 0x02); // MessagePack magic byte
@@ -162,7 +160,7 @@ class KafkaOutTransportTest {
         SendResult result = future.join();
 
         assertThat(result.success()).isFalse();
-        assertThat(result.destination()).isEqualTo("test-topic-p0");
+        assertThat(result.destination()).isEqualTo("kafka-test-topic-p0");
         assertThat(result.error()).isInstanceOf(NetworkException.class);
         assertThat(result.errorDetails()).isEqualTo("Network error");
     }

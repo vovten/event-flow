@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for {@link CommonConfiguration}.
+ * @since 1.0.0
  */
 class CommonConfigurationTest {
 

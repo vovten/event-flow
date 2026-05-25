@@ -21,7 +21,7 @@ import java.util.concurrent.CompletionException;
  * channel name.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-12
+ * @since 1.0.0
  */
 public abstract class AbstractEventChannel implements EventChannel {
 

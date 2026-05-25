@@ -42,7 +42,7 @@ import java.util.List;
  *
  * @param <T> the concrete builder type (CRTP pattern for fluent interface)
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  */
 public class EventHandlerRegistryBuilder<T extends EventHandlerRegistryBuilder<T>> {
 

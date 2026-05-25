@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Note: Full integration tests for registry configuration are covered in
  * {@link io.github.vovten.eventflow.registry.EventHandlerRegistryIntegrationTest}.
  * This test class focuses on configuration validation only.
+ * @since 1.0.0
  */
 class RegistryConfigurationTest {
 

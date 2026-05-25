@@ -4,13 +4,14 @@ import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
-import io.github.vovten.eventflow.transport.InTransport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -18,27 +19,25 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link EventDispatcherBuilder}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 @DisplayName("EventDispatcherBuilder Tests")
 class EventDispatcherBuilderTest {
 
     private ExecutorService executorService;
     private EventHandlerRegistry handlerRegistry;
-    private InTransport transport;
+    private Map<Class<?>, List<EventHandler>> handlerMap;
 
     @BeforeEach
     void setUp() {
         executorService = Executors.newSingleThreadExecutor();
-        handlerRegistry = mock(EventHandlerRegistry.class);
-        transport = mock(InTransport.class);
-        when(transport.name()).thenReturn("test-transport");
+        handlerMap = new HashMap<>();
+        handlerRegistry = new MapBasedHandlerRegistry(handlerMap);
     }
 
     @Test
@@ -47,7 +46,7 @@ class EventDispatcherBuilderTest {
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .build();
 
         assertNotNull(dispatcher);
@@ -60,7 +59,7 @@ class EventDispatcherBuilderTest {
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .buildAndLog();
 
         assertNotNull(dispatcher);
@@ -73,7 +72,7 @@ class EventDispatcherBuilderTest {
                 IllegalStateException.class,
                 () -> EventDispatcherBuilder.create()
                         .handlerRegistry(handlerRegistry)
-                        .transports(List.of(transport))
+                        .transports(List.of())
                         .build()
         );
         assertEquals("ExecutorService must be configured", exception.getMessage());
@@ -86,7 +85,7 @@ class EventDispatcherBuilderTest {
                 IllegalStateException.class,
                 () -> EventDispatcherBuilder.create()
                         .executor(executorService)
-                        .transports(List.of(transport))
+                        .transports(List.of())
                         .build()
         );
         assertEquals("EventHandlerRegistry must be configured", exception.getMessage());
@@ -110,7 +109,7 @@ class EventDispatcherBuilderTest {
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .idempotent()
                 .build();
 
@@ -128,7 +127,7 @@ class EventDispatcherBuilderTest {
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .idempotent(ttl, maxSize, warnOnDuplicate)
                 .build();
 
@@ -144,7 +143,7 @@ class EventDispatcherBuilderTest {
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .withDecorator(d -> {
                     decoratorApplied.set(true);
                     return d;
@@ -162,7 +161,7 @@ class EventDispatcherBuilderTest {
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .withDecorator(d -> {
                     decoratorCount.incrementAndGet();
                     return d;
@@ -185,7 +184,7 @@ class EventDispatcherBuilderTest {
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .withDecorator(d -> {
                     order[0] = decoratorOrder.incrementAndGet();
                     return d;
@@ -202,13 +201,10 @@ class EventDispatcherBuilderTest {
     @Test
     @DisplayName("Should add transports via addTransports(List)")
     void shouldAddTransportsViaList() {
-        InTransport transport2 = mock(InTransport.class);
-        when(transport2.name()).thenReturn("test-transport-2");
-
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .addTransports(List.of(transport, transport2))
+                .addTransports(List.of())
                 .build();
 
         assertNotNull(dispatcher);
@@ -217,13 +213,10 @@ class EventDispatcherBuilderTest {
     @Test
     @DisplayName("Should add transports via addTransports(varargs)")
     void shouldAddTransportsViaVarargs() {
-        InTransport transport2 = mock(InTransport.class);
-        when(transport2.name()).thenReturn("test-transport-2");
-
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .addTransports(transport, transport2)
+                .addTransports()
                 .build();
 
         assertNotNull(dispatcher);
@@ -234,12 +227,12 @@ class EventDispatcherBuilderTest {
     void shouldDispatchEventWithIdempotentProcessing() throws Exception {
         TestEvent event = new TestEvent("test-data");
         TestEventHandler handler = new TestEventHandler();
-        when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
+        handlerMap.put(TestEvent.class, List.of(handler));
 
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .idempotent(Duration.ofMinutes(1), 100, false)
                 .build();
 
@@ -263,19 +256,19 @@ class EventDispatcherBuilderTest {
         AtomicInteger handlerCallCount = new AtomicInteger(0);
 
         EventHandler handler = e -> handlerCallCount.incrementAndGet();
-        when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
+        handlerMap.put(TestEvent.class, List.of(handler));
 
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .idempotent(Duration.ofMinutes(1), 100, false)
                 .build();
 
         dispatcher.start(dispatcher::dispatch);
         try {
-            dispatcher.dispatch(event);
-            dispatcher.dispatch(event); // Duplicate
+            dispatcher.dispatch(event).get(); // Wait for first dispatch to complete
+            dispatcher.dispatch(event).get(); // Duplicate - should be filtered
             executorService.shutdown();
             executorService.awaitTermination(1, TimeUnit.SECONDS);
 
@@ -288,16 +281,16 @@ class EventDispatcherBuilderTest {
     @Test
     @DisplayName("Should allow non-TraceableEvent through idempotent dispatcher")
     void shouldAllowNonTraceableEventThroughIdempotent() throws Exception {
-        Event event = mock(Event.class);
+        NonTraceableTestEvent event = new NonTraceableTestEvent();
         AtomicInteger handlerCallCount = new AtomicInteger(0);
 
         EventHandler handler = e -> handlerCallCount.incrementAndGet();
-        when(handlerRegistry.getHandlers(event)).thenReturn(List.of(handler));
+        handlerMap.put(NonTraceableTestEvent.class, List.of(handler));
 
         EventDispatcher dispatcher = EventDispatcherBuilder.create()
                 .executor(executorService)
                 .handlerRegistry(handlerRegistry)
-                .transports(List.of(transport))
+                .transports(List.of())
                 .idempotent(Duration.ofMinutes(1), 100, false)
                 .build();
 
@@ -312,6 +305,73 @@ class EventDispatcherBuilderTest {
         } finally {
             dispatcher.stop();
         }
+    }
+
+    @Test
+    @DisplayName("Chain should build dispatcher with required parameters")
+    void chainShouldBuildDispatcherWithRequiredParameters() {
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
+                .executor(executorService)
+                .handlerRegistry(handlerRegistry)
+                .transports(List.of())
+                .chain()
+                .build();
+
+        assertNotNull(dispatcher);
+        assertInstanceOf(UnifiedEventDispatcher.class, dispatcher);
+    }
+
+    @Test
+    @DisplayName("Chain should apply decorators in added order")
+    void chainShouldApplyDecoratorsInAddedOrder() {
+        AtomicBoolean firstApplied = new AtomicBoolean(false);
+        AtomicBoolean secondApplied = new AtomicBoolean(false);
+
+        EventDispatcherBuilder.DecoratorFunction first = d -> {
+            firstApplied.set(true);
+            assertInstanceOf(UnifiedEventDispatcher.class, d);
+            return d;
+        };
+        EventDispatcherBuilder.DecoratorFunction second = d -> {
+            secondApplied.set(true);
+            assertTrue(firstApplied.get(), "First decorator should have been applied before second");
+            return d;
+        };
+
+        EventDispatcher dispatcher = EventDispatcherBuilder.create()
+                .executor(executorService)
+                .handlerRegistry(handlerRegistry)
+                .transports(List.of())
+                .chain()
+                .add(first)
+                .add(second)
+                .build();
+
+        assertNotNull(dispatcher);
+        assertTrue(firstApplied.get());
+        assertTrue(secondApplied.get());
+    }
+
+    @Test
+    @DisplayName("Chain should detect missing executor")
+    void chainShouldDetectMissingExecutor() {
+        assertThrows(IllegalStateException.class, () ->
+                EventDispatcherBuilder.create()
+                        .handlerRegistry(handlerRegistry)
+                        .transports(List.of())
+                        .chain()
+                        .build());
+    }
+
+    @Test
+    @DisplayName("Chain should detect missing handler registry")
+    void chainShouldDetectMissingHandlerRegistry() {
+        assertThrows(IllegalStateException.class, () ->
+                EventDispatcherBuilder.create()
+                        .executor(executorService)
+                        .transports(List.of())
+                        .chain()
+                        .build());
     }
 
     /**
@@ -347,6 +407,16 @@ class EventDispatcherBuilderTest {
         public void onEvent(Event event) {
             this.called = true;
             this.receivedEvent = (TestEvent) event;
+        }
+    }
+
+    /**
+     * Non-traceable event for idempotent filter tests.
+     */
+    private static final class NonTraceableTestEvent implements Event {
+        @Override
+        public Class<? extends Event> type() {
+            return NonTraceableTestEvent.class;
         }
     }
 }

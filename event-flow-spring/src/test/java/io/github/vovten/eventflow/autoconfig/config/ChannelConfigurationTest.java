@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link ChannelConfiguration}.
+ * @since 1.0.0
  */
 class ChannelConfigurationTest {
 
@@ -233,7 +234,7 @@ class ChannelConfigurationTest {
             channelConfig.setName("external");
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
-            transportConfig.setTopic("test-topic");
+            transportConfig.setTopics("test-topic");
             transportConfig.setServers("localhost:9092");
             channelConfig.getTransports().add(transportConfig);
             properties.getPublisher().getChannels().add(channelConfig);

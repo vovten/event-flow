@@ -15,7 +15,7 @@ import io.github.vovten.eventflow.serialization.EventSerializationException;
  * Utilities for working with events
  *
  * @author Vladimir Aleshkov
- * @since 2024-11-21
+ * @since 1.0.0
  */
 public final class EventUtils {
 
@@ -45,6 +45,21 @@ public final class EventUtils {
     public static String toJson(Event event) {
         try {
             return objectMapper.writeValueAsString(event);
+        } catch (JsonProcessingException e) {
+            throw new EventSerializationException("Error converting object to json", e);
+        }
+    }
+
+    /**
+     * Convert object to json string
+     *
+     * @param object the object
+     * @return json string
+     * @throws EventSerializationException if error occurs during object to json conversion
+     */
+    public static String toJson(Object object) {
+        try {
+            return objectMapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
             throw new EventSerializationException("Error converting object to json", e);
         }

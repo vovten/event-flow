@@ -14,7 +14,7 @@ import io.github.vovten.eventflow.transport.outgoing.BroadcastKafkaOutTransport;
  * that send events to all partitions of a Kafka topic.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  * @see BroadcastKafkaOutTransport
  */
 public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
@@ -36,7 +36,7 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
         EventSerializer serializer = createSerializer(config.getSerialization());
         return new BroadcastKafkaOutTransport(
             config.getServers(),
-            config.getTopic(),
+            config.getTopics(),
             serializer
         );
     }
@@ -53,9 +53,9 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
                     "Broadcast Kafka transport requires 'servers' configuration (e.g., 'localhost:9092' or 'kafka1:9092,kafka2:9092')"
             );
         }
-        if (config.getTopic() == null) {
+        if (config.getTopics() == null) {
             throw new IllegalStateException(
-                    "Broadcast Kafka transport requires topic configuration"
+                    "Broadcast Kafka transport requires topics configuration"
             );
         }
     }

@@ -28,7 +28,7 @@ import static java.util.stream.Collectors.toMap;
  * Creates dispatcher transports using configured factories.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
@@ -72,6 +72,10 @@ public class DispatcherConfiguration {
         if (properties.getDispatcher().getIdempotent().isEnabled()) {
             EventFlowProperties.IdempotentConfig config = properties.getDispatcher().getIdempotent();
             builder.idempotent(config.getTtl(), config.getMaxSize(), config.isWarnOnDuplicate());
+        }
+        var loggingConfig = properties.getDispatcher().getLogging();
+        if (loggingConfig.isEnabled()) {
+            builder.loggable(loggingConfig.getMaxPayloadLength());
         }
         EventDispatcher dispatcher = builder.buildAndLog();
         dispatcher.start(dispatcher::dispatch);

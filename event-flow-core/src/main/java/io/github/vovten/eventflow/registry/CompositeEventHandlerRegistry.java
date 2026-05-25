@@ -65,7 +65,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  * @see EventHandlerRegistry
  * @see EventListenerRegistry
  * @see EventSubscriberRegistry

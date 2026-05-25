@@ -2,6 +2,8 @@ package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventListener;
+import io.github.vovten.eventflow.event.Envelope;
+import io.github.vovten.eventflow.event.Event;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -72,7 +74,7 @@ import java.util.regex.Pattern;
  * ensuring annotated methods are discovered even on proxied beans.
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-07
+ * @since 1.0.0
  * @see EventListenerRegistry
  * @see SpringEventSubscriberRegistry
  * @see EventHandler
@@ -130,6 +132,7 @@ public class SpringEventListenerRegistry extends EventListenerRegistry
      * Register a Spring bean if its methods have @EventListener annotation.
      * <p>
      * Uses {@link ClassUtils#getUserClass(Class)} to handle Spring proxies correctly.
+     * Supports annotation value for specifying domain event type.
      *
      * @param bean the Spring bean to scan
      */
@@ -139,9 +142,39 @@ public class SpringEventListenerRegistry extends EventListenerRegistry
         for (Method method : methods) {
             if (method.isAnnotationPresent(EventListener.class)) {
                 checkMethodSignature(method);
-                registerListener(bean, method);
+                EventListener annotation = method.getAnnotation(EventListener.class);
+                Class<?> eventType = resolveListenerEventType(method, annotation);
+                registerListener(bean, method, eventType);
             }
         }
+    }
+
+    /**
+     * Resolve the event type for listener registration.
+     * If method parameter is Envelope and annotation value is not specified,
+     * throws exception requiring explicit domain event type.
+     *
+     * @param method the annotated method
+     * @param annotation the annotation
+     * @return the event type to register
+     * @throws IllegalArgumentException if Envelope is used without annotation value
+     */
+    private Class<?> resolveListenerEventType(Method method, EventListener annotation) {
+        Class<?> annotationValue = annotation.value();
+        Class<?> paramType = method.getParameterTypes()[0];
+        if (Envelope.class.isAssignableFrom(paramType)) {
+            if (annotationValue == null || annotationValue.equals(Event.class)) {
+                throw new IllegalArgumentException(
+                        "Listener '" + method.getDeclaringClass().getSimpleName() + "." + method.getName() +
+                                "()': When method parameter is Envelope, annotation value must specify domain event type. " +
+                                "Use @EventListener(YourDomainEvent.class) instead of @EventListener");
+            }
+            return annotationValue;
+        }
+        if (annotationValue != null && !annotationValue.equals(Event.class)) {
+            return annotationValue;
+        }
+        return paramType;
     }
 
     /**

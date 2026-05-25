@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * The name and code are taken automatically from the serializer itself.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-30
+ * @since 1.0.0
  */
 public class EventSerializerFactory {
 

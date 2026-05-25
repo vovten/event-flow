@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.dispatcher;
 
 import io.github.vovten.eventflow.event.Event;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -9,16 +10,17 @@ import java.util.function.Consumer;
  * <p>Receives an event from the bus and delivers it to listeners.
  *
  * @author Vladimir Aleshkov
- * @since 2024-11-20
+ * @since 1.0.0
  */
 public interface EventDispatcher {
 
     /**
-     * Redirect the event to appropriate listeners
+     * Redirect the event to appropriate listeners asynchronously.
      *
      * @param event the event
+     * @return CompletableFuture that completes with HandlerResults
      */
-    void dispatch(Event event);
+    CompletableFuture<HandlerResults> dispatch(Event event);
 
     /**
      * Register a listener

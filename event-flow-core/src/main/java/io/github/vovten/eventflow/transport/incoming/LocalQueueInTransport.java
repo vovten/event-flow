@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.transport.InTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
@@ -33,7 +34,7 @@ import java.util.function.Consumer;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-06
+ * @since 1.0.0
  */
 public class LocalQueueInTransport implements InTransport {
 
@@ -117,10 +118,13 @@ public class LocalQueueInTransport implements InTransport {
 
     private void tryDeliver(Event event, Consumer<Event> eventConsumer) {
         try {
+            MDC.put("deliveredFrom", name());
             eventConsumer.accept(event);
             log.debug("Event delivered from local-queue: {}", event.type().getSimpleName());
         } catch (Exception e) {
             log.error("Error delivering event from local-queue: {}", event, e);
+        } finally {
+            MDC.remove("deliveredFrom");
         }
     }
 }

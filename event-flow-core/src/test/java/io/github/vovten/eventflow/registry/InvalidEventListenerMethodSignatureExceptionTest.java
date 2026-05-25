@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link InvalidEventListenerMethodSignatureException}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @DisplayName("InvalidEventListenerMethodSignatureException Tests")
 class InvalidEventListenerMethodSignatureExceptionTest {

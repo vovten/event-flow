@@ -13,7 +13,7 @@ import java.util.concurrent.CompletableFuture;
  * Provides backpressure by returning a failed SendResult when the queue is full.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public class LocalQueueOutTransport implements OutTransport {
 
@@ -37,10 +37,10 @@ public class LocalQueueOutTransport implements OutTransport {
     public CompletableFuture<SendResult> send(Event event) {
         if (!eventQueue.offer(event)) {
             return CompletableFuture.completedFuture(
-                    SendResult.failure("local-queue", null, "Queue is full, event rejected")
+                    SendResult.failure(name(), null, "Queue is full, event rejected")
             );
         }
         Map<String, Object> metadata = Map.of("queueSize", eventQueue.size());
-        return CompletableFuture.completedFuture(SendResult.success("local-queue", metadata));
+        return CompletableFuture.completedFuture(SendResult.success(name(), metadata));
     }
 }

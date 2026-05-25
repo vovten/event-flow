@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for MsgPackEventSerializer.
+ * @since 1.0.0
  */
 @DisplayName("MsgPackEventSerializer Tests")
 class MsgPackEventSerializerTest {
@@ -24,22 +25,18 @@ class MsgPackEventSerializerTest {
     @DisplayName("Should serialize event to byte array with magic byte")
     void shouldSerializeEventToByteArray() {
         SimpleEvent event = new SimpleEvent("test-id", 42);
-
         byte[] result = serializer.serialize(event);
-
         assertNotNull(result);
         assertTrue(result.length > 1);
-        assertEquals(0x02, result[0]); // Magic byte for MessagePack
+        assertEquals(0x02, result[0]);
     }
 
     @Test
     @DisplayName("Should serialize and deserialize event")
     void shouldSerializeAndDeserializeEvent() {
         SimpleEvent original = new SimpleEvent("test-id", 42);
-
         byte[] data = serializer.serialize(original);
         SimpleEvent deserialized = serializer.deserialize(data, SimpleEvent.class);
-
         assertEquals("test-id", deserialized.id);
         assertEquals(42, deserialized.value);
     }
@@ -60,11 +57,8 @@ class MsgPackEventSerializerTest {
     @DisplayName("Should produce smaller output than JSON for simple event")
     void shouldProduceSmallerOutput() {
         SimpleEvent event = new SimpleEvent("test-id", 42);
-
         byte[] msgpackBytes = serializer.serialize(event);
         byte[] jsonBytes = new JsonEventSerializer().serialize(event);
-
-        // MessagePack should be more compact
         assertTrue(msgpackBytes.length < jsonBytes.length,
                 "MessagePack (" + msgpackBytes.length + " bytes) should be smaller than JSON (" + jsonBytes.length + " bytes)");
     }
@@ -80,17 +74,16 @@ class MsgPackEventSerializerTest {
     @DisplayName("Should serialize and deserialize AbstractTraceableEvent with all fields")
     void shouldSerializeAndDeserializeAbstractTraceableEvent() {
         UUID fixedUid = UUID.randomUUID();
-        UUID fixedTraceId = UUID.randomUUID();
-        // Use millisecond precision Instant (MessagePack compatible)
+        UUID fixedProcessId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
         Instant fixedInstant = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
 
-        TraceableTestEvent original = new TraceableTestEvent(fixedUid, fixedTraceId, fixedInstant, "data");
+        TraceableTestEvent original = new TraceableTestEvent(fixedUid, fixedProcessId, fixedInstant, "data");
 
         byte[] data = serializer.serialize(original);
         TraceableTestEvent deserialized = serializer.deserialize(data, TraceableTestEvent.class);
 
-        assertEquals(fixedUid, deserialized.uid());
-        assertEquals(fixedTraceId, deserialized.traceId());
+        assertEquals(fixedUid, deserialized.eventId());
+        assertEquals(fixedProcessId, deserialized.processId());
         assertEquals(fixedInstant, deserialized.occurredAt());
         assertEquals("data", deserialized.data);
     }
@@ -103,8 +96,8 @@ class MsgPackEventSerializerTest {
         byte[] data = serializer.serialize(original);
         TraceableTestEvent deserialized = serializer.deserialize(data, TraceableTestEvent.class);
 
-        assertNotNull(deserialized.uid());
-        assertNotNull(deserialized.traceId());
+        assertNotNull(deserialized.eventId());
+        assertNull(deserialized.processId());
         assertNotNull(deserialized.occurredAt());
         assertEquals("auto-generated", deserialized.data);
     }
@@ -113,19 +106,18 @@ class MsgPackEventSerializerTest {
     @DisplayName("Should preserve event type after serialization")
     void shouldPreserveEventTypeAfterSerialization() {
         TraceableTestEvent original = new TraceableTestEvent("type-test");
-
         byte[] data = serializer.serialize(original);
         TraceableTestEvent deserialized = serializer.deserialize(data, TraceableTestEvent.class);
-
         assertEquals(original.type(), deserialized.type());
     }
 
     @Test
     @DisplayName("Should handle complex event with nested objects")
     void shouldHandleComplexEventWithNestedObjects() {
+        UUID processId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
         ComplexTraceableEvent original = new ComplexTraceableEvent(
                 UUID.randomUUID(),
-                UUID.randomUUID(),
+                processId,
                 Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS),
                 "complex-data",
                 42,
@@ -135,8 +127,8 @@ class MsgPackEventSerializerTest {
         byte[] data = serializer.serialize(original);
         ComplexTraceableEvent deserialized = serializer.deserialize(data, ComplexTraceableEvent.class);
 
-        assertEquals(original.uid(), deserialized.uid());
-        assertEquals(original.traceId(), deserialized.traceId());
+        assertEquals(original.eventId(), deserialized.eventId());
+        assertEquals(original.processId(), deserialized.processId());
         assertNotNull(deserialized.occurredAt());
         assertEquals("complex-data", deserialized.data);
         assertEquals(42, deserialized.value);
@@ -145,6 +137,7 @@ class MsgPackEventSerializerTest {
     }
 
     static class SimpleEvent extends AbstractTraceableEvent {
+
         public String id;
         public int value;
 
@@ -165,6 +158,7 @@ class MsgPackEventSerializerTest {
     }
 
     static class TraceableTestEvent extends AbstractTraceableEvent {
+
         public String data;
 
         TraceableTestEvent() {
@@ -176,8 +170,8 @@ class MsgPackEventSerializerTest {
             this.data = data;
         }
 
-        TraceableTestEvent(UUID uid, UUID traceId, Instant occurredAt, String data) {
-            super(uid, traceId, occurredAt);
+        TraceableTestEvent(UUID uid, UUID processId, Instant occurredAt, String data) {
+            super(uid, processId, occurredAt);
             this.data = data;
         }
 
@@ -188,6 +182,7 @@ class MsgPackEventSerializerTest {
     }
 
     static class ComplexTraceableEvent extends AbstractTraceableEvent {
+
         public String data;
         public int value;
         public NestedObject nested;
@@ -196,8 +191,8 @@ class MsgPackEventSerializerTest {
             super();
         }
 
-        ComplexTraceableEvent(UUID uid, UUID traceId, Instant occurredAt, String data, int value, NestedObject nested) {
-            super(uid, traceId, occurredAt);
+        ComplexTraceableEvent(UUID uid, UUID processId, Instant occurredAt, String data, int value, NestedObject nested) {
+            super(uid, processId, occurredAt);
             this.data = data;
             this.value = value;
             this.nested = nested;
@@ -210,6 +205,7 @@ class MsgPackEventSerializerTest {
     }
 
     static class NestedObject {
+
         public String name;
         public int count;
 

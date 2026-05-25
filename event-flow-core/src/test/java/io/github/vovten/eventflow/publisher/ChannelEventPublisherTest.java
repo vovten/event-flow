@@ -7,19 +7,22 @@ import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.transport.OutTransport;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
+import io.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for ChannelEventPublisher.
+ * @since 1.0.0
  */
 @DisplayName("ChannelEventPublisher Tests")
 class ChannelEventPublisherTest {
@@ -39,10 +42,9 @@ class ChannelEventPublisherTest {
     @Test
     @DisplayName("Should create publisher with valid channels")
     void shouldCreatePublisherWithValidChannels() {
-        EventChannel channel = mock(EventChannel.class);
-        when(channel.name()).thenReturn("test");
-        when(channel.transports()).thenReturn(List.of());
-        when(channel.send(any())).thenReturn(CompletableFuture.completedFuture(SendResults.empty()));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
+        EventChannel channel = new InternalEventChannel(transport);
 
         assertDoesNotThrow(() -> new ChannelEventPublisher(List.of(channel)));
     }
@@ -50,8 +52,8 @@ class ChannelEventPublisherTest {
     @Test
     @DisplayName("Should send event to configured channel")
     void shouldSendEventToConfiguredChannel() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.completedFuture(SendResult.success("dest")));
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel channel = new InternalEventChannel(transport);
 
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
@@ -61,13 +63,15 @@ class ChannelEventPublisherTest {
         SendResults results = future.join();
 
         assertThat(results.isAllSuccess()).isTrue();
-        verify(transport).send(event);
+        Event sentEvent = queue.poll();
+        assertThat(sentEvent).isEqualTo(event);
     }
 
     @Test
     @DisplayName("Should throw exception when channel not configured")
     void shouldThrowExceptionWhenChannelNotConfigured() {
-        OutTransport transport = mock(OutTransport.class);
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        OutTransport transport = new LocalQueueOutTransport(queue);
         EventChannel internalChannel = new InternalEventChannel(transport);
 
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(internalChannel));
@@ -82,8 +86,7 @@ class ChannelEventPublisherTest {
     @Test
     @DisplayName("Should complete exceptionally when send fails")
     void shouldCompleteExceptionallyWhenSendFails() {
-        OutTransport transport = mock(OutTransport.class);
-        when(transport.send(any())).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Send failed")));
+        OutTransport transport = new FailingOutTransport();
         EventChannel channel = new InternalEventChannel(transport);
 
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
@@ -133,6 +136,18 @@ class ChannelEventPublisherTest {
         @Override
         public CompletableFuture<SendResults> send(Event event) {
             return CompletableFuture.completedFuture(SendResults.empty());
+        }
+    }
+
+    static class FailingOutTransport implements OutTransport {
+        @Override
+        public String name() {
+            return "failing";
+        }
+
+        @Override
+        public CompletableFuture<SendResult> send(Event event) {
+            return CompletableFuture.failedFuture(new RuntimeException("Send failed"));
         }
     }
 }

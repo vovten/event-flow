@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for SpringEventSubscriberRegistry.
+ * @since 1.0.0
  */
 @DisplayName("SpringEventSubscriberRegistry Tests")
 class SpringEventSubscriberRegistryTest {
@@ -169,7 +170,7 @@ class SpringEventSubscriberRegistryTest {
 
     static class TestEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class);
         }
 
@@ -187,7 +188,7 @@ class SpringEventSubscriberRegistryTest {
 
     static class SpecificEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(SpecificEvent.class);
         }
 
@@ -205,7 +206,7 @@ class SpringEventSubscriberRegistryTest {
 
     static class GenericEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(Event.class);
         }
 
@@ -216,7 +217,7 @@ class SpringEventSubscriberRegistryTest {
 
     static class MultiEventSubscriber implements EventSubscriber {
         @Override
-        public List<Class<? extends Event>> events() {
+        public List<Class<?>> events() {
             return List.of(TestEvent.class, SpecificEvent.class);
         }
 

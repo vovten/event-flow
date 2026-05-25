@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -25,7 +26,7 @@ import java.util.function.Consumer;
  * This ensures events flow through the decorator before reaching the origin dispatcher.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 public final class IdempotentEventDispatcher implements EventDispatcher {
 
@@ -35,7 +36,7 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     private final Cache<UUID, Boolean> cache;
     private final boolean warnOnDuplicate;
 
-    IdempotentEventDispatcher(EventDispatcher origin,
+    public IdempotentEventDispatcher(EventDispatcher origin,
                               Duration ttl,
                               long maxSize,
                               boolean warnOnDuplicate) {
@@ -49,7 +50,7 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
 
     @Override
     public void start(Consumer<Event> dispatchConsumer) {
-        origin.start(this::dispatch);
+        origin.start(dispatchConsumer);
     }
 
     @Override
@@ -59,23 +60,33 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void dispatch(Event event) {
+    public CompletableFuture<HandlerResults> dispatch(Event event) {
         if (!(event instanceof TraceableEvent traceable)) {
-            origin.dispatch(event);
-            return;
+            return origin.dispatch(event);
         }
-        UUID uid = traceable.uid();
-        Boolean existing = cache.getIfPresent(uid);
-
-        if (existing == null) {
-            origin.dispatch(event);
-            cache.put(uid, Boolean.TRUE);
-            log.debug("Event processed: {}", uid);
-        } else {
+        UUID eventId = traceable.eventId();
+        if (eventId == null) {
+            return origin.dispatch(event);
+        }
+        Boolean previous = cache.asMap().putIfAbsent(eventId, Boolean.TRUE);
+        if (previous != null) {
             if (warnOnDuplicate) {
-                log.warn("Duplicate event ignored: {}", uid);
+                log.warn("Duplicate event ignored: {}", eventId);
             }
+            return CompletableFuture.completedFuture(HandlerResults.duplicate());
         }
+        return origin.dispatch(event)
+                .whenComplete((results, throwable) -> {
+                    if (throwable != null) {
+                        cache.invalidate(eventId);
+                        log.debug("Event dispatch failed, removed from cache: {}", eventId);
+                    } else if (results != null && results.isAllFailure()) {
+                        cache.invalidate(eventId);
+                        log.debug("All handlers failed, removed from cache: {}", eventId);
+                    } else {
+                        log.debug("Event processed: {}", eventId);
+                    }
+                });
     }
 
     @Override

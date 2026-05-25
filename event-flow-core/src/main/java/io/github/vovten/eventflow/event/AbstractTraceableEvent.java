@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.event;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -10,68 +11,98 @@ import java.util.UUID;
 
 /**
  * Abstract base class for traceable events providing automatic generation of unique identifiers,
- * correlation IDs, and timestamps.
+ * process IDs, and timestamps.
  * <p>
  * This class implements the {@link TraceableEvent} interface and provides ready-to-use
  * fields for event tracing, correlation, and timing. It's designed to be extended by
  * concrete event classes, reducing boilerplate code and ensuring consistent event structure.
+ * <p>
+ * <b>Deprecated:</b> Use {@link Envelope} instead. Prefer composition over inheritance —
+ * wrap your POJO/record payloads with {@link Envelope} to get automatic eventId, processId,
+ * and timestamp generation without extending a base class.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
+ * @deprecated Use {@link Envelope} instead of extending this class.
+ *     Will be removed in a future version.
  */
+@Deprecated(since = "1.1.0")
 public abstract class AbstractTraceableEvent implements TraceableEvent {
 
-    private final UUID uid;
-    private final UUID traceId;
+    private final UUID eventId;
+    private final UUID processId;
     private final Instant occurredAt;
 
     /**
-     * Creates a new traceable event with auto-generated UID, traceId and occurredAt.
+     * Creates a new traceable event with auto-generated eventId, null processId and occurredAt.
      */
     protected AbstractTraceableEvent() {
-        this.uid = UUID.randomUUID();
-        this.traceId = UUID.randomUUID();
+        this.eventId = UUID.randomUUID();
+        this.processId = null;
         this.occurredAt = Instant.now();
     }
 
     /**
-     * Creates a new traceable event with auto-generated UID, and occurredAt.
+     * Creates a new traceable event with auto-generated eventId, specified processId, and occurredAt.
      *
-     * @param traceId the correlation ID
+     * @param processId the process identifier
      */
-    protected AbstractTraceableEvent(UUID traceId) {
-        this.uid = UUID.randomUUID();
-        this.traceId = traceId;
+    protected AbstractTraceableEvent(UUID processId) {
+        this.eventId = UUID.randomUUID();
+        this.processId = processId;
         this.occurredAt = Instant.now();
     }
 
     /**
-     * Creates a traceable event with specified UID, traceId and occurredAt.
+     * Creates a new traceable event with specified processId and occurredAt.
      *
-     * @param uid the unique identifier
-     * @param traceId the correlation ID
+     * @param processId  the process identifier
+     * @param occurredAt the event timestamp
+     */
+    protected AbstractTraceableEvent(UUID processId, Instant occurredAt) {
+        this.eventId = UUID.randomUUID();
+        this.processId = processId;
+        this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
+    }
+
+    /**
+     * Creates a new traceable event with specified occurredAt and no processId.
+     *
+     * @param occurredAt the event timestamp
+     */
+    protected AbstractTraceableEvent(Instant occurredAt) {
+        this.eventId = UUID.randomUUID();
+        this.processId = null;
+        this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
+    }
+
+    /**
+     * Creates a traceable event with specified eventId, processId and occurredAt.
+     *
+     * @param eventId    the unique identifier
+     * @param processId  the process identifier
      * @param occurredAt the event timestamp
      */
     @JsonCreator
     protected AbstractTraceableEvent(
-            @JsonProperty("uid") UUID uid,
-            @JsonProperty("traceId") UUID traceId,
+            @JsonProperty("eventId") @JsonAlias("uid") UUID eventId,
+            @JsonProperty("processId") @JsonAlias("traceId") UUID processId,
             @JsonProperty("occurredAt") Instant occurredAt) {
-        this.uid = Objects.requireNonNull(uid, "UID must not be null");
-        this.traceId = Objects.requireNonNull(traceId, "TraceId must not be null");
-        this.occurredAt = Objects.requireNonNull(occurredAt, "OccurredAt must not be null");
+        this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
+        this.processId = processId;
+        this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
     }
 
-    @JsonGetter("uid")
+    @JsonGetter("eventId")
     @Override
-    public UUID uid() {
-        return uid;
+    public UUID eventId() {
+        return eventId;
     }
 
-    @JsonGetter("traceId")
+    @JsonGetter("processId")
     @Override
-    public UUID traceId() {
-        return traceId;
+    public UUID processId() {
+        return processId;
     }
 
     @JsonGetter("occurredAt")
@@ -85,20 +116,20 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         AbstractTraceableEvent that = (AbstractTraceableEvent) o;
-        return uid.equals(that.uid);
+        return eventId.equals(that.eventId);
     }
 
     @Override
     public int hashCode() {
-        return uid.hashCode();
+        return eventId.hashCode();
     }
 
     @Override
     public String toString() {
-        return String.format("%s{uid=%s, traceId=%s, occurredAt=%s, type=%s}",
+        return String.format("%s{eventId=%s, processId=%s, occurredAt=%s, type=%s}",
                 getClass().getSimpleName(),
-                uid,
-                traceId,
+                eventId,
+                processId,
                 occurredAt,
                 type().getSimpleName()
         );

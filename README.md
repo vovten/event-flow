@@ -3,7 +3,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Java](https://img.shields.io/badge/Java-21-blue)](https://openjdk.java.net/)
 
-**Event Flow** is a lightweight Java library for building event-driven architectures. It provides a flexible event publishing and processing system that works equally well in simple standalone applications and complex projects using DI frameworks.
+**Event Flow** is a lightweight Java framework for building event-driven applications. It provides the structural backbone for publishing, routing, and processing events — so you can focus on business logic instead of wiring infrastructure.
 
 ## 📖 Table of Contents
 
@@ -19,16 +19,16 @@
 
 ## ✨ Features
 
-- **Typed Events** — Events with JSON serialization and polymorphic deserialization
 - **Flexible Routing** — Event channels with configurable transports
-- **Multiple Transports** — LocalQueue (in-JVM) and Apache Kafka out of the box
+- **Multiple Transports** — LocalQueue (in-JVM) and Apache Kafka out of the box, with extension points for custom transports
 - **Annotation-Based** — Event handling via `@EventListener`
 - **Interface-Based** — Event handling via `EventSubscriber` interface
+- **POJO/Record Events** — Support for plain Java objects without `Event` interface
 - **Idempotency** — Event deduplication based on UID
 - **Transactional Publishing** — Send events after transaction commit
+- **Structured Logging** — Decorators for publisher and dispatcher with machine-parseable JSON output
 - **Retry Mechanism** — Exponential backoff with configurable parameters
 - **Extensible Serialization** — JSON and MessagePack with support for custom formats
-- **Security** — Event class whitelist to protect against deserialization attacks
 
 ## 🏗 Architecture
 
@@ -170,7 +170,7 @@
 
 | Module | Description | Documentation |
 |--------|-------------|---------------|
-| **event-flow-core** | Core library — framework-agnostic, pure Java 21+ | [README](event-flow-core/README.md) |
+| **event-flow-core** | Core module — framework-agnostic, pure Java 21+ | [README](event-flow-core/README.md) |
 | **event-flow-spring** | Spring Boot auto-configuration with YAML | [README](event-flow-spring/README.md) |
 
 ## 📦 Installation
@@ -183,7 +183,7 @@ Add the dependency to your `pom.xml`:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -193,16 +193,16 @@ For Spring Boot integration:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.github.vovten:event-flow:1.0.0'
+implementation 'io.github.vovten:event-flow:1.1.0'
 // For Spring Boot:
-implementation 'io.github.vovten:event-flow-spring:1.0.0'
+implementation 'io.github.vovten:event-flow-spring:1.1.0'
 ```
 
 ### Requirements
@@ -214,38 +214,46 @@ implementation 'io.github.vovten:event-flow-spring:1.0.0'
 
 ### 1. Create an Event
 
+Events can be defined in two ways:
+
+**a) Use the `@Event` annotation (recommended)** — cleaner POJO/record, channels from annotation:
+
+```java
+@Event(channels = InternalEventChannel.class)
+public record OrderShipped(String orderId, String customerId) {}
+```
+
+**b) Implement the `Event` interface** — full control over type and channels:
+
 ```java
 public record OrderCreatedEvent(String orderId, String customerId) implements Event {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return OrderCreatedEvent.class;
     }
 }
 ```
 
+> Both approaches work with `publish()`, `prepare()`, and handler registration.
+> **Recommended:** `@Event` annotation for cleaner code; use `implements Event` only when you need full control.
+
 ### 2. Set Up Infrastructure
 
 ```java
-// Create transports for internal and external communication
-var internalTransports = new LocalQueueTransportsBuilder()
+// Create local queue transport for in-JVM event delivery
+var transports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 
-var externalTransports = new LocalQueueTransportsBuilder()
-    .queueSize(1000)
-    .build();
-
-// Create channels
+// Create a channel for internal (in-application) events
+// For external events (Kafka), use ExternalEventChannel with Kafka transports
 EventChannel internalChannel = new InternalEventChannel(
-    List.of(internalTransports.outTransport())
-);
-EventChannel externalChannel = new ExternalEventChannel(
-    List.of(externalTransports.outTransport())
+    List.of(transports.publisher())
 );
 
-// Create publisher
-EventPublisher eventPublisher = EventPublisherBuilder.create(internalChannel, externalChannel)
+// Create publisher (add externalChannel here for external events)
+EventPublisher eventPublisher = EventPublisherBuilder.create(internalChannel)
     .retryable(3, Duration.ofMillis(100), 2.0)
     .buildAndLog();
 
@@ -259,15 +267,17 @@ EventHandlerRegistry handlerRegistry = EventHandlerRegistryBuilder.create()
 EventDispatcher eventDispatcher = EventDispatcherBuilder.create()
     .executor(Executors.newVirtualThreadPerTaskExecutor())
     .handlerRegistry(handlerRegistry)
-    .transports(List.of(internalTransports.inTransport(), externalTransports.inTransport()))
+    .transports(List.of(transports.dispatcher()))
     .concurrencyLimit(100)
     .buildAndLog();
 
 // Start the dispatcher
-eventDispatcher.start();
+eventDispatcher.start(eventDispatcher::dispatch);
 ```
 
 ### 3. Create a Handler (Annotation-Based)
+
+Handle the event directly:
 
 ```java
 public class OrderEventHandler {
@@ -281,6 +291,26 @@ public class OrderEventHandler {
 // Register the handler
 handlerRegistry.register(new OrderEventHandler());
 ```
+
+Or receive the full `Envelope` with metadata (eventId, processId, occurredAt, etc.):
+
+```java
+public class OrderEnvelopeHandler {
+
+    @EventListener(OrderShipped.class)
+    public void handleOrderShipped(Envelope<OrderShipped> envelope) {
+        OrderShipped event = envelope.payload();
+        System.out.println("Order " + event.orderId()
+                + " processed with id " + envelope.eventId());
+    }
+}
+
+// Register the envelope handler
+handlerRegistry.register(new OrderEnvelopeHandler());
+```
+
+> When the handler parameter is `Envelope<T>`, the `@EventListener` annotation must specify the payload type explicitly (e.g., `@EventListener(OrderShipped.class)`).
+> This is especially useful for POJO/record events annotated with `@Event` — they are automatically wrapped in an `Envelope` upon publishing.
 
 ### 4. Publish an Event
 
@@ -308,7 +338,7 @@ Base interface for all events. Defines event type and publication channels.
 
 ```java
 public interface Event {
-    Class<? extends Event> type();
+    Class<?> type();
     default List<Class<? extends EventChannel>> channels() {
         return List.of(InternalEventChannel.class);
     }
@@ -318,7 +348,43 @@ public interface Event {
 }
 ```
 
-**TraceableEvent** — extends `Event` with tracing fields: `uid` (UUID), `traceId` (correlation), `occurredAt` (timestamp).
+**TraceableEvent** — extends `Event` with tracing fields: `eventId` (UUID), `processId` (correlation), `occurredAt` (timestamp).
+
+### Envelope
+
+Wrapper for domain events that adds technical metadata. Automatically captures:
+- `eventId` (UUID) — unique event identifier
+- `processId` (UUID) — correlation ID (e.g., saga ID)
+- `occurredAt` (Instant) — event timestamp
+- `metadata` (Map) — custom key-value pairs
+- `payload` — the actual domain object
+
+The envelope implements `Event` interface, so it passes through existing transport infrastructure.
+
+**Creating Envelopes:**
+
+```java
+// Auto-generated metadata
+Envelope<OrderCreatedEvent> envelope = Envelope.of(new OrderCreatedEvent("123"));
+
+// With custom processId (correlation)
+UUID processId = UUID.fromString("...");
+Envelope<OrderCreatedEvent> envelope = Envelope.of(new OrderCreatedEvent("123"), processId);
+
+// With explicit channels
+Envelope<OrderCreatedEvent> envelope = Envelope.of(
+    new OrderCreatedEvent("123"),
+    List.of(ExternalEventChannel.class)
+);
+```
+
+**Channels from `@Event` Annotation:**
+POJO/record classes can use the `@Event` annotation to specify default channels:
+
+```java
+@Event(channels = ExternalEventChannel.class)
+public record OrderCreatedEvent(String orderId) {}
+```
 
 ### EventChannel
 
@@ -328,8 +394,9 @@ A channel defines event delivery routes through transports.
 public interface EventChannel {
     String name();
     List<OutTransport> transports();
-    void send(Event event);
+    CompletableFuture<SendResults> send(Event event);
 }
+
 ```
 
 **Built-in Channels:**
@@ -442,14 +509,16 @@ var transports = new LocalQueueTransportsBuilder()
     .build();
 
 EventChannel channel = new InternalEventChannel(
-    List.of(transports.outTransport())
+    List.of(transports.publisher())
 );
 
 EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .executor(Executors.newVirtualThreadPerTaskExecutor())
-    .handlerRegistry(registry)
-    .transports(List.of(transports.inTransport()))
+    .handlerRegistry(handlerRegistry)
+    .transports(List.of(transports.dispatcher()))
     .build();
+
+dispatcher.start(dispatcher::dispatch);
 ```
 
 ### Serialization
@@ -477,13 +546,138 @@ EventTypeRegistry.allowClass(MyEvent.class);
 
 ## 📝 Usage Examples
 
+### Publishing Options Overview
+
+Event Flow provides multiple ways to publish events:
+
+| Method | Envelope | Channels | Metadata | Message Size |
+|--------|----------|----------|----------|--------------|
+| `implements Event` | ❌ No | From event | Minimal | ⚡ Smallest |
+| `prepare().publish()` | ✅ Auto | Custom | Custom | Medium |
+
+> **Note:** When POJO/record or `prepare()` is used, an `Envelope` is automatically created wrapping the payload with additional metadata (eventId, processId, occurredAt). This increases message size but adds correlation/tracing capabilities.
+
+### Recommended: `@Event` Annotation + `prepare()` Builder
+
+The most convenient approach for most use cases:
+
+```java
+// Define event with default channels via annotation
+@Event(channels = {InternalEventChannel.class, ExternalEventChannel.class})
+public record OrderCreatedEvent(long orderId) {}
+
+// Publish with custom metadata (channels from annotation are used automatically)
+eventPublisher.prepare(new OrderCreatedEvent(1))
+    .withProcessId(processId)
+    .publish();
+```
+
+This gives you:
+- Channels from `@Event` annotation (no need to specify in code)
+- Auto-generated eventId and occurredAt (timestamps)
+- Custom metadata via builder (processId, etc.)
+- Envelope for correlation/tracing
+
+### 1. Fastest: Event Interface (No Envelope)
+
+Implement `Event` interface for minimum overhead — no Envelope wrapper, smallest message size:
+
+```java
+public record OrderCreatedEvent(String orderId, String email) implements Event {
+
+    @Override
+    public Class<?> type() {
+        return OrderCreatedEvent.class;
+    }
+
+    @Override
+    public List<Class<? extends EventChannel>> channels() {
+        return List.of(InternalEventChannel.class, ExternalEventChannel.class);
+    }
+}
+
+eventPublisher.publish(new OrderCreatedEvent("order-123", "user@example.com"));
+```
+
+**Use cases:** High-throughput scenarios, microservice-to-microservice communication, Kafka topics.
+
+### 2. POJO/Record Publishing (Enveloped)
+
+Publish any Java object directly — Envelope is created automatically:
+
+```java
+// Simple POJO with @Event annotation
+@Event(channels = InternalEventChannel.class)
+public record OrderCreated(String orderId, String email) {}
+
+eventPublisher.publish(new OrderCreated("order-123", "user@example.com"));
+```
+
+Envelope with auto-generated metadata:
+- `eventId` — random UUID
+- `processId` — null
+- `occurredAt` — current timestamp
+- `metadata` — empty
+- Channels — `InternalEventChannel` (default)
+
+### 3. Full Control with `prepare()` Builder (Enveloped)
+
+Use the builder for custom metadata and channels — same Envelope is created internally:
+
+```java
+eventPublisher.prepare(new OrderCreated("order-123", "user@example.com"))
+    .withMetadata("key1", "data1")
+    .withMetadata("key2", "data2")
+    .withChannels(InternalEventChannel.class, ExternalEventChannel.class)
+    .withProcessId(UUID.randomUUID())
+    .withOccurredAt(Instant.now())
+    .publish();
+```
+
+> **Note:** Channels specified via `withChannels()` have priority over channels defined in `@Event` annotation on the payload class.
+
+**Available builder methods:**
+- `withMetadata(key, value)` — add single metadata entry
+- `withMetadata(Map)` — add multiple metadata entries
+- `withChannel(channel)` — set single channel (convenience alias)
+- `withChannels(c1)` — set one channel
+- `withChannels(c1, c2)` — set two channels
+- `withChannels(c1, c2, c3)` — set three channels
+- `withChannels(List)` — set arbitrary number of channels
+- `withProcessId(UUID)` — correlation ID (e.g., saga ID)
+- `withOccurredAt(Instant)` — custom event timestamp
+- `publish()` — send the event
+
+### 4. POJO/Record with `@Event` Annotation
+
+Specify default channels on the POJO/record class:
+
+```java
+@Event(channels = ExternalEventChannel.class)
+public record OrderShipped(String orderId, Instant shippedAt) {}
+
+@Event(channels = {InternalEventChannel.class, ExternalEventChannel.class})
+public record OrderDelivered(String orderId, Instant deliveredAt) {}
+
+eventPublisher.publish(new OrderShipped("order-123", Instant.now()));
+```
+
+### Comparison Table
+
+| Approach | Best For | Envelope | Message Size |
+|----------|----------|----------|--------------|
+| `implements Event` | High throughput, Kafka, microservices | ❌ | Smallest |
+| `publish(POJO/record)` | Simple notifications, internal events | ✅ | Medium |
+| `publish(POJO/record) + @Event` | Default routing configuration | ✅ | Medium |
+| `prepare().publish()` | Custom metadata, dynamic routing | ✅ | Medium |
+
 ### Event with Multiple Channels
 
 ```java
 public record UserRegisteredEvent(String userId, String email) implements Event {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return UserRegisteredEvent.class;
     }
 
@@ -520,6 +714,38 @@ public class NotificationEventSubscriber implements EventSubscriber {
 handlerRegistry.register(new NotificationEventSubscriber());
 ```
 
+### Handling Envelope (entire wrapper with metadata)
+
+Handlers can receive the entire `Envelope` including metadata:
+
+```java
+public class OrderEventHandler {
+
+    @EventListener
+    public void handleOrder(Envelope<OrderPlacedEvent> envelope) {
+        // Access payload
+        OrderPlacedEvent event = envelope.payload();
+
+        // Access metadata
+        UUID eventId = envelope.eventId();
+        UUID processId = envelope.processId();
+        Instant occurredAt = envelope.occurredAt();
+        Map<String, String> metadata = envelope.metadata();
+
+        System.out.println("Processed: " + event.orderId());
+    }
+}
+```
+
+**Note:** When using `Envelope` as a handler parameter, you must specify the payload type in the annotation:
+
+```java
+@EventListener(OrderPlacedEvent.class)
+public void handleOrder(Envelope<OrderPlacedEvent> envelope) {
+    // Handle envelope
+}
+```
+
 ### Kafka Transport Configuration
 
 ```java
@@ -547,7 +773,7 @@ EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .transports(List.of(kafkaIn))
     .build();
 
-dispatcher.start();
+dispatcher.start(dispatcher::dispatch);
 ```
 
 ### Idempotent Dispatcher
@@ -671,7 +897,7 @@ Implement `OutTransport` or `InTransport` interfaces to add custom transport typ
 
 ## 📚 Documentation
 
-- **[Event Flow Core](event-flow-core/README.md)** — Detailed core library documentation
+- **[Event Flow Core](event-flow-core/README.md)** — Detailed core module documentation
 - **[Event Flow Spring](event-flow-spring/README.md)** — Spring Boot auto-configuration
 - [Javadoc](https://github.com/vovten/event-flow/javadoc)
 - [Source Code](https://github.com/vovten/event-flow)

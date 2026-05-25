@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for EventSerializerFactory.
+ * @since 1.0.0
  */
 @DisplayName("EventSerializerFactory Tests")
 class EventSerializerFactoryTest {
@@ -101,33 +102,6 @@ class EventSerializerFactoryTest {
     void shouldThrowExceptionForNullData() {
         assertThrows(EventSerializationException.class, () ->
                 factory.getByData(null));
-    }
-
-    @Test
-    @DisplayName("Should get default JSON serializer")
-    void shouldGetDefaultSerializer() {
-        EventSerializer serializer = factory.getDefault();
-
-        assertNotNull(serializer);
-        assertTrue(serializer instanceof JsonEventSerializer);
-    }
-
-    @Test
-    @DisplayName("Should get JSON serializer explicitly")
-    void shouldGetJsonSerializer() {
-        EventSerializer serializer = factory.getJson();
-
-        assertNotNull(serializer);
-        assertTrue(serializer instanceof JsonEventSerializer);
-    }
-
-    @Test
-    @DisplayName("Should get MessagePack serializer explicitly")
-    void shouldGetMsgPackSerializer() {
-        EventSerializer serializer = factory.getMsgPack();
-
-        assertNotNull(serializer);
-        assertTrue(serializer instanceof MsgPackEventSerializer);
     }
 
     @Test

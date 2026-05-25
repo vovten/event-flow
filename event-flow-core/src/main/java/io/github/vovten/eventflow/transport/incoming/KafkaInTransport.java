@@ -1,17 +1,19 @@
 package io.github.vovten.eventflow.transport.incoming;
 
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.transport.InTransport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.time.Duration;
 import java.util.List;
@@ -49,7 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * </ul>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-06
+ * @since 1.0.0
  * @see EventSerializerFactory
  */
 public class KafkaInTransport implements InTransport, AutoCloseable {
@@ -232,11 +234,19 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
             byte[] data = record.value();
             EventSerializer serializer = serializerFactory.getByData(data);
             Event event = serializer.deserialize(data, Event.class);
+            MDC.put("deliveredFrom", name() + "-" + record.topic() + "-p" + record.partition());
             eventConsumer.accept(event);
-            log.debug("Event delivered from Kafka topic: {}, key: {}, event type: {}",
-                    record.topic(), record.key(), event.type().getSimpleName());
+            if (log.isDebugEnabled()) {
+                String payloadType = event instanceof Envelope<?> envelope
+                        ? envelope.payload().getClass().getSimpleName()
+                        : event.getClass().getSimpleName();
+                log.debug("Event delivered from Kafka topic: {}, key: {}, event type: {}, payload type: {}",
+                        record.topic(), record.key(), event.type().getSimpleName(), payloadType);
+            }
         } catch (Exception e) {
             log.error("Failed to deliver event from topic: {}, key: {}", record.topic(), record.key(), e);
+        } finally {
+            MDC.remove("deliveredFrom");
         }
     }
 
@@ -262,6 +272,9 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, 1000);
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1000);
+        props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 524288);
+        props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 500);
         return new KafkaConsumer<>(props);
     }
 
@@ -271,6 +284,9 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
         props.putIfAbsent(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.putIfAbsent(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.putIfAbsent(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.putIfAbsent(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1000);
+        props.putIfAbsent(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 524288);
+        props.putIfAbsent(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 500);
         return new KafkaConsumer<>(props);
     }
 

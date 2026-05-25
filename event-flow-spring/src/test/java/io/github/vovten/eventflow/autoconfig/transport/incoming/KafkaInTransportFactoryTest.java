@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for Kafka dispatcher transport factory.
+ * @since 1.0.0
  */
 class KafkaInTransportFactoryTest {
 
@@ -38,7 +39,7 @@ class KafkaInTransportFactoryTest {
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("kafka-dispatcher");
         config.setServers("localhost:9092");
-        config.setTopic("test-topic");
+        config.setTopics("test-topic");
         config.setConsumerGroup("test-group");
 
         // when
@@ -55,7 +56,7 @@ class KafkaInTransportFactoryTest {
         KafkaInTransportFactory factory = new KafkaInTransportFactory(serializerFactory);
 
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
-        config.setTopic("test-topic");
+        config.setTopics("test-topic");
 
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
@@ -64,8 +65,8 @@ class KafkaInTransportFactoryTest {
     }
 
     @Test
-    @DisplayName("KafkaDispatcherTransportFactory should throw exception when topic is missing")
-    void kafkaDispatcherTransportFactoryShouldThrowExceptionWhenTopicIsMissing() {
+    @DisplayName("KafkaDispatcherTransportFactory should throw exception when topics is missing")
+    void kafkaDispatcherTransportFactoryShouldThrowExceptionWhenTopicsIsMissing() {
         // given
         KafkaInTransportFactory factory = new KafkaInTransportFactory(serializerFactory);
 
@@ -75,6 +76,6 @@ class KafkaInTransportFactoryTest {
         // when & then
         assertThatThrownBy(() -> factory.validate(config))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Kafka transport requires topic configuration");
+                .hasMessageContaining("Kafka transport requires topics configuration");
     }
 }

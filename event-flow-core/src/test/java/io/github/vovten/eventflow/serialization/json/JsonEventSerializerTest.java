@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for JsonEventSerializer.
+ * @since 1.0.0
  */
 @DisplayName("JsonEventSerializer Tests")
 class JsonEventSerializerTest {
@@ -78,18 +79,6 @@ class JsonEventSerializerTest {
 
         assertThrows(EventSerializationException.class, () ->
                 serializer.deserialize(invalidData, SimpleEvent.class));
-    }
-
-    @Test
-    @DisplayName("Should return json code")
-    void shouldReturnJsonCode() {
-        assertEquals(0x01, serializer.getCode());
-    }
-
-    @Test
-    @DisplayName("Should return json name")
-    void shouldReturnJsonName() {
-        assertEquals("json", serializer.getName());
     }
 
     @Test

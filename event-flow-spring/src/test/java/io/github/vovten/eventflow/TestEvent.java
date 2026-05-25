@@ -1,28 +1,84 @@
 package io.github.vovten.eventflow;
 
-import io.github.vovten.eventflow.channel.EventChannel;
-import io.github.vovten.eventflow.channel.ExternalEventChannel;
-import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.channel.EventChannel;
+import io.github.vovten.eventflow.channel.InternalEventChannel;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
- * Test event record-based for unit and integration tests
+ * Base test event for unit and integration tests
+ * @since 1.0.0
  */
 public class TestEvent extends AbstractTraceableEvent {
 
-    private final String id;
+    private String id;
+    private String message;
 
-    public TestEvent(String id) {
+    public TestEvent() {
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.message = "Test event message";
+    }
+
+    public TestEvent(String id, String message) {
         super();
         this.id = id;
+        this.message = message;
+    }
+
+    public TestEvent(String message) {
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.message = message;
+    }
+
+    public TestEvent(UUID uid, UUID processId, String id, String message, Instant timestamp) {
+        super(uid, processId, timestamp);
+        this.id = id;
+        this.message = message;
+    }
+
+    public TestEvent(String id, String message, Instant timestamp) {
+        super(timestamp);
+        this.id = id;
+        this.message = message;
+    }
+
+    public static TestEvent create() {
+        return new TestEvent();
+    }
+
+    public static TestEvent create(String message) {
+        return new TestEvent(UUID.randomUUID().toString(), message);
+    }
+
+    public static TestEvent create(String id, String message) {
+        return new TestEvent(id, message);
+    }
+
+    public static TestEvent create(String id, String message, Instant dateTime) {
+        return new TestEvent(id, message, dateTime);
     }
 
     public String getId() {
         return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 
     @Override
@@ -32,11 +88,7 @@ public class TestEvent extends AbstractTraceableEvent {
 
     @Override
     public List<Class<? extends EventChannel>> channels() {
-        return List.of(InternalEventChannel.class, ExternalEventChannel.class);
-    }
-
-    public String getMessage() {
-        return id;
+        return List.of(InternalEventChannel.class);
     }
 
     @Override
@@ -44,16 +96,22 @@ public class TestEvent extends AbstractTraceableEvent {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         TestEvent testEvent = (TestEvent) o;
-        return Objects.equals(id, testEvent.id);
+        return Objects.equals(id, testEvent.id) &&
+               Objects.equals(message, testEvent.message);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id);
+        return Objects.hash(id, message);
     }
 
     @Override
     public String toString() {
-        return "TestEvent{id='" + id + "', uid=" + uid() + ", traceId=" + traceId() + ", timestamp=" + occurredAt() + "}";
+        return "TestEvent{" +
+                "id='" + id + '\'' +
+                ", message='" + message + '\'' +
+                ", eventId=" + eventId() +
+                ", timestamp=" + this.occurredAt() +
+                '}';
     }
 }

@@ -1,9 +1,9 @@
-package io.github.vovten.eventflow.test;
+package io.github.vovten.eventflow;
 
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.ExternalEventChannel;
-import io.github.vovten.eventflow.event.Event;
 
 import java.time.Instant;
 import java.util.List;
@@ -12,6 +12,7 @@ import java.util.UUID;
 
 /**
  * Test event for external bus (Kafka)
+ * @since 1.1.0
  */
 public class ExternalTestEvent extends AbstractTraceableEvent {
 
@@ -19,7 +20,9 @@ public class ExternalTestEvent extends AbstractTraceableEvent {
     private String payload;
 
     public ExternalTestEvent() {
-        this(UUID.randomUUID().toString(), "External test event payload");
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.payload = "External test event payload";
     }
 
     public ExternalTestEvent(String id, String payload) {
@@ -28,14 +31,20 @@ public class ExternalTestEvent extends AbstractTraceableEvent {
         this.payload = payload;
     }
 
-    public ExternalTestEvent(String id, String payload, Instant timestamp) {
-        super(UUID.randomUUID(), UUID.randomUUID(), timestamp);
+    public ExternalTestEvent(String payload) {
+        super();
+        this.id = UUID.randomUUID().toString();
+        this.payload = payload;
+    }
+
+    public ExternalTestEvent(UUID uid, UUID processId, String id, String payload, Instant timestamp) {
+        super(uid, processId, timestamp);
         this.id = id;
         this.payload = payload;
     }
 
-    public ExternalTestEvent(UUID uid, UUID traceId, String id, String payload, Instant timestamp) {
-        super(uid, traceId, timestamp);
+    public ExternalTestEvent(String id, String payload, Instant timestamp) {
+        super(timestamp);
         this.id = id;
         this.payload = payload;
     }
@@ -99,7 +108,7 @@ public class ExternalTestEvent extends AbstractTraceableEvent {
         return "ExternalTestEvent{" +
                 "id='" + id + '\'' +
                 ", payload='" + payload + '\'' +
-                ", uid=" + uid() +
+                ", eventId=" + eventId() +
                 ", timestamp=" + this.occurredAt() +
                 '}';
     }

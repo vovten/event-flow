@@ -26,7 +26,7 @@ import java.util.List;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public class InternalEventChannel extends AbstractEventChannel {
 

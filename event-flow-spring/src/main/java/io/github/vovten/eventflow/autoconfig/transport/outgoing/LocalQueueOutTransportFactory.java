@@ -12,7 +12,7 @@ import io.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
  * Uses a shared {@link DefaultLocalQueueProvider} for all local-queue transports.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-11
+ * @since 1.0.0
  */
 public class LocalQueueOutTransportFactory implements OutTransportFactory {
 

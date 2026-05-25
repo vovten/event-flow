@@ -8,11 +8,16 @@ import io.github.vovten.eventflow.util.EventUtils;
 import java.util.List;
 
 /**
- * An event that occurs in the application and can be delivered to all interested parties
- * (components within the application, components of third-party applications (microservices)).
+ * Represents an event — a message indicating that something happened in the system.
+ * <p>
+ * Unlike commands, events describe facts (e.g., {@code OrderPlaced}, {@code PaymentFailed})
+ * that other parts of the system can react to. Events are immutable and typically
+ * published after state changes have already occurred.
+ * <p>
+ * Events are routed to channels based on {@link #channels()}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-02
+ * @since 1.0.0
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 public interface Event {
@@ -20,7 +25,7 @@ public interface Event {
     /**
      * @return the event type
      */
-    Class<? extends Event> type();
+    Class<?> type();
 
     /**
      * List of channel classes this event should be published to.
@@ -38,7 +43,9 @@ public interface Event {
      * Used for logging purposes.
      *
      * @return the event as JSON
+     * @deprecated Use {@code toString()} instead. This method will be removed in a future version.
      */
+    @Deprecated(forRemoval = true)
     default String asJson() {
         return EventUtils.toJson(this);
     }

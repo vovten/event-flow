@@ -23,7 +23,7 @@ import java.util.concurrent.Executors;
  * Auto-configuration for common components: executor service and local-queue transports.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-10
+ * @since 1.0.0
  */
 @Configuration(proxyBeanMethods = false)
 @DependsOn("serializerRegistrationComplete")

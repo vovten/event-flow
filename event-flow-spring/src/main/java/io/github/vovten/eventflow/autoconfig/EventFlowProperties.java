@@ -16,7 +16,7 @@ import java.util.List;
  * <pre>{@code
  * event-flow:
  *   enabled: true
- *   scan-packages: com.example.listener
+ *   dispatcher.listener-packages: com.example.listener
  *   publisher:
  *     enabled: true
  *     transactional: true
@@ -33,7 +33,7 @@ import java.util.List;
  *       - name: external
  *         transports:
  *           - name: kafka
- *             topic: events-topic
+ *             topics: events-topic
  *             servers: localhost:9092
  *   dispatcher:
  *     enabled: true
@@ -58,7 +58,7 @@ import java.util.List;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-09
+ * @since 1.0.0
  */
 @ConfigurationProperties(prefix = "event-flow")
 public class EventFlowProperties {
@@ -108,6 +108,7 @@ public class EventFlowProperties {
     public static class PublisherConfig {
         private boolean enabled = false;
         private boolean transactional = true;
+        private LoggingConfig logging = new LoggingConfig();
         private RetryConfig retry = new RetryConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
@@ -127,6 +128,14 @@ public class EventFlowProperties {
             this.transactional = transactional;
         }
 
+        public LoggingConfig getLogging() {
+            return logging;
+        }
+
+        public void setLogging(LoggingConfig logging) {
+            this.logging = logging;
+        }
+
         public RetryConfig getRetry() {
             return retry;
         }
@@ -141,6 +150,30 @@ public class EventFlowProperties {
 
         public void setChannels(List<ChannelConfig> channels) {
             this.channels = channels;
+        }
+    }
+
+    /**
+     * Logging configuration for event publishing.
+     */
+    public static class LoggingConfig {
+        private boolean enabled = false;
+        private int maxPayloadLength = 500;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getMaxPayloadLength() {
+            return maxPayloadLength;
+        }
+
+        public void setMaxPayloadLength(int maxPayloadLength) {
+            this.maxPayloadLength = maxPayloadLength;
         }
     }
 
@@ -226,6 +259,7 @@ public class EventFlowProperties {
         private ThreadPoolConfig threadPool = new ThreadPoolConfig();
         private List<TransportConfig> transports = new ArrayList<>();
         private IdempotentConfig idempotent = new IdempotentConfig();
+        private LoggingConfig logging = new LoggingConfig();
         private DeserializationConfig deserialization = new DeserializationConfig();
 
         public boolean isEnabled() {
@@ -268,6 +302,14 @@ public class EventFlowProperties {
             this.idempotent = idempotent;
         }
 
+        public LoggingConfig getLogging() {
+            return logging;
+        }
+
+        public void setLogging(LoggingConfig logging) {
+            this.logging = logging;
+        }
+
         public DeserializationConfig getDeserialization() {
             return deserialization;
         }
@@ -284,7 +326,7 @@ public class EventFlowProperties {
         private boolean enabled = false;
         private Duration ttl = Duration.ofMinutes(10);
         private long maxSize = 10_000;
-        private boolean warnOnDuplicate = true;
+        private boolean warnOnDuplicate = false;
 
         public boolean isEnabled() {
             return enabled;
@@ -389,7 +431,7 @@ public class EventFlowProperties {
     public static class TransportConfig {
         private String name = "local-queue";
         private int capacity = 1000;
-        private String topic;
+        private String topics;
         private String servers;
         private String consumerGroup = "event-flow-group";
         /**
@@ -414,12 +456,12 @@ public class EventFlowProperties {
             this.capacity = capacity;
         }
 
-        public String getTopic() {
-            return topic;
+        public String getTopics() {
+            return topics;
         }
 
-        public void setTopic(String topic) {
-            this.topic = topic;
+        public void setTopics(String topics) {
+            this.topics = topics;
         }
 
         public String getServers() {

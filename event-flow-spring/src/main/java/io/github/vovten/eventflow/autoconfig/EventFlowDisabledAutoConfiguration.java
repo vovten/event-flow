@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Configuration;
  * Event Flow auto-configuration.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-29
+ * @since 1.0.0
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "false", matchIfMissing = true)
@@ -44,7 +44,7 @@ public class EventFlowDisabledAutoConfiguration {
                ╚═══════════════════════════════════════════════════════════╝
                 event-flow:
                   enabled: true
-                  scan-packages: com.example.listener
+                  dispatcher.listener-packages: com.example.listener
                   publisher:
                     enabled: true
                     channels:

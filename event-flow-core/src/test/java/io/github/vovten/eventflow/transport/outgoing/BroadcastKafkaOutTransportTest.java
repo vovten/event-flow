@@ -34,7 +34,7 @@ import static org.mockito.Mockito.*;
  * Tests for {@link BroadcastKafkaOutTransport}.
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-13
+ * @since 1.0.0
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("BroadcastKafkaPublisherTransport Tests")

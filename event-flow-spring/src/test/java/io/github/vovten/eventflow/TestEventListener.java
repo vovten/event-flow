@@ -1,9 +1,6 @@
 package io.github.vovten.eventflow;
 
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.test.CompositeTestEvent;
-import io.github.vovten.eventflow.test.ExternalTestEvent;
-import io.github.vovten.eventflow.test.TestEvent;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -86,7 +83,7 @@ public class TestEventListener implements EventSubscriber {
     }
 
     @Override
-    public List<Class<? extends Event>> events() {
+    public List<Class<?>> events() {
         return List.of(TestEvent.class, ExternalTestEvent.class);
     }
 }

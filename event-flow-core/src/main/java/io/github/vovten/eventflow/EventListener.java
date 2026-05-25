@@ -12,12 +12,26 @@ import java.lang.annotation.Target;
  * <p>Annotation applied to public methods that handle events dispatched by the dispatcher
  * (see {@link EventDispatcher}).
  * <p>Methods annotated with this must accept exactly one parameter of type
- * {@link Event}.
+ * {@link Event} or {@link io.github.vovten.eventflow.event.Envelope}.
+ * <p>
+ * The annotation can optionally specify the domain event type to handle:
+ * <pre>{@code
+ * @EventListener(DomainOrderEvent.class)
+ * public void onEvent(Envelope<DomainOrderEvent> event) {...}
+ * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2024-12-06
+ * @since 1.0.0
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface EventListener {
+
+    /**
+     * The domain event type to handle.
+     * If not specified, the handler is registered based on the method parameter type.
+     *
+     * @return the domain event class
+     */
+    Class<?> value() default Event.class;
 }

@@ -7,8 +7,11 @@ import io.github.vovten.eventflow.transport.InTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -53,7 +56,7 @@ import static java.util.stream.Collectors.joining;
  * }</pre>
  *
  * @author Vladimir Aleshkov
- * @since 2026-03-06
+ * @since 1.0.0
  */
 public class UnifiedEventDispatcher implements EventDispatcher {
 
@@ -128,7 +131,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                                   EventHandlerRegistry handlerRegistry,
                                   List<InTransport> transports,
                                   Semaphore concurrencySemaphore) {
-        this.transports = transports;
+        this.transports = List.copyOf(transports);
         this.executorService = executorService;
         this.handlerRegistry = handlerRegistry;
         this.concurrencySemaphore = concurrencySemaphore;
@@ -158,43 +161,58 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void dispatch(Event event) {
+    public CompletableFuture<HandlerResults> dispatch(Event event) {
         List<EventHandler> handlers = handlerRegistry.getHandlers(event);
         if (handlers.isEmpty()) {
             log.debug("No handlers found for event: {}", event);
-            return;
+            return CompletableFuture.completedFuture(HandlerResults.empty());
         }
-        int totalHandlers = handlers.size();
-        int submittedHandlers = 0;
+
+        List<CompletableFuture<HandlerResult>> futures = new ArrayList<>();
 
         for (EventHandler handler : handlers) {
             try {
-                if (concurrencySemaphore != null) {
-                    concurrencySemaphore.acquire();
-                }
-                executorService.execute(new HandlerTask(handler, event));
-                submittedHandlers++;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.error("Handler submission interrupted for event {} (handler {}/{}): {}",
-                        event.type().getSimpleName(),
-                        submittedHandlers + 1,
-                        totalHandlers,
-                        handler.getClass().getSimpleName(),
-                        e);
-                break;
-            } catch (Exception e) {
-                log.error("Failed to submit handler for event {} (handler {}/{}): {}",
-                        event.type().getSimpleName(),
-                        submittedHandlers + 1,
-                        totalHandlers,
-                        handler.getClass().getSimpleName(),
-                        e);
+                CompletableFuture<HandlerResult> future = CompletableFuture
+                        .supplyAsync(() -> executeHandler(handler, event), executorService);
+                futures.add(future);
+            } catch (RejectedExecutionException e) {
+                log.warn("Failed to submit handler {}: executor rejected task", handler.name(), e);
+                futures.add(CompletableFuture.completedFuture(
+                        HandlerResult.failure(handler.name(), e)));
             }
         }
-        if (submittedHandlers < totalHandlers) {
-            log.warn("Partial handler submission for event {}: {}/{} handlers submitted",
-                    event.type().getSimpleName(), submittedHandlers, totalHandlers);
+
+        CompletableFuture<Void> allFutures = CompletableFuture
+                .allOf(futures.toArray(CompletableFuture[]::new));
+
+        return allFutures.thenApply(v ->
+                HandlerResults.of(futures.stream()
+                        .map(CompletableFuture::join)
+                        .toList()));
+    }
+
+    private HandlerResult executeHandler(EventHandler handler, Event event) {
+        boolean acquired = false;
+        if (concurrencySemaphore != null) {
+            try {
+                concurrencySemaphore.acquire();
+                acquired = true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return HandlerResult.failure(handler.name(), e);
+            }
+        }
+        try {
+            handler.onEvent(event);
+            return HandlerResult.success(handler.name());
+        } catch (Exception e) {
+            log.error("Handler {} failed for event {}: {}",
+                    handler.name(), event.type().getSimpleName(), e.getMessage(), e);
+            return HandlerResult.failure(handler.name(), e);
+        } finally {
+            if (acquired) {
+                concurrencySemaphore.release();
+            }
         }
     }
 
@@ -224,30 +242,4 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         return String.format(msg, transports.size(), names);
     }
 
-    private final class HandlerTask implements Runnable {
-        private final EventHandler handler;
-        private final Event event;
-
-        private HandlerTask(EventHandler handler, Event event) {
-            this.handler = handler;
-            this.event = event;
-        }
-
-        @Override
-        public void run() {
-            try {
-                handler.onEvent(event);
-            } catch (Exception e) {
-                log.error("Handler execution failed for event {} in handler {}: {}",
-                        event.type().getSimpleName(),
-                        handler.getClass().getSimpleName(),
-                        e.getMessage(),
-                        e);
-            } finally {
-                if (concurrencySemaphore != null) {
-                    concurrencySemaphore.release();
-                }
-            }
-        }
-    }
 }

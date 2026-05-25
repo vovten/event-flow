@@ -55,7 +55,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Vladimir Aleshkov
  * @see ChannelEventPublisher
- * @since 2026-03-05
+ * @since 1.0.0
  */
 public class RetryEventPublisher implements EventPublisher {
 

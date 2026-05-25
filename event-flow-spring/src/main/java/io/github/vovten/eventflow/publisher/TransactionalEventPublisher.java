@@ -29,9 +29,39 @@ import java.util.concurrent.CompletableFuture;
  *   <li>If active, registers {@code TransactionSynchronization} to publish after commit</li>
  *   <li>If not active, publishes immediately</li>
  * </ol>
- *
+ * <p>
+ * <b>Important: Thread safety and transaction boundaries</b>
+ * <p>
+ * When using inside a {@code @Transactional} method, DO NOT call blocking operations like
+ * {@code .join()} or {@code .get()} on the returned Future. This will cause a deadlock because:
+ * <ul>
+ *   <li>The transaction cannot commit until the method completes</li>
+ *   <li>The Future cannot complete until after the transaction commits (via afterCommit)</li>
+ * </ul>
+ * <p>
+ * <b>Incorrect usage (causes deadlock):</b>
+ * <pre>{@code
+ * @Transactional
+ * public void processOrder(Order order) {
+ *     orderRepository.save(order);
+ *     if (publisher.publish(new OrderCreatedEvent(order)).join().isAllSuccess()) {
+ *         outboxService.delete(order.getId());
+ *     }
+ * }
+ * }</pre>
+ * <p>
+ * <b>Correct usage:</b>
+ * <pre>{@code
+ * // CORRECT - non-blocking, callback runs AFTER transaction commits
+ * publisher.publish(event).thenAccept(results -> {
+ *     // This callback executes in a separate thread AFTER transaction commits
+ *     if (results.isAllSuccess()) {
+ *         outboxService.delete(entity.getId());
+ *     }
+ * });
+ * }</pre>
  * @author Vladimir Aleshkov
- * @since 2026-03-05
+ * @since 1.0.0
  * @see ChannelEventPublisher
  * @see TransactionSynchronizationManager
  */

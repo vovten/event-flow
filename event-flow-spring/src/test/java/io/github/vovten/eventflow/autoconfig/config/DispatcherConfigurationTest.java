@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link DispatcherConfiguration}.
+ * @since 1.0.0
  */
 class DispatcherConfigurationTest {
 
@@ -177,7 +178,7 @@ class DispatcherConfigurationTest {
             properties.getDispatcher().getTransports().clear();
             EventFlowProperties.TransportConfig transportConfig = new EventFlowProperties.TransportConfig();
             transportConfig.setName("kafka");
-            transportConfig.setTopic("test-topic");
+            transportConfig.setTopics("test-topic");
             transportConfig.setServers("localhost:9092");
             transportConfig.setConsumerGroup("test-group");
             properties.getDispatcher().getTransports().add(transportConfig);

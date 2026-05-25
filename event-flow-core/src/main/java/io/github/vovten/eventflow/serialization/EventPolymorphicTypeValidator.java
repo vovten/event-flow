@@ -3,9 +3,11 @@ package io.github.vovten.eventflow.serialization;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
-import io.github.vovten.eventflow.event.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Polymorphic type validator for secure event deserialization.
@@ -20,11 +22,13 @@ import org.slf4j.LoggerFactory;
  * not {@link #validateBaseType} which is called for the target type (e.g., Event.class).
  *
  * @author Vladimir Aleshkov
- * @since 2026-04-05
+ * @since 1.0.0
  */
 public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base {
 
     private static final Logger log = LoggerFactory.getLogger(EventPolymorphicTypeValidator.class);
+
+    private final Set<String> knownClasses = ConcurrentHashMap.newKeySet();
 
     /**
      * Validate the base type (the type passed to readValue).
@@ -55,23 +59,14 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
         Class<?> rawClass = subType.getRawClass();
         String className = rawClass.getName();
 
-        // 1. Verify it's actually an Event (defense-in-depth)
-        if (!Event.class.isAssignableFrom(rawClass)) {
-            log.error(
-                    "Blocked deserialization of non-Event class: {}. "
-                    + "This class does not implement the Event interface and cannot be deserialized for security reasons.",
-                    className
-            );
+        if (!classExists(className)) {
+            log.warn("Skipping event: class '{}' not found in classpath", className);
             return Validity.DENIED;
         }
-
-        // 2. Check against the whitelist
         if (EventTypeRegistry.isAllowed(className)) {
             log.debug("Allowed event subtype: {}", className);
             return Validity.ALLOWED;
         }
-
-        // 3. Block everything else with helpful message
         String packageName = getPackageName(className);
         log.error(
                 "Blocked deserialization of unauthorized event class: '{}'.\n"
@@ -96,6 +91,26 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
                 EventTypeRegistry.getAllowedPackages()
         );
         return Validity.DENIED;
+    }
+
+    /**
+     * Check if class exists in classpath.
+     * Uses caching for performance optimization.
+     *
+     * @param className fully qualified class name
+     * @return true if class exists, false otherwise
+     */
+    boolean classExists(String className) {
+        if (knownClasses.contains(className)) {
+            return true;
+        }
+        try {
+            Class.forName(className, false, Thread.currentThread().getContextClassLoader());
+            knownClasses.add(className);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 
     /**

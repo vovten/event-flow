@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for local-queue dispatcher transport factory.
+ * @since 1.0.0
  */
 class LocalQueueInTransportFactoryTest {
 
