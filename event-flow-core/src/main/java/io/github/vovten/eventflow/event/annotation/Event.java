@@ -2,7 +2,7 @@ package io.github.vovten.eventflow.event.annotation;
 
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
-import io.github.vovten.eventflow.event.lifecycle.EventLifecycle;
+import io.github.vovten.eventflow.lifecycle.EventLifecycle;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -19,7 +19,7 @@ import java.lang.annotation.Target;
  * <b>Configuration parameters:</b>
  * <ul>
  *   <li>{@code channels} — target event channel classes for routing</li>
- *   <li>{@code lifecycle} — lifecycle tracking level (default: {@link EventLifecycle#PUBLISH})</li>
+ *   <li>{@code lifecycle} — lifecycle tracking level (default: {@link EventLifecycle#PERSISTED})</li>
  * </ul>
  * <p>
  * <b>Priority:</b> Factory method parameters take precedence over this annotation.
@@ -33,7 +33,7 @@ import java.lang.annotation.Target;
  * import io.github.vovten.eventflow.event.annotation.Event;
  * import io.github.vovten.eventflow.channel.ExternalEventChannel;
  *
- * @Event(channels = ExternalEventChannel.class, lifecycle = EventLifecycle.FULL)
+ * @Event(channels = ExternalEventChannel.class, lifecycle = EventLifecycle.MANAGED)
  * public record OrderCreatedEvent(String orderId) {}
  *
  * // Envelope will use ExternalEventChannel
@@ -67,5 +67,5 @@ public @interface Event {
      * @return lifecycle tracking level
      * @see EventLifecycle
      */
-    EventLifecycle lifecycle() default EventLifecycle.PUBLISH;
+    EventLifecycle lifecycle() default EventLifecycle.PERSISTED;
 }

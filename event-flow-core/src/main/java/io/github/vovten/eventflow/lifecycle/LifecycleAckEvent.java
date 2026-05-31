@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.event.lifecycle;
+package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.event.Event;
 

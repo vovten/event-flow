@@ -27,7 +27,7 @@ COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
 COMMENT ON COLUMN event_store.event_type IS 'Fully qualified event class name';
 COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
 COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
-COMMENT ON COLUMN event_store.status IS 'Lifecycle status: 0=NEW, 1=PUBLISHED, 2=HANDLED, 3=PUBLISH_FAILED, 4=HANDLE_FAILED';
+COMMENT ON COLUMN event_store.status IS 'Lifecycle status: 0=UNDEFINED, 1=NEW, 2=PUBLISHED, 3=HANDLED, 4=FAILED';
 COMMENT ON COLUMN event_store.retry_count IS 'Number of retry attempts for failed events';
 COMMENT ON COLUMN event_store.created_at IS 'Timestamp when the event was first stored';
 COMMENT ON COLUMN event_store.updated_at IS 'Timestamp of the last status update';

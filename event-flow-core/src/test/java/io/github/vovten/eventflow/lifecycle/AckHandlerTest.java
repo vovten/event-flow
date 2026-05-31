@@ -1,8 +1,8 @@
-package io.github.vovten.eventflow.event.lifecycle;
+package io.github.vovten.eventflow.lifecycle;
 
-import io.github.vovten.eventflow.store.EventStatus;
-import io.github.vovten.eventflow.store.InMemoryEventStore;
-import io.github.vovten.eventflow.store.StoredEvent;
+import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class AckHandlerTest {
     }
 
     @Test
-    @DisplayName("Should handle FailureAck and update status to HANDLE_FAILED")
+    @DisplayName("Should handle FailureAck and update status to FAILED")
     void shouldHandleFailureAck() {
         FailureAck ack = new FailureAck(
                 UUID.randomUUID(), eventId, "TestEvent", "test-service", "Handler error",
@@ -52,7 +52,7 @@ class AckHandlerTest {
         handler.onEvent(ack);
 
         StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(EventStatus.HANDLE_FAILED);
+        assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
         assertThat(stored.errorDetails()).isEqualTo("Handler error");
     }
 

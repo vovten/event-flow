@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.event.lifecycle;
+package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
 import io.github.vovten.eventflow.dispatcher.HandlerResults;
@@ -84,7 +84,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
 
     private boolean shouldSkipLifecycleAck(Event event) {
         return !(event instanceof TraceableEvent)
-                || EventUtils.lifecycle(event) != EventLifecycle.FULL;
+                || EventUtils.lifecycle(event) != EventLifecycle.MANAGED;
     }
 
     private boolean hasHandlerFailures(HandlerResults results) {

@@ -1,6 +1,12 @@
 package io.github.vovten.eventflow.autoconfig;
 
-import io.github.vovten.eventflow.autoconfig.config.*;
+import io.github.vovten.eventflow.autoconfig.config.ChannelConfiguration;
+import io.github.vovten.eventflow.autoconfig.config.CommonConfiguration;
+import io.github.vovten.eventflow.autoconfig.config.DispatcherConfiguration;
+import io.github.vovten.eventflow.autoconfig.config.LifecycleConfiguration;
+import io.github.vovten.eventflow.autoconfig.config.PublisherConfiguration;
+import io.github.vovten.eventflow.autoconfig.config.RegistryConfiguration;
+import io.github.vovten.eventflow.autoconfig.config.SerializerConfiguration;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -18,7 +24,7 @@ import org.springframework.context.annotation.Import;
  *   <li>{@link CommonConfiguration} - executor service and local-queue transports</li>
  *   <li>{@link ChannelConfiguration} - event channels</li>
  *   <li>{@link PublisherConfiguration} - event publisher</li>
- *   <li>{@link PersistentStoreConfiguration} - persistent event store and lifecycle tracking</li>
+ *   <li>{@link LifecycleConfiguration} - lifecycle-aware event publishing and lifecycle tracking</li>
  *   <li>{@link DispatcherConfiguration} - event dispatcher</li>
  * </ul>
  * <p>
@@ -66,7 +72,7 @@ import org.springframework.context.annotation.Import;
     CommonConfiguration.class,
     ChannelConfiguration.class,
     PublisherConfiguration.class,
-    PersistentStoreConfiguration.class,
+    LifecycleConfiguration.class,
     DispatcherConfiguration.class
 })
 public class EventFlowAutoConfiguration {

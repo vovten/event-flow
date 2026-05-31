@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.store;
+package io.github.vovten.eventflow.lifecycle.store;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,12 +66,12 @@ class InMemoryEventStoreTest {
     }
 
     @Test
-    @DisplayName("Should update status to PUBLISH_FAILED with error details")
+    @DisplayName("Should update status to FAILED with error details")
     void shouldUpdateStatusToFailedWithError() {
         store.save(event);
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "connection timeout");
+        store.updateStatus(eventId, EventStatus.FAILED, "connection timeout");
         StoredEvent updated = store.findById(eventId).orElseThrow();
-        assertThat(updated.status()).isEqualTo(EventStatus.PUBLISH_FAILED);
+        assertThat(updated.status()).isEqualTo(EventStatus.FAILED);
         assertThat(updated.errorDetails()).isEqualTo("connection timeout");
         assertThat(updated.retryCount()).isZero();
     }
@@ -80,7 +80,7 @@ class InMemoryEventStoreTest {
     @DisplayName("Should increment retry count on NEW status update")
     void shouldIncrementRetryOnNewStatus() {
         store.save(event);
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "error");
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
         store.updateStatus(eventId, EventStatus.NEW, null);
         StoredEvent updated = store.findById(eventId).orElseThrow();
         assertThat(updated.status()).isEqualTo(EventStatus.NEW);
@@ -100,28 +100,28 @@ class InMemoryEventStoreTest {
     @DisplayName("Should find events by status and age")
     void shouldFindByStatusAndAge() {
         store.save(event);
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "error");
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
 
         // Should not find events updated in the future
         Instant recent = Instant.now().minus(1, ChronoUnit.MILLIS);
-        List<StoredEvent> results = store.findByStatus(EventStatus.PUBLISH_FAILED, recent);
+        List<StoredEvent> results = store.findByStatus(EventStatus.FAILED, recent);
         assertThat(results).isEmpty();
 
         // Should find events older than 1 second
         Instant past = Instant.now().plus(1, ChronoUnit.DAYS);
-        results = store.findByStatus(EventStatus.PUBLISH_FAILED, past);
+        results = store.findByStatus(EventStatus.FAILED, past);
         assertThat(results).hasSize(1);
         assertThat(results.get(0).eventId()).isEqualTo(eventId);
     }
 
     @Test
-    @DisplayName("Should handle full lifecycle: NEW → PUBLISH_FAILED → NEW → PUBLISHED → HANDLED")
+    @DisplayName("Should handle full lifecycle: NEW → FAILED → NEW → PUBLISHED → HANDLED")
     void shouldHandleFullLifecycle() {
         store.save(event);
         assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
 
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "error");
-        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PUBLISH_FAILED);
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.FAILED);
 
         store.updateStatus(eventId, EventStatus.NEW, null);
         StoredEvent afterRetry = store.findById(eventId).orElseThrow();

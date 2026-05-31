@@ -20,6 +20,15 @@ import java.util.List;
  *   publisher:
  *     enabled: true
  *     transactional: true
+ *     lifecycle:
+ *       enabled: false
+ *       service: ""
+ *       table-name: event_store
+ *       auto-init-schema: true
+ *       retry-enabled: true
+ *       max-retries: 3
+ *       retry-interval: 30s
+ *       min-age: 30s
  *     retry:
  *       enabled: true
  *       max-attempts: 3
@@ -110,7 +119,7 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private LoggingConfig logging = new LoggingConfig();
         private RetryConfig retry = new RetryConfig();
-        private PersistentPublisherConfig persistent = new PersistentPublisherConfig();
+        private LifecyclePublisherConfig lifecycle = new LifecyclePublisherConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
         public boolean isEnabled() {
@@ -145,12 +154,12 @@ public class EventFlowProperties {
             this.retry = retry;
         }
 
-        public PersistentPublisherConfig getPersistent() {
-            return persistent;
+        public LifecyclePublisherConfig getLifecycle() {
+            return lifecycle;
         }
 
-        public void setPersistent(PersistentPublisherConfig persistent) {
-            this.persistent = persistent;
+        public void setLifecycle(LifecyclePublisherConfig lifecycle) {
+            this.lifecycle = lifecycle;
         }
 
         public List<ChannelConfig> getChannels() {
@@ -163,14 +172,19 @@ public class EventFlowProperties {
     }
 
     /**
-     * Persistent publisher configuration for event lifecycle tracking.
+     * Lifecycle-aware publisher configuration for event lifecycle tracking.
      * <p>
-     * When enabled, events are persisted to an {@code EventStore} before publication
-     * and their lifecycle status is tracked through acknowledgment events.
+     * When enabled, events are persisted to an {@code EventStore} according to their
+     * {@code EventLifecycle} level:
+     * <ul>
+     *   <li>{@code PERSISTED} — saved with {@code UNDEFINED} status, no further tracking</li>
+     *   <li>{@code MANAGED} — saved with {@code NEW} status, full lifecycle tracking
+     *       via acknowledgment events</li>
+     * </ul>
      * <p>
      * Requires a {@code DataSource} bean to be present in the application context.
      */
-    public static class PersistentPublisherConfig {
+    public static class LifecyclePublisherConfig {
         private boolean enabled = false;
         private boolean retryEnabled = true;
         private int maxRetries = 3;

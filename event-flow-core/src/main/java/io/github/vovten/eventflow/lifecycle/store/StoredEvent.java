@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.store;
+package io.github.vovten.eventflow.lifecycle.store;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -52,10 +52,24 @@ public record StoredEvent(
      * @return a new StoredEvent with status NEW, retryCount 0, and timestamps set to now
      */
     public static StoredEvent newEvent(UUID eventId, String eventType, String payload, UUID processId) {
+        return newEvent(eventId, eventType, payload, processId, EventStatus.NEW);
+    }
+
+    /**
+     * Creates a new event with the given status and attributes.
+     *
+     * @param eventId   unique event identifier
+     * @param eventType fully qualified class name of the event type
+     * @param payload   JSON-serialized event data
+     * @param processId optional process correlation ID, or null
+     * @param status    the initial lifecycle status
+     * @return a new StoredEvent with the given status, retryCount 0, and timestamps set to now
+     */
+    public static StoredEvent newEvent(UUID eventId, String eventType, String payload, UUID processId, EventStatus status) {
         Instant now = Instant.now();
         return new StoredEvent(
                 eventId, eventType, payload, processId,
-                EventStatus.NEW, 0, now, now, null
+                status, 0, now, now, null
         );
     }
 

@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.store;
+package io.github.vovten.eventflow.lifecycle.store;
 
 import java.time.Instant;
 import java.util.List;

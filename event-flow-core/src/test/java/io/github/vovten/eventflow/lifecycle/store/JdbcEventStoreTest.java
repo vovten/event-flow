@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.store;
+package io.github.vovten.eventflow.lifecycle.store;
 
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.AfterEach;
@@ -142,10 +142,10 @@ class JdbcEventStoreTest {
         UUID eventId = UUID.randomUUID();
         store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
 
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "timeout");
+        store.updateStatus(eventId, EventStatus.FAILED, "timeout");
 
         StoredEvent updated = store.findById(eventId).orElseThrow();
-        assertThat(updated.status()).isEqualTo(EventStatus.PUBLISH_FAILED);
+        assertThat(updated.status()).isEqualTo(EventStatus.FAILED);
         assertThat(updated.errorDetails()).isEqualTo("timeout");
     }
 
@@ -156,7 +156,7 @@ class JdbcEventStoreTest {
         UUID eventId = UUID.randomUUID();
         store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
 
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "err");
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
         store.updateStatus(eventId, EventStatus.NEW, null);
 
         StoredEvent updated = store.findById(eventId).orElseThrow();
@@ -180,16 +180,16 @@ class JdbcEventStoreTest {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
         store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "err");
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
 
         // Should not find events newer than 'before'
         Instant recent = Instant.now().minus(1, ChronoUnit.MILLIS);
-        assertThat(store.findByStatus(EventStatus.PUBLISH_FAILED, recent)).isEmpty();
+        assertThat(store.findByStatus(EventStatus.FAILED, recent)).isEmpty();
 
         // Should find events older than 'before'
         Thread.sleep(10); // ensure freshness
         Instant future = Instant.now().plus(1, ChronoUnit.DAYS);
-        List<StoredEvent> results = store.findByStatus(EventStatus.PUBLISH_FAILED, future);
+        List<StoredEvent> results = store.findByStatus(EventStatus.FAILED, future);
         assertThat(results).hasSize(1);
         assertThat(results.get(0).eventId()).isEqualTo(eventId);
     }
@@ -227,8 +227,8 @@ class JdbcEventStoreTest {
         store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
         assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
 
-        store.updateStatus(eventId, EventStatus.PUBLISH_FAILED, "err");
-        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PUBLISH_FAILED);
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.FAILED);
 
         store.updateStatus(eventId, EventStatus.NEW, null);
         assertThat(store.findById(eventId).orElseThrow().retryCount()).isEqualTo(1);

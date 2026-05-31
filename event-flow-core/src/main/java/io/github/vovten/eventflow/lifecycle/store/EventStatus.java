@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.store;
+package io.github.vovten.eventflow.lifecycle.store;
 
 import java.util.Arrays;
 
@@ -7,11 +7,14 @@ import java.util.Arrays;
  * <p>
  * Flow:
  * <pre>
- * NEW ──publish──► PUBLISHED ──ack──► HANDLED
- *  │                                    │
- *  └──failed──► PUBLISH_FAILED ──retry──► NEW
- *                                       │
- *                                       └──ack-failed──► HANDLE_FAILED ──retry──► NEW
+ * PERSISTED:                         UNDEFINED (terminal, no tracking)
+ *
+ * MANAGED (full lifecycle):
+ *   NEW ──publish──► PUBLISHED ──ack──► HANDLED
+ *    │                                    │
+ *    └──failed──► FAILED ──retry──► NEW   │
+ *                                         │
+ *                    (ack-failed) ────────┘──► FAILED ──retry──► NEW
  * </pre>
  * <p>
  * Each status has a numeric code used for efficient storage in the database.
@@ -21,20 +24,23 @@ import java.util.Arrays;
  */
 public enum EventStatus {
 
-    /** Event was saved but not yet published successfully. */
-    NEW(0),
+    /** Event was persisted but is not lifecycle-tracked (PERSISTED lifecycle). */
+    UNDEFINED(0),
+
+    /** Event saved and lifecycle-tracked (MANAGED lifecycle), not yet published successfully. */
+    NEW(1),
 
     /** Event was successfully published to all target transports. */
-    PUBLISHED(1),
+    PUBLISHED(2),
 
     /** Event was successfully handled by all registered handlers. Set via ack from dispatcher. */
-    HANDLED(2),
+    HANDLED(3),
 
-    /** Event publication failed. Eligible for retry. */
-    PUBLISH_FAILED(3),
-
-    /** Event handling failed. Eligible for retry. Set via ack from dispatcher. */
-    HANDLE_FAILED(4);
+    /**
+     * Event publication or handling failed. Eligible for retry.
+     * Check {@link StoredEvent#errorDetails()} for the specific cause.
+     */
+    FAILED(4);
 
     private final int code;
 

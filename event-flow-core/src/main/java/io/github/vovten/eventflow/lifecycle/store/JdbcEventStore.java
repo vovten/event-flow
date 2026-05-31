@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.store;
+package io.github.vovten.eventflow.lifecycle.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +31,7 @@ import java.util.UUID;
  * Automatic schema initialization can be disabled via the
  * {@link #JdbcEventStore(DataSource, String, boolean)} constructor.
  * A ready-to-use DDL script is available as a classpath resource at
- * {@code io/github/vovten/eventflow/store/event-store.sql}.
+ * {@code io/github/vovten/eventflow/lifecycle/store/event-store.sql}.
  * <p>
  * The {@code status} column uses {@code SMALLINT} with codes defined in {@link EventStatus}.
  * The {@code payload} column uses {@code TEXT} for JSON-serialized event data.
@@ -63,7 +63,7 @@ public class JdbcEventStore implements EventStore {
             COMMENT ON COLUMN %s.event_type IS 'Fully qualified event class name';
             COMMENT ON COLUMN %s.payload IS 'JSON-serialized event body';
             COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
-            COMMENT ON COLUMN %s.status IS 'Lifecycle status: 0=NEW, 1=PUBLISHED, 2=HANDLED, 3=PUBLISH_FAILED, 4=HANDLE_FAILED';
+            COMMENT ON COLUMN %s.status IS 'Lifecycle status: 0=UNDEFINED, 1=NEW, 2=PUBLISHED, 3=HANDLED, 4=FAILED';
             COMMENT ON COLUMN %s.retry_count IS 'Number of retry attempts for failed events';
             COMMENT ON COLUMN %s.created_at IS 'Timestamp when the event was first stored';
             COMMENT ON COLUMN %s.updated_at IS 'Timestamp of the last status update';
@@ -142,7 +142,7 @@ public class JdbcEventStore implements EventStore {
      * <p>
      * When {@code autoInitSchema} is {@code false}, the caller is responsible
      * for creating the table beforehand. A ready-to-use DDL script is available
-     * at {@code io/github/vovten/eventflow/store/event-store.sql} in the classpath.
+     * at {@code io/github/vovten/eventflow/lifecycle/store/event-store.sql} in the classpath.
      *
      * @param dataSource     the JDBC DataSource (must not be null)
      * @param tableName      the name of the event store table (must not be null)

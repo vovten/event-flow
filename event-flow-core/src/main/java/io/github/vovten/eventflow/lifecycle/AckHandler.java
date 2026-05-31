@@ -1,9 +1,9 @@
-package io.github.vovten.eventflow.event.lifecycle;
+package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.store.EventStatus;
-import io.github.vovten.eventflow.store.EventStore;
+import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,10 +79,10 @@ public final class AckHandler implements EventSubscriber {
     private void handle(FailureAck failureAck) {
         UUID originalEventId = failureAck.originalEventId();
         try {
-            eventStore.updateStatus(originalEventId, EventStatus.HANDLE_FAILED, failureAck.error());
+            eventStore.updateStatus(originalEventId, EventStatus.FAILED, failureAck.error());
             log.debug("Event handling failed: {} ({})", originalEventId, failureAck.eventType());
         } catch (Exception e) {
-            log.error("Failed to update event status to HANDLE_FAILED for {}", originalEventId, e);
+            log.error("Failed to update event status to FAILED for {}", originalEventId, e);
         }
     }
 

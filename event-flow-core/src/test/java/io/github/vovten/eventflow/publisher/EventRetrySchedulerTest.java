@@ -1,9 +1,15 @@
 package io.github.vovten.eventflow.publisher;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.store.EventStatus;
-import io.github.vovten.eventflow.store.InMemoryEventStore;
-import io.github.vovten.eventflow.store.StoredEvent;
+import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.lifecycle.EventLifecycle;
+import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
+import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
+import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.util.EventUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +19,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -24,32 +29,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EventRetrySchedulerTest {
 
     private InMemoryEventStore eventStore;
-    private List<Event> publishedEvents;
-    private EventPublisher publisher;
-    private UUID eventId;
+    private EventPublisher lifecyclePublisher;
 
     @BeforeEach
     void setUp() {
         eventStore = new InMemoryEventStore();
-        publishedEvents = new ArrayList<>();
-        publisher = event -> {
-            publishedEvents.add(event);
-            return CompletableFuture.completedFuture(SendResults.empty());
-        };
-    }
-
-    private StoredEvent createFailedEvent(UUID id, EventStatus status, int retryCount, Instant updatedAt) {
-        String payload = EventUtils.toJson(new TestEvent("data"));
-        return new StoredEvent(
-                id, TestEvent.class.getName(), payload, null,
-                status, retryCount, updatedAt, updatedAt, "test error"
-        );
+        EventPublisher originPublisher = event ->
+                CompletableFuture.completedFuture(
+                        SendResults.of(List.of(SendResult.success("dest"))));
+        lifecyclePublisher = new EventLifecyclePublisher(
+                originPublisher, eventStore, null);
     }
 
     private EventRetryScheduler scheduler(Duration minAge, int maxRetries) {
         return new EventRetryScheduler(
-                eventStore, publisher,
-                Duration.ofMinutes(1), // interval doesn't matter for direct retryCycle() calls
+                eventStore, lifecyclePublisher,
+                Duration.ofMinutes(1),
                 minAge, maxRetries
         );
     }
@@ -58,168 +53,178 @@ class EventRetrySchedulerTest {
         return scheduler(Duration.ZERO, maxRetries);
     }
 
+    /**
+     * Creates a StoredEvent with FAILED status.
+     * The eventId from the serialized payload matches the stored event ID
+     * so EventLifecyclePublisher can find it on retry.
+     * Uses a past timestamp (default: 10 seconds ago) so the event is
+     * immediately eligible for retry with minAge=Duration.ZERO.
+     */
+    private UUID createFailedEvent(int retryCount) {
+        return createFailedEvent(retryCount, Instant.now().minusSeconds(10));
+    }
+
+    private UUID createFailedEvent(int retryCount, Instant updatedAt) {
+        UUID id = UUID.randomUUID();
+        TestEvent event = new TestEvent(id, "data");
+        String payload = EventUtils.toJson(event);
+        StoredEvent stored = new StoredEvent(
+                id, TestEvent.class.getName(), payload, null,
+                EventStatus.FAILED, retryCount, updatedAt, updatedAt, "test error"
+        );
+        eventStore.save(stored);
+        return id;
+    }
+
     @Nested
     @DisplayName("retryCycle")
     class RetryCycle {
 
         @Test
-        @DisplayName("retries PUBLISH_FAILED events within retry limit")
-        void retriesPublishFailedEvents() {
-            eventId = UUID.randomUUID();
-            eventStore.save(createFailedEvent(eventId, EventStatus.PUBLISH_FAILED, 0, Instant.now().minusSeconds(10)));
+        @DisplayName("retries FAILED events within retry limit")
+        void retriesFailedEvents() {
+            UUID eventId = createFailedEvent(0);
 
             scheduler(3).retryCycle();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-            assertThat(stored.status()).isEqualTo(EventStatus.NEW);
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
             assertThat(stored.retryCount()).isEqualTo(1);
-            assertThat(publishedEvents).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("retries HANDLE_FAILED events within retry limit")
-        void retriesHandleFailedEvents() {
-            eventId = UUID.randomUUID();
-            eventStore.save(createFailedEvent(eventId, EventStatus.HANDLE_FAILED, 0, Instant.now().minusSeconds(10)));
-
-            scheduler(3).retryCycle();
-
-            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-            assertThat(stored.status()).isEqualTo(EventStatus.NEW);
-            assertThat(publishedEvents).hasSize(1);
         }
 
         @Test
         @DisplayName("skips events that have exceeded max retries")
         void skipsEventsExceedingMaxRetries() {
-            eventId = UUID.randomUUID();
-            eventStore.save(createFailedEvent(eventId, EventStatus.PUBLISH_FAILED, 3, Instant.now().minusSeconds(10)));
+            // Create event with retryCount = maxRetries → should NOT be retried
+            UUID eventId = createFailedEvent(3, Instant.now().minusSeconds(10));
 
             scheduler(3).retryCycle();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISH_FAILED);
+            assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
             assertThat(stored.retryCount()).isEqualTo(3);
-            assertThat(publishedEvents).isEmpty();
         }
 
         @Test
         @DisplayName("skips events below the minimum age threshold")
         void skipsEventsBelowMinAge() {
-            eventId = UUID.randomUUID();
             // Event updated just now — newer than minAge of 10 seconds
-            eventStore.save(createFailedEvent(eventId, EventStatus.PUBLISH_FAILED, 0, Instant.now()));
+            UUID eventId = createFailedEvent(0, Instant.now());
 
             scheduler(Duration.ofSeconds(10), 3).retryCycle();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISH_FAILED);
-            assertThat(publishedEvents).isEmpty();
+            assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
         }
 
         @Test
         @DisplayName("does nothing when there are no failed events")
         void noFailedEvents() {
-            eventId = UUID.randomUUID();
-            // Save event with NEW status — not failed
-            String payload = EventUtils.toJson(new TestEvent("data"));
-            StoredEvent newEvent = StoredEvent.newEvent(eventId, TestEvent.class.getName(), payload, null);
-            eventStore.save(newEvent);
+            // Publish an event successfully — status will be PUBLISHED, not FAILED
+            TestEvent event = new TestEvent("data");
+            lifecyclePublisher.publish(event).join();
 
             scheduler(3).retryCycle();
 
-            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-            assertThat(stored.status()).isEqualTo(EventStatus.NEW);
-            assertThat(publishedEvents).isEmpty();
+            StoredEvent stored = eventStore.findById(event.eventId()).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
         }
 
         @Test
         @DisplayName("handles invalid JSON payload without crashing the cycle")
         void invalidJsonPayload() {
-            eventId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
             StoredEvent invalid = new StoredEvent(
                     eventId, TestEvent.class.getName(), "{invalid-json", null,
-                    EventStatus.PUBLISH_FAILED, 0, Instant.now().minusSeconds(10),
+                    EventStatus.FAILED, 0, Instant.now().minusSeconds(10),
                     Instant.now().minusSeconds(10), "error"
             );
             eventStore.save(invalid);
 
             // Should not throw
             scheduler(3).retryCycle();
-
-            assertThat(publishedEvents).isEmpty();
         }
 
         @Test
-        @DisplayName("retries both PUBLISH_FAILED and HANDLE_FAILED events in one cycle")
-        void retriesBothStatuses() {
-            UUID id1 = UUID.randomUUID();
-            UUID id2 = UUID.randomUUID();
-            eventStore.save(createFailedEvent(id1, EventStatus.PUBLISH_FAILED, 0, Instant.now().minusSeconds(10)));
-            eventStore.save(createFailedEvent(id2, EventStatus.HANDLE_FAILED, 0, Instant.now().minusSeconds(10)));
+        @DisplayName("retries multiple FAILED events in one cycle")
+        void retriesMultipleFailed() {
+            UUID id1 = createFailedEvent(0);
+            UUID id2 = createFailedEvent(0);
 
             scheduler(3).retryCycle();
 
             assertThat(eventStore.findById(id1)).hasValueSatisfying(e ->
-                    assertThat(e.status()).isEqualTo(EventStatus.NEW));
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
             assertThat(eventStore.findById(id2)).hasValueSatisfying(e ->
-                    assertThat(e.status()).isEqualTo(EventStatus.NEW));
-            assertThat(publishedEvents).hasSize(2);
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
         }
 
         @Test
         @DisplayName("respects exponential backoff — skips event when backoff not elapsed")
         void skipsEventBeforeBackoffElapsed() {
-            eventId = UUID.randomUUID();
             // retryCount=1 → backoff = minAge * 2^1 = 20s
             // updatedAt was 15s ago → retryAt is 5s in the future → skip
-            eventStore.save(createFailedEvent(eventId, EventStatus.PUBLISH_FAILED, 1, Instant.now().minusSeconds(15)));
+            UUID eventId = createFailedEvent(1, Instant.now().minusSeconds(15));
 
             scheduler(Duration.ofSeconds(10), 3).retryCycle();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISH_FAILED);
-            assertThat(publishedEvents).isEmpty();
+            assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
         }
 
         @Test
         @DisplayName("respects exponential backoff — retries event after backoff elapsed")
         void retriesEventAfterBackoffElapsed() {
-            eventId = UUID.randomUUID();
             // retryCount=1 → backoff = minAge * 2^1 = 20s
             // updatedAt was 30s ago → retryAt is 10s in the past → retry
-            eventStore.save(createFailedEvent(eventId, EventStatus.PUBLISH_FAILED, 1, Instant.now().minusSeconds(30)));
+            UUID eventId = createFailedEvent(1, Instant.now().minusSeconds(30));
 
             scheduler(Duration.ofSeconds(10), 3).retryCycle();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
-            assertThat(stored.status()).isEqualTo(EventStatus.NEW);
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
             assertThat(stored.retryCount()).isEqualTo(2);
-            assertThat(publishedEvents).hasSize(1);
         }
 
         @Test
         @DisplayName("exponential backoff doubles with each retry attempt")
         void backoffDoublesWithEachRetry() {
-            UUID id0 = UUID.randomUUID();
-            UUID id1 = UUID.randomUUID();
-            UUID id2 = UUID.randomUUID();
             // retryCount=0 → backoff = 10s * 1 = 10s, updatedAt 20s ago → elapsed
             // retryCount=1 → backoff = 10s * 2 = 20s, updatedAt 20s ago → just elapsed
             // retryCount=2 → backoff = 10s * 4 = 40s, updatedAt 30s ago → NOT elapsed
-            eventStore.save(createFailedEvent(id0, EventStatus.PUBLISH_FAILED, 0, Instant.now().minusSeconds(20)));
-            eventStore.save(createFailedEvent(id1, EventStatus.PUBLISH_FAILED, 1, Instant.now().minusSeconds(20)));
-            eventStore.save(createFailedEvent(id2, EventStatus.PUBLISH_FAILED, 2, Instant.now().minusSeconds(30)));
+            UUID id0 = createFailedEvent(0, Instant.now().minusSeconds(20));
+            UUID id1 = createFailedEvent(1, Instant.now().minusSeconds(20));
+            UUID id2 = createFailedEvent(2, Instant.now().minusSeconds(30));
 
             scheduler(Duration.ofSeconds(10), 5).retryCycle();
 
             assertThat(eventStore.findById(id0)).hasValueSatisfying(e ->
-                    assertThat(e.status()).isEqualTo(EventStatus.NEW));
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
             assertThat(eventStore.findById(id1)).hasValueSatisfying(e ->
-                    assertThat(e.status()).isEqualTo(EventStatus.NEW));
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
             assertThat(eventStore.findById(id2)).hasValueSatisfying(e ->
-                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISH_FAILED));
-            assertThat(publishedEvents).hasSize(2);
+                    assertThat(e.status()).isEqualTo(EventStatus.FAILED));
+        }
+
+        @Test
+        @DisplayName("preserves retry increment across multiple retry cycles")
+        void preservesRetryIncrementAcrossCycles() {
+            UUID eventId = createFailedEvent(0);
+
+            // First retry cycle
+            scheduler(5).retryCycle();
+            StoredEvent afterFirstRetry = eventStore.findById(eventId).orElseThrow();
+            assertThat(afterFirstRetry.retryCount()).isEqualTo(1);
+            assertThat(afterFirstRetry.status()).isEqualTo(EventStatus.PUBLISHED);
+
+            // Set back to FAILED for another retry
+            eventStore.updateStatus(eventId, EventStatus.FAILED, "error again");
+
+            // Second retry cycle
+            scheduler(5).retryCycle();
+            StoredEvent afterSecondRetry = eventStore.findById(eventId).orElseThrow();
+            assertThat(afterSecondRetry.retryCount()).isEqualTo(2);
+            assertThat(afterSecondRetry.status()).isEqualTo(EventStatus.PUBLISHED);
         }
     }
 
@@ -231,38 +236,58 @@ class EventRetrySchedulerTest {
         @DisplayName("start and stop without errors")
         void startAndStop() throws Exception {
             EventRetryScheduler scheduler = new EventRetryScheduler(
-                    eventStore, publisher,
+                    eventStore, lifecyclePublisher,
                     Duration.ofMinutes(1), Duration.ZERO, 3
             );
             scheduler.start();
-            // Give it a moment to schedule the task
             Thread.sleep(50);
             scheduler.stop();
-            // Should not throw
         }
 
         @Test
         @DisplayName("close calls stop without errors")
         void close() {
             EventRetryScheduler scheduler = new EventRetryScheduler(
-                    eventStore, publisher,
+                    eventStore, lifecyclePublisher,
                     Duration.ofMinutes(1), Duration.ZERO, 3
             );
             scheduler.start();
             scheduler.close();
-            // Should not throw
         }
     }
 
     /**
-     * Test event record for serialization/deserialization in retry tests.
-     * Records are natively supported by Jackson 2.12+ for both serialization
-     * and deserialization.
+     * Test event with MANAGED lifecycle for proper retry integration.
+     * Extends AbstractTraceableEvent so eventId is preserved through JSON
+     * serialization/deserialization when EventLifecyclePublisher resolves it.
+     * Uses a {@code @JsonCreator} on the all-args constructor for proper
+     * deserialization by the retry scheduler.
      */
-    private record TestEvent(String data) implements Event {
+    @io.github.vovten.eventflow.event.annotation.Event(lifecycle = EventLifecycle.MANAGED)
+    private static class TestEvent extends AbstractTraceableEvent {
+        private final String data;
+
+        TestEvent(String data) {
+            super();
+            this.data = data;
+        }
+
+        /** Constructor with explicit eventId for matching stored event IDs. */
+        @JsonCreator
+        TestEvent(@JsonProperty("eventId") UUID eventId,
+                  @JsonProperty("data") String data) {
+            super(eventId, null, java.time.Instant.now());
+            this.data = data;
+        }
+
         @Override
         public Class<? extends Event> type() {
             return TestEvent.class;
+        }
+
+        @SuppressWarnings("unused")
+        public String getData() {
+            return data;
         }
     }
 }

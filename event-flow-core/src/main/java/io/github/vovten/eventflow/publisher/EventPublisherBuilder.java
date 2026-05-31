@@ -1,7 +1,8 @@
 package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.channel.EventChannel;
-import io.github.vovten.eventflow.store.EventStore;
+import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,17 +152,22 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     }
 
     /**
-     * Enable persistent event storage with lifecycle tracking.
+     * Enable lifecycle-aware event publishing.
      * <p>
      * When enabled, every published event is persisted to the {@link EventStore}
-     * before publishing and its status is updated after publishing completes.
+     * and its lifecycle status is managed according to the event's
+     * {@link io.github.vovten.eventflow.lifecycle.EventLifecycle} level:
+     * <ul>
+     *   <li>{@code PERSISTED} — saved with UNDEFINED status, no further tracking</li>
+     *   <li>{@code MANAGED} — saved with NEW status, full lifecycle tracking</li>
+     * </ul>
      * Failed events are eligible for retry via {@code EventRetryScheduler}.
      *
      * @param eventStore the event store for persistence
      * @return this builder
      */
     @SuppressWarnings("unchecked")
-    public T persistent(EventStore eventStore) {
+    public T lifecycleAware(EventStore eventStore) {
         this.persistentStore = eventStore;
         return (T) this;
     }
@@ -227,10 +233,10 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
                     retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
         }
 
-        // Apply persistent storage if configured (wraps retry, so save/status update happens once)
+        // Apply lifecycle-aware publisher if configured (wraps retry, so save/status update happens once)
         if (persistentStore != null) {
-            publisher = new PersistentEventPublisher(publisher, persistentStore, persistentService);
-            log.debug("Applied persistent event storage decorator");
+            publisher = new EventLifecyclePublisher(publisher, persistentStore, persistentService);
+            log.debug("Applied EventLifecyclePublisher decorator");
         }
 
         // Allow subclasses to add additional decorations (e.g., transactional, logging) — always outermost
@@ -257,7 +263,7 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      */
     public EventPublisher buildAndLog() {
         EventPublisher publisher = build();
-        log.info("Built EventPublisher with configuration: channels={}, retry={}, persistent={}, customDecorators={}",
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, lifecycle={}, customDecorators={}",
                 channels.size(),
                 retryConfig != null ? "enabled" : "disabled",
                 persistentStore != null ? "enabled" : "disabled",

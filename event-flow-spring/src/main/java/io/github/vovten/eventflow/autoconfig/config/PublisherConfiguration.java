@@ -3,10 +3,10 @@ package io.github.vovten.eventflow.autoconfig.config;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import io.github.vovten.eventflow.channel.EventChannel;
+import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
-import io.github.vovten.eventflow.publisher.PersistentEventPublisher;
 import io.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
-import io.github.vovten.eventflow.store.EventStore;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -100,18 +100,18 @@ public class PublisherConfiguration {
 
         EventPublisher publisher = builder.build();
 
-        // Wrap with persistent event publisher if enabled
-        if (eventStore != null && publisherConfig.getPersistent().isEnabled()) {
-            String service = publisherConfig.getPersistent().getService();
-            publisher = new PersistentEventPublisher(publisher, eventStore, service);
-            log.info("Wrapped EventPublisher with PersistentEventPublisher (service: {})",
+        // Wrap with lifecycle-aware publisher if enabled
+        if (eventStore != null && publisherConfig.getLifecycle().isEnabled()) {
+            String service = publisherConfig.getLifecycle().getService();
+            publisher = new EventLifecyclePublisher(publisher, eventStore, service);
+            log.info("Wrapped EventPublisher with EventLifecyclePublisher (service: {})",
                     service.isEmpty() ? "none" : service);
         }
 
-        log.info("Built EventPublisher with configuration: channels={}, retry={}, persistent={}, customDecorators={}",
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, lifecycle={}, customDecorators={}",
                 eventChannels.size(),
                 retry.isEnabled() ? "enabled" : "disabled",
-                publisherConfig.getPersistent().isEnabled() ? "enabled" : "disabled",
+                publisherConfig.getLifecycle().isEnabled() ? "enabled" : "disabled",
                 "0"
         );
         return publisher;

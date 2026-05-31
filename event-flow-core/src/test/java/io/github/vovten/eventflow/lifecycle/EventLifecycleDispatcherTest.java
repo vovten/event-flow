@@ -1,4 +1,4 @@
-package io.github.vovten.eventflow.event.lifecycle;
+package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
 import io.github.vovten.eventflow.dispatcher.HandlerResult;
@@ -97,18 +97,18 @@ class EventLifecycleDispatcherTest {
     }
 
     @Test
-    @DisplayName("Should not publish ack for event without FULL lifecycle")
-    void shouldNotPublishAckForNonFullLifecycle() {
+    @DisplayName("Should not publish ack for event without MANAGED lifecycle")
+    void shouldNotPublishAckForNonManagedLifecycle() {
         EventDispatcher origin = successDispatcher();
         EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
-        Event nonFullEvent = new Event() {
+        Event nonManagedEvent = new Event() {
             @Override
             public Class<?> type() {
                 return Event.class;
             }
         };
 
-        dispatcher.dispatch(nonFullEvent).join();
+        dispatcher.dispatch(nonManagedEvent).join();
 
         assertThat(publishedAck.get()).isNull();
     }
@@ -166,7 +166,7 @@ class EventLifecycleDispatcherTest {
         }
     }
 
-    @io.github.vovten.eventflow.event.annotation.Event(lifecycle = EventLifecycle.FULL)
+    @io.github.vovten.eventflow.event.annotation.Event(lifecycle = EventLifecycle.MANAGED)
     private static class TestEvent extends AbstractTraceableEvent {
         private final String data;
 

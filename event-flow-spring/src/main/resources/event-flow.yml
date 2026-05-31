@@ -46,10 +46,10 @@ event-flow:
       max-payload-length: 500
 
     # ---------------------------------------------------------------------------
-    # Persistent publisher (event lifecycle tracking)
+    # Lifecycle-aware event publishing (event lifecycle tracking)
     # ---------------------------------------------------------------------------
-    persistent:
-      # Enable or disable persistent event storage and lifecycle tracking
+    lifecycle:
+      # Enable or disable lifecycle-aware event publishing and lifecycle tracking
       enabled: false
       # Service name stamped on outgoing events for ack filtering
       service: ""

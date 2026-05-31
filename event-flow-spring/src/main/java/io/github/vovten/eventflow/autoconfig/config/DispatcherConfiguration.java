@@ -4,7 +4,7 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.InTransportFactory;
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
 import io.github.vovten.eventflow.dispatcher.EventDispatcherBuilder;
-import io.github.vovten.eventflow.event.lifecycle.EventLifecycleDispatcher;
+import io.github.vovten.eventflow.lifecycle.EventLifecycleDispatcher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 import io.github.vovten.eventflow.transport.InTransport;

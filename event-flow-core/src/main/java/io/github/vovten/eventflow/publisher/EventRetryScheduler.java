@@ -1,9 +1,9 @@
 package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.store.EventStatus;
-import io.github.vovten.eventflow.store.EventStore;
-import io.github.vovten.eventflow.store.StoredEvent;
+import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.util.EventUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,13 +19,14 @@ import java.util.concurrent.TimeUnit;
 /**
  * Scheduled retry mechanism for failed events in the {@link EventStore}.
  * <p>
- * Periodically scans for events with status {@link EventStatus#PUBLISH_FAILED}
- * or {@link EventStatus#HANDLE_FAILED} that are older than a configured minimum age
+ * Periodically scans for events with status {@link EventStatus#FAILED}
+ * that are older than a configured minimum age
  * and have not exceeded the maximum retry count. Eligible events are:
  * <ol>
- *   <li>Retry count incremented (via {@link EventStore#updateStatus})</li>
- *   <li>Status reset to {@link EventStatus#NEW}</li>
- *   <li>Event deserialized from JSON and re-published</li>
+ *   <li>Deserialized from JSON payload</li>
+ *   <li>Re-published via the configured {@link EventPublisher}</li>
+ *   <li>Status reset to {@link EventStatus#NEW} and retry count incremented
+ *       by the {@link io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher}</li>
  * </ol>
  * <p>
  * The delay between retry attempts increases exponentially:
@@ -111,8 +112,7 @@ public final class EventRetryScheduler implements AutoCloseable {
     void retryCycle() {
         try {
             Instant deadline = Instant.now().minus(minAge);
-            List<StoredEvent> failedEvents = eventStore.findByStatus(EventStatus.PUBLISH_FAILED, deadline);
-            failedEvents.addAll(eventStore.findByStatus(EventStatus.HANDLE_FAILED, deadline));
+            List<StoredEvent> failedEvents = eventStore.findByStatus(EventStatus.FAILED, deadline);
 
             if (failedEvents.isEmpty()) {
                 log.trace("No failed events to retry");
@@ -139,7 +139,8 @@ public final class EventRetryScheduler implements AutoCloseable {
     private void retryEvent(StoredEvent stored) {
         try {
             Event event = EventUtils.fromJson(stored.payload(), Event.class);
-            eventStore.updateStatus(stored.eventId(), EventStatus.NEW, null);
+            // EventLifecyclePublisher.persistOrReset() handles the status reset to NEW
+            // and retry count increment — no need to call updateStatus here
             publisher.publish(event);
             log.info("Retried event id={} (attempt {}/{})", stored.eventId(), stored.retryCount() + 1, maxRetries);
         } catch (Exception e) {

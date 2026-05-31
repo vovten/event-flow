@@ -1,13 +1,12 @@
-package io.github.vovten.eventflow.publisher;
+package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.event.lifecycle.EventLifecycle;
 import io.github.vovten.eventflow.event.TraceableEvent;
-import io.github.vovten.eventflow.event.lifecycle.LifecycleAckEvent;
-import io.github.vovten.eventflow.store.EventStatus;
-import io.github.vovten.eventflow.store.EventStore;
-import io.github.vovten.eventflow.store.StoredEvent;
+import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.util.EventUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -23,13 +22,16 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * A decorator for {@link EventPublisher} that persists events to an {@link EventStore}
- * before publishing and updates their lifecycle status after publishing completes.
+ * and manages their lifecycle status according to the event's {@link EventLifecycle} level.
  * <p>
- * Lifecycle:
+ * Behaviour by lifecycle level:
  * <ul>
- *   <li>Before publish: saves the event with status {@link EventStatus#NEW}</li>
- *   <li>On success: updates status to {@link EventStatus#PUBLISHED}</li>
- *   <li>On failure: updates status to {@link EventStatus#PUBLISH_FAILED}</li>
+ *   <li>{@link EventLifecycle#NONE} — passes through without persistence</li>
+ *   <li>{@link EventLifecycle#PERSISTED} — persists the event with
+ *       {@link EventStatus#UNDEFINED} status, no further tracking</li>
+ *   <li>{@link EventLifecycle#MANAGED} — persists with {@link EventStatus#NEW},
+ *       tracks publication outcome ({@link EventStatus#PUBLISHED} / {@link EventStatus#FAILED})
+ *       and publishes lifecycle ack events for end-to-end tracking</li>
  * </ul>
  * <p>
  * If configured with a {@code service} name, it enriches the event's
@@ -42,9 +44,9 @@ import java.util.concurrent.CompletableFuture;
  * @author Vladimir Aleshkov
  * @since 1.3.0
  */
-public final class PersistentEventPublisher implements EventPublisher {
+public final class EventLifecyclePublisher implements EventPublisher {
 
-    private static final Logger log = LoggerFactory.getLogger(PersistentEventPublisher.class);
+    private static final Logger log = LoggerFactory.getLogger(EventLifecyclePublisher.class);
 
     private static final String PUBLISHER_SERVICE_KEY = "publisherService";
 
@@ -53,13 +55,13 @@ public final class PersistentEventPublisher implements EventPublisher {
     private final EventStore eventStore;
 
     /**
-     * Creates a new PersistentEventPublisher.
+     * Creates a new EventLifecyclePublisher.
      *
      * @param origin     the underlying publisher to delegate to
      * @param eventStore the event store for persistence
      * @param service    the service name for ack filtering, or null/empty to disable
      */
-    public PersistentEventPublisher(EventPublisher origin, EventStore eventStore, String service) {
+    public EventLifecyclePublisher(EventPublisher origin, EventStore eventStore, String service) {
         this.service = service;
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
@@ -74,6 +76,14 @@ public final class PersistentEventPublisher implements EventPublisher {
         }
         Event enriched = enrichWithService(event);
         UUID eventId = resolveEventId(enriched);
+        EventLifecycle lifecycle = EventUtils.lifecycle(event);
+
+        if (lifecycle == EventLifecycle.PERSISTED) {
+            // Persist with UNDEFINED status, no further tracking
+            persistNewOnly(eventId, enriched);
+            return origin.publish(enriched);
+        }
+        // MANAGED — persist with NEW status, full lifecycle tracking
         persistOrReset(eventId, enriched);
         return origin.publish(enriched)
                 .whenComplete((result, error) -> updatePublishResult(eventId, result, error));
@@ -92,6 +102,20 @@ public final class PersistentEventPublisher implements EventPublisher {
         return false;
     }
 
+    private void persistNewOnly(UUID eventId, Event event) {
+        Optional<StoredEvent> existing = eventStore.findById(eventId);
+        if (existing.isPresent()) {
+            log.trace("Event already persisted, skipping: {} ({})", eventId, event.getClass().getName());
+            return;
+        }
+        String eventType = event.getClass().getName();
+        UUID processId = resolveProcessId(event);
+        String payload = EventUtils.toJson(event);
+        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId, EventStatus.UNDEFINED);
+        eventStore.save(stored);
+        log.debug("Saved new event with UNDEFINED status: {} ({})", eventId, eventType);
+    }
+
     private void persistOrReset(UUID eventId, Event event) {
         String eventType = event.getClass().getName();
         Optional<StoredEvent> existing = eventStore.findById(eventId);
@@ -102,20 +126,20 @@ public final class PersistentEventPublisher implements EventPublisher {
         }
         UUID processId = resolveProcessId(event);
         String payload = EventUtils.toJson(event);
-        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId);
+        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId, EventStatus.NEW);
         eventStore.save(stored);
         log.debug("Saved new event to store: {} ({})", eventId, eventType);
     }
 
     private void updatePublishResult(UUID eventId, SendResults result, Throwable error) {
         if (error != null) {
-            eventStore.updateStatus(eventId, EventStatus.PUBLISH_FAILED, error.getMessage());
+            eventStore.updateStatus(eventId, EventStatus.FAILED, error.getMessage());
             log.warn("Event publication failed: {} — {}", eventId, error.getMessage());
             return;
         }
         if (result == null || result.isAllFailure()) {
             String errorMsg = result != null ? result.getSummary() : "null result";
-            eventStore.updateStatus(eventId, EventStatus.PUBLISH_FAILED, errorMsg);
+            eventStore.updateStatus(eventId, EventStatus.FAILED, errorMsg);
             log.warn("Event publication failed: {} — {}", eventId, errorMsg);
             return;
         }
@@ -138,13 +162,6 @@ public final class PersistentEventPublisher implements EventPublisher {
         );
     }
 
-    /**
-     * Extracts the event ID from the event, generating one if the event doesn't
-     * implement {@link TraceableEvent}.
-     *
-     * @param event the event
-     * @return the event ID
-     */
     private UUID resolveEventId(Event event) {
         if (event instanceof TraceableEvent traceable) {
             return traceable.eventId();
@@ -152,13 +169,6 @@ public final class PersistentEventPublisher implements EventPublisher {
         return UUID.randomUUID();
     }
 
-    /**
-     * Extracts the process ID from the event, returning null if the event doesn't
-     * implement {@link TraceableEvent}.
-     *
-     * @param event the event
-     * @return the process ID, or null
-     */
     private UUID resolveProcessId(Event event) {
         if (event instanceof TraceableEvent traceable) {
             return traceable.processId();
