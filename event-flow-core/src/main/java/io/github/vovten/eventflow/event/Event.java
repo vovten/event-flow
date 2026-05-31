@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.event;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
+import io.github.vovten.eventflow.lifecycle.EventLifecycle;
 import io.github.vovten.eventflow.util.EventUtils;
 
 import java.util.List;
@@ -36,6 +37,20 @@ public interface Event {
      */
     default List<Class<? extends EventChannel>> channels() {
         return List.of(InternalEventChannel.class);
+    }
+
+    /**
+     * Lifecycle tracking level for this event.
+     * <p>
+     * Override to change from the default {@link EventLifecycle#PERSISTED}.
+     * The {@link io.github.vovten.eventflow.event.annotation.Event @Event} annotation
+     * takes precedence when present.
+     *
+     * @return lifecycle tracking level
+     * @see EventLifecycle
+     */
+    default EventLifecycle lifecycle() {
+        return EventLifecycle.PERSISTED;
     }
 
     /**

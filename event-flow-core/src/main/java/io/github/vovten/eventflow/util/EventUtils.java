@@ -84,16 +84,24 @@ public final class EventUtils {
     }
 
     /**
-     * Resolves the {@link EventLifecycle} for the given event based on its
-     * {@link io.github.vovten.eventflow.event.annotation.Event @Event} annotation.
+     * Resolves the {@link EventLifecycle} for the given event.
      * <p>
-     * If the annotation is not present, returns the default value {@link EventLifecycle#PERSISTED}.
+     * Priority:
+     * <ol>
+     *   <li>{@link io.github.vovten.eventflow.event.annotation.Event @Event} annotation
+     *       on the event class (highest priority)</li>
+     *   <li>{@link Event#lifecycle()} default method override</li>
+     *   <li>{@link EventLifecycle#PERSISTED} — global default</li>
+     * </ol>
      *
      * @param event the event instance
      * @return the resolved lifecycle level
      */
     public static EventLifecycle lifecycle(Event event) {
         var ann = event.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
-        return ann != null ? ann.lifecycle() : EventLifecycle.PERSISTED;
+        if (ann != null) {
+            return ann.lifecycle();
+        }
+        return event.lifecycle();
     }
 }
