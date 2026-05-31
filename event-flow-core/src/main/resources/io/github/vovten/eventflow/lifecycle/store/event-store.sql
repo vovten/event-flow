@@ -5,6 +5,14 @@
 -- schema initialization via application code, set:
 --   event-flow.publisher.persistent.auto-init-schema: false
 -- and manage this DDL through your regular migration tooling.
+--
+-- NOTE: The UUID column types below are for PostgreSQL (native UUID).
+-- For other databases:
+--   MySQL / SQL Server → BINARY(16)
+--   Oracle             → RAW(16)
+--   SQLite             → BLOB
+-- The application auto-detects the database and adjusts DDL accordingly
+-- when auto-init-schema is enabled.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS event_store (

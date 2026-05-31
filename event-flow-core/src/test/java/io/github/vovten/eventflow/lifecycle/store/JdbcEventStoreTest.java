@@ -253,6 +253,48 @@ class JdbcEventStoreTest {
         assertThat(found.processId()).isEqualTo(processId);
     }
 
+    @Test
+    @DisplayName("Should work with BINARY(16) UUID strategy")
+    void shouldWorkWithBinaryUuidStrategy() {
+        JdbcEventStore store = new JdbcEventStore(dataSource, "event_store", JdbcEventStore.UuidType.BINARY);
+        UUID eventId = UUID.randomUUID();
+        UUID processId = UUID.randomUUID();
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.BinaryEvent",
+                "{\"data\":\"binary-test\"}", processId);
+
+        store.save(event);
+
+        StoredEvent found = store.findById(eventId).orElseThrow();
+        assertThat(found.eventId()).isEqualTo(eventId);
+        assertThat(found.eventType()).isEqualTo("test.BinaryEvent");
+        assertThat(found.payload()).isEqualTo("{\"data\":\"binary-test\"}");
+        assertThat(found.processId()).isEqualTo(processId);
+        assertThat(found.status()).isEqualTo(EventStatus.NEW);
+        assertThat(found.retryCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("Should handle full lifecycle with BINARY(16) UUID strategy")
+    void shouldHandleFullLifecycleWithBinaryUuid() {
+        JdbcEventStore store = new JdbcEventStore(dataSource, "event_store_bin", JdbcEventStore.UuidType.BINARY);
+        UUID eventId = UUID.randomUUID();
+
+        store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
+
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.FAILED);
+
+        store.updateStatus(eventId, EventStatus.NEW, null);
+        assertThat(store.findById(eventId).orElseThrow().retryCount()).isEqualTo(1);
+
+        store.updateStatus(eventId, EventStatus.PUBLISHED, null);
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PUBLISHED);
+
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.HANDLED);
+    }
+
     private boolean tableExists(String tableName) throws SQLException {
         try (Connection conn = dataSource.getConnection()) {
             DatabaseMetaData meta = conn.getMetaData();
