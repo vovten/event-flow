@@ -33,7 +33,8 @@ import java.util.UUID;
  * A ready-to-use DDL script is available as a classpath resource at
  * {@code io/github/vovten/eventflow/lifecycle/store/event-store.sql}.
  * <p>
- * The {@code status} column uses {@code SMALLINT} with codes defined in {@link EventStatus}.
+ * The {@code status} column uses {@code CHAR(1)} with single-character codes (U, N, P, H, F)
+ * defined in {@link EventStatus}.
  * The {@code payload} column uses {@code TEXT} for JSON-serialized event data.
  *
  * @author Vladimir Aleshkov
@@ -49,7 +50,7 @@ public class JdbcEventStore implements EventStore {
                 event_type      VARCHAR(512) NOT NULL,
                 payload         TEXT NOT NULL,
                 process_id      UUID,
-                status          SMALLINT NOT NULL DEFAULT 0,
+                status          CHAR(1) NOT NULL DEFAULT 'U',
                 retry_count     INT DEFAULT 0 NOT NULL,
                 created_at      TIMESTAMP NOT NULL,
                 updated_at      TIMESTAMP NOT NULL,
@@ -63,7 +64,7 @@ public class JdbcEventStore implements EventStore {
             COMMENT ON COLUMN %s.event_type IS 'Fully qualified event class name';
             COMMENT ON COLUMN %s.payload IS 'JSON-serialized event body';
             COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
-            COMMENT ON COLUMN %s.status IS 'Lifecycle status: 0=UNDEFINED, 1=NEW, 2=PUBLISHED, 3=HANDLED, 4=FAILED';
+            COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
             COMMENT ON COLUMN %s.retry_count IS 'Number of retry attempts for failed events';
             COMMENT ON COLUMN %s.created_at IS 'Timestamp when the event was first stored';
             COMMENT ON COLUMN %s.updated_at IS 'Timestamp of the last status update';
@@ -237,7 +238,7 @@ public class JdbcEventStore implements EventStore {
             } else {
                 ps.setNull(4, Types.OTHER);
             }
-            ps.setInt(5, event.status().getCode());
+            ps.setString(5, String.valueOf(event.status().getCode()));
             ps.setInt(6, event.retryCount());
             ps.setTimestamp(7, Timestamp.from(event.createdAt()));
             ps.setTimestamp(8, Timestamp.from(event.updatedAt()));
@@ -261,7 +262,7 @@ public class JdbcEventStore implements EventStore {
         String sql = (status == EventStatus.NEW) ? updateStatusWithRetrySql : updateStatusOnlySql;
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, status.getCode());
+            ps.setString(1, String.valueOf(status.getCode()));
             if (errorDetails != null) {
                 ps.setString(2, errorDetails);
             } else {
@@ -282,7 +283,7 @@ public class JdbcEventStore implements EventStore {
     public List<StoredEvent> findByStatus(EventStatus status, Instant before) {
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(selectByStatusSql)) {
-            ps.setInt(1, status.getCode());
+            ps.setString(1, String.valueOf(status.getCode()));
             ps.setTimestamp(2, Timestamp.from(before));
             try (ResultSet rs = ps.executeQuery()) {
                 List<StoredEvent> results = new ArrayList<>();
@@ -319,7 +320,7 @@ public class JdbcEventStore implements EventStore {
                 rs.getString("event_type"),
                 rs.getString("payload"),
                 processId,
-                EventStatus.fromCode(rs.getInt("status")),
+                EventStatus.fromCode(rs.getString("status").charAt(0)),
                 rs.getInt("retry_count"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant(),

@@ -17,7 +17,8 @@ import java.util.Arrays;
  *                    (ack-failed) ────────┘──► FAILED ──retry──► NEW
  * </pre>
  * <p>
- * Each status has a numeric code used for efficient storage in the database.
+ * Each status has a single-character code used for efficient storage in the database.
+ * The codes are mnemonic first letters of the status names for readability in DB dumps.
  *
  * @author Vladimir Aleshkov
  * @since 1.3.0
@@ -25,46 +26,46 @@ import java.util.Arrays;
 public enum EventStatus {
 
     /** Event was persisted but is not lifecycle-tracked (PERSISTED lifecycle). */
-    UNDEFINED(0),
+    UNDEFINED('U'),
 
     /** Event saved and lifecycle-tracked (MANAGED lifecycle), not yet published successfully. */
-    NEW(1),
+    NEW('N'),
 
     /** Event was successfully published to all target transports. */
-    PUBLISHED(2),
+    PUBLISHED('P'),
 
     /** Event was successfully handled by all registered handlers. Set via ack from dispatcher. */
-    HANDLED(3),
+    HANDLED('H'),
 
     /**
      * Event publication or handling failed. Eligible for retry.
      * Check {@link StoredEvent#errorDetails()} for the specific cause.
      */
-    FAILED(4);
+    FAILED('F');
 
-    private final int code;
+    private final char code;
 
-    EventStatus(int code) {
+    EventStatus(char code) {
         this.code = code;
     }
 
     /**
-     * Returns the numeric code for this status.
+     * Returns the character code for this status.
      *
-     * @return status code
+     * @return status code character
      */
-    public int getCode() {
+    public char getCode() {
         return code;
     }
 
     /**
-     * Resolves a status from its numeric code.
+     * Resolves a status from its character code.
      *
-     * @param code the numeric code
+     * @param code the character code (e.g., 'U', 'N', 'P', 'H', 'F')
      * @return the corresponding status
      * @throws IllegalArgumentException if no status matches the code
      */
-    public static EventStatus fromCode(int code) {
+    public static EventStatus fromCode(char code) {
         return Arrays.stream(values())
                 .filter(s -> s.code == code)
                 .findFirst()

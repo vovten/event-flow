@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS event_store (
     event_type      VARCHAR(512) NOT NULL,
     payload         TEXT NOT NULL,
     process_id      UUID,
-    status          SMALLINT NOT NULL DEFAULT 0,
+    status          CHAR(1) NOT NULL DEFAULT 'U',
     retry_count     INT DEFAULT 0 NOT NULL,
     created_at      TIMESTAMP NOT NULL,
     updated_at      TIMESTAMP NOT NULL,
@@ -27,7 +27,7 @@ COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
 COMMENT ON COLUMN event_store.event_type IS 'Fully qualified event class name';
 COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
 COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
-COMMENT ON COLUMN event_store.status IS 'Lifecycle status: 0=UNDEFINED, 1=NEW, 2=PUBLISHED, 3=HANDLED, 4=FAILED';
+COMMENT ON COLUMN event_store.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
 COMMENT ON COLUMN event_store.retry_count IS 'Number of retry attempts for failed events';
 COMMENT ON COLUMN event_store.created_at IS 'Timestamp when the event was first stored';
 COMMENT ON COLUMN event_store.updated_at IS 'Timestamp of the last status update';
