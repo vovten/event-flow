@@ -65,12 +65,24 @@ class EventRetrySchedulerTest {
     }
 
     private UUID createFailedEvent(int retryCount, Instant updatedAt) {
+        return createEvent(EventStatus.FAILED, retryCount, updatedAt, "test error");
+    }
+
+    private UUID createPublishedEvent(int retryCount) {
+        return createPublishedEvent(retryCount, Instant.now().minusSeconds(10));
+    }
+
+    private UUID createPublishedEvent(int retryCount, Instant updatedAt) {
+        return createEvent(EventStatus.PUBLISHED, retryCount, updatedAt, null);
+    }
+
+    private UUID createEvent(EventStatus status, int retryCount, Instant updatedAt, String errorDetails) {
         UUID id = UUID.randomUUID();
         TestEvent event = new TestEvent(id, "data");
         String payload = EventUtils.toJson(event);
         StoredEvent stored = new StoredEvent(
                 id, TestEvent.class.getName(), payload, null,
-                EventStatus.FAILED, retryCount, updatedAt, updatedAt, "test error"
+                status, retryCount, updatedAt, updatedAt, errorDetails
         );
         eventStore.save(stored);
         return id;
@@ -204,6 +216,71 @@ class EventRetrySchedulerTest {
                     assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
             assertThat(eventStore.findById(id2)).hasValueSatisfying(e ->
                     assertThat(e.status()).isEqualTo(EventStatus.FAILED));
+        }
+
+        @Test
+        @DisplayName("retries PUBLISHED events within retry limit")
+        void retriesPublishedEvents() {
+            UUID eventId = createPublishedEvent(0);
+
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(stored.retryCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("skips PUBLISHED events that have exceeded max retries")
+        void skipsPublishedEventsExceedingMaxRetries() {
+            UUID eventId = createPublishedEvent(3, Instant.now().minusSeconds(10));
+
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(stored.retryCount()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("skips recent PUBLISHED events below minimum age threshold")
+        void skipsRecentPublishedEvents() {
+            UUID eventId = createPublishedEvent(0, Instant.now());
+
+            scheduler(Duration.ofSeconds(10), 3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(stored.retryCount()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("retries mix of FAILED and PUBLISHED events in one cycle")
+        void retriesMixOfFailedAndPublished() {
+            UUID failedId = createFailedEvent(0);
+            UUID stuckId = createPublishedEvent(0);
+
+            scheduler(3).retryCycle();
+
+            assertThat(eventStore.findById(failedId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+            assertThat(eventStore.findById(stuckId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+            assertThat(eventStore.findById(failedId)).hasValueSatisfying(e ->
+                    assertThat(e.retryCount()).isEqualTo(1));
+            assertThat(eventStore.findById(stuckId)).hasValueSatisfying(e ->
+                    assertThat(e.retryCount()).isEqualTo(1));
+        }
+
+        @Test
+        @DisplayName("respects exponential backoff for PUBLISHED events")
+        void skipsPublishedEventBeforeBackoffElapsed() {
+            UUID eventId = createPublishedEvent(1, Instant.now().minusSeconds(15));
+
+            scheduler(Duration.ofSeconds(10), 3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
         }
 
         @Test
