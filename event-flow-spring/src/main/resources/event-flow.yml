@@ -164,9 +164,9 @@ event-flow:
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
 
-    # Lifecycle tracking configuration
+    # Lifecycle configuration
     # When enabled, the dispatcher publishes SuccessAck / FailureAck events
     # back to the source channels after handler execution
-    lifecycle-tracking:
+    lifecycle:
       # Enable or disable ack-based lifecycle tracking
       enabled: false

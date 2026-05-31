@@ -367,7 +367,7 @@ public class EventFlowProperties {
         private IdempotentConfig idempotent = new IdempotentConfig();
         private LoggingConfig logging = new LoggingConfig();
         private DeserializationConfig deserialization = new DeserializationConfig();
-        private LifecycleTrackingConfig lifecycleTracking = new LifecycleTrackingConfig();
+        private LifecycleConfig lifecycle = new LifecycleConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -425,23 +425,23 @@ public class EventFlowProperties {
             this.deserialization = deserialization;
         }
 
-        public LifecycleTrackingConfig getLifecycleTracking() {
-            return lifecycleTracking;
+        public LifecycleConfig getLifecycle() {
+            return lifecycle;
         }
 
-        public void setLifecycleTracking(LifecycleTrackingConfig lifecycleTracking) {
-            this.lifecycleTracking = lifecycleTracking;
+        public void setLifecycle(LifecycleConfig lifecycle) {
+            this.lifecycle = lifecycle;
         }
     }
 
     /**
-     * Lifecycle tracking configuration for the dispatcher.
+     * Lifecycle configuration for the dispatcher.
      * <p>
      * When enabled, the dispatcher publishes {@code SuccessAck} or
      * {@code FailureAck} acknowledgment events back to the source channels
      * after handler execution, enabling the publisher to track event lifecycle.
      */
-    public static class LifecycleTrackingConfig {
+    public static class LifecycleConfig {
         private boolean enabled = false;
 
         public boolean isEnabled() {
@@ -450,6 +450,11 @@ public class EventFlowProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        @Override
+        public String toString() {
+            return "LifecycleConfig{enabled=" + enabled + '}';
         }
     }
 

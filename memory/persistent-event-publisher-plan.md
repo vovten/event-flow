@@ -217,7 +217,7 @@ event-flow:
       retry-interval: 30s
       min-age: 10s
   dispatcher:
-    lifecycle-tracking:
+    lifecycle:
       enabled: true   # включает EventLifecycleDispatcher
 ```
 
@@ -269,7 +269,7 @@ public class PersistentStoreConfiguration {
 
 ```java
 @Bean
-@ConditionalOnProperty("event-flow.dispatcher.lifecycle-tracking.enabled")
+@ConditionalOnProperty("event-flow.dispatcher.lifecycle.enabled")
 public EventDispatcher eventDispatcher(
         ..., @Autowired(required=false) EventPublisher ackPublisher) {
     var builder = EventDispatcherBuilder.create()...;

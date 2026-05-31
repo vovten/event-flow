@@ -85,18 +85,18 @@ public class DispatcherConfiguration {
         EventDispatcher dispatcher = builder.build();
 
         // Wrap with lifecycle tracking if enabled and ack publisher is available
-        if (ackPublisher != null && properties.getDispatcher().getLifecycleTracking().isEnabled()) {
+        if (ackPublisher != null && properties.getDispatcher().getLifecycle().isEnabled()) {
             dispatcher = new EventLifecycleDispatcher(dispatcher, ackPublisher);
             log.info("Wrapped EventDispatcher with EventLifecycleDispatcher (ack publisher available)");
-        } else if (properties.getDispatcher().getLifecycleTracking().isEnabled()) {
+        } else if (properties.getDispatcher().getLifecycle().isEnabled()) {
             log.warn("Lifecycle tracking enabled but no EventPublisher available for ack events");
         }
 
-        log.info("Built EventDispatcher with configuration: transports={}, idempotent={}, logging={}, lifecycleTracking={}",
+        log.info("Built EventDispatcher with configuration: transports={}, idempotent={}, logging={}, lifecycle={}",
                 inTransports.size(),
                 properties.getDispatcher().getIdempotent().isEnabled() ? "enabled" : "disabled",
                 properties.getDispatcher().getLogging().isEnabled() ? "enabled" : "disabled",
-                properties.getDispatcher().getLifecycleTracking().isEnabled() ? "enabled" : "disabled"
+                properties.getDispatcher().getLifecycle().isEnabled() ? "enabled" : "disabled"
         );
         dispatcher.start(dispatcher::dispatch);
         return dispatcher;
