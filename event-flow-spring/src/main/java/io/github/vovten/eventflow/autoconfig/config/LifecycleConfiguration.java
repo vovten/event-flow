@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.EventRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.JdbcEventStore;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -70,12 +71,17 @@ public class LifecycleConfiguration {
      *
      * @param eventStore the event store to update
      * @return the ack handler
+     * @throws IllegalStateException if service-name is not configured
      */
     @Bean
     @ConditionalOnMissingBean
     public AckHandler ackHandler(EventStore eventStore) {
         String service = properties.getPublisher().getLifecycle().getServiceName();
-        log.info("Creating AckHandler with service: {}", service.isEmpty() ? "none" : service);
+        if (StringUtils.isEmpty(service)) {
+            throw new IllegalStateException(
+                    "event-flow.publisher.lifecycle.service-name must be configured when lifecycle tracking is enabled");
+        }
+        log.info("Creating AckHandler with service: {}", service);
         return new AckHandler(eventStore, service);
     }
 
