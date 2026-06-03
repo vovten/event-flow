@@ -102,7 +102,7 @@ public class PublisherConfiguration {
 
         // Wrap with lifecycle-aware publisher if enabled
         if (eventStore != null && publisherConfig.getLifecycle().isEnabled()) {
-            String service = publisherConfig.getLifecycle().getService();
+            String service = publisherConfig.getLifecycle().getServiceName();
             publisher = new EventLifecyclePublisher(publisher, eventStore, service);
             log.info("Wrapped EventPublisher with EventLifecyclePublisher (service: {})",
                     service.isEmpty() ? "none" : service);

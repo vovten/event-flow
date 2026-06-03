@@ -190,7 +190,7 @@ public class EventFlowProperties {
         private int maxRetries = 3;
         private Duration retryInterval = Duration.ofSeconds(30);
         private Duration minAge = Duration.ofSeconds(30);
-        private String service = "";
+        private String serviceName = "";
         private String tableName = "event_store";
         private boolean autoInitSchema = true;
 
@@ -234,12 +234,12 @@ public class EventFlowProperties {
             this.minAge = minAge;
         }
 
-        public String getService() {
-            return service;
+        public String getServiceName() {
+            return serviceName;
         }
 
-        public void setService(String service) {
-            this.service = service;
+        public void setServiceName(String serviceName) {
+            this.serviceName = serviceName;
         }
 
         public String getTableName() {

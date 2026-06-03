@@ -52,7 +52,7 @@ event-flow:
       # Enable or disable lifecycle-aware event publishing and lifecycle tracking
       enabled: false
       # Service name stamped on outgoing events for ack filtering
-      service: ""
+      service-name: ""
       # Name of the database table for event storage
       table-name: event_store
       # Automatically create the table on startup (requires DDL privileges)

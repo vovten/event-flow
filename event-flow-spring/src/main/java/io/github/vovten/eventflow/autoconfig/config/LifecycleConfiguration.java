@@ -74,7 +74,7 @@ public class LifecycleConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public AckHandler ackHandler(EventStore eventStore) {
-        String service = properties.getPublisher().getLifecycle().getService();
+        String service = properties.getPublisher().getLifecycle().getServiceName();
         log.info("Creating AckHandler with service: {}", service.isEmpty() ? "none" : service);
         return new AckHandler(eventStore, service);
     }
