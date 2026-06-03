@@ -190,7 +190,7 @@ public class JdbcEventStore implements EventStore {
         try (Connection conn = dataSource.getConnection()) {
             if (!tableExists(conn, tableName)) {
                 String ddl = buildCreateTableSql(uuidType).formatted(tableName);
-                String createIndexSql = CREATE_INDEX.formatted(INDEX_NAME.formatted(tableName), tableName);
+                String createIndexSql = CREATE_INDEX.formatted(INDEX_NAME.formatted(tableBase(tableName)), tableName);
                 try (Statement stmt = conn.createStatement()) {
                     stmt.execute(ddl);
                     stmt.execute(createIndexSql);
@@ -306,17 +306,21 @@ public class JdbcEventStore implements EventStore {
         return bytes != null ? bytesToUuid(bytes) : null;
     }
 
-    private static boolean tableExists(Connection conn, String tableName) throws SQLException {
+    private String tableBase(String fullName) {
+        int dot = fullName.indexOf('.');
+        return dot > 0 ? fullName.substring(dot + 1) : fullName;
+    }
+
+    private boolean tableExists(Connection conn, String tableName) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
-        // Some databases (e.g., PostgreSQL) store names in lowercase,
-        // others (e.g., Oracle) in uppercase. Try both.
-        try (ResultSet rs = meta.getTables(null, null, tableName, null)) {
+        String baseName = tableBase(tableName);
+        try (ResultSet rs = meta.getTables(null, null, baseName, null)) {
             if (rs.next()) return true;
         }
-        try (ResultSet rs = meta.getTables(null, null, tableName.toUpperCase(), null)) {
+        try (ResultSet rs = meta.getTables(null, null, baseName.toUpperCase(), null)) {
             if (rs.next()) return true;
         }
-        try (ResultSet rs = meta.getTables(null, null, tableName.toLowerCase(), null)) {
+        try (ResultSet rs = meta.getTables(null, null, baseName.toLowerCase(), null)) {
             return rs.next();
         }
     }
