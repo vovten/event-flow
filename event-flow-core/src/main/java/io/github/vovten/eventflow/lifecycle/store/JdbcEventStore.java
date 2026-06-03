@@ -245,9 +245,9 @@ public class JdbcEventStore implements EventStore {
                     status          CHAR(1) NOT NULL DEFAULT 'U',
                     payload         TEXT NOT NULL,
                     process_id      %s,
-                    retry_count     INT DEFAULT 0 NOT NULL,
                     created_at      TIMESTAMP NOT NULL,
                     updated_at      TIMESTAMP NOT NULL,
+                    retry_count     INT DEFAULT 0 NOT NULL,
                     error_details   TEXT
                 )
                 """.formatted(uuidDdl, uuidDdl);
