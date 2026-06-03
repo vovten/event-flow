@@ -10,7 +10,7 @@ import java.util.UUID;
  * Contains the JSON payload, lifecycle status, and optional process correlation ID.
  *
  * @param eventId       unique event identifier
- * @param eventType     fully qualified class name of the event type (for deserialization)
+ * @param eventType     simple class name of the event type (for display and queries)
  * @param payload       JSON-serialized event data
  * @param processId     optional process/correlation ID for event correlation
  * @param status        current lifecycle status
@@ -46,7 +46,7 @@ public record StoredEvent(
      * Creates a new event in NEW status with the given attributes.
      *
      * @param eventId   unique event identifier
-     * @param eventType fully qualified class name of the event type
+     * @param eventType simple class name of the event type (for display and queries)
      * @param payload   JSON-serialized event data
      * @param processId optional process correlation ID, or null
      * @return a new StoredEvent with status NEW, retryCount 0, and timestamps set to now
@@ -59,7 +59,7 @@ public record StoredEvent(
      * Creates a new event with the given status and attributes.
      *
      * @param eventId   unique event identifier
-     * @param eventType fully qualified class name of the event type
+     * @param eventType simple class name of the event type (for display and queries)
      * @param payload   JSON-serialized event data
      * @param processId optional process correlation ID, or null
      * @param status    the initial lifecycle status

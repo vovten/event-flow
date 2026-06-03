@@ -105,10 +105,10 @@ public final class EventLifecyclePublisher implements EventPublisher {
     private void persistNewOnly(UUID eventId, Event event) {
         Optional<StoredEvent> existing = eventStore.findById(eventId);
         if (existing.isPresent()) {
-            log.trace("Event already persisted, skipping: {} ({})", eventId, event.getClass().getName());
+            log.trace("Event already persisted, skipping: {} ({})", eventId, resolveEventType(event));
             return;
         }
-        String eventType = event.getClass().getName();
+        String eventType = resolveEventType(event);
         UUID processId = resolveProcessId(event);
         String payload = EventUtils.toJson(event);
         StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId, EventStatus.UNDEFINED);
@@ -117,7 +117,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
     }
 
     private void persistOrReset(UUID eventId, Event event) {
-        String eventType = event.getClass().getName();
+        String eventType = resolveEventType(event);
         Optional<StoredEvent> existing = eventStore.findById(eventId);
         if (existing.isPresent()) {
             eventStore.updateStatus(eventId, EventStatus.NEW, null);
@@ -174,5 +174,12 @@ public final class EventLifecyclePublisher implements EventPublisher {
             return traceable.processId();
         }
         return null;
+    }
+
+    private String resolveEventType(Event event) {
+        if (event instanceof Envelope<?> envelope) {
+            return envelope.payload().getClass().getSimpleName();
+        }
+        return event.getClass().getSimpleName();
     }
 }

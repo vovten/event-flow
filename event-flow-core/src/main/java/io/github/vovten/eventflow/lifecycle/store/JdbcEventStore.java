@@ -55,7 +55,7 @@ public class JdbcEventStore implements EventStore {
     private static final String COMMENT_ON_COLUMNS = """
             COMMENT ON TABLE %s IS 'Event store for persistent event lifecycle tracking';
             COMMENT ON COLUMN %s.event_id IS 'Unique event identifier';
-            COMMENT ON COLUMN %s.event_type IS 'Fully qualified event class name';
+            COMMENT ON COLUMN %s.event_type IS 'Simple event class name (for display and queries)';
             COMMENT ON COLUMN %s.payload IS 'JSON-serialized event body';
             COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
             COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
@@ -242,9 +242,9 @@ public class JdbcEventStore implements EventStore {
                 CREATE TABLE %%s (
                     event_id        %s PRIMARY KEY,
                     event_type      VARCHAR(512) NOT NULL,
+                    status          CHAR(1) NOT NULL DEFAULT 'U',
                     payload         TEXT NOT NULL,
                     process_id      %s,
-                    status          CHAR(1) NOT NULL DEFAULT 'U',
                     retry_count     INT DEFAULT 0 NOT NULL,
                     created_at      TIMESTAMP NOT NULL,
                     updated_at      TIMESTAMP NOT NULL,
