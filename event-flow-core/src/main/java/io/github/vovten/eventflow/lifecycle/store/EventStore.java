@@ -24,6 +24,17 @@ import java.util.UUID;
 public interface EventStore {
 
     /**
+     * Returns the type identifier for this store implementation.
+     * <p>
+     * Used by {@link EventStoreRegistry} to resolve the store by type name.
+     * Built-in types: {@code "db"} for {@link JdbcEventStore}, {@code "in-memory"}
+     * for {@link InMemoryEventStore}.
+     *
+     * @return the store type identifier (e.g., "db", "in-memory", or custom)
+     */
+    String getType();
+
+    /**
      * Persists a new event in the store.
      *
      * @param event the event to save (must not be null)

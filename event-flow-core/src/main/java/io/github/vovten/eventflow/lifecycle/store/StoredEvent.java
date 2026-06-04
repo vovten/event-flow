@@ -9,15 +9,15 @@ import java.util.UUID;
  * <p>
  * Contains the JSON payload, lifecycle status, and optional process correlation ID.
  *
- * @param eventId       unique event identifier
- * @param eventType     simple class name of the event type (for display and queries)
- * @param payload       JSON-serialized event data
- * @param processId     optional process/correlation ID for event correlation
- * @param status        current lifecycle status
- * @param retryCount    number of retry attempts so far
- * @param createdAt     timestamp when the event was first saved
- * @param updatedAt     timestamp when the event was last updated
- * @param errorDetails  error details from the last failure, or null if none
+ * @param eventId      unique event identifier
+ * @param eventType    simple class name of the event type (for display and queries)
+ * @param payload      JSON-serialized event data
+ * @param processId    optional process/correlation ID for event correlation
+ * @param status       current lifecycle status
+ * @param retryCount   number of retry attempts so far
+ * @param createdAt    timestamp when the event was first saved
+ * @param updatedAt    timestamp when the event was last updated
+ * @param errorDetails error details from the last failure, or null if none
  * @author Vladimir Aleshkov
  * @since 1.3.0
  */

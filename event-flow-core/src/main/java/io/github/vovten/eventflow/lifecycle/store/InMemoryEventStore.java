@@ -1,11 +1,7 @@
 package io.github.vovten.eventflow.lifecycle.store;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.stream.Collectors.toList;
@@ -22,6 +18,11 @@ import static java.util.stream.Collectors.toList;
 public class InMemoryEventStore implements EventStore {
 
     private final Map<UUID, StoredEvent> store = new ConcurrentHashMap<>();
+
+    @Override
+    public String getType() {
+        return "in-memory";
+    }
 
     @Override
     public void save(StoredEvent event) {

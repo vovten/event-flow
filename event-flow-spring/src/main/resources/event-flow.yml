@@ -53,22 +53,30 @@ event-flow:
       enabled: false
       # Service name stamped on outgoing events for ack filtering
       service-name: ""
-      # Name of the database table for event storage
-      table-name: event_store
-      # Automatically create the table on startup (requires DDL privileges)
-      # Set to false in production and manage schema via Flyway/Liquibase.
-      # A ready-to-use DDL script is available in the classpath at:
-      #   io/github/vovten/eventflow/store/event-store.sql
-      auto-init-schema: true
-      # Enable or disable automatic retry of failed events
-      retry-enabled: true
-      # Maximum number of retry attempts for failed events
-      max-retries: 3
-      # Interval between retry cycles
-      retry-interval: 30s
-      # Base backoff interval for retries (delay = min-age × 2^retryCount, grows exponentially)
-      # Examples with 30s: 1st retry=30s, 2nd=60s, 3rd=120s
-      min-age: 30s
+
+      # Event store configuration
+      store:
+        # Store type: "db" (database, default), "in-memory" (non-persistent), or custom
+        type: db
+        # Name of the database table for event storage (only for type: db)
+        table-name: event_store
+        # Automatically create the table on startup (requires DDL privileges)
+        # Set to false in production and manage schema via Flyway/Liquibase.
+        # A ready-to-use DDL script is available in the classpath at:
+        #   io/github/vovten/eventflow/store/event-store.sql
+        auto-init-schema: true
+
+      # Retry configuration for lifecycle event tracking
+      retry:
+        # Enable or disable automatic retry of failed and stuck events
+        enabled: true
+        # Maximum number of retry attempts
+        max-retries: 3
+        # Interval between retry cycles
+        retry-interval: 30s
+        # Base backoff interval for retries (delay = min-age × 2^retryCount)
+        # Examples with 30s: 1st retry=30s, 2nd=60s, 3rd=120s
+        min-age: 30s
 
     # Event channels configuration
     # Each channel defines a logical route with a list of transports

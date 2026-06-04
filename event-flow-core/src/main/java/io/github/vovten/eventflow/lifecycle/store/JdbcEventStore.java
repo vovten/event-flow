@@ -4,22 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
-import java.sql.Types;
 import java.nio.ByteBuffer;
+import java.sql.*;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * JDBC implementation of {@link EventStore} backed by a relational database.
@@ -184,6 +172,11 @@ public class JdbcEventStore implements EventStore {
         this.updateStatusWithRetrySql = UPDATE_STATUS_WITH_RETRY.formatted(tableName);
         this.uuidType = Objects.requireNonNull(uuidType, "uuidType must not be null");
         initSchema();
+    }
+
+    @Override
+    public String getType() {
+        return "db";
     }
 
     private void initSchema() {

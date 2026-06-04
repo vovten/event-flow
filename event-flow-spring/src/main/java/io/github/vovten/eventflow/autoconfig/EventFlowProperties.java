@@ -22,13 +22,16 @@ import java.util.List;
  *     transactional: true
  *     lifecycle:
  *       enabled: false
- *       service: ""
- *       table-name: event_store
- *       auto-init-schema: true
- *       retry-enabled: true
- *       max-retries: 3
- *       retry-interval: 30s
- *       min-age: 30s
+ *       service-name: ""
+ *       store:
+ *         type: db
+ *         table-name: event_store
+ *         auto-init-schema: true
+ *       retry:
+ *         enabled: true
+ *         max-retries: 3
+ *         retry-interval: 30s
+ *         min-age: 30s
  *     retry:
  *       enabled: true
  *       max-attempts: 3
@@ -182,17 +185,13 @@ public class EventFlowProperties {
      *       via acknowledgment events</li>
      * </ul>
      * <p>
-     * Requires a {@code DataSource} bean to be present in the application context.
+     * Requires a {@code DataSource} bean to be present for the {@code "db"} store type.
      */
     public static class LifecyclePublisherConfig {
         private boolean enabled = false;
-        private boolean retryEnabled = true;
-        private int maxRetries = 3;
-        private Duration retryInterval = Duration.ofSeconds(30);
-        private Duration minAge = Duration.ofSeconds(30);
         private String serviceName = "";
-        private String tableName = "event_store";
-        private boolean autoInitSchema = true;
+        private StoreConfig store = new StoreConfig();
+        private RetryTrackingConfig retry = new RetryTrackingConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -200,38 +199,6 @@ public class EventFlowProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
-        }
-
-        public boolean isRetryEnabled() {
-            return retryEnabled;
-        }
-
-        public void setRetryEnabled(boolean retryEnabled) {
-            this.retryEnabled = retryEnabled;
-        }
-
-        public int getMaxRetries() {
-            return maxRetries;
-        }
-
-        public void setMaxRetries(int maxRetries) {
-            this.maxRetries = maxRetries;
-        }
-
-        public Duration getRetryInterval() {
-            return retryInterval;
-        }
-
-        public void setRetryInterval(Duration retryInterval) {
-            this.retryInterval = retryInterval;
-        }
-
-        public Duration getMinAge() {
-            return minAge;
-        }
-
-        public void setMinAge(Duration minAge) {
-            this.minAge = minAge;
         }
 
         public String getServiceName() {
@@ -242,20 +209,139 @@ public class EventFlowProperties {
             this.serviceName = serviceName;
         }
 
-        public String getTableName() {
-            return tableName;
+        public StoreConfig getStore() {
+            return store;
         }
 
-        public void setTableName(String tableName) {
-            this.tableName = tableName;
+        public void setStore(StoreConfig store) {
+            this.store = store;
         }
 
-        public boolean isAutoInitSchema() {
-            return autoInitSchema;
+        public RetryTrackingConfig getRetry() {
+            return retry;
         }
 
-        public void setAutoInitSchema(boolean autoInitSchema) {
-            this.autoInitSchema = autoInitSchema;
+        public void setRetry(RetryTrackingConfig retry) {
+            this.retry = retry;
+        }
+
+        @Override
+        public String toString() {
+            return "LifecyclePublisherConfig{" +
+                    "enabled=" + enabled +
+                    ", serviceName='" + serviceName + '\'' +
+                    ", store=" + store +
+                    ", retry=" + retry +
+                    '}';
+        }
+
+        /**
+         * Event store configuration.
+         */
+        public static class StoreConfig {
+            /**
+             * Store type identifier. Built-in values: {@code "db"}, {@code "in-memory"}.
+             * Custom types are supported via {@link io.github.vovten.eventflow.lifecycle.store.EventStoreRegistry}.
+             */
+            private String type = "db";
+
+            /**
+             * Name of the database table for event storage (only for {@code type: "db"}).
+             */
+            private String tableName = "event_store";
+
+            /**
+             * Automatically create the table on startup (only for {@code type: "db"}).
+             * Set to false in production and manage schema via Flyway/Liquibase.
+             */
+            private boolean autoInitSchema = true;
+
+            public String getType() {
+                return type;
+            }
+
+            public void setType(String type) {
+                this.type = type;
+            }
+
+            public String getTableName() {
+                return tableName;
+            }
+
+            public void setTableName(String tableName) {
+                this.tableName = tableName;
+            }
+
+            public boolean isAutoInitSchema() {
+                return autoInitSchema;
+            }
+
+            public void setAutoInitSchema(boolean autoInitSchema) {
+                this.autoInitSchema = autoInitSchema;
+            }
+
+            @Override
+            public String toString() {
+                return "StoreConfig{" +
+                        "type='" + type + '\'' +
+                        ", tableName='" + tableName + '\'' +
+                        ", autoInitSchema=" + autoInitSchema +
+                        '}';
+            }
+        }
+
+        /**
+         * Retry configuration for lifecycle event tracking.
+         * <p>
+         * Controls automatic retry of failed and stuck (PUBLISHED) events.
+         */
+        public static class RetryTrackingConfig {
+            private boolean enabled = true;
+            private int maxRetries = 3;
+            private java.time.Duration retryInterval = java.time.Duration.ofSeconds(30);
+            private java.time.Duration minAge = java.time.Duration.ofSeconds(30);
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
+
+            public int getMaxRetries() {
+                return maxRetries;
+            }
+
+            public void setMaxRetries(int maxRetries) {
+                this.maxRetries = maxRetries;
+            }
+
+            public java.time.Duration getRetryInterval() {
+                return retryInterval;
+            }
+
+            public void setRetryInterval(java.time.Duration retryInterval) {
+                this.retryInterval = retryInterval;
+            }
+
+            public java.time.Duration getMinAge() {
+                return minAge;
+            }
+
+            public void setMinAge(java.time.Duration minAge) {
+                this.minAge = minAge;
+            }
+
+            @Override
+            public String toString() {
+                return "RetryTrackingConfig{" +
+                        "enabled=" + enabled +
+                        ", maxRetries=" + maxRetries +
+                        ", retryInterval=" + retryInterval +
+                        ", minAge=" + minAge +
+                        '}';
+            }
         }
     }
 

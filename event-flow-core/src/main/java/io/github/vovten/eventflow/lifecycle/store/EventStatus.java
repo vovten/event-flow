@@ -25,16 +25,24 @@ import java.util.Arrays;
  */
 public enum EventStatus {
 
-    /** Event was persisted but is not lifecycle-tracked (PERSISTED lifecycle). */
+    /**
+     * Event was persisted but is not lifecycle-tracked (PERSISTED lifecycle).
+     */
     UNDEFINED('U'),
 
-    /** Event saved and lifecycle-tracked (MANAGED lifecycle), not yet published successfully. */
+    /**
+     * Event saved and lifecycle-tracked (MANAGED lifecycle), not yet published successfully.
+     */
     NEW('N'),
 
-    /** Event was successfully published to all target transports. */
+    /**
+     * Event was successfully published to all target transports.
+     */
     PUBLISHED('P'),
 
-    /** Event was successfully handled by all registered handlers. Set via ack from dispatcher. */
+    /**
+     * Event was successfully handled by all registered handlers. Set via ack from dispatcher.
+     */
     HANDLED('H'),
 
     /**
