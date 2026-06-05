@@ -7,10 +7,12 @@ import java.util.UUID;
 /**
  * Immutable record representing an event stored in the {@link EventStore}.
  * <p>
- * Contains the JSON payload, lifecycle status, and optional process correlation ID.
+ * Contains the JSON payload, lifecycle status, optional process correlation ID,
+ * and the service name that originated the event.
  *
  * @param eventId      unique event identifier
  * @param eventType    simple class name of the event type (for display and queries)
+ * @param service      name of the service that originated the event, or null if unknown
  * @param payload      JSON-serialized event data
  * @param processId    optional process/correlation ID for event correlation
  * @param status       current lifecycle status
@@ -24,6 +26,7 @@ import java.util.UUID;
 public record StoredEvent(
         UUID eventId,
         String eventType,
+        String service,
         String payload,
         UUID processId,
         EventStatus status,
@@ -47,12 +50,13 @@ public record StoredEvent(
      *
      * @param eventId   unique event identifier
      * @param eventType simple class name of the event type (for display and queries)
+     * @param service   name of the originating service, or null
      * @param payload   JSON-serialized event data
      * @param processId optional process correlation ID, or null
      * @return a new StoredEvent with status NEW, retryCount 0, and timestamps set to now
      */
-    public static StoredEvent newEvent(UUID eventId, String eventType, String payload, UUID processId) {
-        return newEvent(eventId, eventType, payload, processId, EventStatus.NEW);
+    public static StoredEvent newEvent(UUID eventId, String eventType, String service, String payload, UUID processId) {
+        return newEvent(eventId, eventType, service, payload, processId, EventStatus.NEW);
     }
 
     /**
@@ -60,15 +64,16 @@ public record StoredEvent(
      *
      * @param eventId   unique event identifier
      * @param eventType simple class name of the event type (for display and queries)
+     * @param service   name of the originating service, or null
      * @param payload   JSON-serialized event data
      * @param processId optional process correlation ID, or null
      * @param status    the initial lifecycle status
      * @return a new StoredEvent with the given status, retryCount 0, and timestamps set to now
      */
-    public static StoredEvent newEvent(UUID eventId, String eventType, String payload, UUID processId, EventStatus status) {
+    public static StoredEvent newEvent(UUID eventId, String eventType, String service, String payload, UUID processId, EventStatus status) {
         Instant now = Instant.now();
         return new StoredEvent(
-                eventId, eventType, payload, processId,
+                eventId, eventType, service, payload, processId,
                 status, 0, now, now, null
         );
     }
@@ -82,7 +87,7 @@ public record StoredEvent(
      */
     public StoredEvent withStatus(EventStatus newStatus, String error) {
         return new StoredEvent(
-                eventId, eventType, payload, processId,
+                eventId, eventType, service, payload, processId,
                 newStatus, retryCount, createdAt, Instant.now(), error
         );
     }
@@ -94,7 +99,7 @@ public record StoredEvent(
      */
     public StoredEvent withRetry() {
         return new StoredEvent(
-                eventId, eventType, payload, processId,
+                eventId, eventType, service, payload, processId,
                 EventStatus.NEW, retryCount + 1, createdAt, Instant.now(), null
         );
     }

@@ -107,7 +107,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
         String eventType = resolveEventType(event);
         UUID processId = resolveProcessId(event);
         String payload = EventUtils.toJson(event);
-        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId, EventStatus.UNDEFINED);
+        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, service, payload, processId, EventStatus.UNDEFINED);
         eventStore.save(stored);
         log.debug("Saved new event with UNDEFINED status: {} ({})", eventId, eventType);
     }
@@ -122,7 +122,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
         }
         UUID processId = resolveProcessId(event);
         String payload = EventUtils.toJson(event);
-        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, payload, processId, EventStatus.NEW);
+        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, service, payload, processId, EventStatus.NEW);
         eventStore.save(stored);
         log.debug("Saved new event to store: {} ({})", eventId, eventType);
     }

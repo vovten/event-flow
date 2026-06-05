@@ -25,7 +25,7 @@ class AckHandlerTest {
         eventStore = new InMemoryEventStore();
         handler = new AckHandler(eventStore, "test-service");
         eventId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.TestEvent", "{\"data\":\"test\"}", null);
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.TestEvent", null, "{\"data\":\"test\"}", null);
         eventStore.save(event);
     }
 

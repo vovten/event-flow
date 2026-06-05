@@ -18,6 +18,7 @@
 CREATE TABLE IF NOT EXISTS event_store (
     event_id        UUID PRIMARY KEY,
     event_type      VARCHAR(512) NOT NULL,
+    service         VARCHAR(255),
     status          CHAR(1) NOT NULL DEFAULT 'U',
     payload         TEXT NOT NULL,
     process_id      UUID,
@@ -33,6 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_event_store_status
 COMMENT ON TABLE event_store IS 'Event store for persistent event lifecycle tracking';
 COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
 COMMENT ON COLUMN event_store.event_type IS 'Simple event class name (for display and queries)';
+COMMENT ON COLUMN event_store.service IS 'Originating service name for service-specific queries';
 COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
 COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
 COMMENT ON COLUMN event_store.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';

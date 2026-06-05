@@ -26,7 +26,7 @@ class InMemoryEventStoreTest {
     void setUp() {
         store = new InMemoryEventStore();
         eventId = UUID.randomUUID();
-        event = StoredEvent.newEvent(eventId, "test.TestEvent", "{\"data\":\"test\"}", null);
+        event = StoredEvent.newEvent(eventId, "test.TestEvent", null, "{\"data\":\"test\"}", null);
     }
 
     @Test
@@ -141,7 +141,7 @@ class InMemoryEventStoreTest {
         assertThat(store.size()).isZero();
         store.save(event);
         assertThat(store.size()).isEqualTo(1);
-        store.save(StoredEvent.newEvent(UUID.randomUUID(), "test.Other", "{\"data\":\"other\"}", null));
+        store.save(StoredEvent.newEvent(UUID.randomUUID(), "test.Other", null, "{\"data\":\"other\"}", null));
         assertThat(store.size()).isEqualTo(2);
     }
 

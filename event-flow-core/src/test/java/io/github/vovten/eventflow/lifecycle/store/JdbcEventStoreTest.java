@@ -75,7 +75,7 @@ class JdbcEventStoreTest {
     void shouldFailWhenTableDoesNotExist() {
         JdbcEventStore store = new JdbcEventStore(dataSource, "event_store", false);
         UUID eventId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", "{}", null);
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", null, "{}", null);
         assertThatThrownBy(() -> store.save(event))
                 .isInstanceOf(RuntimeException.class);
     }
@@ -85,7 +85,7 @@ class JdbcEventStoreTest {
     void shouldSaveAndFindById() {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.TestEvent", "{\"data\":\"test\"}", null);
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.TestEvent", null, "{\"data\":\"test\"}", null);
 
         store.save(event);
 
@@ -112,7 +112,7 @@ class JdbcEventStoreTest {
     void shouldThrowOnDuplicate() {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", "{}", null);
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", null, "{}", null);
 
         store.save(event);
         assertThatThrownBy(() -> store.save(event))
@@ -125,7 +125,7 @@ class JdbcEventStoreTest {
     void shouldUpdateStatus() {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
-        store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
 
         store.updateStatus(eventId, EventStatus.PUBLISHED, null);
 
@@ -140,7 +140,7 @@ class JdbcEventStoreTest {
     void shouldUpdateStatusWithError() {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
-        store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
 
         store.updateStatus(eventId, EventStatus.FAILED, "timeout");
 
@@ -154,7 +154,7 @@ class JdbcEventStoreTest {
     void shouldIncrementRetryOnNewStatus() {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
-        store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
 
         store.updateStatus(eventId, EventStatus.FAILED, "err");
         store.updateStatus(eventId, EventStatus.NEW, null);
@@ -179,7 +179,7 @@ class JdbcEventStoreTest {
     void shouldFindByStatusAndAge() throws InterruptedException {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
-        store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
         store.updateStatus(eventId, EventStatus.FAILED, "err");
 
         // Should not find events newer than 'before'
@@ -198,7 +198,7 @@ class JdbcEventStoreTest {
     @DisplayName("Should return empty when no events match status")
     void shouldReturnEmptyWhenNoMatch() {
         JdbcEventStore store = new JdbcEventStore(dataSource);
-        store.save(StoredEvent.newEvent(UUID.randomUUID(), "test.T", "{}", null));
+        store.save(StoredEvent.newEvent(UUID.randomUUID(), "test.T", null, "{}", null));
 
         List<StoredEvent> results = store.findByStatus(EventStatus.HANDLED, Instant.now().plus(1, ChronoUnit.DAYS));
         assertThat(results).isEmpty();
@@ -209,7 +209,7 @@ class JdbcEventStoreTest {
     void shouldWorkWithCustomTableName() {
         JdbcEventStore store = new JdbcEventStore(dataSource, "my_events");
         UUID eventId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", "{}", null);
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", null, "{}", null);
 
         store.save(event);
         assertThat(store.findById(eventId)).isPresent();
@@ -224,7 +224,7 @@ class JdbcEventStoreTest {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
 
-        store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
         assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
 
         store.updateStatus(eventId, EventStatus.FAILED, "err");
@@ -246,7 +246,7 @@ class JdbcEventStoreTest {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
         UUID processId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", "{}", processId);
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", null, "{}", processId);
 
         store.save(event);
         StoredEvent found = store.findById(eventId).orElseThrow();
@@ -259,7 +259,7 @@ class JdbcEventStoreTest {
         JdbcEventStore store = new JdbcEventStore(dataSource, "event_store", JdbcEventStore.UuidType.BINARY);
         UUID eventId = UUID.randomUUID();
         UUID processId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.BinaryEvent",
+        StoredEvent event = StoredEvent.newEvent(eventId, "test.BinaryEvent", null,
                 "{\"data\":\"binary-test\"}", processId);
 
         store.save(event);
@@ -279,7 +279,7 @@ class JdbcEventStoreTest {
         JdbcEventStore store = new JdbcEventStore(dataSource, "event_store_bin", JdbcEventStore.UuidType.BINARY);
         UUID eventId = UUID.randomUUID();
 
-        store.save(StoredEvent.newEvent(eventId, "test.T", "{}", null));
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
         assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
 
         store.updateStatus(eventId, EventStatus.FAILED, "err");

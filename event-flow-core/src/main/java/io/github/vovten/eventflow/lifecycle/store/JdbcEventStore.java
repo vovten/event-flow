@@ -44,6 +44,7 @@ public class JdbcEventStore implements EventStore {
             COMMENT ON TABLE %s IS 'Event store for persistent event lifecycle tracking';
             COMMENT ON COLUMN %s.event_id IS 'Unique event identifier';
             COMMENT ON COLUMN %s.event_type IS 'Event class name';
+            COMMENT ON COLUMN %s.service IS 'Originating service name for service-specific queries';
             COMMENT ON COLUMN %s.payload IS 'JSON-serialized event body';
             COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
             COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
@@ -60,13 +61,13 @@ public class JdbcEventStore implements EventStore {
 
     private static final String INSERT = """
             INSERT INTO %s
-                (event_id, event_type, payload, process_id, status,
+                (event_id, event_type, service, payload, process_id, status,
                  retry_count, created_at, updated_at, error_details)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private static final String SELECT_BY_STATUS = """
-            SELECT event_id, event_type, payload, process_id, status,
+            SELECT event_id, event_type, service, payload, process_id, status,
                    retry_count, created_at, updated_at, error_details
             FROM %s
             WHERE status = ? AND updated_at < ?
@@ -74,7 +75,7 @@ public class JdbcEventStore implements EventStore {
             """;
 
     private static final String SELECT_BY_ID = """
-            SELECT event_id, event_type, payload, process_id, status,
+            SELECT event_id, event_type, service, payload, process_id, status,
                    retry_count, created_at, updated_at, error_details
             FROM %s
             WHERE event_id = ?
@@ -216,7 +217,8 @@ public class JdbcEventStore implements EventStore {
     private void addColumnComments(Statement stmt) {
         String[] lines = COMMENT_ON_COLUMNS.formatted(
                 tableName, tableName, tableName, tableName, tableName,
-                tableName, tableName, tableName, tableName, tableName
+                tableName, tableName, tableName, tableName, tableName,
+                tableName
         ).split(";");
         for (String line : lines) {
             String sql = line.trim();
@@ -235,6 +237,7 @@ public class JdbcEventStore implements EventStore {
                 CREATE TABLE %%s (
                     event_id        %s PRIMARY KEY,
                     event_type      VARCHAR(512) NOT NULL,
+                    service         VARCHAR(255),
                     status          CHAR(1) NOT NULL DEFAULT 'U',
                     payload         TEXT NOT NULL,
                     process_id      %s,
@@ -324,16 +327,21 @@ public class JdbcEventStore implements EventStore {
                 PreparedStatement ps = conn.prepareStatement(insertSql)) {
             setUuid(ps, 1, event.eventId());
             ps.setString(2, event.eventType());
-            ps.setString(3, event.payload());
-            setUuidNullable(ps, 4, event.processId());
-            ps.setString(5, String.valueOf(event.status().getCode()));
-            ps.setInt(6, event.retryCount());
-            ps.setTimestamp(7, Timestamp.from(event.createdAt()));
-            ps.setTimestamp(8, Timestamp.from(event.updatedAt()));
-            if (event.errorDetails() != null) {
-                ps.setString(9, event.errorDetails());
+            if (event.service() != null) {
+                ps.setString(3, event.service());
             } else {
-                ps.setNull(9, Types.VARCHAR);
+                ps.setNull(3, Types.VARCHAR);
+            }
+            ps.setString(4, event.payload());
+            setUuidNullable(ps, 5, event.processId());
+            ps.setString(6, String.valueOf(event.status().getCode()));
+            ps.setInt(7, event.retryCount());
+            ps.setTimestamp(8, Timestamp.from(event.createdAt()));
+            ps.setTimestamp(9, Timestamp.from(event.updatedAt()));
+            if (event.errorDetails() != null) {
+                ps.setString(10, event.errorDetails());
+            } else {
+                ps.setNull(10, Types.VARCHAR);
             }
             ps.executeUpdate();
         } catch (SQLException e) {
@@ -405,6 +413,7 @@ public class JdbcEventStore implements EventStore {
         return new StoredEvent(
                 getUuid(rs, "event_id"),
                 rs.getString("event_type"),
+                rs.getString("service"),
                 rs.getString("payload"),
                 getUuid(rs, "process_id"),
                 EventStatus.fromCode(rs.getString("status").charAt(0)),

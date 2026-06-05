@@ -81,7 +81,7 @@ class EventRetrySchedulerTest {
         TestEvent event = new TestEvent(id, "data");
         String payload = EventUtils.toJson(event);
         StoredEvent stored = new StoredEvent(
-                id, TestEvent.class.getName(), payload, null,
+                id, TestEvent.class.getName(), null, payload, null,
                 status, retryCount, updatedAt, updatedAt, errorDetails
         );
         eventStore.save(stored);
@@ -147,7 +147,7 @@ class EventRetrySchedulerTest {
         void invalidJsonPayload() {
             UUID eventId = UUID.randomUUID();
             StoredEvent invalid = new StoredEvent(
-                    eventId, TestEvent.class.getName(), "{invalid-json", null,
+                    eventId, TestEvent.class.getName(), null, "{invalid-json", null,
                     EventStatus.FAILED, 0, Instant.now().minusSeconds(10),
                     Instant.now().minusSeconds(10), "error"
             );
