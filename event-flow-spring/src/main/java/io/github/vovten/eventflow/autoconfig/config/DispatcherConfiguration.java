@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
@@ -80,7 +81,8 @@ public class DispatcherConfiguration {
         }
         var loggingConfig = properties.getDispatcher().getLogging();
         if (loggingConfig.isEnabled()) {
-            builder.loggable(loggingConfig.getMaxPayloadLength());
+            builder.loggable(loggingConfig.getMaxPayloadLength(),
+                    Set.copyOf(loggingConfig.getExcludedEvents()));
         }
         EventDispatcher dispatcher = builder.build();
 

@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 
@@ -115,6 +117,7 @@ public final class EventDispatcherBuilder {
     private boolean idempotentWarnOnDuplicate = true;
     private boolean loggable = false;
     private int logMaxPayloadLength = 500;
+    private Set<String> logExcludedEventTypes = Collections.emptySet();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
 
     private EventDispatcherBuilder() {
@@ -282,8 +285,20 @@ public final class EventDispatcherBuilder {
      * @return this builder
      */
     public EventDispatcherBuilder loggable(int maxPayloadLength) {
+        return loggable(maxPayloadLength, Collections.emptySet());
+    }
+
+    /**
+     * Enable logging decorator with custom max payload length and excluded event types.
+     *
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @return this builder
+     */
+    public EventDispatcherBuilder loggable(int maxPayloadLength, Set<String> excludedEvents) {
         this.loggable = true;
         this.logMaxPayloadLength = maxPayloadLength;
+        this.logExcludedEventTypes = excludedEvents;
         return this;
     }
 
@@ -322,8 +337,9 @@ public final class EventDispatcherBuilder {
         }
         // Apply logging decorator
         if (loggable) {
-            dispatcher = new LoggingEventDispatcher(dispatcher, logMaxPayloadLength);
-            log.debug("Applied logging decorator with maxPayloadLength={}", logMaxPayloadLength);
+            dispatcher = new LoggingEventDispatcher(dispatcher, logMaxPayloadLength, logExcludedEventTypes);
+            log.debug("Applied logging decorator with maxPayloadLength={}, excludedEvents={}",
+                    logMaxPayloadLength, logExcludedEventTypes);
         }
         if (concurrencyLimit != null) {
             log.info("Concurrency limit applied: max {} concurrent handler executions", concurrencyLimit);

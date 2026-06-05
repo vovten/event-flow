@@ -44,6 +44,11 @@ event-flow:
       enabled: false
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
+      # Event types (simple class names) to exclude from logging
+      # Default: SuccessAck, FailureAck (lifecycle acknowledgment events)
+      excluded-events:
+        - SuccessAck
+        - FailureAck
 
     # ---------------------------------------------------------------------------
     # Lifecycle-aware event publishing (event lifecycle tracking)
@@ -171,6 +176,11 @@ event-flow:
       enabled: false
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
+      # Event types (simple class names) to exclude from logging
+      # Default: SuccessAck, FailureAck (lifecycle acknowledgment events)
+      excluded-events:
+        - SuccessAck
+        - FailureAck
 
     # Lifecycle configuration
     # When enabled, the dispatcher publishes SuccessAck / FailureAck events

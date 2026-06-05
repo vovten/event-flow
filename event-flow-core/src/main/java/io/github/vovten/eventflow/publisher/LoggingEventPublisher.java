@@ -10,7 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -46,6 +48,7 @@ public final class LoggingEventPublisher implements EventPublisher {
 
     private final EventPublisher origin;
     private final int maxPayloadLength;
+    private final Set<String> excludedEvents;
 
     /**
      * Create logging decorator with default settings.
@@ -54,7 +57,7 @@ public final class LoggingEventPublisher implements EventPublisher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventPublisher(EventPublisher origin) {
-        this(origin, 1024);
+        this(origin, 1024, Collections.emptySet());
     }
 
     /**
@@ -65,12 +68,28 @@ public final class LoggingEventPublisher implements EventPublisher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventPublisher(EventPublisher origin, int maxPayloadLength) {
+        this(origin, maxPayloadLength, Collections.emptySet());
+    }
+
+    /**
+     * Create logging decorator with custom max payload length and excluded event types.
+     *
+     * @param origin             the delegate publisher to wrap
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @throws NullPointerException if origin is null
+     */
+    public LoggingEventPublisher(EventPublisher origin, int maxPayloadLength, Set<String> excludedEvents) {
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.maxPayloadLength = maxPayloadLength;
+        this.excludedEvents = Objects.requireNonNullElseGet(excludedEvents, Collections::emptySet);
     }
 
     @Override
     public CompletableFuture<SendResults> publish(Event event) {
+        if (isExcluded(event)) {
+            return origin.publish(event);
+        }
         Instant start = Instant.now();
         String traceId = MDC.get("traceId");
         String spanId = MDC.get("spanId");
@@ -78,6 +97,14 @@ public final class LoggingEventPublisher implements EventPublisher {
         return origin.publish(event)
                 .whenComplete((result, error) ->
                         logEvent(event, result, error, start, traceId, spanId, deliveredFrom));
+    }
+
+    private boolean isExcluded(Event event) {
+        if (excludedEvents.isEmpty()) {
+            return false;
+        }
+        Object payload = EventLogUtils.extractPayload(event);
+        return excludedEvents.contains(payload.getClass().getSimpleName());
     }
 
     private void logEvent(Event event, SendResults result, Throwable error,

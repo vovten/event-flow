@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 import static java.util.stream.Collectors.joining;
@@ -97,7 +98,8 @@ public class PublisherConfiguration {
         // Apply logging if enabled
         var loggingConfig = publisherConfig.getLogging();
         if (loggingConfig.isEnabled()) {
-            builder.loggable(loggingConfig.getMaxPayloadLength());
+            builder.loggable(loggingConfig.getMaxPayloadLength(),
+                    Set.copyOf(loggingConfig.getExcludedEvents()));
         }
 
         EventPublisher publisher = builder.build();

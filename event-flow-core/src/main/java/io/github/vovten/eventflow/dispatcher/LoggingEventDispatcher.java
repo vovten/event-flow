@@ -9,7 +9,9 @@ import org.slf4j.MDC;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -46,6 +48,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
 
     private final EventDispatcher origin;
     private final int maxPayloadLength;
+    private final Set<String> excludedEvents;
 
     /**
      * Create logging decorator with default settings.
@@ -54,7 +57,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin) {
-        this(origin, 1024);
+        this(origin, 1024, Collections.emptySet());
     }
 
     /**
@@ -65,12 +68,28 @@ public final class LoggingEventDispatcher implements EventDispatcher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin, int maxPayloadLength) {
+        this(origin, maxPayloadLength, Collections.emptySet());
+    }
+
+    /**
+     * Create logging decorator with custom max payload length and excluded event types.
+     *
+     * @param origin             the delegate dispatcher to wrap
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @throws NullPointerException if origin is null
+     */
+    public LoggingEventDispatcher(EventDispatcher origin, int maxPayloadLength, Set<String> excludedEvents) {
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.maxPayloadLength = maxPayloadLength;
+        this.excludedEvents = Objects.requireNonNullElseGet(excludedEvents, Collections::emptySet);
     }
 
     @Override
     public CompletableFuture<HandlerResults> dispatch(Event event) {
+        if (isExcluded(event)) {
+            return origin.dispatch(event);
+        }
         Instant start = Instant.now();
         String traceId = MDC.get("traceId");
         String spanId = MDC.get("spanId");
@@ -80,6 +99,14 @@ public final class LoggingEventDispatcher implements EventDispatcher {
                     long durationMs = Duration.between(start, Instant.now()).toMillis();
                     logEvent(event, results, error, durationMs, start, traceId, spanId, deliveredFrom);
                 });
+    }
+
+    private boolean isExcluded(Event event) {
+        if (excludedEvents.isEmpty()) {
+            return false;
+        }
+        Object payload = EventLogUtils.extractPayload(event);
+        return excludedEvents.contains(payload.getClass().getSimpleName());
     }
 
     private void logEvent(Event event, HandlerResults results, Throwable error,

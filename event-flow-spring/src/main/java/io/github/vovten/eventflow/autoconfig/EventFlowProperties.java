@@ -352,6 +352,11 @@ public class EventFlowProperties {
     public static class LoggingConfig {
         private boolean enabled = false;
         private int maxPayloadLength = 500;
+        /**
+         * List of event simple class names to exclude from logging.
+         * Default: SuccessAck, FailureAck (lifecycle acknowledgment events).
+         */
+        private List<String> excludedEvents = new ArrayList<>(List.of("SuccessAck", "FailureAck"));
 
         public boolean isEnabled() {
             return enabled;
@@ -367,6 +372,14 @@ public class EventFlowProperties {
 
         public void setMaxPayloadLength(int maxPayloadLength) {
             this.maxPayloadLength = maxPayloadLength;
+        }
+
+        public List<String> getExcludedEvents() {
+            return excludedEvents;
+        }
+
+        public void setExcludedEvents(List<String> excludedEvents) {
+            this.excludedEvents = excludedEvents;
         }
     }
 
