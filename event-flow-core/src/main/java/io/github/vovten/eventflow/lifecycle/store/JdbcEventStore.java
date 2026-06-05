@@ -152,6 +152,8 @@ public class JdbcEventStore implements EventStore {
         this.uuidType = detectUuidType();
         if (autoInitSchema) {
             initSchema();
+        } else {
+            verifyTableExists();
         }
     }
 
@@ -178,6 +180,22 @@ public class JdbcEventStore implements EventStore {
     @Override
     public String getType() {
         return "db";
+    }
+
+    private void verifyTableExists() {
+        try (Connection conn = dataSource.getConnection()) {
+            if (!tableExists(conn, tableName)) {
+                throw new IllegalStateException(
+                        "Event store table '" + tableName + "' does not exist. " +
+                        "Either set auto-init-schema: true to allow automatic table creation, " +
+                        "or create the table manually using the DDL script at: " +
+                        "io/github/vovten/eventflow/lifecycle/store/event-store.sql");
+            }
+            log.info("Event store table '{}' exists, auto-init-schema is disabled", tableName);
+        } catch (SQLException e) {
+            throw new IllegalStateException(
+                    "Failed to verify event store table '" + tableName + "' existence", e);
+        }
     }
 
     private void initSchema() {

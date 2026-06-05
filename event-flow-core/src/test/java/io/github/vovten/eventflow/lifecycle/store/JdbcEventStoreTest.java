@@ -64,20 +64,21 @@ class JdbcEventStoreTest {
     }
 
     @Test
-    @DisplayName("Should not create table when autoInitSchema is false")
-    void shouldNotCreateTableWhenAutoInitIsFalse() throws SQLException {
-        new JdbcEventStore(dataSource, "event_store", false);
-        assertThat(tableExists("EVENT_STORE")).isFalse();
+    @DisplayName("Should fail at construction when autoInitSchema is false and table does not exist")
+    void shouldFailWhenTableDoesNotExistOnConstruction() {
+        assertThatThrownBy(() -> new JdbcEventStore(dataSource, "event_store", false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not exist");
     }
 
     @Test
-    @DisplayName("Should fail gracefully when table does not exist")
-    void shouldFailWhenTableDoesNotExist() {
-        JdbcEventStore store = new JdbcEventStore(dataSource, "event_store", false);
-        UUID eventId = UUID.randomUUID();
-        StoredEvent event = StoredEvent.newEvent(eventId, "test.T", null, "{}", null);
-        assertThatThrownBy(() -> store.save(event))
-                .isInstanceOf(RuntimeException.class);
+    @DisplayName("Should succeed when autoInitSchema is false and table already exists")
+    void shouldSucceedWhenTableExistsAutoInitFalse() throws SQLException {
+        new JdbcEventStore(dataSource, "event_store", true);
+        assertThat(tableExists("EVENT_STORE")).isTrue();
+
+        // Now create a second store with autoInitSchema=false — should not throw
+        new JdbcEventStore(dataSource, "event_store", false);
     }
 
     @Test
