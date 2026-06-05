@@ -90,6 +90,47 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
+     * Create envelope with specified eventId, null processId, and current timestamp.
+     * Channels are resolved from payload's {@link Event} annotation, or default to internal.
+     *
+     * @param <T>     the payload type
+     * @param eventId the explicit event identifier
+     * @param payload the event to wrap
+     * @return new envelope instance
+     */
+    public static <T> Envelope<T> of(UUID eventId, T payload) {
+        return new Envelope<>(
+                eventId,
+                null,
+                Instant.now(),
+                payload,
+                Map.of(),
+                null
+        );
+    }
+
+    /**
+     * Create envelope with specified eventId, specified processId, and current timestamp.
+     * Channels are resolved from payload's {@link Event} annotation, or default to internal.
+     *
+     * @param <T>        the payload type
+     * @param eventId    the explicit event identifier
+     * @param processId  the process identifier (e.g., saga ID)
+     * @param payload    the domain event to wrap
+     * @return new envelope instance
+     */
+    public static <T> Envelope<T> of(UUID eventId, UUID processId, T payload) {
+        return new Envelope<>(
+                eventId,
+                processId,
+                Instant.now(),
+                payload,
+                Map.of(),
+                null
+        );
+    }
+
+    /**
      * Create envelope with auto-generated eventId, specified processId, and current timestamp.
      * Channels are resolved from payload's {@link Event} annotation, or default to internal.
      *
