@@ -241,7 +241,8 @@ public class EventFlowProperties {
         public static class StoreConfig {
             /**
              * Store type identifier. Built-in values: {@code "db"}, {@code "in-memory"}.
-             * Custom types are supported via {@link io.github.vovten.eventflow.lifecycle.store.EventStoreRegistry}.
+             * Custom types are supported by defining a custom {@code @Bean EventStore}
+             * — the framework auto-discovers it and returns it when the type matches.
              */
             private String type = "db";
 

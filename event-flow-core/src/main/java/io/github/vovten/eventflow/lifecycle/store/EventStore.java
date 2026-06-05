@@ -26,7 +26,7 @@ public interface EventStore {
     /**
      * Returns the type identifier for this store implementation.
      * <p>
-     * Used by {@link EventStoreRegistry} to resolve the store by type name.
+     * Used to select the active store via the {@code store.type} configuration property.
      * Built-in types: {@code "db"} for {@link JdbcEventStore}, {@code "in-memory"}
      * for {@link InMemoryEventStore}.
      *

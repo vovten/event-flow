@@ -6,17 +6,17 @@ import io.github.vovten.eventflow.lifecycle.AckHandler;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.EventRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
-import io.github.vovten.eventflow.lifecycle.store.EventStoreRegistry;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.JdbcEventStore;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
 import java.util.List;
@@ -26,7 +26,8 @@ import java.util.List;
  * <p>
  * Provides the following beans when {@code event-flow.publisher.lifecycle.enabled=true}:
  * <ul>
- *   <li>{@link EventStore} — resolved from {@link EventStoreRegistry} by {@code store.type}</li>
+ *   <li>{@link EventStore} — resolves user-defined custom {@link EventStore} beans
+ *       by the configured {@code store.type}, or creates a built-in implementation</li>
  *   <li>{@link AckHandler} — processes lifecycle ack events (SuccessAck/FailureAck)</li>
  *   <li>{@link EventRetryScheduler} — periodically retries failed events</li>
  * </ul>
@@ -37,9 +38,9 @@ import java.util.List;
  *   <li>{@code "in-memory"} — {@link InMemoryEventStore} (non-persistent, for testing)</li>
  * </ul>
  * <p>
- * Custom store implementations can be provided by creating an {@link EventStore} bean
- * with a custom {@link EventStore#getType()} value. The registry automatically discovers
- * and registers custom stores. Select the store type via {@code store.type} in configuration.
+ * Custom stores: define a {@code @Bean EventStore} and set {@code store.type}
+ * to match its {@link EventStore#getType()}. The bean will be auto-discovered
+ * and returned by {@link #eventStore(ObjectProvider, ObjectProvider)}.
  * <p>
  * The {@link EventPublisher} from {@link PublisherConfiguration} is automatically
  * wrapped in an {@link io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher}
@@ -61,93 +62,55 @@ public class LifecycleConfiguration {
     }
 
     /**
-     * Creates the {@link EventStoreRegistry} that holds all registered store
-     * implementations and resolves the active one by configured type.
-     *
-     * @return the event store registry
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public EventStoreRegistry eventStoreRegistry() {
-        return new EventStoreRegistry();
-    }
-
-    /**
-     * Registers the built-in {@link JdbcEventStore} (type {@code "db"}).
+     * Resolves the active {@link EventStore} for the configured {@code store.type}.
      * <p>
-     * Only registered when {@code store.type} is {@code "db"} (or default)
-     * and a {@link DataSource} is available.
-     *
-     * @param registry   the event store registry to register into
-     * @param dataSource the JDBC DataSource for database access
-     * @return marker object (for dependency ordering)
-     */
-    @Bean
-    @ConditionalOnClass(DataSource.class)
-    @ConditionalOnProperty(prefix = "event-flow.publisher.lifecycle.store", name = "type",
-            havingValue = "db", matchIfMissing = true)
-    public Object registerJdbcStore(EventStoreRegistry registry, DataSource dataSource) {
-        LifecyclePublisherConfig.StoreConfig cfg = properties.getPublisher().getLifecycle().getStore();
-        registry.register(new JdbcEventStore(dataSource, cfg.getTableName(), cfg.isAutoInitSchema()));
-        log.info("Registered JdbcEventStore (type='db', table={}, autoInit={})",
-                cfg.getTableName(), cfg.isAutoInitSchema());
-        return new Object();
-    }
-
-    /**
-     * Registers the built-in {@link InMemoryEventStore} (type {@code "in-memory"}).
+     * Resolution order:
+     * <ol>
+     *   <li>If a user-defined {@code @Bean EventStore} matches {@code store.type},
+     *       that bean is returned directly</li>
+     *   <li>If {@code store.type} is {@code "in-memory"}, creates {@link InMemoryEventStore}</li>
+     *   <li>Otherwise (default {@code "db"}), creates {@link JdbcEventStore} if a
+     *       {@link DataSource} is available</li>
+     * </ol>
      * <p>
-     * Only registered when {@code store.type} is explicitly set to {@code "in-memory"}.
+     * Marked as {@link Primary @Primary} so this bean is used for injection into
+     * {@link AckHandler}, {@link EventRetryScheduler}, and other consumers.
      *
-     * @param registry the event store registry to register into
-     * @return marker object (for dependency ordering)
+     * @param customStores       provider for user-defined EventStore beans
+     * @param dataSourceProvider provider for optional DataSource
+     * @return the event store for the configured type
+     * @throws IllegalStateException if no matching custom store is found and the
+     *                               built-in type ("db") has no DataSource available
      */
     @Bean
-    @ConditionalOnProperty(prefix = "event-flow.publisher.lifecycle.store", name = "type",
-            havingValue = "in-memory")
-    public Object registerInMemoryStore(EventStoreRegistry registry) {
-        registry.register(new InMemoryEventStore());
-        log.warn("Registered InMemoryEventStore (type='in-memory') — event data is NOT persisted across restarts");
-        return new Object();
-    }
-
-    /**
-     * Discovers and registers custom {@link EventStore} beans provided by the user.
-     * <p>
-     * Any {@link EventStore} bean not created by this configuration (e.g., user-defined
-     * {@code @Component} or {@code @Bean}) is automatically registered in the registry
-     * under its {@link EventStore#getType()} identifier.
-     *
-     * @param registry       the event store registry to register into
-     * @param customStores   user-defined EventStore beans (auto-injected)
-     * @return marker object (for dependency ordering)
-     */
-    @Bean
-    public Object registerCustomStores(EventStoreRegistry registry, List<EventStore> customStores) {
-        for (EventStore store : customStores) {
-            registry.register(store);
-            log.info("Registered custom EventStore: type='{}'", store.getType());
-        }
-        return new Object();
-    }
-
-    /**
-     * Resolves the active {@link EventStore} from the registry based on
-     * the configured {@code store.type}.
-     * <p>
-     * Uses {@link EventStoreRegistry#resolve(String)} to look up the store.
-     *
-     * @param registry the event store registry
-     * @return the resolved event store
-     * @throws IllegalArgumentException if no store is registered for the configured type
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public EventStore eventStore(EventStoreRegistry registry) {
+    @Primary
+    public EventStore eventStore(
+            ObjectProvider<List<EventStore>> customStores,
+            ObjectProvider<DataSource> dataSourceProvider) {
         String type = properties.getPublisher().getLifecycle().getStore().getType();
-        EventStore store = registry.resolve(type);
-        log.info("Resolved EventStore: type='{}'", store.getType());
-        return store;
+        List<EventStore> stores = customStores.getIfAvailable();
+        if (stores != null) {
+            for (EventStore store : stores) {
+                if (type.equals(store.getType())) {
+                    log.info("Matched custom EventStore: type='{}'", type);
+                    return store;
+                }
+            }
+        }
+        if ("in-memory".equals(type)) {
+            log.warn("Using InMemoryEventStore — event data is NOT persisted across restarts");
+            return new InMemoryEventStore();
+        }
+        DataSource dataSource = dataSourceProvider.getIfAvailable();
+        if (dataSource != null) {
+            LifecyclePublisherConfig.StoreConfig cfg = properties.getPublisher().getLifecycle().getStore();
+            log.info("Creating JdbcEventStore: table={}, autoInit={}", cfg.getTableName(), cfg.isAutoInitSchema());
+            return new JdbcEventStore(dataSource, cfg.getTableName(), cfg.isAutoInitSchema());
+        }
+        throw new IllegalStateException(
+                "store.type is '" + type + "' but no DataSource available. " +
+                "Either configure a DataSource, set store.type to 'in-memory', " +
+                "or define a custom @Bean EventStore with type '" + type + "'.");
     }
 
     /**
