@@ -74,6 +74,14 @@ public class JdbcEventStore implements EventStore {
             ORDER BY updated_at ASC
             """;
 
+    private static final String SELECT_BY_STATUSES = """
+            SELECT event_id, event_type, service, payload, process_id, status,
+                   retry_count, created_at, updated_at, error_details
+            FROM %s
+            WHERE status IN (%s) AND updated_at < ?
+            ORDER BY updated_at ASC
+            """;
+
     private static final String SELECT_BY_ID = """
             SELECT event_id, event_type, service, payload, process_id, status,
                    retry_count, created_at, updated_at, error_details
@@ -408,6 +416,34 @@ public class JdbcEventStore implements EventStore {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find events by status: " + status, e);
+        }
+    }
+
+    @Override
+    public List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before) {
+        if (statuses.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = statuses.stream()
+                .map(s -> "?")
+                .collect(java.util.stream.Collectors.joining(", "));
+        String sql = SELECT_BY_STATUSES.formatted(tableName, placeholders);
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+            int i = 1;
+            for (EventStatus status : statuses) {
+                ps.setString(i++, String.valueOf(status.getCode()));
+            }
+            ps.setTimestamp(i, Timestamp.from(before));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<StoredEvent> results = new ArrayList<>();
+                while (rs.next()) {
+                    results.add(mapRow(rs));
+                }
+                return results;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find events by statuses: " + statuses, e);
         }
     }
 

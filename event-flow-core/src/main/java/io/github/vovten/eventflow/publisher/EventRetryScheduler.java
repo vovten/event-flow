@@ -15,13 +15,12 @@ import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 /**
- * Scheduled retry mechanism for failed and stuck events in the {@link EventStore}.
+ * Scheduled retry mechanism for failed, stuck, and orphaned events in the {@link EventStore}.
  * <p>
- * Periodically scans for events with status {@link EventStatus#FAILED}
- * or {@link EventStatus#PUBLISHED}
+ * Periodically scans for events with status {@link EventStatus#FAILED},
+ * {@link EventStatus#PUBLISHED}, or {@link EventStatus#NEW}
  * that are older than a configured minimum age
  * and have not exceeded the maximum retry count. Eligible events are:
  * <ol>
@@ -33,7 +32,9 @@ import java.util.stream.Stream;
  * <p>
  * {@link EventStatus#PUBLISHED} events are retried to handle cases where
  * the acknowledgment event (ack) was lost and the event is stuck in the
- * published state. The same backoff and retry limit apply.
+ * published state. {@link EventStatus#NEW} events are retried to handle
+ * cases where the application crashed before the initial publish completed.
+ * The same backoff and retry limit apply for all statuses.
  * <p>
  * The delay between retry attempts increases exponentially:
  * {@code minAge × 2^retryCount}. The first retry waits {@code minAge},
@@ -92,7 +93,7 @@ public final class EventRetryScheduler implements AutoCloseable {
                 interval.toMillis(),
                 TimeUnit.MILLISECONDS
         );
-        log.info("Event retry scheduler started: interval={}, minAge={}, maxRetries={} (FAILED and PUBLISHED)",
+        log.info("Event retry scheduler started: interval={}, minAge={}, maxRetries={} (FAILED, PUBLISHED, NEW)",
                 interval, minAge, maxRetries);
     }
 
@@ -113,28 +114,41 @@ public final class EventRetryScheduler implements AutoCloseable {
     }
 
     /**
-     * Performs a single retry cycle: scans for FAILED and PUBLISHED events
+     * Performs a single retry cycle: scans for FAILED, PUBLISHED, and NEW events
      * and retries eligible ones.
+     * <p>
+     * NEW events are included to handle cases where the event was persisted
+     * but the application crashed before the publish completed. These events
+     * would otherwise be stuck in the NEW state indefinitely.
      */
     void retryCycle() {
         try {
             Instant deadline = Instant.now().minus(minAge);
-            List<StoredEvent> failedEvents = eventStore.findByStatus(EventStatus.FAILED, deadline);
-            List<StoredEvent> stuckEvents = eventStore.findByStatus(EventStatus.PUBLISHED, deadline);
-
-            if (failedEvents.isEmpty() && stuckEvents.isEmpty()) {
+            List<StoredEvent> events = eventStore.findByStatuses(
+                    List.of(EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.NEW), deadline);
+            if (events.isEmpty()) {
                 log.trace("No events to retry");
                 return;
             }
-            int total = failedEvents.size() + stuckEvents.size();
-            log.debug("Found {} events eligible for retry ({} FAILED, {} PUBLISHED)",
-                    total, failedEvents.size(), stuckEvents.size());
-
-            Stream.concat(failedEvents.stream(), stuckEvents.stream())
-                    .forEach(this::retryIfEligible);
+            if (log.isDebugEnabled()) {
+                log.debug("Found {} events eligible for retry ({} FAILED, {} PUBLISHED, {} NEW)",
+                        events.size(),
+                        countByStatus(events, EventStatus.FAILED),
+                        countByStatus(events, EventStatus.PUBLISHED),
+                        countByStatus(events, EventStatus.NEW));
+            }
+            events.forEach(this::retryIfEligible);
         } catch (Exception e) {
             log.error("Error during retry cycle", e);
         }
+    }
+
+    private static int countByStatus(List<StoredEvent> events, EventStatus status) {
+        int count = 0;
+        for (StoredEvent event : events) {
+            if (event.status() == status) count++;
+        }
+        return count;
     }
 
     private void retryIfEligible(StoredEvent event) {

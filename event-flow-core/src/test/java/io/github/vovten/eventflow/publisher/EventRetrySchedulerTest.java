@@ -68,6 +68,14 @@ class EventRetrySchedulerTest {
         return createEvent(EventStatus.FAILED, retryCount, updatedAt, "test error");
     }
 
+    private UUID createNewEvent(int retryCount) {
+        return createNewEvent(retryCount, Instant.now().minusSeconds(10));
+    }
+
+    private UUID createNewEvent(int retryCount, Instant updatedAt) {
+        return createEvent(EventStatus.NEW, retryCount, updatedAt, null);
+    }
+
     private UUID createPublishedEvent(int retryCount) {
         return createPublishedEvent(retryCount, Instant.now().minusSeconds(10));
     }
@@ -281,6 +289,63 @@ class EventRetrySchedulerTest {
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+        }
+
+        // -------------------------------------------------------
+        // NEW events (stuck after crash before publish)
+        // -------------------------------------------------------
+
+        @Test
+        @DisplayName("retries NEW events within retry limit")
+        void retriesNewEvents() {
+            UUID eventId = createNewEvent(0);
+
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(stored.retryCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("skips NEW events that have exceeded max retries")
+        void skipsNewEventsExceedingMaxRetries() {
+            UUID eventId = createNewEvent(3, Instant.now().minusSeconds(10));
+
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.NEW);
+            assertThat(stored.retryCount()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("skips recent NEW events below minimum age threshold")
+        void skipsRecentNewEvents() {
+            UUID eventId = createNewEvent(0, Instant.now());
+
+            scheduler(Duration.ofSeconds(10), 3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.NEW);
+            assertThat(stored.retryCount()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("retries mix of FAILED, PUBLISHED and NEW events in one cycle")
+        void retriesMixOfFailedPublishedAndNew() {
+            UUID failedId = createFailedEvent(0);
+            UUID stuckId = createPublishedEvent(0);
+            UUID newId = createNewEvent(0);
+
+            scheduler(3).retryCycle();
+
+            assertThat(eventStore.findById(failedId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+            assertThat(eventStore.findById(stuckId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+            assertThat(eventStore.findById(newId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
         }
 
         @Test

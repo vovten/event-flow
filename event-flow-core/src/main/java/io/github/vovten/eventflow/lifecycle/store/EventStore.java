@@ -68,6 +68,27 @@ public interface EventStore {
     List<StoredEvent> findByStatus(EventStatus status, Instant before);
 
     /**
+     * Finds all events matching any of the given statuses that were last
+     * updated before the given timestamp.
+     * <p>
+     * This is an optimisation over calling {@link #findByStatus(EventStatus, Instant)}
+     * multiple times &mdash; implementations should use a single query where possible.
+     * The default implementation delegates to {@code findByStatus} and merges results.
+     *
+     * @param statuses the statuses to search for (must not be null or empty)
+     * @param before   only return events updated before this time
+     * @return list of matching events (never null)
+     * @since 1.3.2
+     */
+    default List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before) {
+        return statuses.stream()
+                .map(status -> findByStatus(status, before))
+                .flatMap(List::stream)
+                .distinct()
+                .toList();
+    }
+
+    /**
      * Finds an event by its unique identifier.
      *
      * @param eventId the event ID

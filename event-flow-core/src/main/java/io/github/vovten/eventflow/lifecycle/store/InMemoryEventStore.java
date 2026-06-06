@@ -55,6 +55,15 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
+    public List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before) {
+        Set<EventStatus> statusSet = EnumSet.copyOf(statuses);
+        return store.values().stream()
+                .filter(e -> statusSet.contains(e.status()))
+                .filter(e -> e.updatedAt().isBefore(before))
+                .collect(toList());
+    }
+
+    @Override
     public Optional<StoredEvent> findById(UUID eventId) {
         return Optional.ofNullable(store.get(eventId));
     }
