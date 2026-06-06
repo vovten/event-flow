@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.lifecycle.EventLifecycle;
 import io.github.vovten.eventflow.serialization.EventPolymorphicTypeValidator;
@@ -84,24 +85,39 @@ public final class EventUtils {
     }
 
     /**
-     * Resolves the {@link EventLifecycle} for the given event.
+     * Resolves the lifecycle for the given event.
      * <p>
-     * Priority:
+     * This is the single canonical resolution method.
+     * Resolution priority:
      * <ol>
-     *   <li>{@link io.github.vovten.eventflow.event.annotation.Event @Event} annotation
-     *       on the event class (highest priority)</li>
-     *   <li>{@link Event#lifecycle()} default method override</li>
-     *   <li>{@link EventLifecycle#PERSISTED} — global default</li>
+     *   <li>{@link io.github.vovten.eventflow.event.annotation.Event @Event} annotation on the event class
+     *       (or on the payload class for {@link Envelope})</li>
+     *   <li>{@link Event#lifecycle()} default method (or {@link EventLifecycle#PERSISTED} for POJO payloads)</li>
      * </ol>
      *
      * @param event the event instance
      * @return the resolved lifecycle level
      */
     public static EventLifecycle lifecycle(Event event) {
+        if (event instanceof Envelope<?> envelope) {
+            return resolveEnvelopeLifecycle(envelope);
+        }
         var ann = event.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
         if (ann != null) {
             return ann.lifecycle();
         }
         return event.lifecycle();
+    }
+
+    private static EventLifecycle resolveEnvelopeLifecycle(Envelope<?> envelope) {
+        Object payload = envelope.payload();
+        var ann = payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
+        if (ann != null) {
+            return ann.lifecycle();
+        }
+        if (payload instanceof Event evt) {
+            return evt.lifecycle();
+        }
+        return EventLifecycle.PERSISTED;
     }
 }

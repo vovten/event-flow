@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.lifecycle.EventLifecycle;
+import io.github.vovten.eventflow.util.EventUtils;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -270,26 +271,15 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
-     * Resolves the lifecycle from the payload in the following priority:
-     * <ol>
-     *   <li>{@link io.github.vovten.eventflow.event.annotation.Event @Event} annotation
-     *       on the payload class</li>
-     *   <li>{@link Event#lifecycle()} default method, if payload implements {@link Event}</li>
-     *   <li>{@link EventLifecycle#PERSISTED} as default</li>
-     * </ol>
+     * Delegates to {@link EventUtils#lifecycle(Event)} which is the single
+     * canonical resolution method. For resolution priority see
+     * {@link EventUtils#lifecycle(Event)}.
      *
      * @return resolved lifecycle level
      */
     @Override
     public EventLifecycle lifecycle() {
-        var annotation = payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
-        if (annotation != null) {
-            return annotation.lifecycle();
-        }
-        if (payload instanceof Event evt) {
-            return evt.lifecycle();
-        }
-        return EventLifecycle.PERSISTED;
+        return EventUtils.lifecycle(this);
     }
 
     @Override
