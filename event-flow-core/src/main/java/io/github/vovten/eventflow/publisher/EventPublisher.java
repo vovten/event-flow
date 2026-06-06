@@ -75,7 +75,7 @@ public interface EventPublisher {
      * Example:
      * <pre>{@code
      * publisher.prepare(new OrderCreated(orderId, email))
-     *     .withTraceId("trace-123")
+     *     .withProcessId(processId)
      *     .withMetadata("source", "web-api")
      *     .publish();
      * }</pre>

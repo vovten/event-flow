@@ -131,7 +131,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                                   EventHandlerRegistry handlerRegistry,
                                   List<InTransport> transports,
                                   Semaphore concurrencySemaphore) {
-        this.transports = transports;
+        this.transports = List.copyOf(transports);
         this.executorService = executorService;
         this.handlerRegistry = handlerRegistry;
         this.concurrencySemaphore = concurrencySemaphore;

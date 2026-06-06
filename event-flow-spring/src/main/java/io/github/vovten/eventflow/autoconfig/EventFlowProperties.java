@@ -16,7 +16,7 @@ import java.util.List;
  * <pre>{@code
  * event-flow:
  *   enabled: true
- *   scan-packages: com.example.listener
+ *   dispatcher.listener-packages: com.example.listener
  *   publisher:
  *     enabled: true
  *     transactional: true

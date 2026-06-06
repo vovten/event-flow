@@ -183,7 +183,7 @@ Add the dependency to your `pom.xml`:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -193,16 +193,16 @@ For Spring Boot integration:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.github.vovten:event-flow:1.0.0'
+implementation 'io.github.vovten:event-flow:1.1.0'
 // For Spring Boot:
-implementation 'io.github.vovten:event-flow-spring:1.0.0'
+implementation 'io.github.vovten:event-flow-spring:1.1.0'
 ```
 
 ### Requirements
@@ -214,38 +214,46 @@ implementation 'io.github.vovten:event-flow-spring:1.0.0'
 
 ### 1. Create an Event
 
+Events can be defined in two ways:
+
+**a) Use the `@Event` annotation (recommended)** — cleaner POJO/record, channels from annotation:
+
+```java
+@Event(channels = InternalEventChannel.class)
+public record OrderShipped(String orderId, String customerId) {}
+```
+
+**b) Implement the `Event` interface** — full control over type and channels:
+
 ```java
 public record OrderCreatedEvent(String orderId, String customerId) implements Event {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return OrderCreatedEvent.class;
     }
 }
 ```
 
+> Both approaches work with `publish()`, `prepare()`, and handler registration.
+> **Recommended:** `@Event` annotation for cleaner code; use `implements Event` only when you need full control.
+
 ### 2. Set Up Infrastructure
 
 ```java
-// Create transports for internal and external communication
-var internalTransports = new LocalQueueTransportsBuilder()
+// Create local queue transport for in-JVM event delivery
+var transports = new LocalQueueTransportsBuilder()
     .queueSize(1000)
     .build();
 
-var externalTransports = new LocalQueueTransportsBuilder()
-    .queueSize(1000)
-    .build();
-
-// Create channels
+// Create a channel for internal (in-application) events
+// For external events (Kafka), use ExternalEventChannel with Kafka transports
 EventChannel internalChannel = new InternalEventChannel(
-    List.of(internalTransports.outTransport())
-);
-EventChannel externalChannel = new ExternalEventChannel(
-    List.of(externalTransports.outTransport())
+    List.of(transports.publisher())
 );
 
-// Create publisher
-EventPublisher eventPublisher = EventPublisherBuilder.create(internalChannel, externalChannel)
+// Create publisher (add externalChannel here for external events)
+EventPublisher eventPublisher = EventPublisherBuilder.create(internalChannel)
     .retryable(3, Duration.ofMillis(100), 2.0)
     .buildAndLog();
 
@@ -259,15 +267,17 @@ EventHandlerRegistry handlerRegistry = EventHandlerRegistryBuilder.create()
 EventDispatcher eventDispatcher = EventDispatcherBuilder.create()
     .executor(Executors.newVirtualThreadPerTaskExecutor())
     .handlerRegistry(handlerRegistry)
-    .transports(List.of(internalTransports.inTransport(), externalTransports.inTransport()))
+    .transports(List.of(transports.dispatcher()))
     .concurrencyLimit(100)
     .buildAndLog();
 
 // Start the dispatcher
-eventDispatcher.start();
+eventDispatcher.start(eventDispatcher::dispatch);
 ```
 
 ### 3. Create a Handler (Annotation-Based)
+
+Handle the event directly:
 
 ```java
 public class OrderEventHandler {
@@ -281,6 +291,26 @@ public class OrderEventHandler {
 // Register the handler
 handlerRegistry.register(new OrderEventHandler());
 ```
+
+Or receive the full `Envelope` with metadata (eventId, processId, occurredAt, etc.):
+
+```java
+public class OrderEnvelopeHandler {
+
+    @EventListener(OrderShipped.class)
+    public void handleOrderShipped(Envelope<OrderShipped> envelope) {
+        OrderShipped event = envelope.payload();
+        System.out.println("Order " + event.orderId()
+                + " processed with id " + envelope.eventId());
+    }
+}
+
+// Register the envelope handler
+handlerRegistry.register(new OrderEnvelopeHandler());
+```
+
+> When the handler parameter is `Envelope<T>`, the `@EventListener` annotation must specify the payload type explicitly (e.g., `@EventListener(OrderShipped.class)`).
+> This is especially useful for POJO/record events annotated with `@Event` — they are automatically wrapped in an `Envelope` upon publishing.
 
 ### 4. Publish an Event
 
@@ -308,7 +338,7 @@ Base interface for all events. Defines event type and publication channels.
 
 ```java
 public interface Event {
-    Class<? extends Event> type();
+    Class<?> type();
     default List<Class<? extends EventChannel>> channels() {
         return List.of(InternalEventChannel.class);
     }
@@ -318,7 +348,7 @@ public interface Event {
 }
 ```
 
-**TraceableEvent** — extends `Event` with tracing fields: `uid` (UUID), `processId` (correlation), `occurredAt` (timestamp).
+**TraceableEvent** — extends `Event` with tracing fields: `eventId` (UUID), `processId` (correlation), `occurredAt` (timestamp).
 
 ### Envelope
 
@@ -364,8 +394,9 @@ A channel defines event delivery routes through transports.
 public interface EventChannel {
     String name();
     List<OutTransport> transports();
-    void send(Event event);
+    CompletableFuture<SendResults> send(Event event);
 }
+
 ```
 
 **Built-in Channels:**
@@ -478,14 +509,16 @@ var transports = new LocalQueueTransportsBuilder()
     .build();
 
 EventChannel channel = new InternalEventChannel(
-    List.of(transports.outTransport())
+    List.of(transports.publisher())
 );
 
 EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .executor(Executors.newVirtualThreadPerTaskExecutor())
-    .handlerRegistry(registry)
-    .transports(List.of(transports.inTransport()))
+    .handlerRegistry(handlerRegistry)
+    .transports(List.of(transports.dispatcher()))
     .build();
+
+dispatcher.start(dispatcher::dispatch);
 ```
 
 ### Serialization
@@ -553,7 +586,7 @@ Implement `Event` interface for minimum overhead — no Envelope wrapper, smalle
 public record OrderCreatedEvent(String orderId, String email) implements Event {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return OrderCreatedEvent.class;
     }
 
@@ -573,7 +606,8 @@ eventPublisher.publish(new OrderCreatedEvent("order-123", "user@example.com"));
 Publish any Java object directly — Envelope is created automatically:
 
 ```java
-// Simple POJO
+// Simple POJO with @Event annotation
+@Event(channels = InternalEventChannel.class)
 public record OrderCreated(String orderId, String email) {}
 
 eventPublisher.publish(new OrderCreated("order-123", "user@example.com"));
@@ -643,7 +677,7 @@ eventPublisher.publish(new OrderShipped("order-123", Instant.now()));
 public record UserRegisteredEvent(String userId, String email) implements Event {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return UserRegisteredEvent.class;
     }
 
@@ -739,7 +773,7 @@ EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .transports(List.of(kafkaIn))
     .build();
 
-dispatcher.start();
+dispatcher.start(dispatcher::dispatch);
 ```
 
 ### Idempotent Dispatcher

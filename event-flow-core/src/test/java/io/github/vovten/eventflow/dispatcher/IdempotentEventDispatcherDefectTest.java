@@ -21,7 +21,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 /**
  * Tests that expose the TOCTOU race condition in IdempotentEventDispatcher.
@@ -107,8 +106,11 @@ class IdempotentEventDispatcherDefectTest {
         handlerEnteredLatch.await(3, TimeUnit.SECONDS);
 
         // Small delay to allow the second thread to also pass the idempotent check
-        await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1))
-                .until(() -> true);
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
         // Release the blocked handlers
         releaseLatch.countDown();
@@ -168,8 +170,11 @@ class IdempotentEventDispatcherDefectTest {
         latch.await(5, TimeUnit.SECONDS);
 
         // Small wait for any in-flight handlers
-        await().pollDelay(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
-                .until(() -> true);
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
         // Assert: should only be invoked ONCE
         assertThat(invocationCount.get())

@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.event;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -25,7 +26,7 @@ import java.util.UUID;
  * @deprecated Use {@link Envelope} instead of extending this class.
  *     Will be removed in a future version.
  */
-@Deprecated(forRemoval = true, since = "1.1.0")
+@Deprecated(since = "1.1.0")
 public abstract class AbstractTraceableEvent implements TraceableEvent {
 
     private final UUID eventId;
@@ -84,8 +85,8 @@ public abstract class AbstractTraceableEvent implements TraceableEvent {
      */
     @JsonCreator
     protected AbstractTraceableEvent(
-            @JsonProperty("eventId") UUID eventId,
-            @JsonProperty("processId") UUID processId,
+            @JsonProperty("eventId") @JsonAlias("uid") UUID eventId,
+            @JsonProperty("processId") @JsonAlias("traceId") UUID processId,
             @JsonProperty("occurredAt") Instant occurredAt) {
         this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
         this.processId = processId;

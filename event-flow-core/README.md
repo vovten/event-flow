@@ -22,7 +22,7 @@ Detailed documentation for the core Event Flow module — framework-agnostic, pu
 public record OrderCreatedEvent(String orderId, String customerId) implements Event {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return OrderCreatedEvent.class;
     }
 }
@@ -36,7 +36,7 @@ var transports = new LocalQueueTransportsBuilder()
     .build();
 
 EventChannel channel = new InternalEventChannel(
-    List.of(transports.outTransport())
+    List.of(transports.publisher())
 );
 
 EventPublisher publisher = EventPublisherBuilder.create(channel)
@@ -51,11 +51,11 @@ EventHandlerRegistry registry = EventHandlerRegistryBuilder.create()
 EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .executor(Executors.newVirtualThreadPerTaskExecutor())
     .handlerRegistry(registry)
-    .transports(List.of(transports.inTransport()))
+    .transports(List.of(transports.dispatcher()))
     .concurrencyLimit(100)
     .buildAndLog();
 
-dispatcher.start();
+dispatcher.start(dispatcher::dispatch);
 ```
 
 ### 3. Register a Handler & Publish
@@ -82,7 +82,7 @@ Every event must implement the `Event` interface:
 
 ```java
 public interface Event {
-    Class<? extends Event> type();
+    Class<?> type();
     default List<Class<? extends EventChannel>> channels() {
         return List.of(InternalEventChannel.class);
     }
@@ -99,18 +99,18 @@ For tracing and correlation, extend `TraceableEvent`:
 ```java
 public record PaymentCompletedEvent(
     String paymentId,
-    UUID uid,
+    UUID eventId,
     UUID processId,
     Instant occurredAt
 ) implements TraceableEvent {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return PaymentCompletedEvent.class;
     }
 
     @Override
-    public UUID uid() { return uid; }
+    public UUID eventId() { return eventId; }
 
     @Override
     public UUID processId() { return processId; }
@@ -126,7 +126,7 @@ public record PaymentCompletedEvent(
 public record UserRegisteredEvent(String userId, String email) implements Event {
 
     @Override
-    public Class<? extends Event> type() {
+    public Class<?> type() {
         return UserRegisteredEvent.class;
     }
 
@@ -149,7 +149,7 @@ A channel defines event delivery routes through transports:
 public interface EventChannel {
     String name();
     List<OutTransport> transports();
-    void send(Event event);
+    CompletableFuture<SendResults> send(Event event);
 }
 ```
 
@@ -222,7 +222,7 @@ var internalTransports = new LocalQueueTransportsBuilder()
 OutTransport kafkaOut = new KafkaOutTransport("localhost:9092", "events");
 
 EventChannel internalChannel = new InternalEventChannel(
-    List.of(internalTransports.outTransport())
+    List.of(internalTransports.publisher())
 );
 EventChannel externalChannel = new ExternalEventChannel(
     List.of(kafkaOut)
@@ -236,10 +236,10 @@ InTransport kafkaIn = new KafkaInTransport("localhost:9092", "events", "my-group
 EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .executor(Executors.newVirtualThreadPerTaskExecutor())
     .handlerRegistry(registry)
-    .transports(List.of(internalTransports.inTransport(), kafkaIn))
+    .transports(List.of(internalTransports.dispatcher(), kafkaIn))
     .build();
 
-dispatcher.start();
+dispatcher.start(dispatcher::dispatch);
 ```
 
 ---
@@ -473,8 +473,12 @@ public class RabbitMQEventChannel implements EventChannel {
     }
 
     @Override
-    public void send(Event event) {
-        transports.forEach(t -> t.send(event));
+    public CompletableFuture<SendResults> send(Event event) {
+        var futures = transports.stream()
+                .map(t -> t.send(event))
+                .toArray(CompletableFuture[]::new);
+        return CompletableFuture.allOf(futures)
+                .thenApply(v -> SendResults.success());
     }
 }
 ```
