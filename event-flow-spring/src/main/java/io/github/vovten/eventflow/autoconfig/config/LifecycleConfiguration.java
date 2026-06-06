@@ -4,7 +4,7 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties.LifecyclePublisherConfig;
 import io.github.vovten.eventflow.lifecycle.AckHandler;
 import io.github.vovten.eventflow.publisher.EventPublisher;
-import io.github.vovten.eventflow.publisher.EventRetryScheduler;
+import io.github.vovten.eventflow.lifecycle.EventRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.JdbcEventStore;

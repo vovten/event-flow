@@ -1,9 +1,10 @@
-package io.github.vovten.eventflow.publisher;
+package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
+import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.util.EventUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

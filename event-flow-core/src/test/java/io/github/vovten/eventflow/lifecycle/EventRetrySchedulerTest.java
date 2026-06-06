@@ -1,14 +1,13 @@
-package io.github.vovten.eventflow.publisher;
+package io.github.vovten.eventflow.lifecycle;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
-import io.github.vovten.eventflow.lifecycle.EventLifecycle;
-import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
+import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.util.EventUtils;
