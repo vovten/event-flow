@@ -72,7 +72,10 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
             return;
         }
         if (error != null) {
-            publishFailedAck(event, originalService, error.getMessage());
+            String errorMessage = error.getMessage() != null
+                    ? error.getMessage()
+                    : error.getClass().getSimpleName();
+            publishFailedAck(event, originalService, errorMessage);
             return;
         }
         if (hasHandlerFailures(results)) {

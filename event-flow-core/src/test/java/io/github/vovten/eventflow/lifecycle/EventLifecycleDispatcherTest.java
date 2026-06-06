@@ -20,6 +20,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @DisplayName("EventLifecycleDispatcher Tests")
 class EventLifecycleDispatcherTest {
@@ -63,6 +64,22 @@ class EventLifecycleDispatcherTest {
         FailureAck ack = (FailureAck) publishedAck.get();
         assertThat(ack.originalEventId()).isEqualTo(event.eventId());
         assertThat(ack.error()).contains("Handler error");
+    }
+
+    @Test
+    @DisplayName("Should handle dispatch failure with null error message without NPE")
+    void shouldHandleDispatchFailureWithNullErrorMessage() {
+        EventDispatcher origin = new TestDispatcher(
+                e -> CompletableFuture.failedFuture(new RuntimeException()));
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        assertThrows(Exception.class, () -> dispatcher.dispatch(event).join());
+
+        assertThat(publishedAck.get()).isInstanceOf(FailureAck.class);
+        FailureAck ack = (FailureAck) publishedAck.get();
+        assertThat(ack.originalEventId()).isEqualTo(event.eventId());
+        // Should fall back to exception class name when message is null
+        assertThat(ack.error()).contains("RuntimeException");
     }
 
     @Test
