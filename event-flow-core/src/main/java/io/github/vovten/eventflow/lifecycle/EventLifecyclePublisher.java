@@ -147,15 +147,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
         if (StringUtils.isEmpty(service) || !(event instanceof Envelope<?> env)) {
             return event;
         }
-        Map<String, String> newMetadata = new HashMap<>(env.metadata());
-        newMetadata.put(PUBLISHER_SERVICE_KEY, service);
-        return new Envelope<>(
-                env.eventId(),
-                env.processId(),
-                env.occurredAt(),
-                env.payload(),
-                newMetadata
-        );
+        return env.withAdditionalMetadata(PUBLISHER_SERVICE_KEY, service);
     }
 
     private UUID resolveEventId(Event event) {

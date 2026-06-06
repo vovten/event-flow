@@ -1,11 +1,14 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
+import io.github.vovten.eventflow.transport.OutTransport;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -128,6 +132,26 @@ class EventLifecyclePublisherTest {
 
             assertThat(eventStore.findById(ack.eventId())).isEmpty();
             assertThat(eventStore.findById(eventId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should preserve explicit target channels when enriching with service metadata")
+        void shouldPreserveExplicitChannelsWhenEnrichingWithService() {
+            Envelope<?> envelope = Envelope.of(event, TestExternalChannel.class);
+            AtomicReference<Event> captured = new AtomicReference<>();
+            EventPublisher origin = e -> {
+                captured.set(e);
+                return CompletableFuture.completedFuture(
+                        SendResults.of(List.of(SendResult.success("dest"))));
+            };
+            EventLifecyclePublisher publisher = new EventLifecyclePublisher(
+                    origin, eventStore, "test-service");
+
+            publisher.publish(envelope).join();
+
+            Event published = captured.get();
+            assertThat(published).isInstanceOf(Envelope.class);
+            assertThat(published.channels()).contains(TestExternalChannel.class);
         }
     }
 
@@ -261,6 +285,25 @@ class EventLifecyclePublisherTest {
         @Override
         public Class<?> type() {
             return NoneLifecycleEvent.class;
+        }
+    }
+
+    /** Custom channel for testing explicit channel preservation. */
+    private static final class TestExternalChannel implements EventChannel {
+        @Override
+        public String name() {
+            return "test-external-channel";
+        }
+
+        @Override
+        public List<OutTransport> transports() {
+            return List.of();
+        }
+
+        @Override
+        public CompletableFuture<SendResults> send(Event event) {
+            return CompletableFuture.completedFuture(
+                    SendResults.of(List.of(SendResult.success("test"))));
         }
     }
 }

@@ -10,6 +10,7 @@ import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.lifecycle.EventLifecycle;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -219,6 +220,23 @@ public final class Envelope<T> implements TraceableEvent {
     @JsonGetter("metadata")
     public Map<String, String> metadata() {
         return metadata;
+    }
+
+    /**
+     * Returns a new {@code Envelope} with the same properties plus an additional
+     * metadata entry. The explicit {@code targetChannels} (if any) are preserved.
+     *
+     * @param key   metadata key
+     * @param value metadata value
+     * @return a new envelope with the merged metadata
+     */
+    public Envelope<T> withAdditionalMetadata(String key, String value) {
+        Map<String, String> newMetadata = new HashMap<>(this.metadata);
+        newMetadata.put(key, value);
+        return new Envelope<>(
+                this.eventId, this.processId, this.occurredAt, this.payload,
+                newMetadata, this.targetChannels
+        );
     }
 
     /**
