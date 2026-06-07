@@ -70,28 +70,45 @@ class SchemaInitializer {
      * @throws IllegalStateException if schema initialization fails and was not caused
      *                               by concurrent table creation
      */
-    void ensureSchema() {
+    public void ensureSchema() {
         try (Connection conn = dataSource.getConnection()) {
             if (!tableExists(conn, tableName)) {
                 String ddl = buildCreateTableSql(uuidType).formatted(tableName);
-                String createIndexSql = CREATE_INDEX.formatted(INDEX_NAME.formatted(tableBase(tableName)), tableName);
+                String indexName = INDEX_NAME.formatted(tableBase(tableName));
+                String createIndexSql = CREATE_INDEX.formatted(indexName, tableName);
+                conn.setAutoCommit(false);
                 try (Statement stmt = conn.createStatement()) {
                     stmt.execute(ddl);
                     stmt.execute(createIndexSql);
-                    addColumnComments(stmt);
-                    log.info("Event store schema initialized for table '{}' with UUID strategy {}",
-                            tableName, uuidType);
+                    conn.commit();
+                } catch (SQLException e) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException ex) {
+                        log.warn("Failed to rollback DDL for table '{}'", tableName, ex);
+                    }
+                    throw e;
+                } finally {
+                    try {
+                        conn.setAutoCommit(true);
+                    } catch (SQLException ex) {
+                        log.warn("Failed to reset auto-commit for table '{}'", tableName, ex);
+                    }
                 }
+                // Column comments are best-effort metadata outside the DDL transaction
+                try (Statement commentStmt = conn.createStatement()) {
+                    addColumnComments(commentStmt);
+                } catch (SQLException e) {
+                    log.warn("Failed to add column comments for table '{}'", tableName, e);
+                }
+                log.info("Event store schema initialized for table '{}' with UUID strategy {}",
+                        tableName, uuidType);
             } else {
                 log.debug("Event store table '{}' already exists, skipping schema creation", tableName);
             }
         } catch (SQLException e) {
-            if (wasCreatedConcurrently()) {
-                log.warn("Table '{}' was created concurrently by another instance, proceeding", tableName);
-            } else {
-                throw new IllegalStateException(
-                        "Failed to initialize event store schema for table '" + tableName + "'", e);
-            }
+            throw new IllegalStateException(
+                    "Failed to initialize event store schema for table '" + tableName + "'", e);
         }
     }
 
@@ -100,7 +117,7 @@ class SchemaInitializer {
      *
      * @throws IllegalStateException if the table does not exist or verification fails
      */
-    void verifyTableExists() {
+    public void verifyTableExists() {
         try (Connection conn = dataSource.getConnection()) {
             if (!tableExists(conn, tableName)) {
                 throw new IllegalStateException(
@@ -113,15 +130,6 @@ class SchemaInitializer {
         } catch (SQLException e) {
             throw new IllegalStateException(
                     "Failed to verify event store table '" + tableName + "' existence", e);
-        }
-    }
-
-    private boolean wasCreatedConcurrently() {
-        try (Connection conn = dataSource.getConnection()) {
-            return tableExists(conn, tableName);
-        } catch (SQLException e) {
-            log.warn("Failed to verify table existence after schema error", e);
-            return false;
         }
     }
 

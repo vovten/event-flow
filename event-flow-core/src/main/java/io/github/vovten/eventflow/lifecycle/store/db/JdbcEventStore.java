@@ -12,6 +12,8 @@ import java.nio.ByteBuffer;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * JDBC implementation of {@link EventStore} backed by a relational database.
@@ -43,6 +45,9 @@ import java.util.*;
 public class JdbcEventStore implements EventStore {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcEventStore.class);
+
+    private static final String SQLSTATE_UNIQUE_VIOLATION_POSTGRES = "23505";
+    private static final String SQLSTATE_UNIQUE_VIOLATION_MYSQL = "23000";
 
     private static final String INSERT = """
             INSERT INTO %s
@@ -85,12 +90,13 @@ public class JdbcEventStore implements EventStore {
     private final DataSource dataSource;
     private final String tableName;
     private final UuidType uuidType;
-    private final SchemaInitializer schemaInitializer;
     private final String insertSql;
     private final String selectByStatusSql;
     private final String selectByIdSql;
     private final String updateStatusOnlySql;
     private final String updateStatusWithRetrySql;
+    private final SchemaInitializer schemaInitializer;
+    private final Map<Set<EventStatus>, String> selectByStatusesCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a new JdbcEventStore with the default table name {@value #DEFAULT_TABLE_NAME}
@@ -236,8 +242,8 @@ public class JdbcEventStore implements EventStore {
             setUuidNullable(ps, 5, event.processId());
             ps.setString(6, String.valueOf(event.status().getCode()));
             ps.setInt(7, event.retryCount());
-            ps.setTimestamp(8, Timestamp.from(event.createdAt()));
-            ps.setTimestamp(9, Timestamp.from(event.updatedAt()));
+            ps.setTimestamp(8, Timestamp.from(event.createdAt()), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
+            ps.setTimestamp(9, Timestamp.from(event.updatedAt()), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
             if (event.errorDetails() != null) {
                 ps.setString(10, event.errorDetails());
             } else {
@@ -264,7 +270,7 @@ public class JdbcEventStore implements EventStore {
             } else {
                 ps.setNull(2, Types.VARCHAR);
             }
-            ps.setTimestamp(3, Timestamp.from(Instant.now()));
+            ps.setTimestamp(3, Timestamp.from(Instant.now()), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
             setUuid(ps, 4, eventId);
             int affected = ps.executeUpdate();
             if (affected == 0) {
@@ -280,7 +286,10 @@ public class JdbcEventStore implements EventStore {
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(selectByStatusSql)) {
             ps.setString(1, String.valueOf(status.getCode()));
-            ps.setTimestamp(2, Timestamp.from(before));
+            if (before.isAfter(Instant.now())) {
+                log.warn("Looking for events with future timestamp: {}", before);
+            }
+            ps.setTimestamp(2, Timestamp.from(before), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
             try (ResultSet rs = ps.executeQuery()) {
                 List<StoredEvent> results = new ArrayList<>();
                 while (rs.next()) {
@@ -298,17 +307,22 @@ public class JdbcEventStore implements EventStore {
         if (statuses.isEmpty()) {
             return List.of();
         }
-        String placeholders = statuses.stream()
-                .map(s -> "?")
-                .collect(java.util.stream.Collectors.joining(", "));
-        String sql = SELECT_BY_STATUSES.formatted(tableName, placeholders);
+        String sql = selectByStatusesCache.computeIfAbsent(Set.copyOf(statuses), key -> {
+            String placeholders = key.stream()
+                    .map(s -> "?")
+                    .collect(Collectors.joining(", "));
+            return SELECT_BY_STATUSES.formatted(tableName, placeholders);
+        });
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
             int i = 1;
             for (EventStatus status : statuses) {
                 ps.setString(i++, String.valueOf(status.getCode()));
             }
-            ps.setTimestamp(i, Timestamp.from(before));
+            if (before.isAfter(Instant.now())) {
+                log.warn("Looking for events with future timestamp: {}", before);
+            }
+            ps.setTimestamp(i, Timestamp.from(before), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
             try (ResultSet rs = ps.executeQuery()) {
                 List<StoredEvent> results = new ArrayList<>();
                 while (rs.next()) {
@@ -354,8 +368,7 @@ public class JdbcEventStore implements EventStore {
 
     private static boolean isDuplicateKey(SQLException e) {
         String sqlState = e.getSQLState();
-        // SQLState 23505 = PostgreSQL unique violation
-        // SQLState 23000 = MySQL, H2 unique constraint violation
-        return "23505".equals(sqlState) || "23000".equals(sqlState);
+        return SQLSTATE_UNIQUE_VIOLATION_POSTGRES.equals(sqlState)
+                || SQLSTATE_UNIQUE_VIOLATION_MYSQL.equals(sqlState);
     }
 }

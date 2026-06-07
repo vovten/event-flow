@@ -299,6 +299,67 @@ class JdbcEventStoreTest {
         assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.HANDLED);
     }
 
+    @Test
+    @DisplayName("Should work with schema-qualified table name and create column comments")
+    void shouldWorkWithSchemaQualifiedTableName() throws SQLException {
+        // Create the schema before store initialization
+        try (Connection conn = dataSource.getConnection();
+                Statement st = conn.createStatement()) {
+            st.execute("CREATE SCHEMA IF NOT EXISTS myschema");
+        }
+
+        String qualifiedName = "myschema.event_store";
+        JdbcEventStore store = new JdbcEventStore(dataSource, qualifiedName);
+
+        // Basic CRUD should work
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        assertThat(store.findById(eventId)).isPresent();
+
+        store.updateStatus(eventId, EventStatus.PUBLISHED, null);
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PUBLISHED);
+
+        // Verify column comments were created
+        try (Connection conn = dataSource.getConnection();
+                Statement st = conn.createStatement()) {
+            ResultSet rs = st.executeQuery(
+                    "SELECT REMARKS FROM INFORMATION_SCHEMA.TABLES " +
+                    "WHERE TABLE_SCHEMA = 'MYSCHEMA' AND TABLE_NAME = 'EVENT_STORE'");
+            assertThat(rs.next()).isTrue();
+            assertThat(rs.getString("REMARKS"))
+                    .isEqualTo("Event store for persistent event lifecycle tracking");
+
+            rs = st.executeQuery(
+                    "SELECT COLUMN_NAME, REMARKS FROM INFORMATION_SCHEMA.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = 'MYSCHEMA' AND TABLE_NAME = 'EVENT_STORE' " +
+                    "AND REMARKS IS NOT NULL");
+            // Should have at least 10 column comments
+            int commentCount = 0;
+            while (rs.next()) {
+                commentCount++;
+                assertThat(rs.getString("REMARKS")).isNotBlank();
+            }
+            assertThat(commentCount).isGreaterThanOrEqualTo(10);
+        }
+    }
+
+    @Test
+    @DisplayName("Should create table with default name and verify column comments")
+    void shouldCreateTableWithDefaultNameAndComments() throws SQLException {
+        new JdbcEventStore(dataSource);
+        assertThat(tableExists("EVENT_STORE")).isTrue();
+
+        try (Connection conn = dataSource.getConnection();
+                Statement st = conn.createStatement()) {
+            ResultSet rs = st.executeQuery(
+                    "SELECT REMARKS FROM INFORMATION_SCHEMA.TABLES " +
+                    "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'EVENT_STORE'");
+            assertThat(rs.next()).isTrue();
+            assertThat(rs.getString("REMARKS"))
+                    .isEqualTo("Event store for persistent event lifecycle tracking");
+        }
+    }
+
     private boolean tableExists(String tableName) throws SQLException {
         try (Connection conn = dataSource.getConnection()) {
             DatabaseMetaData meta = conn.getMetaData();
