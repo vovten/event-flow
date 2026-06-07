@@ -1,7 +1,11 @@
-package io.github.vovten.eventflow.lifecycle.store;
+package io.github.vovten.eventflow.lifecycle.store.db;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 
 import javax.sql.DataSource;
 import java.nio.ByteBuffer;
@@ -20,7 +24,7 @@ import java.util.*;
  * Automatic schema initialization can be disabled via the
  * {@link #JdbcEventStore(DataSource, String, boolean)} constructor.
  * A ready-to-use DDL script is available as a classpath resource at
- * {@code io/github/vovten/eventflow/lifecycle/store/event-store.sql}.
+ * {@code io/github/vovten/eventflow/lifecycle/store/db/event-store.sql}.
  * <p>
  * The {@code event_id} and {@code process_id} column types adapt to the database:
  * <ul>
@@ -39,25 +43,6 @@ import java.util.*;
 public class JdbcEventStore implements EventStore {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcEventStore.class);
-
-    private static final String COMMENT_ON_COLUMNS = """
-            COMMENT ON TABLE %s IS 'Event store for persistent event lifecycle tracking';
-            COMMENT ON COLUMN %s.event_id IS 'Unique event identifier';
-            COMMENT ON COLUMN %s.event_type IS 'Event class name';
-            COMMENT ON COLUMN %s.service IS 'Originating service name for service-specific queries';
-            COMMENT ON COLUMN %s.payload IS 'JSON-serialized event body';
-            COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
-            COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
-            COMMENT ON COLUMN %s.retry_count IS 'Number of retry attempts for failed events';
-            COMMENT ON COLUMN %s.created_at IS 'Timestamp when the event was first stored';
-            COMMENT ON COLUMN %s.updated_at IS 'Timestamp of the last status update';
-            COMMENT ON COLUMN %s.error_details IS 'Error description for failed events';
-            """;
-
-    private static final String CREATE_INDEX = """
-            CREATE INDEX %s
-            ON %s(status, updated_at)
-            """;
 
     private static final String INSERT = """
             INSERT INTO %s
@@ -95,21 +80,12 @@ public class JdbcEventStore implements EventStore {
     private static final String UPDATE_STATUS_WITH_RETRY =
             "UPDATE %s SET status = ?, error_details = ?, updated_at = ?, retry_count = retry_count + 1 WHERE event_id = ?";
 
-    private static final String INDEX_NAME = "idx_%s_status";
-
     static final String DEFAULT_TABLE_NAME = "event_store";
-
-    /**
-     * UUID column storage strategy: {@link #NATIVE} uses DB-native UUID type,
-     * {@link #BINARY} uses {@code BINARY(16)} with byte[] JDBC binding.
-     */
-    enum UuidType {
-        NATIVE, BINARY
-    }
 
     private final DataSource dataSource;
     private final String tableName;
     private final UuidType uuidType;
+    private final SchemaInitializer schemaInitializer;
     private final String insertSql;
     private final String selectByStatusSql;
     private final String selectByIdSql;
@@ -158,10 +134,11 @@ public class JdbcEventStore implements EventStore {
         this.updateStatusOnlySql = UPDATE_STATUS_ONLY.formatted(tableName);
         this.updateStatusWithRetrySql = UPDATE_STATUS_WITH_RETRY.formatted(tableName);
         this.uuidType = detectUuidType();
+        this.schemaInitializer = new SchemaInitializer(dataSource, tableName, uuidType);
         if (autoInitSchema) {
-            initSchema();
+            schemaInitializer.ensureSchema();
         } else {
-            verifyTableExists();
+            schemaInitializer.verifyTableExists();
         }
     }
 
@@ -182,97 +159,13 @@ public class JdbcEventStore implements EventStore {
         this.updateStatusOnlySql = UPDATE_STATUS_ONLY.formatted(tableName);
         this.updateStatusWithRetrySql = UPDATE_STATUS_WITH_RETRY.formatted(tableName);
         this.uuidType = Objects.requireNonNull(uuidType, "uuidType must not be null");
-        initSchema();
+        this.schemaInitializer = new SchemaInitializer(dataSource, tableName, uuidType);
+        schemaInitializer.ensureSchema();
     }
 
     @Override
     public String getType() {
         return "db";
-    }
-
-    private void verifyTableExists() {
-        try (Connection conn = dataSource.getConnection()) {
-            if (!tableExists(conn, tableName)) {
-                throw new IllegalStateException(
-                        "Event store table '" + tableName + "' does not exist. " +
-                        "Either set auto-init-schema: true to allow automatic table creation, " +
-                        "or create the table manually using the DDL script at: " +
-                        "io/github/vovten/eventflow/lifecycle/store/event-store.sql");
-            }
-            log.info("Event store table '{}' exists, auto-init-schema is disabled", tableName);
-        } catch (SQLException e) {
-            throw new IllegalStateException(
-                    "Failed to verify event store table '" + tableName + "' existence", e);
-        }
-    }
-
-    private void initSchema() {
-        try (Connection conn = dataSource.getConnection()) {
-            if (!tableExists(conn, tableName)) {
-                String ddl = buildCreateTableSql(uuidType).formatted(tableName);
-                String createIndexSql = CREATE_INDEX.formatted(INDEX_NAME.formatted(tableBase(tableName)), tableName);
-                try (Statement stmt = conn.createStatement()) {
-                    stmt.execute(ddl);
-                    stmt.execute(createIndexSql);
-                    addColumnComments(stmt);
-                    log.info("Event store schema initialized for table '{}' with UUID strategy {}",
-                            tableName, uuidType);
-                }
-            } else {
-                log.debug("Event store table '{}' already exists, skipping schema creation", tableName);
-            }
-        } catch (SQLException e) {
-            if (wasCreatedConcurrently()) {
-                log.warn("Table '{}' was created concurrently by another instance, proceeding", tableName);
-            } else {
-                throw new IllegalStateException(
-                        "Failed to initialize event store schema for table '" + tableName + "'", e);
-            }
-        }
-    }
-
-    private boolean wasCreatedConcurrently() {
-        try (Connection conn = dataSource.getConnection()) {
-            return tableExists(conn, tableName);
-        } catch (SQLException e) {
-            log.warn("Failed to verify table existence after schema error", e);
-            return false;
-        }
-    }
-
-    private void addColumnComments(Statement stmt) {
-        String[] lines = COMMENT_ON_COLUMNS.formatted(
-                tableName, tableName, tableName, tableName, tableName,
-                tableName, tableName, tableName, tableName, tableName,
-                tableName
-        ).split(";");
-        for (String line : lines) {
-            String sql = line.trim();
-            if (sql.isEmpty()) continue;
-            try {
-                stmt.execute(sql);
-            } catch (SQLException e) {
-                log.warn("Failed to add comment (not supported by this database): {}", e.getMessage());
-            }
-        }
-    }
-
-    private static String buildCreateTableSql(UuidType type) {
-        String uuidDdl = type == UuidType.NATIVE ? "UUID" : "BINARY(16)";
-        return """
-                CREATE TABLE %%s (
-                    event_id        %s PRIMARY KEY,
-                    event_type      VARCHAR(512) NOT NULL,
-                    service         VARCHAR(255),
-                    status          CHAR(1) NOT NULL DEFAULT 'U',
-                    payload         TEXT NOT NULL,
-                    process_id      %s,
-                    created_at      TIMESTAMP NOT NULL,
-                    updated_at      TIMESTAMP NOT NULL,
-                    retry_count     INT DEFAULT 0 NOT NULL,
-                    error_details   TEXT
-                )
-                """.formatted(uuidDdl, uuidDdl);
     }
 
     private UuidType detectUuidType() {
@@ -326,25 +219,6 @@ public class JdbcEventStore implements EventStore {
         }
         byte[] bytes = rs.getBytes(column);
         return bytes != null ? bytesToUuid(bytes) : null;
-    }
-
-    private String tableBase(String fullName) {
-        int dot = fullName.indexOf('.');
-        return dot > 0 ? fullName.substring(dot + 1) : fullName;
-    }
-
-    private boolean tableExists(Connection conn, String tableName) throws SQLException {
-        DatabaseMetaData meta = conn.getMetaData();
-        String baseName = tableBase(tableName);
-        try (ResultSet rs = meta.getTables(null, null, baseName, null)) {
-            if (rs.next()) return true;
-        }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toUpperCase(), null)) {
-            if (rs.next()) return true;
-        }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toLowerCase(), null)) {
-            return rs.next();
-        }
     }
 
     @Override

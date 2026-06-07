@@ -4,7 +4,7 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
-import io.github.vovten.eventflow.lifecycle.store.JdbcEventStore;
+import io.github.vovten.eventflow.lifecycle.store.db.JdbcEventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

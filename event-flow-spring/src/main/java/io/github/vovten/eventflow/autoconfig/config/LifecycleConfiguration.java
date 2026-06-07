@@ -7,7 +7,7 @@ import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.lifecycle.EventRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
-import io.github.vovten.eventflow.lifecycle.store.JdbcEventStore;
+import io.github.vovten.eventflow.lifecycle.store.db.JdbcEventStore;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +34,7 @@ import java.util.List;
  * <p>
  * Built-in store types:
  * <ul>
- *   <li>{@code "db"} — {@link JdbcEventStore} (requires DataSource, schema auto-init)</li>
+ *   <li>{@code "db"} — {@link io.github.vovten.eventflow.lifecycle.store.db.JdbcEventStore} (requires DataSource, schema auto-init)</li>
  *   <li>{@code "in-memory"} — {@link InMemoryEventStore} (non-persistent, for testing)</li>
  * </ul>
  * <p>

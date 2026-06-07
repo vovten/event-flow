@@ -1,5 +1,7 @@
-package io.github.vovten.eventflow.lifecycle.store;
+package io.github.vovten.eventflow.lifecycle.store.db;
 
+import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -258,7 +260,7 @@ class JdbcEventStoreTest {
     @Test
     @DisplayName("Should work with BINARY(16) UUID strategy")
     void shouldWorkWithBinaryUuidStrategy() {
-        JdbcEventStore store = new JdbcEventStore(dataSource, "event_store", JdbcEventStore.UuidType.BINARY);
+        JdbcEventStore store = new JdbcEventStore(dataSource, "event_store", UuidType.BINARY);
         UUID eventId = UUID.randomUUID();
         UUID processId = UUID.randomUUID();
         StoredEvent event = StoredEvent.newEvent(eventId, "test.BinaryEvent", null,
@@ -278,7 +280,7 @@ class JdbcEventStoreTest {
     @Test
     @DisplayName("Should handle full lifecycle with BINARY(16) UUID strategy")
     void shouldHandleFullLifecycleWithBinaryUuid() {
-        JdbcEventStore store = new JdbcEventStore(dataSource, "event_store_bin", JdbcEventStore.UuidType.BINARY);
+        JdbcEventStore store = new JdbcEventStore(dataSource, "event_store_bin", UuidType.BINARY);
         UUID eventId = UUID.randomUUID();
 
         store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));

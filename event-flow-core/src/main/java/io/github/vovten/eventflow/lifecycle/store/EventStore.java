@@ -27,7 +27,7 @@ public interface EventStore {
      * Returns the type identifier for this store implementation.
      * <p>
      * Used to select the active store via the {@code store.type} configuration property.
-     * Built-in types: {@code "db"} for {@link JdbcEventStore}, {@code "in-memory"}
+     * Built-in types: {@code "db"} for {@link io.github.vovten.eventflow.lifecycle.store.db.JdbcEventStore}, {@code "in-memory"}
      * for {@link InMemoryEventStore}.
      *
      * @return the store type identifier (e.g., "db", "in-memory", or custom)
