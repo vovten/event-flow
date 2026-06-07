@@ -375,14 +375,14 @@ class EventRetrySchedulerTest {
 
         @Test
         @DisplayName("start and stop without errors")
-        void startAndStop() throws Exception {
-            EventRetryScheduler scheduler = new EventRetryScheduler(
+        void startAndStop() {
+            try (var scheduler = new EventRetryScheduler(
                     eventStore, lifecyclePublisher,
                     Duration.ofMinutes(1), Duration.ZERO, 3
-            );
-            scheduler.start();
-            Thread.sleep(50);
-            scheduler.stop();
+            )) {
+                scheduler.start();
+                scheduler.stop();
+            }
         }
 
         @Test

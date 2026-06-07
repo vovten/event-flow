@@ -69,8 +69,9 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            assertThrows(Exception.class, () -> publisher.publish(event).join());
+            var result = publisher.publish(event);
 
+            assertThrows(Exception.class, result::join);
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
             assertThat(stored.errorDetails()).contains("Network error");
@@ -97,7 +98,8 @@ class EventLifecyclePublisherTest {
             EventPublisher failingOrigin = e -> CompletableFuture.failedFuture(new RuntimeException("Fail"));
             EventLifecyclePublisher failingPublisher = new EventLifecyclePublisher(
                     failingOrigin, eventStore, "test-service");
-            assertThrows(Exception.class, () -> failingPublisher.publish(event).join());
+            var failingResult = failingPublisher.publish(event);
+            assertThrows(Exception.class, failingResult::join);
 
             assertThat(eventStore.findById(eventId).orElseThrow().status())
                     .isEqualTo(EventStatus.FAILED);
@@ -120,8 +122,9 @@ class EventLifecyclePublisherTest {
             SuccessAck ack = new SuccessAck(
                     UUID.randomUUID(), eventId, "TestEvent", null,
                     List.of(), null, Instant.now());
+            AtomicReference<Event> captured = new AtomicReference<>();
             EventPublisher origin = e -> {
-                assertThat(e).isInstanceOf(LifecycleAckEvent.class);
+                captured.set(e);
                 return CompletableFuture.completedFuture(
                         SendResults.of(List.of(SendResult.success("dest"))));
             };
@@ -130,6 +133,7 @@ class EventLifecyclePublisherTest {
 
             publisher.publish(ack).join();
 
+            assertThat(captured.get()).isInstanceOf(LifecycleAckEvent.class);
             assertThat(eventStore.findById(ack.eventId())).isEmpty();
             assertThat(eventStore.findById(eventId)).isEmpty();
         }
@@ -192,7 +196,8 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            assertThrows(Exception.class, () -> publisher.publish(persistedEvent).join());
+            var result = publisher.publish(persistedEvent);
+            assertThrows(Exception.class, result::join);
 
             // Event is saved as UNDEFINED but never updated — stays UNDEFINED
             StoredEvent stored = eventStore.findById(persistedEvent.eventId()).orElseThrow();

@@ -177,22 +177,23 @@ class JdbcEventStoreTest {
 
     @Test
     @DisplayName("Should find events by status and age")
-    void shouldFindByStatusAndAge() throws InterruptedException {
+    void shouldFindByStatusAndAge() {
         JdbcEventStore store = new JdbcEventStore(dataSource);
         UUID eventId = UUID.randomUUID();
         store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
         store.updateStatus(eventId, EventStatus.FAILED, "err");
 
-        // Should not find events newer than 'before'
-        Instant recent = Instant.now().minus(1, ChronoUnit.MILLIS);
-        assertThat(store.findByStatus(EventStatus.FAILED, recent)).isEmpty();
+        Instant now = Instant.now();
 
-        // Should find events older than 'before'
-        Thread.sleep(10); // ensure freshness
-        Instant future = Instant.now().plus(1, ChronoUnit.DAYS);
-        List<StoredEvent> results = store.findByStatus(EventStatus.FAILED, future);
+        // Should not find events newer than 'before' (event was just updated)
+        Instant justBeforeNow = now.minus(1, ChronoUnit.MILLIS);
+        assertThat(store.findByStatus(EventStatus.FAILED, justBeforeNow)).isEmpty();
+
+        // Should find events older than 'before' when queried with a future deadline
+        Instant farFuture = now.plus(1, ChronoUnit.DAYS);
+        List<StoredEvent> results = store.findByStatus(EventStatus.FAILED, farFuture);
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).eventId()).isEqualTo(eventId);
+        assertThat(results.getFirst().eventId()).isEqualTo(eventId);
     }
 
     @Test

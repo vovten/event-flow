@@ -13,7 +13,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("InMemoryEventStore Tests")
 class InMemoryEventStoreTest {
@@ -102,16 +101,16 @@ class InMemoryEventStoreTest {
         store.save(event);
         store.updateStatus(eventId, EventStatus.FAILED, "error");
 
-        // Should not find events updated in the future
-        Instant recent = Instant.now().minus(1, ChronoUnit.MILLIS);
-        List<StoredEvent> results = store.findByStatus(EventStatus.FAILED, recent);
+        // Should not find events updated after the deadline
+        Instant recentPast = Instant.now().minus(1, ChronoUnit.MILLIS);
+        List<StoredEvent> results = store.findByStatus(EventStatus.FAILED, recentPast);
         assertThat(results).isEmpty();
 
-        // Should find events older than 1 second
-        Instant past = Instant.now().plus(1, ChronoUnit.DAYS);
-        results = store.findByStatus(EventStatus.FAILED, past);
+        // Should find events updated before the deadline
+        Instant farFuture = Instant.now().plus(1, ChronoUnit.DAYS);
+        results = store.findByStatus(EventStatus.FAILED, farFuture);
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).eventId()).isEqualTo(eventId);
+        assertThat(results.getFirst().eventId()).isEqualTo(eventId);
     }
 
     @Test

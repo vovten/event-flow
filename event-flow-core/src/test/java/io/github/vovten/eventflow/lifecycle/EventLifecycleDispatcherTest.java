@@ -73,8 +73,9 @@ class EventLifecycleDispatcherTest {
                 e -> CompletableFuture.failedFuture(new RuntimeException()));
         EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
 
-        assertThrows(Exception.class, () -> dispatcher.dispatch(event).join());
+        var result = dispatcher.dispatch(event);
 
+        assertThrows(Exception.class, result::join);
         assertThat(publishedAck.get()).isInstanceOf(FailureAck.class);
         FailureAck ack = (FailureAck) publishedAck.get();
         assertThat(ack.originalEventId()).isEqualTo(event.eventId());
@@ -133,13 +134,18 @@ class EventLifecycleDispatcherTest {
     @Test
     @DisplayName("Should delegate all dispatcher methods")
     void shouldDelegateMethods() {
-        EventDispatcher origin = successDispatcher();
+        TrackingDispatcher origin = new TrackingDispatcher();
         EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
 
         dispatcher.register(new Object());
         dispatcher.isRegistered(new Object());
         dispatcher.start(e -> {});
         dispatcher.stop();
+
+        assertThat(origin.registerCalled).isTrue();
+        assertThat(origin.isRegisteredCalled).isTrue();
+        assertThat(origin.startCalled).isTrue();
+        assertThat(origin.stopCalled).isTrue();
     }
 
     private static EventDispatcher successDispatcher() {
@@ -151,6 +157,40 @@ class EventLifecycleDispatcherTest {
         return new TestDispatcher(e -> CompletableFuture.completedFuture(
                 HandlerResults.of(List.of(
                         HandlerResult.failure("test-handler", error)))));
+    }
+
+    private static final class TrackingDispatcher implements EventDispatcher {
+        boolean registerCalled;
+        boolean isRegisteredCalled;
+        boolean startCalled;
+        boolean stopCalled;
+
+        @Override
+        public CompletableFuture<HandlerResults> dispatch(Event event) {
+            return CompletableFuture.completedFuture(
+                    HandlerResults.of(List.of(HandlerResult.success("test-handler"))));
+        }
+
+        @Override
+        public void register(Object listener) {
+            registerCalled = true;
+        }
+
+        @Override
+        public boolean isRegistered(Object listener) {
+            isRegisteredCalled = true;
+            return false;
+        }
+
+        @Override
+        public void start(Consumer<Event> dispatchConsumer) {
+            startCalled = true;
+        }
+
+        @Override
+        public void stop() {
+            stopCalled = true;
+        }
     }
 
     private static class TestDispatcher implements EventDispatcher {
