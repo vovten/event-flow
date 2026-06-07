@@ -49,35 +49,18 @@ public class JdbcEventStore implements EventStore {
     private static final String SQLSTATE_UNIQUE_VIOLATION_POSTGRES = "23505";
     private static final String SQLSTATE_UNIQUE_VIOLATION_MYSQL = "23000";
 
-    private static final String INSERT = """
-            INSERT INTO %s
-                (event_id, event_type, service, payload, process_id, status,
-                 retry_count, created_at, updated_at, error_details)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """;
+    private static final Calendar UTC = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
-    private static final String SELECT_BY_STATUS = """
-            SELECT event_id, event_type, service, payload, process_id, status,
-                   retry_count, created_at, updated_at, error_details
-            FROM %s
-            WHERE status = ? AND updated_at < ?
-            ORDER BY updated_at ASC
-            """;
+    private static final String COLUMNS =
+            "event_id, event_type, service, payload, process_id, status, retry_count, created_at, updated_at, error_details";
 
-    private static final String SELECT_BY_STATUSES = """
-            SELECT event_id, event_type, service, payload, process_id, status,
-                   retry_count, created_at, updated_at, error_details
-            FROM %s
-            WHERE status IN (%s) AND updated_at < ?
-            ORDER BY updated_at ASC
-            """;
+    private static final String INSERT = "INSERT INTO %s (" + COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-    private static final String SELECT_BY_ID = """
-            SELECT event_id, event_type, service, payload, process_id, status,
-                   retry_count, created_at, updated_at, error_details
-            FROM %s
-            WHERE event_id = ?
-            """;
+    private static final String SELECT_BY_STATUS = "SELECT " + COLUMNS + " FROM %s WHERE status = ? AND updated_at < ? ORDER BY updated_at ASC";
+
+    private static final String SELECT_BY_STATUSES = "SELECT " + COLUMNS + " FROM %s WHERE status IN (%s) AND updated_at < ? ORDER BY updated_at ASC";
+
+    private static final String SELECT_BY_ID = "SELECT " + COLUMNS + " FROM %s WHERE event_id = ?";
 
     private static final String UPDATE_STATUS_ONLY =
             "UPDATE %s SET status = ?, error_details = ?, updated_at = ? WHERE event_id = ?";
@@ -95,14 +78,11 @@ public class JdbcEventStore implements EventStore {
     private final String selectByIdSql;
     private final String updateStatusOnlySql;
     private final String updateStatusWithRetrySql;
-    private final SchemaInitializer schemaInitializer;
     private final Map<Set<EventStatus>, String> selectByStatusesCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a new JdbcEventStore with the default table name {@value #DEFAULT_TABLE_NAME}
      * and automatic schema initialization enabled.
-     *
-     * @param dataSource the JDBC DataSource (must not be null)
      */
     public JdbcEventStore(DataSource dataSource) {
         this(dataSource, DEFAULT_TABLE_NAME, true);
@@ -111,9 +91,6 @@ public class JdbcEventStore implements EventStore {
     /**
      * Creates a new JdbcEventStore with a custom table name
      * and automatic schema initialization enabled.
-     *
-     * @param dataSource the JDBC DataSource (must not be null)
-     * @param tableName  the name of the event store table (must not be null)
      */
     public JdbcEventStore(DataSource dataSource, String tableName) {
         this(dataSource, tableName, true);
@@ -122,25 +99,29 @@ public class JdbcEventStore implements EventStore {
     /**
      * Creates a new JdbcEventStore with full control over table name
      * and schema initialization.
-     * <p>
-     * When {@code autoInitSchema} is {@code false}, the caller is responsible
-     * for creating the table beforehand. A ready-to-use DDL script is available
-     * at {@code io/github/vovten/eventflow/lifecycle/store/event-store.sql} in the classpath.
-     *
-     * @param dataSource     the JDBC DataSource (must not be null)
-     * @param tableName      the name of the event store table (must not be null)
-     * @param autoInitSchema whether to automatically create the table if it does not exist
      */
     public JdbcEventStore(DataSource dataSource, String tableName, boolean autoInitSchema) {
+        this(dataSource, tableName, detectUuidType(dataSource), autoInitSchema);
+    }
+
+    /**
+     * Creates a JdbcEventStore with an explicit UUID storage strategy, bypassing auto-detection.
+     * Package-private for testing purposes.
+     */
+    JdbcEventStore(DataSource dataSource, String tableName, UuidType uuidType) {
+        this(dataSource, tableName, uuidType, true);
+    }
+
+    private JdbcEventStore(DataSource dataSource, String tableName, UuidType uuidType, boolean autoInitSchema) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
         this.tableName = Objects.requireNonNull(tableName, "tableName must not be null");
+        this.uuidType = Objects.requireNonNull(uuidType, "uuidType must not be null");
         this.insertSql = INSERT.formatted(tableName);
         this.selectByStatusSql = SELECT_BY_STATUS.formatted(tableName);
         this.selectByIdSql = SELECT_BY_ID.formatted(tableName);
         this.updateStatusOnlySql = UPDATE_STATUS_ONLY.formatted(tableName);
         this.updateStatusWithRetrySql = UPDATE_STATUS_WITH_RETRY.formatted(tableName);
-        this.uuidType = detectUuidType();
-        this.schemaInitializer = new SchemaInitializer(dataSource, tableName, uuidType);
+        var schemaInitializer = new SchemaInitializer(dataSource, tableName, uuidType);
         if (autoInitSchema) {
             schemaInitializer.ensureSchema();
         } else {
@@ -148,33 +129,12 @@ public class JdbcEventStore implements EventStore {
         }
     }
 
-    /**
-     * Creates a JdbcEventStore with an explicit UUID storage strategy, bypassing auto-detection.
-     * This constructor is package-private for testing purposes.
-     *
-     * @param dataSource the JDBC DataSource (must not be null)
-     * @param tableName  the name of the event store table (must not be null)
-     * @param uuidType   the UUID strategy to use (NATIVE or BINARY)
-     */
-    JdbcEventStore(DataSource dataSource, String tableName, UuidType uuidType) {
-        this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
-        this.tableName = Objects.requireNonNull(tableName, "tableName must not be null");
-        this.insertSql = INSERT.formatted(tableName);
-        this.selectByStatusSql = SELECT_BY_STATUS.formatted(tableName);
-        this.selectByIdSql = SELECT_BY_ID.formatted(tableName);
-        this.updateStatusOnlySql = UPDATE_STATUS_ONLY.formatted(tableName);
-        this.updateStatusWithRetrySql = UPDATE_STATUS_WITH_RETRY.formatted(tableName);
-        this.uuidType = Objects.requireNonNull(uuidType, "uuidType must not be null");
-        this.schemaInitializer = new SchemaInitializer(dataSource, tableName, uuidType);
-        schemaInitializer.ensureSchema();
-    }
-
     @Override
     public String getType() {
         return "db";
     }
 
-    private UuidType detectUuidType() {
+    private static UuidType detectUuidType(DataSource dataSource) {
         try (Connection conn = dataSource.getConnection()) {
             return detectUuidType(conn);
         } catch (SQLException e) {
@@ -189,6 +149,14 @@ public class JdbcEventStore implements EventStore {
             return UuidType.NATIVE;
         }
         return UuidType.BINARY;
+    }
+
+    private static void setOptionalString(PreparedStatement ps, int index, String value) throws SQLException {
+        if (value != null) {
+            ps.setString(index, value);
+        } else {
+            ps.setNull(index, Types.VARCHAR);
+        }
     }
 
     private static byte[] uuidToBytes(UUID uuid) {
@@ -229,49 +197,40 @@ public class JdbcEventStore implements EventStore {
 
     @Override
     public void save(StoredEvent event) {
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(insertSql)) {
-            setUuid(ps, 1, event.eventId());
-            ps.setString(2, event.eventType());
-            if (event.service() != null) {
-                ps.setString(3, event.service());
-            } else {
-                ps.setNull(3, Types.VARCHAR);
-            }
-            ps.setString(4, event.payload());
-            setUuidNullable(ps, 5, event.processId());
-            ps.setString(6, String.valueOf(event.status().getCode()));
-            ps.setInt(7, event.retryCount());
-            ps.setTimestamp(8, Timestamp.from(event.createdAt()), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
-            ps.setTimestamp(9, Timestamp.from(event.updatedAt()), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
-            if (event.errorDetails() != null) {
-                ps.setString(10, event.errorDetails());
-            } else {
-                ps.setNull(10, Types.VARCHAR);
-            }
+        try (Connection conn = dataSource.getConnection(); PreparedStatement ps = conn.prepareStatement(insertSql)) {
+            setInsertParameters(ps, event);
             ps.executeUpdate();
         } catch (SQLException e) {
-            if (isDuplicateKey(e)) {
-                throw new IllegalArgumentException(
-                        "Event with ID " + event.eventId() + " already exists", e);
-            }
-            throw new RuntimeException("Failed to save event: " + event.eventId(), e);
+            throw mapSaveError(e, event);
         }
+    }
+
+    private void setInsertParameters(PreparedStatement ps, StoredEvent event) throws SQLException {
+        setUuid(ps, 1, event.eventId());
+        ps.setString(2, event.eventType());
+        setOptionalString(ps, 3, event.service());
+        ps.setString(4, event.payload());
+        setUuidNullable(ps, 5, event.processId());
+        ps.setString(6, String.valueOf(event.status().getCode()));
+        ps.setInt(7, event.retryCount());
+        ps.setTimestamp(8, Timestamp.from(event.createdAt()), UTC);
+        ps.setTimestamp(9, Timestamp.from(event.updatedAt()), UTC);
+        setOptionalString(ps, 10, event.errorDetails());
+    }
+
+    private RuntimeException mapSaveError(SQLException e, StoredEvent event) {
+        if (isDuplicateKey(e)) {
+            return new IllegalArgumentException(
+                    "Event with ID " + event.eventId() + " already exists", e);
+        }
+        return new RuntimeException("Failed to save event: " + event.eventId(), e);
     }
 
     @Override
     public void updateStatus(UUID eventId, EventStatus status, String errorDetails) {
-        String sql = (status == EventStatus.NEW) ? updateStatusWithRetrySql : updateStatusOnlySql;
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, String.valueOf(status.getCode()));
-            if (errorDetails != null) {
-                ps.setString(2, errorDetails);
-            } else {
-                ps.setNull(2, Types.VARCHAR);
-            }
-            ps.setTimestamp(3, Timestamp.from(Instant.now()), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
-            setUuid(ps, 4, eventId);
+        String sql = selectUpdateSql(status);
+        try (Connection conn = dataSource.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            setUpdateParameters(ps, eventId, status, errorDetails);
             int affected = ps.executeUpdate();
             if (affected == 0) {
                 throw new NoSuchElementException("Event not found: " + eventId);
@@ -281,22 +240,25 @@ public class JdbcEventStore implements EventStore {
         }
     }
 
+    private String selectUpdateSql(EventStatus status) {
+        return status == EventStatus.NEW ? updateStatusWithRetrySql : updateStatusOnlySql;
+    }
+
+    private void setUpdateParameters(PreparedStatement ps, UUID eventId, EventStatus status,
+                                     String errorDetails) throws SQLException {
+        ps.setString(1, String.valueOf(status.getCode()));
+        setOptionalString(ps, 2, errorDetails);
+        ps.setTimestamp(3, Timestamp.from(Instant.now()), UTC);
+        setUuid(ps, 4, eventId);
+    }
+
     @Override
     public List<StoredEvent> findByStatus(EventStatus status, Instant before) {
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(selectByStatusSql)) {
             ps.setString(1, String.valueOf(status.getCode()));
-            if (before.isAfter(Instant.now())) {
-                log.warn("Looking for events with future timestamp: {}", before);
-            }
-            ps.setTimestamp(2, Timestamp.from(before), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
-            try (ResultSet rs = ps.executeQuery()) {
-                List<StoredEvent> results = new ArrayList<>();
-                while (rs.next()) {
-                    results.add(mapRow(rs));
-                }
-                return results;
-            }
+            setBeforeTimestamp(ps, 2, before);
+            return mapResultList(ps);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find events by status: " + status, e);
         }
@@ -315,23 +277,29 @@ public class JdbcEventStore implements EventStore {
         });
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
-            int i = 1;
-            for (EventStatus status : statuses) {
-                ps.setString(i++, String.valueOf(status.getCode()));
-            }
-            if (before.isAfter(Instant.now())) {
-                log.warn("Looking for events with future timestamp: {}", before);
-            }
-            ps.setTimestamp(i, Timestamp.from(before), Calendar.getInstance(TimeZone.getTimeZone("UTC")));
-            try (ResultSet rs = ps.executeQuery()) {
-                List<StoredEvent> results = new ArrayList<>();
-                while (rs.next()) {
-                    results.add(mapRow(rs));
-                }
-                return results;
-            }
+            setStatusCodes(ps, statuses);
+            setBeforeTimestamp(ps, statuses.size() + 1, before);
+            return mapResultList(ps);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find events by statuses: " + statuses, e);
+        }
+    }
+
+    private void setStatusCodes(PreparedStatement ps, List<EventStatus> statuses) throws SQLException {
+        int i = 1;
+        for (EventStatus status : statuses) {
+            ps.setString(i++, String.valueOf(status.getCode()));
+        }
+    }
+
+    private void setBeforeTimestamp(PreparedStatement ps, int index, Instant before) throws SQLException {
+        warnIfFutureTimestamp(before);
+        ps.setTimestamp(index, Timestamp.from(before), UTC);
+    }
+
+    private void warnIfFutureTimestamp(Instant before) {
+        if (before.isAfter(Instant.now())) {
+            log.warn("Looking for events with future timestamp: {}", before);
         }
     }
 
@@ -340,14 +308,28 @@ public class JdbcEventStore implements EventStore {
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(selectByIdSql)) {
             setUuid(ps, 1, eventId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(mapRow(rs));
-                }
-                return Optional.empty();
-            }
+            return mapSingleResult(ps);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find event: " + eventId, e);
+        }
+    }
+
+    private List<StoredEvent> mapResultList(PreparedStatement ps) throws SQLException {
+        try (ResultSet rs = ps.executeQuery()) {
+            List<StoredEvent> results = new ArrayList<>();
+            while (rs.next()) {
+                results.add(mapRow(rs));
+            }
+            return results;
+        }
+    }
+
+    private Optional<StoredEvent> mapSingleResult(PreparedStatement ps) throws SQLException {
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return Optional.of(mapRow(rs));
+            }
+            return Optional.empty();
         }
     }
 
