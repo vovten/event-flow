@@ -158,10 +158,25 @@ public final class EventRetryScheduler implements AutoCloseable {
                     event.eventId(), event.retryCount(), maxRetries);
             return;
         }
-        if (!isBackoffElapsed(event)) {
+        if (!event.isReadyForRetry(minAge)) {
+            if (log.isTraceEnabled()) {
+                log.trace("Backoff not elapsed for event {}, retry #{}, retryAt={}",
+                        event.eventId(), event.retryCount() + 1, computeRetryAt(event));
+            }
             return;
         }
         retryEvent(event);
+    }
+
+    /**
+     * Computes the earliest retry time for an event based on exponential backoff.
+     *
+     * @param event the event to check
+     * @return the instant when this event becomes eligible for retry
+     */
+    private Instant computeRetryAt(StoredEvent event) {
+        Duration backoff = minAge.multipliedBy(1L << event.retryCount());
+        return event.updatedAt().plus(backoff);
     }
 
     private void retryEvent(StoredEvent stored) {
@@ -172,27 +187,6 @@ public final class EventRetryScheduler implements AutoCloseable {
         } catch (Exception e) {
             log.error("Failed to retry event id={}: {}", stored.eventId(), e.getMessage());
         }
-    }
-
-    /**
-     * Checks whether the exponential backoff period has elapsed for this event.
-     * <p>
-     * The delay grows with each attempt: {@code minAge × 2^retryCount}.
-     * The timer starts from the event's {@link StoredEvent#updatedAt()} timestamp,
-     * which is refreshed after each failed or stuck retry attempt.
-     *
-     * @param event the event to check
-     * @return true if enough time has passed to retry
-     */
-    private boolean isBackoffElapsed(StoredEvent event) {
-        Duration backoff = minAge.multipliedBy(1L << event.retryCount());
-        Instant retryAt = event.updatedAt().plus(backoff);
-        boolean elapsed = !Instant.now().isBefore(retryAt);
-        if (!elapsed) {
-            log.trace("Backoff not elapsed for event {}, retry #{}, retryAt={}",
-                    event.eventId(), event.retryCount() + 1, retryAt);
-        }
-        return elapsed;
     }
 
     @Override

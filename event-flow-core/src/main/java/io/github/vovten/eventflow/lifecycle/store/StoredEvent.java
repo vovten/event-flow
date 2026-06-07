@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.lifecycle.store;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -102,6 +103,24 @@ public record StoredEvent(
                 eventId, eventType, service, payload, processId,
                 EventStatus.NEW, retryCount + 1, createdAt, Instant.now(), null
         );
+    }
+
+    /**
+     * Checks whether the exponential backoff period has elapsed for this event,
+     * meaning it is ready for another retry attempt.
+     * <p>
+     * The delay grows with each attempt: {@code minAge × 2^retryCount}.
+     * The timer starts from the event's {@link #updatedAt()} timestamp,
+     * which is refreshed after each failed or stuck retry attempt.
+     *
+     * @param minAge base backoff interval (delay = minAge × 2^retryCount)
+     * @return {@code true} if enough time has passed since {@link #updatedAt()}
+     *         to allow the next retry, {@code false} otherwise
+     */
+    public boolean isReadyForRetry(Duration minAge) {
+        Duration backoff = minAge.multipliedBy(1L << retryCount);
+        Instant retryAt = updatedAt.plus(backoff);
+        return !Instant.now().isBefore(retryAt);
     }
 
     @Override
