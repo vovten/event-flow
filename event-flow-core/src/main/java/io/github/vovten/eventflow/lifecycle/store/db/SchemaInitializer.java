@@ -41,7 +41,14 @@ class SchemaInitializer {
             ON %s(status, updated_at)
             """;
 
+    private static final String CREATE_INDEX_SERVICE = """
+            CREATE INDEX %s
+            ON %s(service)
+            """;
+
     private static final String INDEX_NAME = "idx_%s_status";
+
+    private static final String INDEX_SERVICE_NAME = "idx_%s_service";
 
     private final DataSource dataSource;
     private final String tableName;
@@ -74,12 +81,16 @@ class SchemaInitializer {
         try (Connection conn = dataSource.getConnection()) {
             if (!tableExists(conn, tableName)) {
                 String ddl = buildCreateTableSql(uuidType).formatted(tableName);
-                String indexName = INDEX_NAME.formatted(tableBase(tableName));
-                String createIndexSql = CREATE_INDEX.formatted(indexName, tableName);
+                String baseName = tableBase(tableName);
+                String statusIndexName = INDEX_NAME.formatted(baseName);
+                String createStatusIndexSql = CREATE_INDEX.formatted(statusIndexName, tableName);
+                String serviceIndexName = INDEX_SERVICE_NAME.formatted(baseName);
+                String createServiceIndexSql = CREATE_INDEX_SERVICE.formatted(serviceIndexName, tableName);
                 conn.setAutoCommit(false);
                 try (Statement stmt = conn.createStatement()) {
                     stmt.execute(ddl);
-                    stmt.execute(createIndexSql);
+                    stmt.execute(createStatusIndexSql);
+                    stmt.execute(createServiceIndexSql);
                     conn.commit();
                 } catch (SQLException e) {
                     try {

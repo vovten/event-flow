@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS event_store (
 CREATE INDEX IF NOT EXISTS idx_event_store_status
     ON event_store(status, updated_at);
 
+CREATE INDEX IF NOT EXISTS idx_event_store_service
+    ON event_store(service);
+
 COMMENT ON TABLE event_store IS 'Event store for persistent event lifecycle tracking';
 COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
 COMMENT ON COLUMN event_store.event_type IS 'Simple event class name (for display and queries)';
