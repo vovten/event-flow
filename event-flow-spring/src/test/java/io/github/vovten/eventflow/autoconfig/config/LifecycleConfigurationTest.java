@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.autoconfig.config;
 
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import io.github.vovten.eventflow.lifecycle.EventCleanupScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
@@ -110,6 +111,40 @@ class LifecycleConfigurationTest {
         }
     }
 
+    @Test
+    @DisplayName("Should create EventCleanupScheduler when cleanup.enabled=true")
+    void shouldCreateEventCleanupScheduler() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            addInlinedPropertiesToEnvironment(ctx,
+                    "event-flow.publisher.lifecycle.enabled=true",
+                    "event-flow.publisher.lifecycle.retry.enabled=false",
+                    "event-flow.publisher.lifecycle.cleanup.enabled=true");
+            ctx.registerBean("properties", EventFlowProperties.class,
+                    () -> inMemoryCleanupProps(false, true));
+            ctx.register(LifecycleConfiguration.class);
+            ctx.refresh();
+
+            assertThat(ctx.getBean(EventCleanupScheduler.class)).isNotNull();
+        }
+    }
+
+    @Test
+    @DisplayName("Should not create EventCleanupScheduler when cleanup.enabled=false")
+    void shouldNotCreateEventCleanupScheduler() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            addInlinedPropertiesToEnvironment(ctx,
+                    "event-flow.publisher.lifecycle.enabled=true",
+                    "event-flow.publisher.lifecycle.retry.enabled=false",
+                    "event-flow.publisher.lifecycle.cleanup.enabled=false");
+            ctx.registerBean("properties", EventFlowProperties.class,
+                    () -> inMemoryCleanupProps(false, false));
+            ctx.register(LifecycleConfiguration.class);
+            ctx.refresh();
+
+            assertThatThrownBy(() -> ctx.getBean(EventCleanupScheduler.class));
+        }
+    }
+
     // -- helpers --
 
     private static AnnotationConfigApplicationContext createContext(EventFlowProperties props,
@@ -142,6 +177,17 @@ class LifecycleConfigurationTest {
         props.getPublisher().getLifecycle().setEnabled(true);
         props.getPublisher().getLifecycle().setServiceName("test-service");
         props.getPublisher().getLifecycle().getStore().setType("in-memory");
+        return props;
+    }
+
+    private static EventFlowProperties inMemoryCleanupProps(boolean retryEnabled, boolean cleanupEnabled) {
+        EventFlowProperties props = new EventFlowProperties();
+        props.getPublisher().setEnabled(true);
+        props.getPublisher().getLifecycle().setEnabled(true);
+        props.getPublisher().getLifecycle().setServiceName("test-service");
+        props.getPublisher().getLifecycle().getStore().setType("in-memory");
+        props.getPublisher().getLifecycle().getRetry().setEnabled(retryEnabled);
+        props.getPublisher().getLifecycle().getCleanup().setEnabled(cleanupEnabled);
         return props;
     }
 
@@ -200,6 +246,11 @@ class LifecycleConfigurationTest {
         @Override
         public Optional<StoredEvent> findById(UUID eventId) {
             return Optional.empty();
+        }
+
+        @Override
+        public int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
+            return 0;
         }
     }
 }

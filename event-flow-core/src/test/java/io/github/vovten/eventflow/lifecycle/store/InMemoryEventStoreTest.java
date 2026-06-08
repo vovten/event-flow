@@ -153,4 +153,80 @@ class InMemoryEventStoreTest {
         assertThat(store.size()).isZero();
         assertThat(store.findById(eventId)).isEmpty();
     }
+
+    @Test
+    @DisplayName("Should delete events by statuses before deadline")
+    void shouldDeleteByStatuses() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+
+        UUID eventId2 = UUID.randomUUID();
+        StoredEvent event2 = StoredEvent.newEvent(eventId2, "test.TestEvent", null, "{}", null);
+        store.save(event2);
+        store.updateStatus(eventId2, EventStatus.UNDEFINED, null);
+
+        UUID eventId3 = UUID.randomUUID();
+        StoredEvent event3 = StoredEvent.newEvent(eventId3, "test.TestEvent", null, "{}", null);
+        store.save(event3);
+        store.updateStatus(eventId3, EventStatus.FAILED, "error");
+
+        Instant deadline = Instant.now().plusSeconds(1);
+        int deleted = store.deleteByStatuses(
+                List.of(EventStatus.HANDLED, EventStatus.UNDEFINED), deadline, 100);
+
+        assertThat(deleted).isEqualTo(2);
+        assertThat(store.findById(eventId)).isEmpty();
+        assertThat(store.findById(eventId2)).isEmpty();
+        assertThat(store.findById(eventId3)).isPresent();
+        assertThat(store.findById(eventId3).orElseThrow().status()).isEqualTo(EventStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("Should delete nothing when no events match statuses")
+    void shouldDeleteNothingWhenNoMatch() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.PUBLISHED, null);
+
+        Instant deadline = Instant.now().plusSeconds(1);
+        int deleted = store.deleteByStatuses(
+                List.of(EventStatus.HANDLED, EventStatus.UNDEFINED), deadline, 100);
+
+        assertThat(deleted).isZero();
+        assertThat(store.findById(eventId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("Should delete nothing when deadline is in the past")
+    void shouldDeleteNothingWhenDeadlineInPast() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+
+        Instant deadline = Instant.now().minusSeconds(1);
+        // Event was just updated, not before the deadline
+        int deleted = store.deleteByStatuses(
+                List.of(EventStatus.HANDLED), deadline, 100);
+
+        assertThat(deleted).isZero();
+        assertThat(store.findById(eventId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("Should delete only events matching given statuses")
+    void shouldDeleteOnlyMatchingStatuses() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+
+        UUID eventId2 = UUID.randomUUID();
+        StoredEvent event2 = StoredEvent.newEvent(eventId2, "test.TestEvent", null, "{}", null);
+        store.save(event2);
+        store.updateStatus(eventId2, EventStatus.UNDEFINED, null);
+
+        // Only delete HANDLED, not UNDEFINED
+        Instant deadline = Instant.now().plusSeconds(1);
+        int deleted = store.deleteByStatuses(List.of(EventStatus.HANDLED), deadline, 100);
+
+        assertThat(deleted).isEqualTo(1);
+        assertThat(store.findById(eventId)).isEmpty();
+        assertThat(store.findById(eventId2)).isPresent();
+    }
 }

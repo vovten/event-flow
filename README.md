@@ -693,6 +693,27 @@ The `service-name` is mandatory — it identifies this service instance so that 
 
 Backoff is exponential: `delay = minAge × 2^retryCount`. First retry at 30s, second at 60s, third at 120s.
 
+### Cleanup
+
+`EventCleanupScheduler` periodically deletes old terminal events (`HANDLED` and `UNDEFINED`) from the `EventStore` to prevent unbounded growth. Deletion is performed in configurable batches with pauses between batches to reduce database load.
+
+```yaml
+event-flow:
+  publisher:
+    lifecycle:
+      cleanup:
+        enabled: true
+        max-age: 7d           # Events older than this are deleted
+        batch-size: 500       # Rows per DELETE
+        interval: 60m         # How often the scheduler runs
+        pause-between-batches: 100ms  # Throttle between batches
+```
+
+**Safety:**
+- Only terminal statuses (`HANDLED`, `UNDEFINED`) are cleaned up — `FAILED` events are preserved for manual inspection
+- A single cycle deletes at most 100 000 events; leftover events are picked up by the next cycle
+- A random jitter (up to `interval`) is added to the first run to avoid thundering herd when multiple instances start
+
 ### Storage
 
 The `EventStore` interface has two built-in implementations:

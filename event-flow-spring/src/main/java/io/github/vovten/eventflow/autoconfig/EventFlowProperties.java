@@ -192,6 +192,7 @@ public class EventFlowProperties {
         private String serviceName = "";
         private StoreConfig store = new StoreConfig();
         private RetryTrackingConfig retry = new RetryTrackingConfig();
+        private CleanupConfig cleanup = new CleanupConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -225,6 +226,14 @@ public class EventFlowProperties {
             this.retry = retry;
         }
 
+        public CleanupConfig getCleanup() {
+            return cleanup;
+        }
+
+        public void setCleanup(CleanupConfig cleanup) {
+            this.cleanup = cleanup;
+        }
+
         @Override
         public String toString() {
             return "LifecyclePublisherConfig{" +
@@ -232,6 +241,7 @@ public class EventFlowProperties {
                     ", serviceName='" + serviceName + '\'' +
                     ", store=" + store +
                     ", retry=" + retry +
+                    ", cleanup=" + cleanup +
                     '}';
         }
 
@@ -299,8 +309,8 @@ public class EventFlowProperties {
         public static class RetryTrackingConfig {
             private boolean enabled = true;
             private int maxRetries = 3;
-            private java.time.Duration retryInterval = java.time.Duration.ofSeconds(30);
-            private java.time.Duration minAge = java.time.Duration.ofSeconds(30);
+            private Duration retryInterval = Duration.ofSeconds(30);
+            private Duration minAge = Duration.ofSeconds(30);
 
             public boolean isEnabled() {
                 return enabled;
@@ -318,19 +328,19 @@ public class EventFlowProperties {
                 this.maxRetries = maxRetries;
             }
 
-            public java.time.Duration getRetryInterval() {
+            public Duration getRetryInterval() {
                 return retryInterval;
             }
 
-            public void setRetryInterval(java.time.Duration retryInterval) {
+            public void setRetryInterval(Duration retryInterval) {
                 this.retryInterval = retryInterval;
             }
 
-            public java.time.Duration getMinAge() {
+            public Duration getMinAge() {
                 return minAge;
             }
 
-            public void setMinAge(java.time.Duration minAge) {
+            public void setMinAge(Duration minAge) {
                 this.minAge = minAge;
             }
 
@@ -341,6 +351,95 @@ public class EventFlowProperties {
                         ", maxRetries=" + maxRetries +
                         ", retryInterval=" + retryInterval +
                         ", minAge=" + minAge +
+                        '}';
+            }
+        }
+
+        /**
+         * Cleanup configuration for lifecycle event tracking.
+         * <p>
+         * Controls automatic deletion of old terminal events (HANDLED, UNDEFINED)
+         * from the event store. Events older than {@code maxAge} are deleted
+         * in batches of {@code batchSize} with a pause between batches to
+         * reduce database load.
+         * <p>
+         * Only terminal events that are no longer needed for retry or tracking
+         * are cleaned up. {@code FAILED} events are preserved for manual inspection.
+         */
+        public static class CleanupConfig {
+            /**
+             * Enable the periodic cleanup scheduler.
+             */
+            private boolean enabled = false;
+
+            /**
+             * How often the cleanup cycle runs.
+             */
+            private Duration interval = Duration.ofMinutes(60);
+
+            /**
+             * Events older than this duration are eligible for deletion.
+             */
+            private Duration maxAge = Duration.ofDays(7);
+
+            /**
+             * Maximum number of events to delete in a single batch.
+             */
+            private int batchSize = 1000;
+
+            /**
+             * Pause between consecutive batches to spread database load.
+             */
+            private Duration pauseBetweenBatches = Duration.ofMillis(100);
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
+
+            public Duration getInterval() {
+                return interval;
+            }
+
+            public void setInterval(Duration interval) {
+                this.interval = interval;
+            }
+
+            public Duration getMaxAge() {
+                return maxAge;
+            }
+
+            public void setMaxAge(Duration maxAge) {
+                this.maxAge = maxAge;
+            }
+
+            public int getBatchSize() {
+                return batchSize;
+            }
+
+            public void setBatchSize(int batchSize) {
+                this.batchSize = batchSize;
+            }
+
+            public Duration getPauseBetweenBatches() {
+                return pauseBetweenBatches;
+            }
+
+            public void setPauseBetweenBatches(Duration pauseBetweenBatches) {
+                this.pauseBetweenBatches = pauseBetweenBatches;
+            }
+
+            @Override
+            public String toString() {
+                return "CleanupConfig{" +
+                        "enabled=" + enabled +
+                        ", interval=" + interval +
+                        ", maxAge=" + maxAge +
+                        ", batchSize=" + batchSize +
+                        ", pauseBetweenBatches=" + pauseBetweenBatches +
                         '}';
             }
         }

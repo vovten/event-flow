@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties.LifecyclePublisherConfig;
 import io.github.vovten.eventflow.lifecycle.AckHandler;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.lifecycle.EventCleanupScheduler;
 import io.github.vovten.eventflow.lifecycle.EventRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
@@ -161,6 +162,33 @@ public class LifecycleConfiguration {
                 retry.getRetryInterval(),
                 retry.getMinAge(),
                 retry.getMaxRetries()
+        );
+    }
+
+    /**
+     * Creates the event cleanup scheduler.
+     * <p>
+     * Periodically deletes old terminal events (HANDLED, UNDEFINED) from
+     * the event store to prevent unbounded growth.
+     *
+     * @param eventStore the event store to clean up
+     * @return the cleanup scheduler
+     */
+    @Bean(initMethod = "start", destroyMethod = "close")
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "event-flow.publisher.lifecycle.cleanup", name = "enabled",
+            havingValue = "true")
+    public EventCleanupScheduler eventCleanupScheduler(EventStore eventStore) {
+        LifecyclePublisherConfig.CleanupConfig cleanup = properties.getPublisher().getLifecycle().getCleanup();
+        log.info("Creating EventCleanupScheduler: interval={}, maxAge={}, batchSize={}, pause={}",
+                cleanup.getInterval(), cleanup.getMaxAge(), cleanup.getBatchSize(),
+                cleanup.getPauseBetweenBatches());
+        return new EventCleanupScheduler(
+                eventStore,
+                cleanup.getInterval(),
+                cleanup.getMaxAge(),
+                cleanup.getBatchSize(),
+                cleanup.getPauseBetweenBatches()
         );
     }
 }

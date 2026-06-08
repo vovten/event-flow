@@ -95,4 +95,23 @@ public interface EventStore {
      * @return the event, or empty if not found
      */
     Optional<StoredEvent> findById(UUID eventId);
+
+    /**
+     * Deletes events matching any of the given statuses that were last
+     * updated before the given timestamp.
+     * <p>
+     * Implementations should delete in batches of up to {@code batchSize}
+     * rows per batch to minimise lock contention and transaction size.
+     * The method returns the total number of deleted events.
+     * <p>
+     * Used by the cleanup scheduler to remove old terminal events
+     * (HANDLED, UNDEFINED) from the store.
+     *
+     * @param statuses  the statuses to delete (must not be null or empty)
+     * @param before    only delete events updated before this time
+     * @param batchSize maximum number of events to delete per batch
+     * @return the total number of deleted events
+     * @since 1.3.2
+     */
+    int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize);
 }

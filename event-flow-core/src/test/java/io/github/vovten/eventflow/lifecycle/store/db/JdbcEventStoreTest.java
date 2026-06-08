@@ -344,6 +344,93 @@ class JdbcEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should delete events by statuses before deadline")
+    void shouldDeleteByStatuses() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+
+        UUID eventId2 = UUID.randomUUID();
+        StoredEvent event2 = StoredEvent.newEvent(eventId2, "test.T", null, "{}", null);
+        store.save(event2);
+        store.updateStatus(eventId2, EventStatus.UNDEFINED, null);
+
+        UUID eventId3 = UUID.randomUUID();
+        StoredEvent event3 = StoredEvent.newEvent(eventId3, "test.T", null, "{}", null);
+        store.save(event3);
+        store.updateStatus(eventId3, EventStatus.FAILED, "error");
+
+        Instant deadline = Instant.now().plusSeconds(1);
+        int deleted = store.deleteByStatuses(
+                List.of(EventStatus.HANDLED, EventStatus.UNDEFINED), deadline, 100);
+
+        assertThat(deleted).isEqualTo(2);
+        assertThat(store.findById(eventId)).isEmpty();
+        assertThat(store.findById(eventId2)).isEmpty();
+        assertThat(store.findById(eventId3)).isPresent();
+        assertThat(store.findById(eventId3).orElseThrow().status()).isEqualTo(EventStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("Should delete nothing when no events match statuses")
+    void shouldDeleteNothingWhenNoMatch() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.PUBLISHED, null);
+
+        Instant deadline = Instant.now().plusSeconds(1);
+        int deleted = store.deleteByStatuses(
+                List.of(EventStatus.HANDLED, EventStatus.UNDEFINED), deadline, 100);
+
+        assertThat(deleted).isZero();
+        assertThat(store.findById(eventId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("Should delete nothing when deadline is in the past")
+    void shouldDeleteNothingWhenDeadlineInPast() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+
+        Instant deadline = Instant.now().minusSeconds(1);
+        int deleted = store.deleteByStatuses(
+                List.of(EventStatus.HANDLED), deadline, 100);
+
+        assertThat(deleted).isZero();
+        assertThat(store.findById(eventId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("Should delete no more than batch size in a single call")
+    void shouldDeleteAtMostBatchSize() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID[] ids = new UUID[5];
+        for (int i = 0; i < 5; i++) {
+            ids[i] = UUID.randomUUID();
+            store.save(StoredEvent.newEvent(ids[i], "test.T", null, "{}", null));
+            store.updateStatus(ids[i], EventStatus.HANDLED, null);
+        }
+
+        Instant deadline = Instant.now().plusSeconds(1);
+        // batchSize = 2 — deletes at most 2 events in one call
+        int deleted = store.deleteByStatuses(List.of(EventStatus.HANDLED), deadline, 2);
+
+        assertThat(deleted).isEqualTo(2);
+        // Remaining 3 events should still be in the store
+        int remaining = 0;
+        for (UUID id : ids) {
+            if (store.findById(id).isPresent()) {
+                remaining++;
+            }
+        }
+        assertThat(remaining).isEqualTo(3);
+    }
+
+    @Test
     @DisplayName("Should create table with default name and verify column comments")
     void shouldCreateTableWithDefaultNameAndComments() throws SQLException {
         new JdbcEventStore(dataSource);

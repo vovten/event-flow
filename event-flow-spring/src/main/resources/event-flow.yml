@@ -83,6 +83,21 @@ event-flow:
         # Examples with 30s: 1st retry=30s, 2nd=60s, 3rd=120s
         min-age: 30s
 
+      # Cleanup configuration for lifecycle event tracking
+      # Removes old terminal events (HANDLED, UNDEFINED) to prevent unbounded growth
+      # FAILED events are never cleaned up automatically — preserved for manual inspection
+      cleanup:
+        # Enable or disable automatic cleanup of old terminal events
+        enabled: false
+        # How often the cleanup cycle runs
+        interval: 60m
+        # Events older than this duration are eligible for deletion
+        max-age: 7d
+        # Maximum number of events to delete in a single batch
+        batch-size: 1000
+        # Pause between consecutive delete batches to spread database load
+        pause-between-batches: 100ms
+
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
     # Transport name identifies the type (e.g., "local-queue", "kafka", "broadcast-kafka")

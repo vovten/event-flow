@@ -51,22 +51,58 @@ public class JdbcEventStore implements EventStore {
 
     private static final Calendar UTC = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
-    private static final String COLUMNS =
-            "event_id, event_type, service, payload, process_id, status, retry_count, created_at, updated_at, error_details";
+    private static final String INSERT = """
+            INSERT INTO %s (event_id, event_type, service, payload, process_id,
+                            status, retry_count, created_at, updated_at, error_details)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """;
 
-    private static final String INSERT = "INSERT INTO %s (" + COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private static final String SELECT_BY_STATUS = """
+            SELECT event_id, event_type, service, payload, process_id,
+                   status, retry_count, created_at, updated_at, error_details
+            FROM %s
+            WHERE status = ? AND updated_at < ?
+            ORDER BY updated_at ASC
+            """;
 
-    private static final String SELECT_BY_STATUS = "SELECT " + COLUMNS + " FROM %s WHERE status = ? AND updated_at < ? ORDER BY updated_at ASC";
+    private static final String SELECT_BY_STATUSES = """
+            SELECT event_id, event_type, service, payload, process_id,
+                   status, retry_count, created_at, updated_at, error_details
+            FROM %s
+            WHERE status IN (%s) AND updated_at < ?
+            ORDER BY updated_at ASC
+            """;
 
-    private static final String SELECT_BY_STATUSES = "SELECT " + COLUMNS + " FROM %s WHERE status IN (%s) AND updated_at < ? ORDER BY updated_at ASC";
+    private static final String DELETE_BY_STATUSES = """
+            DELETE FROM %s
+            WHERE event_id IN (
+                SELECT event_id FROM (
+                    SELECT event_id
+                    FROM %s
+                    WHERE status IN (%s) AND updated_at < ?
+                    LIMIT ?
+                ) AS cleanup_ids
+            )
+            """;
 
-    private static final String SELECT_BY_ID = "SELECT " + COLUMNS + " FROM %s WHERE event_id = ?";
+    private static final String SELECT_BY_ID = """
+            SELECT event_id, event_type, service, payload, process_id,
+                   status, retry_count, created_at, updated_at, error_details
+            FROM %s
+            WHERE event_id = ?
+            """;
 
-    private static final String UPDATE_STATUS_ONLY =
-            "UPDATE %s SET status = ?, error_details = ?, updated_at = ? WHERE event_id = ?";
+    private static final String UPDATE_STATUS_ONLY = """
+            UPDATE %s
+            SET status = ?, error_details = ?, updated_at = ?
+            WHERE event_id = ?
+            """;
 
-    private static final String UPDATE_STATUS_WITH_RETRY =
-            "UPDATE %s SET status = ?, error_details = ?, updated_at = ?, retry_count = retry_count + 1 WHERE event_id = ?";
+    private static final String UPDATE_STATUS_WITH_RETRY = """
+            UPDATE %s
+            SET status = ?, error_details = ?, updated_at = ?, retry_count = retry_count + 1
+            WHERE event_id = ?
+            """;
 
     static final String DEFAULT_TABLE_NAME = "event_store";
 
@@ -79,6 +115,7 @@ public class JdbcEventStore implements EventStore {
     private final String updateStatusOnlySql;
     private final String updateStatusWithRetrySql;
     private final Map<Set<EventStatus>, String> selectByStatusesCache = new ConcurrentHashMap<>();
+    private final Map<Set<EventStatus>, String> deleteByStatusesCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a new JdbcEventStore with the default table name {@value #DEFAULT_TABLE_NAME}
@@ -300,6 +337,31 @@ public class JdbcEventStore implements EventStore {
     private void warnIfFutureTimestamp(Instant before) {
         if (before.isAfter(Instant.now())) {
             log.warn("Looking for events with future timestamp: {}", before);
+        }
+    }
+
+    @Override
+    public int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
+        if (statuses.isEmpty()) {
+            return 0;
+        }
+        String sql = deleteByStatusesCache.computeIfAbsent(Set.copyOf(statuses), key -> {
+            String placeholders = key.stream()
+                    .map(s -> "?")
+                    .collect(Collectors.joining(", "));
+            return DELETE_BY_STATUSES.formatted(tableName, tableName, placeholders);
+        });
+        try (Connection conn = dataSource.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            setStatusCodes(ps, statuses);
+            setBeforeTimestamp(ps, statuses.size() + 1, before);
+            ps.setInt(statuses.size() + 2, batchSize);
+            int deleted = ps.executeUpdate();
+            if (deleted > 0) {
+                log.debug("Deleted {} events by statuses: {} (before {})", deleted, statuses, before);
+            }
+            return deleted;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete events by statuses: " + statuses, e);
         }
     }
 

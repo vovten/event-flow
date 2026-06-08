@@ -68,6 +68,20 @@ public class InMemoryEventStore implements EventStore {
         return Optional.ofNullable(store.get(eventId));
     }
 
+    @Override
+    public int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
+        Set<EventStatus> statusSet = EnumSet.copyOf(statuses);
+        int[] deletedCount = {0};
+        store.values().removeIf(event -> {
+            if (statusSet.contains(event.status()) && event.updatedAt().isBefore(before)) {
+                deletedCount[0]++;
+                return true;
+            }
+            return false;
+        });
+        return deletedCount[0];
+    }
+
     /**
      * Returns the total number of stored events (for testing).
      *
