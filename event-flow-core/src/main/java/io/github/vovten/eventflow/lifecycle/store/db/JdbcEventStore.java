@@ -71,6 +71,7 @@ public class JdbcEventStore implements EventStore {
             FROM %s
             WHERE status IN (%s) AND updated_at < ?
             ORDER BY updated_at ASC
+            LIMIT ?
             """;
 
     private static final String DELETE_BY_STATUSES = """
@@ -302,8 +303,8 @@ public class JdbcEventStore implements EventStore {
     }
 
     @Override
-    public List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before) {
-        if (statuses.isEmpty()) {
+    public List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
+        if (statuses.isEmpty() || batchSize <= 0) {
             return List.of();
         }
         String sql = selectByStatusesCache.computeIfAbsent(Set.copyOf(statuses), key -> {
@@ -316,6 +317,7 @@ public class JdbcEventStore implements EventStore {
                 PreparedStatement ps = conn.prepareStatement(sql)) {
             setStatusCodes(ps, statuses);
             setBeforeTimestamp(ps, statuses.size() + 1, before);
+            ps.setInt(statuses.size() + 2, batchSize);
             return mapResultList(ps);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find events by statuses: " + statuses, e);

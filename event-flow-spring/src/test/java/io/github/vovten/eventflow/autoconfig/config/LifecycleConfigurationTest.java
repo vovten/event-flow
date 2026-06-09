@@ -249,6 +249,11 @@ class LifecycleConfigurationTest {
         }
 
         @Override
+        public List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
+            return Collections.emptyList();
+        }
+
+        @Override
         public int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
             return 0;
         }

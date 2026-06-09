@@ -40,16 +40,20 @@ class EventRetrySchedulerTest {
                 originPublisher, eventStore, null);
     }
 
-    private EventRetryScheduler scheduler(Duration minAge, int maxRetries) {
+    private EventRetryScheduler scheduler(Duration minAge, int maxRetries, int batchSize) {
         return new EventRetryScheduler(
                 eventStore, lifecyclePublisher,
                 Duration.ofMinutes(1),
-                minAge, maxRetries
+                minAge, maxRetries, batchSize
         );
     }
 
+    private EventRetryScheduler scheduler(Duration minAge, int maxRetries) {
+        return scheduler(minAge, maxRetries, 1000);
+    }
+
     private EventRetryScheduler scheduler(int maxRetries) {
-        return scheduler(Duration.ZERO, maxRetries);
+        return scheduler(Duration.ZERO, maxRetries, 1000);
     }
 
     /**
@@ -176,6 +180,31 @@ class EventRetrySchedulerTest {
                     assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
             assertThat(eventStore.findById(id2)).hasValueSatisfying(e ->
                     assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+        }
+
+        @Test
+        @DisplayName("respects batchSize — retries at most N events per cycle")
+        void respectsBatchSize() {
+            UUID[] ids = new UUID[5];
+            for (int i = 0; i < 5; i++) {
+                ids[i] = createFailedEvent(0);
+            }
+
+            // batchSize = 2, should retry only 2 out of 5 events
+            scheduler(Duration.ZERO, 5, 2).retryCycle();
+
+            int retried = 0;
+            int skipped = 0;
+            for (UUID id : ids) {
+                StoredEvent stored = eventStore.findById(id).orElseThrow();
+                if (stored.status() == EventStatus.PUBLISHED) {
+                    retried++;
+                } else {
+                    skipped++;
+                }
+            }
+            assertThat(retried).isEqualTo(2);
+            assertThat(skipped).isEqualTo(3);
         }
 
         @Test
@@ -378,7 +407,7 @@ class EventRetrySchedulerTest {
         void startAndStop() {
             try (var scheduler = new EventRetryScheduler(
                     eventStore, lifecyclePublisher,
-                    Duration.ofMinutes(1), Duration.ZERO, 3
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000
             )) {
                 scheduler.start();
                 scheduler.stop();
@@ -390,7 +419,7 @@ class EventRetrySchedulerTest {
         void close() {
             EventRetryScheduler scheduler = new EventRetryScheduler(
                     eventStore, lifecyclePublisher,
-                    Duration.ofMinutes(1), Duration.ZERO, 3
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000
             );
             scheduler.start();
             scheduler.close();

@@ -154,14 +154,15 @@ public class LifecycleConfiguration {
             havingValue = "true", matchIfMissing = true)
     public EventRetryScheduler eventRetryScheduler(EventStore eventStore, EventPublisher eventPublisher) {
         LifecyclePublisherConfig.RetryTrackingConfig retry = properties.getPublisher().getLifecycle().getRetry();
-        log.info("Creating EventRetryScheduler: interval={}, minAge={}, maxRetries={}",
-                retry.getRetryInterval(), retry.getMinAge(), retry.getMaxRetries());
+        log.info("Creating EventRetryScheduler: interval={}, minAge={}, maxRetries={}, batchSize={}",
+                retry.getRetryInterval(), retry.getMinAge(), retry.getMaxRetries(), retry.getBatchSize());
         return new EventRetryScheduler(
                 eventStore,
                 eventPublisher,
                 retry.getRetryInterval(),
                 retry.getMinAge(),
-                retry.getMaxRetries()
+                retry.getMaxRetries(),
+                retry.getBatchSize()
         );
     }
 

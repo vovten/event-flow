@@ -311,6 +311,7 @@ public class EventFlowProperties {
             private int maxRetries = 3;
             private Duration retryInterval = Duration.ofSeconds(30);
             private Duration minAge = Duration.ofSeconds(30);
+            private int batchSize = 1000;
 
             public boolean isEnabled() {
                 return enabled;
@@ -344,6 +345,14 @@ public class EventFlowProperties {
                 this.minAge = minAge;
             }
 
+            public int getBatchSize() {
+                return batchSize;
+            }
+
+            public void setBatchSize(int batchSize) {
+                this.batchSize = batchSize;
+            }
+
             @Override
             public String toString() {
                 return "RetryTrackingConfig{" +
@@ -351,6 +360,7 @@ public class EventFlowProperties {
                         ", maxRetries=" + maxRetries +
                         ", retryInterval=" + retryInterval +
                         ", minAge=" + minAge +
+                        ", batchSize=" + batchSize +
                         '}';
             }
         }

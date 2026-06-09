@@ -82,6 +82,8 @@ event-flow:
         # Base backoff interval for retries (delay = min-age × 2^retryCount)
         # Examples with 30s: 1st retry=30s, 2nd=60s, 3rd=120s
         min-age: 30s
+        # Maximum number of events to fetch per retry cycle
+        batch-size: 1000
 
       # Cleanup configuration for lifecycle event tracking
       # Removes old terminal events (HANDLED, UNDEFINED) to prevent unbounded growth

@@ -55,11 +55,15 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
-    public List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before) {
+    public List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
+        if (statuses.isEmpty() || batchSize <= 0) {
+            return List.of();
+        }
         Set<EventStatus> statusSet = EnumSet.copyOf(statuses);
         return store.values().stream()
                 .filter(e -> statusSet.contains(e.status()))
                 .filter(e -> e.updatedAt().isBefore(before))
+                .limit(batchSize)
                 .collect(toList());
     }
 

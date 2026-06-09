@@ -96,6 +96,24 @@ class InMemoryEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should limit results in findByStatuses with limit parameter")
+    void shouldLimitFindByStatuses() {
+        Instant now = Instant.now();
+        UUID[] ids = new UUID[5];
+        for (int i = 0; i < 5; i++) {
+            ids[i] = UUID.randomUUID();
+            store.save(StoredEvent.newEvent(ids[i], "test.T", null, "{}", null));
+            store.updateStatus(ids[i], EventStatus.FAILED, "err");
+        }
+
+        Instant deadline = now.plusSeconds(1);
+        List<StoredEvent> limited = store.findByStatuses(
+                List.of(EventStatus.FAILED), deadline, 2);
+
+        assertThat(limited).hasSize(2);
+    }
+
+    @Test
     @DisplayName("Should find events by status and age")
     void shouldFindByStatusAndAge() {
         store.save(event);

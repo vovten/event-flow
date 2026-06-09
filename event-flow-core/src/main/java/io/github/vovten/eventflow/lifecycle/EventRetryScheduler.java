@@ -55,6 +55,7 @@ public final class EventRetryScheduler implements AutoCloseable {
     private final Duration interval;
     private final Duration minAge;
     private final int maxRetries;
+    private final int batchSize;
     private final ScheduledExecutorService scheduler;
 
     /**
@@ -65,17 +66,20 @@ public final class EventRetryScheduler implements AutoCloseable {
      * @param interval   delay between retry cycles
      * @param minAge     base backoff interval for retries (delay = minAge × 2^retryCount)
      * @param maxRetries maximum number of retry attempts before giving up
+     * @param batchSize  maximum number of events to fetch per retry cycle
      */
     public EventRetryScheduler(EventStore eventStore,
-                               EventPublisher publisher,
-                               Duration interval,
-                               Duration minAge,
-                               int maxRetries) {
+                                EventPublisher publisher,
+                                Duration interval,
+                                Duration minAge,
+                                int maxRetries,
+                                int batchSize) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.publisher = Objects.requireNonNull(publisher, "publisher must not be null");
         this.interval = Objects.requireNonNull(interval, "interval must not be null");
         this.minAge = Objects.requireNonNull(minAge, "minAge must not be null");
         this.maxRetries = maxRetries;
+        this.batchSize = batchSize;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "event-retry-scheduler");
             t.setDaemon(true);
@@ -94,8 +98,8 @@ public final class EventRetryScheduler implements AutoCloseable {
                 interval.toMillis(),
                 TimeUnit.MILLISECONDS
         );
-        log.info("Event retry scheduler started: interval={}, minAge={}, maxRetries={} (FAILED, PUBLISHED, NEW)",
-                interval, minAge, maxRetries);
+        log.info("Event retry scheduler started: interval={}, minAge={}, maxRetries={}, batchSize={} (FAILED, PUBLISHED, NEW)",
+                interval, minAge, maxRetries, batchSize);
     }
 
     /**
@@ -126,7 +130,8 @@ public final class EventRetryScheduler implements AutoCloseable {
         try {
             Instant deadline = Instant.now().minus(minAge);
             List<StoredEvent> events = eventStore.findByStatuses(
-                    List.of(EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.NEW), deadline);
+                    List.of(EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.NEW), deadline, batchSize
+            );
             if (events.isEmpty()) {
                 log.trace("No events to retry");
                 return;
