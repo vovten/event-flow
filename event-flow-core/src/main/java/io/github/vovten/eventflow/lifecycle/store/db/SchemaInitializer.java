@@ -10,8 +10,8 @@ import java.sql.*;
  * Manages database schema initialization for the event store table.
  * <p>
  * Handles table creation, index creation, and optional column comments.
- * Supports auto-detection of the UUID storage strategy and graceful
- * handling of concurrent schema initialization across multiple instances.
+ * Supports auto-detection of the database dialect and UUID storage strategy,
+ * and graceful handling of concurrent schema initialization across multiple instances.
  * <p>
  * This class is package-private and used exclusively by {@link JdbcEventStore}.
  *
@@ -52,6 +52,7 @@ class SchemaInitializer {
 
     private final DataSource dataSource;
     private final String tableName;
+    private final DatabaseDialect dialect;
     private final UuidType uuidType;
 
     /**
@@ -59,11 +60,13 @@ class SchemaInitializer {
      *
      * @param dataSource the JDBC DataSource
      * @param tableName  the name of the event store table
+     * @param dialect    the database dialect for DDL type mapping
      * @param uuidType   the UUID storage strategy
      */
-    SchemaInitializer(DataSource dataSource, String tableName, UuidType uuidType) {
+    SchemaInitializer(DataSource dataSource, String tableName, DatabaseDialect dialect, UuidType uuidType) {
         this.dataSource = dataSource;
         this.tableName = tableName;
+        this.dialect = dialect;
         this.uuidType = uuidType;
     }
 
@@ -80,7 +83,7 @@ class SchemaInitializer {
     public void ensureSchema() {
         try (Connection conn = dataSource.getConnection()) {
             if (!tableExists(conn, tableName)) {
-                String ddl = buildCreateTableSql(uuidType).formatted(tableName);
+                String ddl = buildCreateTableSql(dialect, uuidType).formatted(tableName);
                 String baseName = tableBase(tableName);
                 String statusIndexName = INDEX_NAME.formatted(baseName);
                 String createStatusIndexSql = CREATE_INDEX.formatted(statusIndexName, tableName);
@@ -161,22 +164,24 @@ class SchemaInitializer {
         }
     }
 
-    private static String buildCreateTableSql(UuidType type) {
-        String uuidDdl = type == UuidType.NATIVE ? "UUID" : "BINARY(16)";
+    private String buildCreateTableSql(DatabaseDialect dialect, UuidType uuidType) {
+        String uuidDdl = uuidType == UuidType.NATIVE ? "UUID" : "BINARY(16)";
+        String textDdl = dialect.textType();
+        String tsDdl = dialect.timestampType();
         return """
                 CREATE TABLE %%s (
                     event_id        %s PRIMARY KEY,
                     event_type      VARCHAR(512) NOT NULL,
                     service         VARCHAR(255),
                     status          CHAR(1) NOT NULL DEFAULT 'U',
-                    payload         TEXT NOT NULL,
+                    payload         %s NOT NULL,
                     process_id      %s,
-                    created_at      TIMESTAMP NOT NULL,
-                    updated_at      TIMESTAMP NOT NULL,
+                    created_at      %s NOT NULL,
+                    updated_at      %s NOT NULL,
                     retry_count     INT DEFAULT 0 NOT NULL,
-                    error_details   TEXT
+                    error_details   %s
                 )
-                """.formatted(uuidDdl, uuidDdl);
+                """.formatted(uuidDdl, textDdl, uuidDdl, tsDdl, tsDdl, textDdl);
     }
 
     private boolean tableExists(Connection conn, String tableName) throws SQLException {

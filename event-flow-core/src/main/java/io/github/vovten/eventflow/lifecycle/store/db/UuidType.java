@@ -19,5 +19,20 @@ public enum UuidType {
     /**
      * Binary(16) byte array for databases without native UUID support (MySQL, Oracle, etc.).
      */
-    BINARY
+    BINARY;
+
+    /**
+     * Derives the UUID storage strategy from a database dialect.
+     * <p>
+     * PostgreSQL and H2 use native UUID; all others use BINARY(16).
+     *
+     * @param dialect the database dialect
+     * @return the corresponding UUID type
+     */
+    public static UuidType fromDialect(DatabaseDialect dialect) {
+        return switch (dialect) {
+            case POSTGRESQL, H2 -> NATIVE;
+            default -> BINARY;
+        };
+    }
 }

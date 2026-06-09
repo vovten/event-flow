@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
  * JDBC implementation of {@link EventStore} backed by a relational database.
  * <p>
  * Optionally executes DDL on construction to ensure the event store table exists.
- * Designed to work with any {@link DataSource} (PostgreSQL, H2, MySQL, etc.).
+ * Designed to work with any {@link DataSource} (PostgreSQL, H2, MySQL, Oracle, MS SQL Server, etc.).
  * <p>
  * The table name defaults to {@value #DEFAULT_TABLE_NAME} and can be customized
  * via the {@link #JdbcEventStore(DataSource, String)} constructor.
@@ -35,9 +35,16 @@ import java.util.stream.Collectors;
  * </ul>
  * Detection is automatic via {@link DatabaseMetaData#getDatabaseProductName()}.
  * <p>
+ * SQL syntax adapts to the database dialect:
+ * <ul>
+ *   <li><b>PostgreSQL / MySQL / H2</b> — uses {@code LIMIT ?}</li>
+ *   <li><b>Oracle / SQL Server</b> — uses {@code OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY}</li>
+ * </ul>
+ * <p>
  * The {@code status} column uses {@code CHAR(1)} with single-character codes (U, N, P, H, F)
  * defined in {@link EventStatus}.
- * The {@code payload} column uses {@code TEXT} for JSON-serialized event data.
+ * The {@code payload} column uses {@code TEXT} (or {@code CLOB} / {@code NVARCHAR(MAX)} depending on dialect)
+ * for JSON-serialized event data.
  *
  * @author Vladimir Aleshkov
  * @since 1.3.0
@@ -65,23 +72,44 @@ public class JdbcEventStore implements EventStore {
             ORDER BY updated_at ASC
             """;
 
-    private static final String SELECT_BY_STATUSES = """
+    private static final String SELECT_BY_STATUSES_TEMPLATE = """
             SELECT event_id, event_type, service, payload, process_id,
                    status, retry_count, created_at, updated_at, error_details
             FROM %s
             WHERE status IN (%s) AND updated_at < ?
             ORDER BY updated_at ASC
-            LIMIT ?
+            %s
             """;
 
+    /**
+     * DELETE with subquery — used for PostgreSQL, Oracle, MSSQL, H2.
+     * Single-level subquery, no table alias needed.
+     */
     private static final String DELETE_BY_STATUSES = """
+            DELETE FROM %s
+            WHERE event_id IN (
+                SELECT event_id
+                FROM %s
+                WHERE status IN (%s) AND updated_at < ?
+                ORDER BY updated_at ASC
+                %s
+            )
+            """;
+
+    /**
+     * DELETE with subquery — used for MySQL.
+     * MySQL forbids referencing the target table directly in a subquery,
+     * so we wrap in another level with an alias.
+     */
+    private static final String DELETE_BY_STATUSES_MYSQL = """
             DELETE FROM %s
             WHERE event_id IN (
                 SELECT event_id FROM (
                     SELECT event_id
                     FROM %s
                     WHERE status IN (%s) AND updated_at < ?
-                    LIMIT ?
+                    ORDER BY updated_at ASC
+                    %s
                 ) AS cleanup_ids
             )
             """;
@@ -109,6 +137,7 @@ public class JdbcEventStore implements EventStore {
 
     private final DataSource dataSource;
     private final String tableName;
+    private final DatabaseDialect dialect;
     private final UuidType uuidType;
     private final String insertSql;
     private final String selectByStatusSql;
@@ -139,27 +168,38 @@ public class JdbcEventStore implements EventStore {
      * and schema initialization.
      */
     public JdbcEventStore(DataSource dataSource, String tableName, boolean autoInitSchema) {
-        this(dataSource, tableName, detectUuidType(dataSource), autoInitSchema);
+        this(dataSource, tableName, detectDialect(dataSource), UuidType.fromDialect(detectDialect(dataSource)), autoInitSchema);
     }
 
     /**
      * Creates a JdbcEventStore with an explicit UUID storage strategy, bypassing auto-detection.
+     * Dialect is auto-detected from the DataSource.
      * Package-private for testing purposes.
      */
     JdbcEventStore(DataSource dataSource, String tableName, UuidType uuidType) {
-        this(dataSource, tableName, uuidType, true);
+        this(dataSource, tableName, detectDialect(dataSource), uuidType, true);
     }
 
-    private JdbcEventStore(DataSource dataSource, String tableName, UuidType uuidType, boolean autoInitSchema) {
+    /**
+     * Creates a JdbcEventStore with explicit dialect and UUID strategy.
+     * Package-private for testing purposes.
+     */
+    JdbcEventStore(DataSource dataSource, String tableName, DatabaseDialect dialect, UuidType uuidType) {
+        this(dataSource, tableName, dialect, uuidType, true);
+    }
+
+    private JdbcEventStore(DataSource dataSource, String tableName, DatabaseDialect dialect,
+                            UuidType uuidType, boolean autoInitSchema) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
         this.tableName = Objects.requireNonNull(tableName, "tableName must not be null");
+        this.dialect = Objects.requireNonNull(dialect, "dialect must not be null");
         this.uuidType = Objects.requireNonNull(uuidType, "uuidType must not be null");
         this.insertSql = INSERT.formatted(tableName);
         this.selectByStatusSql = SELECT_BY_STATUS.formatted(tableName);
         this.selectByIdSql = SELECT_BY_ID.formatted(tableName);
         this.updateStatusOnlySql = UPDATE_STATUS_ONLY.formatted(tableName);
         this.updateStatusWithRetrySql = UPDATE_STATUS_WITH_RETRY.formatted(tableName);
-        var schemaInitializer = new SchemaInitializer(dataSource, tableName, uuidType);
+        var schemaInitializer = new SchemaInitializer(dataSource, tableName, dialect, uuidType);
         if (autoInitSchema) {
             schemaInitializer.ensureSchema();
         } else {
@@ -172,21 +212,13 @@ public class JdbcEventStore implements EventStore {
         return "db";
     }
 
-    private static UuidType detectUuidType(DataSource dataSource) {
+    private static DatabaseDialect detectDialect(DataSource dataSource) {
         try (Connection conn = dataSource.getConnection()) {
-            return detectUuidType(conn);
+            return DatabaseDialect.detect(conn);
         } catch (SQLException e) {
-            log.warn("Failed to detect database type, defaulting to BINARY(16) for UUID columns", e);
-            return UuidType.BINARY;
+            log.warn("Failed to detect database dialect, defaulting to PostgreSQL", e);
+            return DatabaseDialect.POSTGRESQL;
         }
-    }
-
-    private static UuidType detectUuidType(Connection conn) throws SQLException {
-        String name = conn.getMetaData().getDatabaseProductName().toLowerCase();
-        if (name.contains("postgresql") || name.contains("h2")) {
-            return UuidType.NATIVE;
-        }
-        return UuidType.BINARY;
     }
 
     private static void setOptionalString(PreparedStatement ps, int index, String value) throws SQLException {
@@ -283,7 +315,7 @@ public class JdbcEventStore implements EventStore {
     }
 
     private void setUpdateParameters(PreparedStatement ps, UUID eventId, EventStatus status,
-                                     String errorDetails) throws SQLException {
+                                      String errorDetails) throws SQLException {
         ps.setString(1, String.valueOf(status.getCode()));
         setOptionalString(ps, 2, errorDetails);
         ps.setTimestamp(3, Timestamp.from(Instant.now()), UTC);
@@ -311,7 +343,7 @@ public class JdbcEventStore implements EventStore {
             String placeholders = key.stream()
                     .map(s -> "?")
                     .collect(Collectors.joining(", "));
-            return SELECT_BY_STATUSES.formatted(tableName, placeholders);
+            return SELECT_BY_STATUSES_TEMPLATE.formatted(tableName, placeholders, dialect.limitClause());
         });
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -344,16 +376,20 @@ public class JdbcEventStore implements EventStore {
 
     @Override
     public int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
-        if (statuses.isEmpty()) {
+        if (statuses.isEmpty() || batchSize <= 0) {
             return 0;
         }
         String sql = deleteByStatusesCache.computeIfAbsent(Set.copyOf(statuses), key -> {
             String placeholders = key.stream()
                     .map(s -> "?")
                     .collect(Collectors.joining(", "));
-            return DELETE_BY_STATUSES.formatted(tableName, tableName, placeholders);
+            String template = dialect == DatabaseDialect.MYSQL
+                    ? DELETE_BY_STATUSES_MYSQL
+                    : DELETE_BY_STATUSES;
+            return template.formatted(tableName, tableName, placeholders, dialect.limitClause());
         });
-        try (Connection conn = dataSource.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
             setStatusCodes(ps, statuses);
             setBeforeTimestamp(ps, statuses.size() + 1, before);
             ps.setInt(statuses.size() + 2, batchSize);
@@ -414,7 +450,16 @@ public class JdbcEventStore implements EventStore {
 
     private static boolean isDuplicateKey(SQLException e) {
         String sqlState = e.getSQLState();
-        return SQLSTATE_UNIQUE_VIOLATION_POSTGRES.equals(sqlState)
-                || SQLSTATE_UNIQUE_VIOLATION_MYSQL.equals(sqlState);
+        if (sqlState == null) {
+            return false;
+        }
+        // SQL standard class "23" covers all integrity constraint violations,
+        // including unique constraint violations across all major databases:
+        //   - PostgreSQL: SQLSTATE 23505
+        //   - MySQL:      SQLSTATE 23000
+        //   - Oracle:     SQLSTATE 23000 (ORA-00001)
+        //   - SQL Server: SQLSTATE 23000 (error 2627)
+        //   - H2:         SQLSTATE 23505
+        return sqlState.startsWith("23");
     }
 }
