@@ -37,59 +37,57 @@ CREATE INDEX idx_event_store_service
 -- ============================================================================
 -- Extended properties (column/table comments for SQL Server)
 -- Adjust the schema name (@level0name) if it differs from 'dbo'.
--- Each EXEC must be a separate batch (separated by GO) in SSMS or sqlcmd.
 -- ============================================================================
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Event store for persistent event lifecycle tracking',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Unique event identifier',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'event_id';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Simple event class name (for display and queries)',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'event_type';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Originating service name for service-specific queries',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'service';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'JSON-serialized event body',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'payload';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Correlation or process identifier',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'process_id';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'status';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Number of retry attempts for failed events',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'retry_count';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Timestamp when the event was first stored',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'created_at';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Timestamp of the last status update',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'updated_at';
-GO
+
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Error description for failed events',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'error_details';
-GO
