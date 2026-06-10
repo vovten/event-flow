@@ -718,7 +718,7 @@ event-flow:
 
 The `EventStore` interface has two built-in implementations:
 
-- **`JdbcEventStore`** — production grade, backed by a relational database. Table is created automatically by default. A ready DDL script is shipped at `io/github/vovten/eventflow/lifecycle/store/db/event-store.sql` for manual migration tooling.
+- **`JdbcEventStore`** — production grade, backed by a relational database. Table is created automatically by default. Dialect-specific DDL scripts are shipped at `io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql` for manual migration tooling.
 - **`InMemoryEventStore`** — `ConcurrentHashMap`-backed, for testing and single-JVM scenarios where persistence is not needed.
 
 You can also implement `EventStore` with your own backend (Redis, MongoDB, etc.) and configure it via `store.type`.

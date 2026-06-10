@@ -67,9 +67,9 @@ event-flow:
         table-name: event_store
         # Automatically create the table on startup (requires DDL privileges)
         # Set to false in production and manage schema via Flyway/Liquibase.
-        # A ready-to-use DDL script is available in the classpath at:
-        #   io/github/vovten/eventflow/store/event-store.sql
-        auto-init-schema: true
+        # Dialect-specific DDL scripts are available in the classpath at:
+        #   io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql
+        auto-init-schema: false
 
       # Retry configuration for lifecycle event tracking
       retry:

@@ -265,7 +265,7 @@ public class EventFlowProperties {
              * Automatically create the table on startup (only for {@code type: "db"}).
              * Set to false in production and manage schema via Flyway/Liquibase.
              */
-            private boolean autoInitSchema = true;
+            private boolean autoInitSchema = false;
 
             public String getType() {
                 return type;

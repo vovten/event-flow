@@ -1,37 +1,34 @@
 -- ============================================================================
--- Event Store schema — for use with Flyway, Liquibase, or manual setup.
---
--- This script is shipped as a classpath resource. To disable automatic
--- schema initialization via application code, set:
---   event-flow.publisher.persistent.auto-init-schema: false
--- and manage this DDL through your regular migration tooling.
---
--- NOTE: The UUID column types below are for PostgreSQL (native UUID).
--- For other databases:
---   MySQL / SQL Server → BINARY(16)
---   Oracle             → RAW(16)
---   SQLite             → BLOB
--- The application auto-detects the database and adjusts DDL accordingly
--- when auto-init-schema is enabled.
+-- Event Store DDL — Oracle 12c+
+-- ============================================================================
+-- To disable automatic schema initialization via application code, set:
+--   event-flow.publisher.lifecycle.store.auto-init-schema: false
+-- and manage this DDL through Flyway, Liquibase, or your regular migration
+-- tooling.
+-- ============================================================================
+-- Notes:
+--   - UUID is stored as RAW(16) and converted via application code.
+--   - LOB columns use CLOB for large text payloads.
+--   - COMMENT ON COLUMN syntax is identical to PostgreSQL.
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS event_store (
-    event_id        UUID PRIMARY KEY,
-    event_type      VARCHAR(512) NOT NULL,
-    service         VARCHAR(255),
+CREATE TABLE event_store (
+    event_id        RAW(16) PRIMARY KEY,
+    event_type      VARCHAR2(512) NOT NULL,
+    service         VARCHAR2(255),
     status          CHAR(1) NOT NULL DEFAULT 'U',
-    payload         TEXT NOT NULL,
-    process_id      UUID,
+    payload         CLOB NOT NULL,
+    process_id      RAW(16),
     created_at      TIMESTAMP NOT NULL,
     updated_at      TIMESTAMP NOT NULL,
-    retry_count     INT DEFAULT 0 NOT NULL,
-    error_details   TEXT
+    retry_count     INTEGER DEFAULT 0 NOT NULL,
+    error_details   CLOB
 );
 
-CREATE INDEX IF NOT EXISTS idx_event_store_status
+CREATE INDEX idx_event_store_status
     ON event_store(status, updated_at);
 
-CREATE INDEX IF NOT EXISTS idx_event_store_service
+CREATE INDEX idx_event_store_service
     ON event_store(service);
 
 COMMENT ON TABLE event_store IS 'Event store for persistent event lifecycle tracking';

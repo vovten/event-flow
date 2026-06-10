@@ -1,0 +1,43 @@
+-- ============================================================================
+-- Event Store DDL — H2 (in-memory / file-based, typically used for testing)
+-- ============================================================================
+-- To disable automatic schema initialization via application code, set:
+--   event-flow.publisher.lifecycle.store.auto-init-schema: false
+-- and manage this DDL through Flyway, Liquibase, or your regular migration
+-- tooling.
+-- ============================================================================
+-- Notes:
+--   - H2 supports the native UUID type and COMMENT ON syntax (2.x).
+--   - UUID is handled as UUID via JDBC getObject/setObject.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS event_store (
+    event_id        UUID PRIMARY KEY,
+    event_type      VARCHAR(512) NOT NULL,
+    service         VARCHAR(255),
+    status          CHAR(1) NOT NULL DEFAULT 'U',
+    payload         TEXT NOT NULL,
+    process_id      UUID,
+    created_at      TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP NOT NULL,
+    retry_count     INT DEFAULT 0 NOT NULL,
+    error_details   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_store_status
+    ON event_store(status, updated_at);
+
+CREATE INDEX IF NOT EXISTS idx_event_store_service
+    ON event_store(service);
+
+COMMENT ON TABLE event_store IS 'Event store for persistent event lifecycle tracking';
+COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
+COMMENT ON COLUMN event_store.event_type IS 'Simple event class name (for display and queries)';
+COMMENT ON COLUMN event_store.service IS 'Originating service name for service-specific queries';
+COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
+COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
+COMMENT ON COLUMN event_store.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
+COMMENT ON COLUMN event_store.retry_count IS 'Number of retry attempts for failed events';
+COMMENT ON COLUMN event_store.created_at IS 'Timestamp when the event was first stored';
+COMMENT ON COLUMN event_store.updated_at IS 'Timestamp of the last status update';
+COMMENT ON COLUMN event_store.error_details IS 'Error description for failed events';

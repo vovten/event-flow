@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
  * via the {@link #JdbcEventStore(DataSource, String)} constructor.
  * Automatic schema initialization can be disabled via the
  * {@link #JdbcEventStore(DataSource, String, boolean)} constructor.
- * A ready-to-use DDL script is available as a classpath resource at
- * {@code io/github/vovten/eventflow/lifecycle/store/db/event-store.sql}.
+ * Dialect-specific DDL scripts are available as classpath resources at
+ * {@code io/github/vovten/eventflow/lifecycle/store/db/event-store-&lt;dialect&gt;.sql}.
  * <p>
  * The {@code event_id} and {@code process_id} column types adapt to the database:
  * <ul>

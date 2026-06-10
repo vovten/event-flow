@@ -137,8 +137,8 @@ class SchemaInitializer {
                 throw new IllegalStateException(
                         "Event store table '" + tableName + "' does not exist. " +
                         "Either set auto-init-schema: true to allow automatic table creation, " +
-                        "or create the table manually using the DDL script at: " +
-                        "io/github/vovten/eventflow/lifecycle/store/event-store.sql");
+                        "or create the table manually using the dialect-specific DDL script " +
+                        "at: io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql");
             }
             log.info("Event store table '{}' exists, auto-init-schema is disabled", tableName);
         } catch (SQLException e) {

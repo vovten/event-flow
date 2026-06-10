@@ -167,7 +167,7 @@ class LifecycleConfigurationTest {
         props.getPublisher().setEnabled(true);
         props.getPublisher().getLifecycle().setEnabled(true);
         props.getPublisher().getLifecycle().setServiceName("test-service");
-        // store.type defaults to "db"
+        props.getPublisher().getLifecycle().getStore().setAutoInitSchema(true);
         return props;
     }
 
