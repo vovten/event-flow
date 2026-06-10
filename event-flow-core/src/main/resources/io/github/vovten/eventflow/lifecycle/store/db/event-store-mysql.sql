@@ -26,8 +26,11 @@ CREATE TABLE IF NOT EXISTS event_store (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Event store for persistent event lifecycle tracking';
 
-CREATE INDEX IF NOT EXISTS idx_event_store_status
+-- Note: MySQL does not support IF NOT EXISTS for indexes.
+-- If the index already exists, run: DROP INDEX idx_event_store_status ON event_store;
+CREATE INDEX idx_event_store_status
     ON event_store(status, updated_at);
 
-CREATE INDEX IF NOT EXISTS idx_event_store_service
+-- If the index already exists, run: DROP INDEX idx_event_store_service ON event_store;
+CREATE INDEX idx_event_store_service
     ON event_store(service);
