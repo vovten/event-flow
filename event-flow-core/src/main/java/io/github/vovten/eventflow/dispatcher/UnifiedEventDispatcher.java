@@ -206,8 +206,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
             handler.onEvent(event);
             return HandlerResult.success(handler.name());
         } catch (Exception e) {
-            log.error("Handler {} failed for event {}: {}",
-                    handler.name(), event.type().getSimpleName(), e.getMessage(), e);
+            log.error("Handler {} failed for event {}", handler.name(), event.type().getSimpleName(), e);
             return HandlerResult.failure(handler.name(), e);
         } finally {
             if (acquired) {

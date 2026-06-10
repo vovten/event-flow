@@ -72,14 +72,12 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
             return;
         }
         if (error != null) {
-            String errorMessage = error.getMessage() != null
-                    ? error.getMessage()
-                    : error.getClass().getSimpleName();
-            publishFailedAck(event, originalService, errorMessage);
+            publishFailedAck(event, originalService, buildErrorChain(error));
             return;
         }
         if (hasHandlerFailures(results)) {
-            publishFailedAck(event, originalService, extractErrorSummary(results));
+            Throwable cause = results.getFirstError().orElse(null);
+            publishFailedAck(event, originalService, buildErrorChain(cause));
             return;
         }
         publishSuccessAck(event, originalService);
@@ -94,11 +92,31 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
         return results != null && !results.isEmpty() && !results.isAllSuccess();
     }
 
-    private String extractErrorSummary(HandlerResults results) {
-        return results.getFirstError()
-                .map(Throwable::getMessage)
-                .filter(Objects::nonNull)
-                .orElse("Handler execution failed");
+    /**
+     * Builds a condensed exception chain message from outermost to root cause.
+     * <p>
+     * Format: {@code [{ExceptionClass}] message → [{ExceptionClass}] message → [{RootClass}] root message}
+     *
+     * @param error the throwable to build chain from, may be null
+     * @return formatted chain message, never null
+     */
+    private String buildErrorChain(Throwable error) {
+        if (error == null) {
+            return "Handler execution failed";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Throwable t = error; t != null; t = t.getCause()) {
+            if (!sb.isEmpty()) {
+                sb.append(" → ");
+            }
+            String msg = t.getMessage();
+            if (msg != null) {
+                sb.append("[").append(t.getClass().getSimpleName()).append("] ").append(msg);
+            } else {
+                sb.append(t.getClass().getSimpleName());
+            }
+        }
+        return sb.toString();
     }
 
     private void publishSuccessAck(Event event, String originalService) {
