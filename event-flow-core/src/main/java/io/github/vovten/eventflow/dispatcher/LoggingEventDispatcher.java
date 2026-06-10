@@ -10,6 +10,8 @@ import org.slf4j.MDC;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -49,6 +51,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
     private final EventDispatcher origin;
     private final int maxPayloadLength;
     private final Set<String> excludedEvents;
+    private final Map<String, String> logLevels;
 
     /**
      * Create logging decorator with default settings.
@@ -57,7 +60,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin) {
-        this(origin, 1024, Collections.emptySet());
+        this(origin, 1024, Collections.emptySet(), Collections.emptyMap());
     }
 
     /**
@@ -68,7 +71,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin, int maxPayloadLength) {
-        this(origin, maxPayloadLength, Collections.emptySet());
+        this(origin, maxPayloadLength, Collections.emptySet(), Collections.emptyMap());
     }
 
     /**
@@ -80,9 +83,24 @@ public final class LoggingEventDispatcher implements EventDispatcher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin, int maxPayloadLength, Set<String> excludedEvents) {
+        this(origin, maxPayloadLength, excludedEvents, Collections.emptyMap());
+    }
+
+    /**
+     * Create logging decorator with full configuration.
+     *
+     * @param origin             the delegate dispatcher to wrap
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @param logLevels     per-event log level overrides (event simple class name → level name)
+     * @throws NullPointerException if origin is null
+     */
+    public LoggingEventDispatcher(EventDispatcher origin, int maxPayloadLength,
+                                  Set<String> excludedEvents, Map<String, String> logLevels) {
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.maxPayloadLength = maxPayloadLength;
         this.excludedEvents = Objects.requireNonNullElseGet(excludedEvents, Collections::emptySet);
+        this.logLevels = Objects.requireNonNullElseGet(logLevels, HashMap::new);
     }
 
     @Override
@@ -113,13 +131,31 @@ public final class LoggingEventDispatcher implements EventDispatcher {
                           long durationMs, Instant start,
                           String traceId, String spanId, String deliveredFrom) {
         String entry = buildLogEntry(event, results, error, durationMs, start, traceId, spanId, deliveredFrom);
+        String eventType = resolveEventType(event);
+        String overrideLevel = logLevels.get(eventType);
 
-        if (error != null || (results != null && results.isAllFailure())) {
+        if (overrideLevel != null) {
+            logAtLevel(entry, overrideLevel);
+        } else if (error != null || (results != null && results.isAllFailure())) {
             log.error(entry);
         } else if (results != null && results.isPartialSuccess()) {
             log.warn(entry);
         } else {
             log.info(entry);
+        }
+    }
+
+    private String resolveEventType(Event event) {
+        return EventLogUtils.extractPayload(event).getClass().getSimpleName();
+    }
+
+    private void logAtLevel(String entry, String levelName) {
+        switch (levelName.toUpperCase()) {
+            case "TRACE" -> log.trace(entry);
+            case "DEBUG" -> log.debug(entry);
+            case "WARN"  -> log.warn(entry);
+            case "ERROR" -> log.error(entry);
+            default      -> log.info(entry);
         }
     }
 

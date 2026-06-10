@@ -82,7 +82,8 @@ public class DispatcherConfiguration {
         var loggingConfig = properties.getDispatcher().getLogging();
         if (loggingConfig.isEnabled()) {
             builder.loggable(loggingConfig.getMaxPayloadLength(),
-                    Set.copyOf(loggingConfig.getExcludedEvents()));
+                    Set.copyOf(loggingConfig.getExcludedEvents()),
+                    loggingConfig.getLogLevels());
         }
         EventDispatcher dispatcher = builder.build();
 

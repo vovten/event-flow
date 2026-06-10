@@ -99,7 +99,8 @@ public class PublisherConfiguration {
         var loggingConfig = publisherConfig.getLogging();
         if (loggingConfig.isEnabled()) {
             builder.loggable(loggingConfig.getMaxPayloadLength(),
-                    Set.copyOf(loggingConfig.getExcludedEvents()));
+                    Set.copyOf(loggingConfig.getExcludedEvents()),
+                    loggingConfig.getLogLevels());
         }
 
         EventPublisher publisher = builder.build();

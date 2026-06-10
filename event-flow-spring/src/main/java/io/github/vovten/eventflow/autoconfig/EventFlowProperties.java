@@ -4,7 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Configuration properties for Event Flow auto-configuration.
@@ -466,6 +468,13 @@ public class EventFlowProperties {
          * Default: SuccessAck, FailureAck (lifecycle acknowledgment events).
          */
         private List<String> excludedEvents = new ArrayList<>(List.of("SuccessAck", "FailureAck"));
+        /**
+         * Per-event log level overrides.
+         * Key: event simple class name (e.g., "HeartbeatEvent").
+         * Value: log level name (DEBUG, INFO, WARN, ERROR).
+         * When set, overrides the default status-based log level for matching events.
+         */
+        private Map<String, String> logLevels = new HashMap<>();
 
         public boolean isEnabled() {
             return enabled;
@@ -489,6 +498,14 @@ public class EventFlowProperties {
 
         public void setExcludedEvents(List<String> excludedEvents) {
             this.excludedEvents = excludedEvents;
+        }
+
+        public Map<String, String> getLogLevels() {
+            return logLevels;
+        }
+
+        public void setLogLevels(Map<String, String> logLevels) {
+            this.logLevels = logLevels;
         }
     }
 

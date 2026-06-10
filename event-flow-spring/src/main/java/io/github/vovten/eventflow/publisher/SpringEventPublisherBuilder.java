@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -60,6 +61,7 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     private boolean loggable = false;
     private int logMaxPayloadLength = 500;
     private Set<String> logExcludedEventTypes = Collections.emptySet();
+    private Map<String, String> logLevels = Collections.emptyMap();
 
     /**
      * Start building a new SpringEventPublisher.
@@ -149,6 +151,24 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     }
 
     /**
+     * Enable logging of published events with custom max payload length, excluded event types,
+     * and per-event log level overrides.
+     *
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @param logLevels     per-event log level overrides (event simple class name → level name)
+     * @return this builder
+     */
+    public SpringEventPublisherBuilder loggable(int maxPayloadLength, Set<String> excludedEvents,
+                                                Map<String, String> logLevels) {
+        this.loggable = true;
+        this.logMaxPayloadLength = maxPayloadLength;
+        this.logExcludedEventTypes = excludedEvents;
+        this.logLevels = logLevels;
+        return this;
+    }
+
+    /**
      * Enable logging of published events at INFO level with default max payload length.
      *
      * @return this builder
@@ -164,7 +184,7 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
         if (loggable) {
             log.debug("Applying logging decorator with maxPayloadLength={}, excludedEvents={}",
                     logMaxPayloadLength, logExcludedEventTypes);
-            result = new LoggingEventPublisher(result, logMaxPayloadLength, logExcludedEventTypes);
+            result = new LoggingEventPublisher(result, logMaxPayloadLength, logExcludedEventTypes, logLevels);
         }
 
         if (transactional) {
