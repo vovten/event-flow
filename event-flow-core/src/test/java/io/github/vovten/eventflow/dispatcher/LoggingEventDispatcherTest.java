@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.dispatcher;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -194,13 +196,134 @@ class LoggingEventDispatcherTest {
         assertThat(log.path("deliveredFrom").isMissingNode()).isTrue();
     }
 
+    @Test
+    @DisplayName("Should suppress INFO when override is ERROR and all handlers succeed")
+    void shouldSuppressInfoWhenOverrideIsErrorAndAllSuccess() {
+        Map<String, String> logLevels = Map.of("TestPayload", "ERROR");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should log at ERROR when override is ERROR and all handlers fail")
+    void shouldLogAtErrorWhenOverrideIsErrorAndAllFail() {
+        Map<String, String> logLevels = Map.of("TestPayload", "ERROR");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(
+                        HandlerResult.failure("h1", "fail")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.ERROR);
+    }
+
+    @Test
+    @DisplayName("Should suppress INFO when override is WARN and all handlers succeed")
+    void shouldSuppressInfoWhenOverrideIsWarnAndAllSuccess() {
+        Map<String, String> logLevels = Map.of("TestPayload", "WARN");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should log at WARN when override is WARN and partial success")
+    void shouldLogAtWarnWhenOverrideIsWarnAndPartial() {
+        Map<String, String> logLevels = Map.of("TestPayload", "WARN");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(
+                        HandlerResult.success("h1"),
+                        HandlerResult.failure("h2", "fail")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.WARN);
+    }
+
+    @Test
+    @DisplayName("Should log at ERROR when override is WARN and all handlers fail")
+    void shouldLogAtErrorWhenOverrideIsWarnAndAllFail() {
+        Map<String, String> logLevels = Map.of("TestPayload", "WARN");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(
+                        HandlerResult.failure("h1", "fail")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.ERROR);
+    }
+
+    @Test
+    @DisplayName("Should log at INFO when override is INFO and all handlers succeed")
+    void shouldLogAtInfoWhenOverrideIsInfoAndAllSuccess() {
+        Map<String, String> logLevels = Map.of("TestPayload", "INFO");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.INFO);
+    }
+
+    @Test
+    @DisplayName("Should log at INFO when override is for different event type (not matching)")
+    void shouldLogWhenOverrideIsForDifferentEventType() {
+        Map<String, String> logLevels = Map.of("OtherEvent", "ERROR");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.INFO);
+    }
+
+    @Test
+    @DisplayName("Should suppress INFO when override is ERROR for @Event-annotated record")
+    void shouldSuppressInfoForEventAnnotatedRecord() {
+        Map<String, String> logLevels = Map.of("TestAnnotatedEvent", "ERROR");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestAnnotatedEvent> envelope = Envelope.of(new TestAnnotatedEvent(42L));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
+    }
+
     private static EventDispatcher dispatcherThatReturns(HandlerResults results) {
         return new FixedResultsDispatcher(results);
     }
 
     private JsonNode captureSingleLog() {
         assertThat(listAppender.list).isNotEmpty();
-        String json = listAppender.list.get(0).getFormattedMessage();
+        String json = listAppender.list.getFirst().getFormattedMessage();
         try {
             return MAPPER.readTree(json);
         } catch (Exception e) {
@@ -235,6 +358,11 @@ class LoggingEventDispatcherTest {
             return Instant.now();
         }
     }
+
+    record TestPayload(String value) {}
+
+    @io.github.vovten.eventflow.event.annotation.Event()
+    record TestAnnotatedEvent(long id) {}
 
     private static class FixedResultsDispatcher implements EventDispatcher {
         private final HandlerResults results;

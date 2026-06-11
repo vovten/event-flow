@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.publisher;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,7 +19,9 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -228,15 +231,114 @@ class LoggingEventPublisherTest {
         assertThat(loggedTimestamp).isBetween(before, after);
     }
 
+    @Test
+    @DisplayName("Should suppress INFO when override is ERROR and all sends succeed")
+    void shouldSuppressInfoWhenOverrideIsErrorAndAllSuccess() {
+        Map<String, String> logLevels = Map.of("TestPayload", "ERROR");
+        LoggingEventPublisher underTest = new LoggingEventPublisher(
+                e -> CompletableFuture.completedFuture(SendResults.of(List.of(
+                        SendResult.success("ch1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.publish(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should log at ERROR when override is ERROR and all sends fail")
+    void shouldLogAtErrorWhenOverrideIsErrorAndAllFail() {
+        Map<String, String> logLevels = Map.of("TestPayload", "ERROR");
+        LoggingEventPublisher underTest = new LoggingEventPublisher(
+                e -> CompletableFuture.completedFuture(SendResults.of(List.of(
+                        SendResult.failure("ch1", "timeout")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.publish(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.ERROR);
+    }
+
+    @Test
+    @DisplayName("Should suppress INFO when override is WARN and all sends succeed")
+    void shouldSuppressInfoWhenOverrideIsWarnAndAllSuccess() {
+        Map<String, String> logLevels = Map.of("TestPayload", "WARN");
+        LoggingEventPublisher underTest = new LoggingEventPublisher(
+                e -> CompletableFuture.completedFuture(SendResults.of(List.of(
+                        SendResult.success("ch1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.publish(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should log at WARN when override is WARN and partial success")
+    void shouldLogAtWarnWhenOverrideIsWarnAndPartial() {
+        Map<String, String> logLevels = Map.of("TestPayload", "WARN");
+        LoggingEventPublisher underTest = new LoggingEventPublisher(
+                e -> CompletableFuture.completedFuture(SendResults.of(List.of(
+                        SendResult.success("ch1"),
+                        SendResult.failure("ch2", "fail")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.publish(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.WARN);
+    }
+
+    @Test
+    @DisplayName("Should log at ERROR when override is WARN and all sends fail")
+    void shouldLogAtErrorWhenOverrideIsWarnAndAllFail() {
+        Map<String, String> logLevels = Map.of("TestPayload", "WARN");
+        LoggingEventPublisher underTest = new LoggingEventPublisher(
+                e -> CompletableFuture.completedFuture(SendResults.of(List.of(
+                        SendResult.failure("ch1", "fail")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.publish(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.ERROR);
+    }
+
+    @Test
+    @DisplayName("Should suppress INFO when override is ERROR for @Event-annotated record")
+    void shouldSuppressInfoForEventAnnotatedRecord() {
+        Map<String, String> logLevels = Map.of("TestAnnotatedEvent", "ERROR");
+        LoggingEventPublisher underTest = new LoggingEventPublisher(
+                e -> CompletableFuture.completedFuture(SendResults.of(List.of(
+                        SendResult.success("ch1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestAnnotatedEvent> envelope = Envelope.of(new TestAnnotatedEvent(42L));
+        underTest.publish(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
+    }
+
     private JsonNode captureSingleLog() {
         assertThat(listAppender.list).isNotEmpty();
-        String json = listAppender.list.get(0).getFormattedMessage();
+        String json = listAppender.list.getFirst().getFormattedMessage();
         try {
             return MAPPER.readTree(json);
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse log JSON: " + json, e);
         }
     }
+
+    record TestPayload(String value) {}
+
+    @io.github.vovten.eventflow.event.annotation.Event(channels = InternalEventChannel.class)
+    record TestAnnotatedEvent(long id) {}
 
     record TestTraceableEvent() implements TraceableEvent {
         @Override

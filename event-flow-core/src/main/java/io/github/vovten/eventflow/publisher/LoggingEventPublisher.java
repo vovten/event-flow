@@ -130,12 +130,15 @@ public final class LoggingEventPublisher implements EventPublisher {
         String entry = buildLogEntry(event, result, error, start, traceId, spanId, deliveredFrom);
         String eventType = resolveEventType(event);
         String overrideLevel = logLevels.get(eventType);
+        boolean isError = error != null || (result != null && result.isAllFailure());
+        boolean isWarn = !isError && result != null && result.isPartialSuccess();
 
-        if (overrideLevel != null) {
-            logAtLevel(entry, overrideLevel);
-        } else if (error != null || (result != null && result.isAllFailure())) {
+        if (overrideLevel != null && !isLoggable(isError, isWarn, overrideLevel)) {
+            return;
+        }
+        if (isError) {
             log.error(entry);
-        } else if (result != null && result.isPartialSuccess()) {
+        } else if (isWarn) {
             log.warn(entry);
         } else {
             log.info(entry);
@@ -146,14 +149,14 @@ public final class LoggingEventPublisher implements EventPublisher {
         return EventLogUtils.extractPayload(event).getClass().getSimpleName();
     }
 
-    private void logAtLevel(String entry, String levelName) {
-        switch (levelName.toUpperCase()) {
-            case "TRACE" -> log.trace(entry);
-            case "DEBUG" -> log.debug(entry);
-            case "WARN"  -> log.warn(entry);
-            case "ERROR" -> log.error(entry);
-            default      -> log.info(entry);
-        }
+    private static boolean isLoggable(boolean isError, boolean isWarn, String minLevel) {
+        int natural = isError ? 3 : isWarn ? 2 : 1;
+        int min = switch (minLevel.toUpperCase()) {
+            case "ERROR" -> 3;
+            case "WARN"  -> 2;
+            default      -> 1; // INFO, DEBUG, TRACE — log everything
+        };
+        return natural >= min;
     }
 
     private String buildLogEntry(Event event, SendResults result, Throwable error,
