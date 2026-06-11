@@ -6,7 +6,6 @@ import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.publisher.EventPublisher;
-import io.github.vovten.eventflow.util.EventUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,16 +40,30 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
 
     private final EventDispatcher origin;
     private final EventPublisher ackPublisher;
+    private final LifecycleResolver lifecycleResolver;
 
     /**
-     * Creates a new EventLifecycleDispatcher.
+     * Creates a new EventLifecycleDispatcher with the standard lifecycle resolver.
      *
      * @param origin       the dispatcher to delegate to
      * @param ackPublisher the publisher for sending acknowledgment events
      */
     public EventLifecycleDispatcher(EventDispatcher origin, EventPublisher ackPublisher) {
+        this(origin, ackPublisher, LifecycleResolver.standard());
+    }
+
+    /**
+     * Creates a new EventLifecycleDispatcher with a custom lifecycle resolver.
+     *
+     * @param origin            the dispatcher to delegate to
+     * @param ackPublisher      the publisher for sending acknowledgment events
+     * @param lifecycleResolver the lifecycle resolver strategy (must not be null)
+     */
+    public EventLifecycleDispatcher(EventDispatcher origin, EventPublisher ackPublisher,
+                                     LifecycleResolver lifecycleResolver) {
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.ackPublisher = Objects.requireNonNull(ackPublisher, "ackPublisher must not be null");
+        this.lifecycleResolver = Objects.requireNonNull(lifecycleResolver, "lifecycleResolver must not be null");
     }
 
     @Override
@@ -85,7 +98,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
 
     private boolean shouldSkipLifecycleAck(Event event) {
         return !(event instanceof TraceableEvent)
-                || EventUtils.lifecycle(event) != EventLifecycle.MANAGED;
+                || lifecycleResolver.resolve(event) != EventLifecycle.MANAGED;
     }
 
     private boolean hasHandlerFailures(HandlerResults results) {

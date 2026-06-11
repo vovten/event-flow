@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.lifecycle.EventLifecycle;
+import io.github.vovten.eventflow.lifecycle.LifecycleResolver;
 import io.github.vovten.eventflow.serialization.EventSerializationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -82,62 +83,64 @@ class EventUtilsTest {
     }
 
     // ---------------------------------------------------------------
-    // lifecycle — verify EventUtils and Envelope agree
+    // lifecycle — verify LifecycleResolver and Envelope agree
     // ---------------------------------------------------------------
 
     @Nested
     @DisplayName("lifecycle resolution")
     class LifecycleResolution {
 
+        private final LifecycleResolver resolver = LifecycleResolver.standard();
+
         @Test
-        @DisplayName("EventUtils and Envelope agree for MANAGED lifecycle")
+        @DisplayName("LifecycleResolver and Envelope agree for MANAGED lifecycle")
         void managedLifecycle() {
             var payload = new ManagedPayload();
             Envelope<ManagedPayload> env = Envelope.of(payload);
 
-            assertThat(EventUtils.lifecycle(env))
+            assertThat(resolver.resolve(env))
                     .isEqualTo(env.lifecycle())
                     .isEqualTo(EventLifecycle.MANAGED);
         }
 
         @Test
-        @DisplayName("EventUtils and Envelope agree for PERSISTED lifecycle")
+        @DisplayName("LifecycleResolver and Envelope agree for PERSISTED lifecycle")
         void persistedLifecycle() {
             var payload = new PersistedPayload();
             Envelope<PersistedPayload> env = Envelope.of(payload);
 
-            assertThat(EventUtils.lifecycle(env))
+            assertThat(resolver.resolve(env))
                     .isEqualTo(env.lifecycle())
                     .isEqualTo(EventLifecycle.PERSISTED);
         }
 
         @Test
-        @DisplayName("EventUtils and Envelope agree for NONE lifecycle")
+        @DisplayName("LifecycleResolver and Envelope agree for NONE lifecycle")
         void noneLifecycle() {
             var payload = new NonePayload();
             Envelope<NonePayload> env = Envelope.of(payload);
 
-            assertThat(EventUtils.lifecycle(env))
+            assertThat(resolver.resolve(env))
                     .isEqualTo(env.lifecycle())
                     .isEqualTo(EventLifecycle.NONE);
         }
 
         @Test
-        @DisplayName("EventUtils and Envelope agree for Event without annotation (default PERSISTED)")
+        @DisplayName("LifecycleResolver and Envelope agree for Event without annotation (default PERSISTED)")
         void eventWithoutAnnotation() {
             Envelope<SimpleEvent> env = Envelope.of(new SimpleEvent("id", 1));
 
-            assertThat(EventUtils.lifecycle(env))
+            assertThat(resolver.resolve(env))
                     .isEqualTo(env.lifecycle())
                     .isEqualTo(EventLifecycle.PERSISTED);
         }
 
         @Test
-        @DisplayName("EventUtils and Envelope agree for POJO without annotation (default PERSISTED)")
+        @DisplayName("LifecycleResolver and Envelope agree for POJO without annotation (default PERSISTED)")
         void pojoWithoutAnnotation() {
             Envelope<NoAnnotationPayload> env = Envelope.of(new NoAnnotationPayload());
 
-            assertThat(EventUtils.lifecycle(env))
+            assertThat(resolver.resolve(env))
                     .isEqualTo(env.lifecycle())
                     .isEqualTo(EventLifecycle.PERSISTED);
         }

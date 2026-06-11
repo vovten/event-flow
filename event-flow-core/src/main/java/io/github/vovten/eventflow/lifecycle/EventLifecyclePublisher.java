@@ -49,18 +49,33 @@ public final class EventLifecyclePublisher implements EventPublisher {
     private final String service;
     private final EventPublisher origin;
     private final EventStore eventStore;
+    private final LifecycleResolver lifecycleResolver;
 
     /**
-     * Creates a new EventLifecyclePublisher.
+     * Creates a new EventLifecyclePublisher with the standard lifecycle resolver.
      *
      * @param origin     the underlying publisher to delegate to
      * @param eventStore the event store for persistence
      * @param service    the service name for ack filtering, or null/empty to disable
      */
     public EventLifecyclePublisher(EventPublisher origin, EventStore eventStore, String service) {
+        this(origin, eventStore, service, LifecycleResolver.standard());
+    }
+
+    /**
+     * Creates a new EventLifecyclePublisher with a custom lifecycle resolver.
+     *
+     * @param origin            the underlying publisher to delegate to
+     * @param eventStore        the event store for persistence
+     * @param service           the service name for ack filtering, or null/empty to disable
+     * @param lifecycleResolver the lifecycle resolver strategy (must not be null)
+     */
+    public EventLifecyclePublisher(EventPublisher origin, EventStore eventStore, String service,
+                                    LifecycleResolver lifecycleResolver) {
         this.service = service;
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
+        this.lifecycleResolver = Objects.requireNonNull(lifecycleResolver, "lifecycleResolver must not be null");
     }
 
     @Override
@@ -72,7 +87,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
         }
         Event enriched = enrichWithService(event);
         UUID eventId = resolveEventId(enriched);
-        EventLifecycle lifecycle = EventUtils.lifecycle(event);
+        EventLifecycle lifecycle = lifecycleResolver.resolve(event);
 
         if (lifecycle == EventLifecycle.PERSISTED) {
             // Persist with UNDEFINED status, no further tracking
@@ -90,7 +105,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
             log.trace("Skipping persistence for lifecycle ack event: {}", event);
             return true;
         }
-        EventLifecycle lifecycle = EventUtils.lifecycle(event);
+        EventLifecycle lifecycle = lifecycleResolver.resolve(event);
         if (lifecycle == EventLifecycle.NONE) {
             log.trace("Skipping persistence for NONE lifecycle event: {}", event);
             return true;
