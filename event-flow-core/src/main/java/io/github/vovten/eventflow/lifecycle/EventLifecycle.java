@@ -8,7 +8,7 @@ package io.github.vovten.eventflow.lifecycle;
  * ({@code SuccessAck} / {@code FailureAck}) are generated.
  *
  * @author Vladimir Aleshkov
- * @since 1.3.0
+ * @since 1.2.0
  */
 public enum EventLifecycle {
 

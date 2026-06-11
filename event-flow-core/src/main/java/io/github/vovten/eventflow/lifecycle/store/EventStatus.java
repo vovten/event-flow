@@ -21,7 +21,7 @@ import java.util.Arrays;
  * The codes are mnemonic first letters of the status names for readability in DB dumps.
  *
  * @author Vladimir Aleshkov
- * @since 1.3.0
+ * @since 1.2.0
  */
 public enum EventStatus {
 

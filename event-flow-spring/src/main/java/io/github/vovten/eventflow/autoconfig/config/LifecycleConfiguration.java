@@ -48,7 +48,7 @@ import java.util.List;
  * when lifecycle-aware publishing is enabled.
  *
  * @author Vladimir Aleshkov
- * @since 1.3.0
+ * @since 1.2.0
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "event-flow.publisher.lifecycle", name = "enabled", havingValue = "true")

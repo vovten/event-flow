@@ -35,7 +35,7 @@ import static org.springframework.test.context.support.TestPropertySourceUtils.a
 /**
  * Tests for {@link LifecycleConfiguration}.
  *
- * @since 1.3.0
+ * @since 1.2.0
  */
 class LifecycleConfigurationTest {
 

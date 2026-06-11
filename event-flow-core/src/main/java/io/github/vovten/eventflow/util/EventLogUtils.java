@@ -14,7 +14,7 @@ import java.time.Instant;
  * JSON-structured log entries for event operations.
  *
  * @author Vladimir Aleshkov
- * @since 1.3.0
+ * @since 1.2.0
  */
 public final class EventLogUtils {
 

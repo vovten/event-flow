@@ -13,7 +13,7 @@ import static java.util.stream.Collectors.toList;
  * is not required.
  *
  * @author Vladimir Aleshkov
- * @since 1.3.0
+ * @since 1.2.0
  */
 public class InMemoryEventStore implements EventStore {
 
