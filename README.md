@@ -427,6 +427,10 @@ EventPublisher publisher = EventPublisherBuilder.create(internalChannel, externa
 | `withDecorator(fn)` | Add custom decorator to the publisher chain |
 | `build()` | Build the publisher |
 | `buildAndLog()` | Build the publisher and log the configuration |
+| `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
+| `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
+| `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
 
 ### EventDispatcher
 
@@ -455,6 +459,10 @@ public interface EventDispatcher {
 | `withDecorator(fn)` | Add custom decorator |
 | `build()` | Build the dispatcher |
 | `buildAndLog()` | Build the dispatcher and log the configuration |
+| `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
+| `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
+| `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
 
 ### EventHandlerRegistry
 
@@ -1004,6 +1012,77 @@ Kafka transport for external event communication. See [event-flow-core/README.md
 ### Custom Transport
 
 Implement `OutTransport` or `InTransport` interfaces to add custom transport types. See [event-flow-core/README.md](event-flow-core/README.md#custom-transport) for an example.
+
+## 🔊 Structured Logging
+
+Event Flow provides structured JSON logging decorators for both the publisher and the dispatcher. Each log entry captures: event status, envelope metadata (eventId, processId, occurredAt), payload (truncated), handler/transport results, duration, and distributed tracing context (traceId, spanId, deliveredFrom).
+
+### Enabling Logging
+
+Use `buildAndLog()` or the `loggable()` builder methods:
+
+```java
+// Publisher
+EventPublisher publisher = EventPublisherBuilder.create(channel)
+    .loggable()                                    // defaults: 1024 char payload
+    .loggable(500)                                 // custom payload truncation
+    .loggable(500, Set.of("HeartbeatEvent"))       // exclude noisy events
+    .loggable(500, Set.of(), Map.of("HeartbeatEvent", "ERROR"))  // with log overrides
+    .build();
+
+// Dispatcher
+EventDispatcher dispatcher = EventDispatcherBuilder.create()
+    .executor(executor)
+    .handlerRegistry(registry)
+    .loggable()
+    .build();
+```
+
+### Per-Event Log Level Overrides
+
+By default, log level is determined by the outcome:
+
+| Outcome | Default level |
+|---------|---------------|
+| All handlers/transports succeed | `INFO` |
+| Partial success (some fail) | `WARN` |
+| All fail or exception | `ERROR` |
+
+With `logLevels` you can override the minimum log level for specific event types. The override acts as a **threshold**:
+
+| Override | ERROR outcome | WARN outcome | INFO outcome |
+|----------|:------------:|:------------:|:------------:|
+| `ERROR`  | `log.error`  | suppressed   | suppressed   |
+| `WARN`   | `log.error`  | `log.warn`   | suppressed   |
+| `INFO`   | `log.error`  | `log.warn`   | `log.info`   |
+
+**Example:** Suppress logging for a high-frequency heartbeat event, only show errors:
+
+```yaml
+event-flow:
+  dispatcher:
+    logging:
+      enabled: true
+      log-levels:
+        HeartbeatEvent: ERROR
+        HealthCheckEvent: WARN
+```
+
+In Spring Boot, these settings go into `event-flow.yml` or `application.yml`. When using the builder directly (without Spring), pass the map via `loggable(maxPayloadLength, excludedEvents, logLevels)`:
+
+```java
+Map<String, String> logLevels = Map.of(
+    "HeartbeatEvent", "ERROR",
+    "HealthCheckEvent", "WARN"
+);
+EventDispatcher dispatcher = EventDispatcherBuilder.create()
+    .executor(executor)
+    .handlerRegistry(registry)
+    .loggable(1024, Set.of(), logLevels)
+    .build();
+```
+
+Valid level names: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`.
 
 ## 📊 Interaction Diagrams
 
