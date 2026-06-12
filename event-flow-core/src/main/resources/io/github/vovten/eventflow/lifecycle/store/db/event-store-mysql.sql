@@ -15,7 +15,7 @@
 CREATE TABLE IF NOT EXISTS event_store (
     event_id        BINARY(16) PRIMARY KEY COMMENT 'Unique event identifier',
     event_type      VARCHAR(512) NOT NULL COMMENT 'Simple event class name (for display and queries)',
-    service         VARCHAR(255) COMMENT 'Originating service name for service-specific queries',
+    service         VARCHAR(255) COMMENT 'Service that published the event',
     status          CHAR(1) NOT NULL DEFAULT 'U' COMMENT 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED',
     payload         TEXT NOT NULL COMMENT 'JSON-serialized event body',
     process_id      BINARY(16) COMMENT 'Correlation or process identifier',

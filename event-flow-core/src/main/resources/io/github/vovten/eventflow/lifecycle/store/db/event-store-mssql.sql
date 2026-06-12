@@ -54,7 +54,7 @@ EXEC sys.sp_addextendedproperty
     @level2type=N'COLUMN', @level2name=N'event_type';
 
 EXEC sys.sp_addextendedproperty
-    @name=N'MS_Description', @value=N'Originating service name for service-specific queries',
+    @name=N'MS_Description', @value=N'Service that published the event',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'service';
 

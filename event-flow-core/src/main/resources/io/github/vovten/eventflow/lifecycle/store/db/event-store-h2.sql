@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_event_store_service
 COMMENT ON TABLE event_store IS 'Event store for persistent event lifecycle tracking';
 COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
 COMMENT ON COLUMN event_store.event_type IS 'Simple event class name (for display and queries)';
-COMMENT ON COLUMN event_store.service IS 'Originating service name for service-specific queries';
+COMMENT ON COLUMN event_store.service IS 'Service that published the event';
 COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
 COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
 COMMENT ON COLUMN event_store.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
