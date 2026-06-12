@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import static io.github.vovten.eventflow.lifecycle.store.EventStatus.FAILED;
+import static io.github.vovten.eventflow.lifecycle.store.EventStatus.HANDLED;
+
 /**
  * Processes acknowledgment events ({@link SuccessAck} and {@link FailureAck})
  * and updates the corresponding event status in the {@link EventStore}.
@@ -31,18 +34,18 @@ public final class AckHandler implements EventSubscriber {
 
     private static final Logger log = LoggerFactory.getLogger(AckHandler.class);
 
+    private final String serviceName;
     private final EventStore eventStore;
-    private final String service;
 
     /**
      * Creates a new AckHandler.
      *
      * @param eventStore the event store to update
-     * @param service    the local service name for ack filtering, or empty to accept all acks
+     * @param serviceName    the local service name for ack filtering, or empty to accept all acks
      */
-    public AckHandler(EventStore eventStore, String service) {
+    public AckHandler(EventStore eventStore, String serviceName) {
+        this.serviceName = serviceName;
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
-        this.service = service;
     }
 
     @Override
@@ -52,47 +55,45 @@ public final class AckHandler implements EventSubscriber {
 
     @Override
     public void onEvent(Event event) {
-        if (!(event instanceof LifecycleAckEvent ack)) {
-            return;
-        }
-        if (StringUtils.isNotEmpty(service) && !matchesService(ack)) {
-            log.trace("Skipping ack for foreign service (local: {})", service);
-            return;
-        }
-        switch (ack) {
+        switch (event) {
             case SuccessAck successAck -> handle(successAck);
             case FailureAck failureAck -> handle(failureAck);
-            default -> log.warn("Unknown lifecycle ack event type: {}", ack.getClass().getName());
+            default -> log.trace("Ignoring non-ack event: {}", event);
         }
     }
 
-    private void handle(SuccessAck successAck) {
-        UUID originalEventId = successAck.originalEventId();
+    private void handle(SuccessAck ack) {
+        updateEventStatus(ack.originalEventId(), ack.eventType(), ack.originalService(), HANDLED, null);
+    }
+
+    private void handle(FailureAck ack) {
+        updateEventStatus(ack.originalEventId(), ack.eventType(), ack.originalService(), FAILED, ack.error());
+    }
+
+    private void updateEventStatus(UUID originalEventId, String eventType, String originalService,
+                                    EventStatus status, String error) {
+        if (shouldSkipForForeignService(originalService)) {
+            return;
+        }
         try {
-            eventStore.updateStatus(originalEventId, EventStatus.HANDLED, null);
-            log.debug("Event handled successfully: {} ({})", originalEventId, successAck.eventType());
+            eventStore.updateStatus(originalEventId, status, error);
+            log.debug("Event {} status updated to {}: {} ({})",
+                    status == HANDLED ? "handled" : "failed",
+                    status, originalEventId, eventType);
         } catch (Exception e) {
-            log.error("Failed to update event status to HANDLED for {}", originalEventId, e);
+            log.error("Failed to update event status to {} for {}", status, originalEventId, e);
         }
     }
 
-    private void handle(FailureAck failureAck) {
-        UUID originalEventId = failureAck.originalEventId();
-        try {
-            eventStore.updateStatus(originalEventId, EventStatus.FAILED, failureAck.error());
-            log.debug("Event handling failed: {} ({})", originalEventId, failureAck.eventType());
-        } catch (Exception e) {
-            log.error("Failed to update event status to FAILED for {}", originalEventId, e);
+    private boolean shouldSkipForForeignService(String ackService) {
+        if (StringUtils.isEmpty(serviceName)) {
+            return false;
         }
-    }
-
-    private boolean matchesService(LifecycleAckEvent ack) {
-        String ackService = switch (ack) {
-            case SuccessAck successAck -> successAck.originalService();
-            case FailureAck failureAck -> failureAck.originalService();
-            default -> null;
-        };
-        return service.equals(ackService);
+        if (!serviceName.equals(ackService)) {
+            log.trace("Skipping ack for foreign service (local: {})", serviceName);
+            return true;
+        }
+        return false;
     }
 
     @Override
