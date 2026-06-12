@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.lifecycle.store.db;
 
+import io.github.vovten.eventflow.lifecycle.store.db.dialect.SqlDialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,7 +19,7 @@ import java.sql.*;
  * @author Vladimir Aleshkov
  * @since 1.3.2
  */
-class SchemaInitializer {
+public class SchemaInitializer {
 
     private static final Logger log = LoggerFactory.getLogger(SchemaInitializer.class);
 
@@ -52,7 +53,7 @@ class SchemaInitializer {
 
     private final DataSource dataSource;
     private final String tableName;
-    private final DatabaseDialect dialect;
+    private final SqlDialect sqlDialect;
     private final UuidType uuidType;
 
     /**
@@ -60,13 +61,13 @@ class SchemaInitializer {
      *
      * @param dataSource the JDBC DataSource
      * @param tableName  the name of the event store table
-     * @param dialect    the database dialect for DDL type mapping
+     * @param sqlDialect the SQL dialect for DDL type mapping
      * @param uuidType   the UUID storage strategy
      */
-    SchemaInitializer(DataSource dataSource, String tableName, DatabaseDialect dialect, UuidType uuidType) {
+    public SchemaInitializer(DataSource dataSource, String tableName, SqlDialect sqlDialect, UuidType uuidType) {
         this.dataSource = dataSource;
         this.tableName = tableName;
-        this.dialect = dialect;
+        this.sqlDialect = sqlDialect;
         this.uuidType = uuidType;
     }
 
@@ -83,7 +84,7 @@ class SchemaInitializer {
     public void ensureSchema() {
         try (Connection conn = dataSource.getConnection()) {
             if (!tableExists(conn, tableName)) {
-                String ddl = buildCreateTableSql(dialect, uuidType).formatted(tableName);
+                String ddl = buildCreateTableSql(sqlDialect, uuidType).formatted(tableName);
                 String baseName = tableBase(tableName);
                 String statusIndexName = INDEX_NAME.formatted(baseName);
                 String createStatusIndexSql = CREATE_INDEX.formatted(statusIndexName, tableName);
@@ -164,10 +165,10 @@ class SchemaInitializer {
         }
     }
 
-    private String buildCreateTableSql(DatabaseDialect dialect, UuidType uuidType) {
+    private String buildCreateTableSql(SqlDialect sqlDialect, UuidType uuidType) {
         String uuidDdl = uuidType == UuidType.NATIVE ? "UUID" : "BINARY(16)";
-        String textDdl = dialect.textType();
-        String tsDdl = dialect.timestampType();
+        String textDdl = sqlDialect.textType();
+        String tsDdl = sqlDialect.timestampType();
         return """
                 CREATE TABLE %%s (
                     event_id        %s PRIMARY KEY,
@@ -198,7 +199,7 @@ class SchemaInitializer {
         }
     }
 
-    private static String tableBase(String fullName) {
+    private String tableBase(String fullName) {
         int dot = fullName.indexOf('.');
         return dot > 0 ? fullName.substring(dot + 1) : fullName;
     }
