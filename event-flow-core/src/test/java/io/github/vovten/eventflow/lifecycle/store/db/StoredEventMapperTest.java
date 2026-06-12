@@ -59,6 +59,7 @@ class StoredEventMapperTest {
                         created_at      TIMESTAMP NOT NULL,
                         updated_at      TIMESTAMP NOT NULL,
                         retry_count     INT DEFAULT 0 NOT NULL,
+                        retry           BOOLEAN DEFAULT FALSE NOT NULL,
                         error_details   TEXT
                     )
                     """);
@@ -166,18 +167,18 @@ class StoredEventMapperTest {
         UUID eventId = UUID.randomUUID();
         Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         StoredEvent event = new StoredEvent(eventId, "test.TestEvent", "my-service",
-                "{\"key\":\"value\"}", null, EventStatus.NEW, 0, now, now, null);
+                "{\"key\":\"value\"}", null, EventStatus.NEW, 0, false, now, now, null);
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO event_store (event_id, event_type, service, payload, process_id, status, retry_count, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                        "INSERT INTO event_store (event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             mapper.setInsertParameters(ps, event);
             ps.executeUpdate();
         }
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "SELECT event_id, event_type, service, payload, process_id, status, retry_count, created_at, updated_at, error_details FROM event_store WHERE event_id = ?")) {
+                        "SELECT event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details FROM event_store WHERE event_id = ?")) {
             mapper.setUuid(ps, 1, eventId);
             StoredEvent read;
             try (ResultSet rs = ps.executeQuery()) {
@@ -195,6 +196,7 @@ class StoredEventMapperTest {
             assertThat(read.createdAt()).isNotNull();
             assertThat(read.updatedAt()).isNotNull();
             assertThat(read.errorDetails()).isNull();
+            assertThat(read.retry()).isFalse();
         }
     }
 
@@ -208,7 +210,7 @@ class StoredEventMapperTest {
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO event_store (event_id, event_type, service, payload, process_id, status, retry_count, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                        "INSERT INTO event_store (event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             mapper.setInsertParameters(ps, event);
             ps.executeUpdate();
         }
@@ -327,7 +329,7 @@ class StoredEventMapperTest {
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "SELECT event_id, event_type, service, payload, process_id, status, retry_count, created_at, updated_at, error_details FROM event_store ORDER BY created_at ASC")) {
+                        "SELECT event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details FROM event_store ORDER BY created_at ASC")) {
             List<StoredEvent> results = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {

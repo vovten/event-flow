@@ -98,6 +98,54 @@ public interface SqlDialect {
     String selectByStatusesStatement(int statusCount);
 
     /**
+     * SELECT for events eligible for retry: matching any of the given statuses
+     * <b>or</b> having the manual retry flag set ({@code retry = TRUE}),
+     * with an updated-at cutoff and limit.
+     * <p>
+     * This is a unified replacement for separate status-based and retry-flag
+     * queries. The caller can distinguish retry-flagged events by checking
+     * {@code retry} — those bypass maxRetries/backoff checks.
+     *
+     * @param statusCount number of status values for the IN clause
+     * @return SELECT SQL with placeholders for statuses, cutoff, and limit
+     */
+    default String selectRetryableEventsStatement(int statusCount) {
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < statusCount; i++) {
+            if (i > 0) placeholders.append(", ");
+            placeholders.append("?");
+        }
+        String template = """
+                SELECT event_id, event_type, service, payload, process_id,
+                       status, retry_count, retry, created_at, updated_at, error_details
+                FROM %%s
+                WHERE (status IN (%s) OR retry = TRUE)
+                  AND updated_at < ?
+                ORDER BY updated_at ASC
+                %s
+                """;
+        return String.format(template, placeholders.toString(), limitClause());
+    }
+
+    /**
+     * UPDATE to mark an event for manual retry.
+     * <p>
+     * Sets {@code retry = TRUE}, clears error details, and updates the timestamp.
+     * Does NOT change the event status or retry count — the existing status
+     * is preserved. The retry scheduler picks up the event by the {@code retry}
+     * flag regardless of its current status.
+     *
+     * @return UPDATE SQL with placeholders for updated_at and event_id
+     */
+    default String markForRetryStatement() {
+        return """
+                UPDATE %s
+                SET retry = TRUE, error_details = NULL, updated_at = ?
+                WHERE event_id = ?
+                """;
+    }
+
+    /**
      * DELETE by multiple statuses with cutoff and limit.
      * Uses subquery to select rows before deleting.
      *

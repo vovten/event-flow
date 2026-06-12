@@ -88,15 +88,23 @@ class EventRetrySchedulerTest {
     }
 
     private UUID createEvent(EventStatus status, int retryCount, Instant updatedAt, String errorDetails) {
+        return createEvent(status, retryCount, updatedAt, errorDetails, false);
+    }
+
+    private UUID createEvent(EventStatus status, int retryCount, Instant updatedAt, String errorDetails, boolean retryFlag) {
         UUID id = UUID.randomUUID();
         TestEvent event = new TestEvent(id, "data");
         String payload = EventUtils.toJson(event);
         StoredEvent stored = new StoredEvent(
                 id, TestEvent.class.getName(), null, payload, null,
-                status, retryCount, updatedAt, updatedAt, errorDetails
+                status, retryCount, retryFlag, updatedAt, updatedAt, errorDetails
         );
         eventStore.save(stored);
         return id;
+    }
+
+    private UUID createRetryFlaggedEvent(EventStatus status, int retryCount, Instant updatedAt) {
+        return createEvent(status, retryCount, updatedAt, null, true);
     }
 
     @Nested
@@ -159,7 +167,7 @@ class EventRetrySchedulerTest {
             UUID eventId = UUID.randomUUID();
             StoredEvent invalid = new StoredEvent(
                     eventId, TestEvent.class.getName(), null, "{invalid-json", null,
-                    EventStatus.FAILED, 0, Instant.now().minusSeconds(10),
+                    EventStatus.FAILED, 0, false, Instant.now().minusSeconds(10),
                     Instant.now().minusSeconds(10), "error"
             );
             eventStore.save(invalid);
@@ -395,6 +403,37 @@ class EventRetrySchedulerTest {
             StoredEvent afterSecondRetry = eventStore.findById(eventId).orElseThrow();
             assertThat(afterSecondRetry.retryCount()).isEqualTo(2);
             assertThat(afterSecondRetry.status()).isEqualTo(EventStatus.PUBLISHED);
+        }
+
+        // -------------------------------------------------------
+        // Manual retry (retry flag)
+        // -------------------------------------------------------
+
+        @Test
+        @DisplayName("retries events with retry flag set, regardless of status")
+        void retriesRetryFlaggedEvents() {
+            UUID eventId = createRetryFlaggedEvent(EventStatus.UNDEFINED, 0, Instant.now().minusSeconds(10));
+
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            // TestEvent has MANAGED lifecycle → publish sets it to PUBLISHED
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(stored.retry()).isFalse();
+        }
+
+        @Test
+        @DisplayName("retries event with retry flag even when maxRetries exceeded")
+        void retriesRetryFlaggedEventBeyondMaxRetries() {
+            UUID eventId = createRetryFlaggedEvent(EventStatus.FAILED, 5, Instant.now().minusSeconds(10));
+
+            // maxRetries=3 — event has retryCount=5, but manual retry bypasses the limit
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(stored.retry()).isFalse();
+            assertThat(stored.retryCount()).isEqualTo(6);
         }
     }
 

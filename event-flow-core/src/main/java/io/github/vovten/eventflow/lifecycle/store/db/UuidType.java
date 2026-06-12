@@ -9,7 +9,7 @@ package io.github.vovten.eventflow.lifecycle.store.db;
  * UUID strategy is configured per dialect via {@code SqlDialect.uuidType()}.
  *
  * @author Vladimir Aleshkov
- * @since 1.3.2
+ * @since 1.2.0
  */
 public enum UuidType {
 

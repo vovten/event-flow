@@ -21,7 +21,7 @@ import java.util.function.Consumer;
  * ({@link SuccessAck} or {@link FailureAck}) back to the source channels
  * after an event has been processed by the dispatcher.
  * <p>
- * The decorator extracts the {@code publisherService} from the original event's
+ * The decorator extracts the {@code pubSrv} from the original event's
  * {@link Envelope} metadata and passes it as {@code originalService} in ack events.
  * This enables the publisher-side {@link AckHandler} to filter acks by service
  * identity without querying the database.
@@ -36,7 +36,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(EventLifecycleDispatcher.class);
 
-    private static final String PUBLISHER_SERVICE_KEY = "publisherService";
+    private static final String PUBLISHER_SERVICE_KEY = "pubSrv";
 
     private final EventDispatcher origin;
     private final EventPublisher ackPublisher;

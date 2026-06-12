@@ -42,8 +42,8 @@ public class PostgresqlDialect implements SqlDialect {
     public String insertStatement() {
         return """
                 INSERT INTO %s (event_id, event_type, service, payload, process_id,
-                                status, retry_count, created_at, updated_at, error_details)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                status, retry_count, retry, created_at, updated_at, error_details)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
     }
 
@@ -51,7 +51,7 @@ public class PostgresqlDialect implements SqlDialect {
     public String selectByStatusStatement() {
         return """
                 SELECT event_id, event_type, service, payload, process_id,
-                       status, retry_count, created_at, updated_at, error_details
+                       status, retry_count, retry, created_at, updated_at, error_details
                 FROM %s
                 WHERE status = ? AND updated_at < ?
                 ORDER BY updated_at ASC
@@ -62,7 +62,7 @@ public class PostgresqlDialect implements SqlDialect {
     public String selectByIdStatement() {
         return """
                 SELECT event_id, event_type, service, payload, process_id,
-                       status, retry_count, created_at, updated_at, error_details
+                       status, retry_count, retry, created_at, updated_at, error_details
                 FROM %s
                 WHERE event_id = ?
                 """;
@@ -72,7 +72,7 @@ public class PostgresqlDialect implements SqlDialect {
     public String updateStatusOnlyStatement() {
         return """
                 UPDATE %s
-                SET status = ?, error_details = ?, updated_at = ?
+                SET status = ?, error_details = ?, updated_at = ?, retry = FALSE
                 WHERE event_id = ?
                 """;
     }
@@ -90,7 +90,7 @@ public class PostgresqlDialect implements SqlDialect {
     public String selectByStatusesStatement(int statusCount) {
         String placeholders = placeholders(statusCount);
         return "SELECT event_id, event_type, service, payload, process_id,"
-                + " status, retry_count, created_at, updated_at, error_details"
+                + " status, retry_count, retry, created_at, updated_at, error_details"
                 + " FROM %s"
                 + " WHERE status IN (" + placeholders + ") AND updated_at < ?"
                 + " ORDER BY updated_at ASC"

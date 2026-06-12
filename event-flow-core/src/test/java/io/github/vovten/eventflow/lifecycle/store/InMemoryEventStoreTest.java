@@ -96,6 +96,68 @@ class InMemoryEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should mark event for retry: set retry flag, clear error, preserve status and retryCount")
+    void shouldMarkForRetry() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.FAILED, "original error");
+        store.markForRetry(eventId);
+
+        StoredEvent marked = store.findById(eventId).orElseThrow();
+        assertThat(marked.status()).isEqualTo(EventStatus.FAILED);
+        assertThat(marked.retry()).isTrue();
+        assertThat(marked.retryCount()).isZero();
+        assertThat(marked.errorDetails()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should throw when marking non-existent event for retry")
+    void shouldThrowWhenMarkingNonExistentForRetry() {
+        assertThatThrownBy(() ->
+                store.markForRetry(UUID.randomUUID())
+        ).isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    @DisplayName("Should find events eligible for retry by retry flag")
+    void shouldFindEligibleForRetryByFlag() {
+        store.save(event);
+        store.markForRetry(eventId);
+
+        Instant deadline = Instant.now().plusSeconds(10);
+        List<StoredEvent> results = store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10);
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().eventId()).isEqualTo(eventId);
+        assertThat(results.getFirst().retry()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should find events eligible for retry by status")
+    void shouldFindEligibleForRetryByStatus() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
+
+        Instant deadline = Instant.now().plusSeconds(10);
+        List<StoredEvent> results = store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10);
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().status()).isEqualTo(EventStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("Should limit results in findRetryableEvents")
+    void shouldLimitFindEligibleForRetry() {
+        for (int i = 0; i < 3; i++) {
+            UUID id = UUID.randomUUID();
+            store.save(StoredEvent.newEvent(id, "test.A", null, "{}", null));
+            store.markForRetry(id);
+        }
+        Instant deadline = Instant.now().plusSeconds(10);
+        assertThat(store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 2)).hasSize(2);
+    }
+
+    @Test
     @DisplayName("Should limit results in findByStatuses with limit parameter")
     void shouldLimitFindByStatuses() {
         Instant now = Instant.now();

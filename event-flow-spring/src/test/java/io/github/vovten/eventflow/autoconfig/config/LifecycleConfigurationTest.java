@@ -257,5 +257,14 @@ class LifecycleConfigurationTest {
         public int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize) {
             return 0;
         }
+
+        @Override
+        public void markForRetry(UUID eventId) {
+        }
+
+        @Override
+        public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize) {
+            return Collections.emptyList();
+        }
     }
 }

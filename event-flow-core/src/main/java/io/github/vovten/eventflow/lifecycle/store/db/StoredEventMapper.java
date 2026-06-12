@@ -111,9 +111,22 @@ public final class StoredEventMapper {
         setUuidNullable(ps, 5, event.processId());
         ps.setString(6, String.valueOf(event.status().getCode()));
         ps.setInt(7, event.retryCount());
-        ps.setTimestamp(8, Timestamp.from(event.createdAt()), UTC);
-        ps.setTimestamp(9, Timestamp.from(event.updatedAt()), UTC);
-        setOptionalString(ps, 10, event.errorDetails());
+        ps.setBoolean(8, event.retry());
+        ps.setTimestamp(9, Timestamp.from(event.createdAt()), UTC);
+        ps.setTimestamp(10, Timestamp.from(event.updatedAt()), UTC);
+        setOptionalString(ps, 11, event.errorDetails());
+    }
+
+    /**
+     * Sets UPDATE parameters for marking an event for manual retry.
+     *
+     * @param ps      the PreparedStatement (must be prepared with markForRetryStatement)
+     * @param eventId the event ID to mark for retry
+     * @throws SQLException if a database access error occurs
+     */
+    public void setMarkForRetryParameters(PreparedStatement ps, UUID eventId) throws SQLException {
+        ps.setTimestamp(1, Timestamp.from(Instant.now()), UTC);
+        setUuid(ps, 2, eventId);
     }
 
     /**
@@ -177,6 +190,7 @@ public final class StoredEventMapper {
                 getUuid(rs, "process_id"),
                 EventStatus.fromCode(rs.getString("status").charAt(0)),
                 rs.getInt("retry_count"),
+                rs.getBoolean("retry"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant(),
                 rs.getString("error_details")

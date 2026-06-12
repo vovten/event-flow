@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS event_store (
     created_at      TIMESTAMP NOT NULL COMMENT 'Timestamp when the event was first stored',
     updated_at      TIMESTAMP NOT NULL COMMENT 'Timestamp of the last status update',
     retry_count     INT DEFAULT 0 NOT NULL COMMENT 'Number of retry attempts for failed events',
+    retry           BOOLEAN DEFAULT FALSE NOT NULL COMMENT 'Manual retry flag: when TRUE, the event is eligible for retry regardless of lifecycle status',
     error_details   TEXT COMMENT 'Error description for failed events'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Event store for persistent event lifecycle tracking';

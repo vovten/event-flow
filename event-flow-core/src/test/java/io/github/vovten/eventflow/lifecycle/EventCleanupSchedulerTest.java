@@ -46,7 +46,7 @@ class EventCleanupSchedulerTest {
         UUID id = UUID.randomUUID();
         StoredEvent stored = new StoredEvent(
                 id, "test.TestEvent", null, "{\"data\":\"test\"}", null,
-                status, 0, updatedAt, updatedAt, errorDetails
+                status, 0, false, updatedAt, updatedAt, errorDetails
         );
         eventStore.save(stored);
         return id;

@@ -31,7 +31,7 @@ import java.util.concurrent.CompletableFuture;
  * </ul>
  * <p>
  * If configured with a {@code service} name, it enriches the event's
- * {@link Envelope} metadata with the service identity ({@code publisherService})
+ * {@link Envelope} metadata with the service identity ({@code pubSrv})
  * so that acknowledgment events can be filtered by the originating service.
  * <p>
  * {@link LifecycleAckEvent} instances are passed through without persistence
@@ -44,7 +44,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(EventLifecyclePublisher.class);
 
-    private static final String PUBLISHER_SERVICE_KEY = "publisherService";
+    private static final String PUBLISHER_SERVICE_KEY = "pubSrv";
 
     private final String service;
     private final EventPublisher origin;
@@ -92,7 +92,8 @@ public final class EventLifecyclePublisher implements EventPublisher {
         if (lifecycle == EventLifecycle.PERSISTED) {
             // Persist with UNDEFINED status, no further tracking
             persistNewOnly(eventId, enriched);
-            return origin.publish(enriched);
+            return origin.publish(enriched)
+                    .whenComplete((result, error) -> completePersistedRetry(eventId));
         }
         // MANAGED — persist with NEW status, full lifecycle tracking
         persistOrReset(eventId, enriched);
@@ -156,6 +157,10 @@ public final class EventLifecyclePublisher implements EventPublisher {
         }
         eventStore.updateStatus(eventId, EventStatus.PUBLISHED, null);
         log.debug("Event published successfully: {}", eventId);
+    }
+
+    private void completePersistedRetry(UUID eventId) {
+        eventStore.updateStatus(eventId, EventStatus.UNDEFINED, null);
     }
 
     private Event enrichWithService(Event event) {

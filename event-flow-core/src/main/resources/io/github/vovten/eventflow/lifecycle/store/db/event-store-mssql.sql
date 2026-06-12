@@ -25,6 +25,7 @@ CREATE TABLE event_store (
     created_at      DATETIME2 NOT NULL,
     updated_at      DATETIME2 NOT NULL,
     retry_count     INT DEFAULT 0 NOT NULL,
+    retry           BIT DEFAULT 0 NOT NULL,
     error_details   NVARCHAR(MAX)
 );
 
@@ -76,6 +77,11 @@ EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Number of retry attempts for failed events',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'retry_count';
+
+EXEC sys.sp_addextendedproperty
+    @name=N'MS_Description', @value=N'Manual retry flag: when TRUE, the event is eligible for retry regardless of lifecycle status',
+    @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
+    @level2type=N'COLUMN', @level2name=N'retry';
 
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Timestamp when the event was first stored',

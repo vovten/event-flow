@@ -78,9 +78,42 @@ public interface EventStore {
      * @param before    return events updated before this time
      * @param batchSize maximum number of events to return
      * @return matching events, at most {@code batchSize}
-     * @since 1.3.2
+     * @since 1.2.0
      */
     List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before, int batchSize);
+
+    /**
+     * Marks an event for manual retry.
+     * <p>
+     * Sets the {@code retry} flag to {@code true} and clears error details.
+     * Does NOT change the event status or retry count — the existing
+     * lifecycle status is preserved. The retry scheduler picks up events
+     * by the {@code retry} flag regardless of their status.
+     * <p>
+     * The retry count will be incremented by the publisher's retry lifecycle
+     * (via {@code persistOrReset}) when the event is actually re-published.
+     *
+     * @param eventId the event to mark for retry
+     * @throws java.util.NoSuchElementException if the event is not found
+     */
+    void markForRetry(UUID eventId);
+
+    /**
+     * Finds events eligible for retry: those matching any of the given statuses
+     * <b>or</b> having the manual retry flag set ({@code retry = TRUE}),
+     * limited by updated-at cutoff and batch size.
+     * <p>
+     * This is a unified replacement for separate status-based and retry-flag
+     * queries. The caller can distinguish retry-flagged events by checking
+     * {@link StoredEvent#retry()} — those bypass maxRetries/backoff checks.
+     *
+     * @param statuses  statuses to include in the query
+     * @param before    only return events updated before this time
+     * @param batchSize maximum number of events to return
+     * @return matching events, at most {@code batchSize} (never null)
+     * @since 1.2.0
+     */
+    List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize);
 
     /**
      * Finds an event by its unique identifier.
@@ -105,7 +138,7 @@ public interface EventStore {
      * @param before    only delete events updated before this time
      * @param batchSize maximum number of events to delete per batch
      * @return the total number of deleted events
-     * @since 1.3.2
+     * @since 1.2.0
      */
     int deleteByStatuses(List<EventStatus> statuses, Instant before, int batchSize);
 }

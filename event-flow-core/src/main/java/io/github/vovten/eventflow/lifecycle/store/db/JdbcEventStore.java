@@ -65,7 +65,9 @@ public class JdbcEventStore implements EventStore {
     private final String selectByIdSql;
     private final String updateStatusOnlySql;
     private final String updateStatusWithRetrySql;
+    private final String markForRetrySql;
     private final Map<Set<EventStatus>, String> selectByStatusesCache = new ConcurrentHashMap<>();
+    private final Map<Set<EventStatus>, String> selectRetryableEventsCache = new ConcurrentHashMap<>();
     private final Map<Set<EventStatus>, String> deleteByStatusesCache = new ConcurrentHashMap<>();
 
     /**
@@ -136,6 +138,7 @@ public class JdbcEventStore implements EventStore {
         this.selectByIdSql = sqlDialect.selectByIdStatement().formatted(tableName);
         this.updateStatusOnlySql = sqlDialect.updateStatusOnlyStatement().formatted(tableName);
         this.updateStatusWithRetrySql = sqlDialect.updateStatusWithRetryStatement().formatted(tableName);
+        this.markForRetrySql = sqlDialect.markForRetryStatement().formatted(tableName);
         var schemaInitializer = new SchemaInitializer(dataSource, tableName, sqlDialect, uuidType);
         if (autoInitSchema) {
             schemaInitializer.ensureSchema();
@@ -165,6 +168,20 @@ public class JdbcEventStore implements EventStore {
             ps.executeUpdate();
         } catch (SQLException e) {
             throw mapper.mapSaveError(e, event);
+        }
+    }
+
+    @Override
+    public void markForRetry(UUID eventId) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(markForRetrySql)) {
+            mapper.setMarkForRetryParameters(ps, eventId);
+            int affected = ps.executeUpdate();
+            if (affected == 0) {
+                throw new NoSuchElementException("Event not found: " + eventId);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to mark event for retry: " + eventId, e);
         }
     }
 
@@ -214,6 +231,24 @@ public class JdbcEventStore implements EventStore {
             return mapResultList(ps);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find events by statuses: " + statuses, e);
+        }
+    }
+
+    @Override
+    public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize) {
+        if (statuses.isEmpty() || batchSize <= 0) {
+            return List.of();
+        }
+        String sql = selectRetryableEventsCache.computeIfAbsent(Set.copyOf(statuses), key ->
+                sqlDialect.selectRetryableEventsStatement(key.size()).formatted(tableName));
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+            mapper.setStatusCodes(ps, statuses);
+            mapper.setBeforeTimestamp(ps, statuses.size() + 1, before);
+            ps.setInt(statuses.size() + 2, batchSize);
+            return mapResultList(ps);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find events eligible for retry", e);
         }
     }
 

@@ -119,8 +119,13 @@ public final class EventRetryScheduler implements AutoCloseable {
     }
 
     /**
-     * Performs a single retry cycle: scans for FAILED, PUBLISHED, and NEW events
-     * and retries eligible ones.
+     * Performs a single retry cycle: scans for events eligible for retry
+     * (FAILED, PUBLISHED, NEW, or manually marked with {@code retry = true})
+     * and retries them.
+     * <p>
+     * Events manually marked for retry ({@code retry = true}) are retried
+     * regardless of their current status and bypass the maxRetries and backoff
+     * checks. Other events are subject to the configured retry limits.
      * <p>
      * NEW events are included to handle cases where the event was persisted
      * but the application crashed before the publish completed. These events
@@ -129,32 +134,27 @@ public final class EventRetryScheduler implements AutoCloseable {
     void retryCycle() {
         try {
             Instant deadline = Instant.now().minus(minAge);
-            List<StoredEvent> events = eventStore.findByStatuses(
-                    List.of(EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.NEW), deadline, batchSize
-            );
+            List<EventStatus> statuses = List.of(EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.NEW);
+            List<StoredEvent> events = eventStore.findRetryableEvents(statuses, deadline, batchSize);
             if (events.isEmpty()) {
                 log.trace("No events to retry");
                 return;
             }
             if (log.isDebugEnabled()) {
-                log.debug("Found {} events eligible for retry ({} FAILED, {} PUBLISHED, {} NEW)",
-                        events.size(),
-                        countByStatus(events, EventStatus.FAILED),
-                        countByStatus(events, EventStatus.PUBLISHED),
-                        countByStatus(events, EventStatus.NEW));
+                log.debug("Found {} events eligible for retry ({} with retry flag)",
+                        events.size(), events.stream().filter(StoredEvent::retry).count());
             }
-            events.forEach(this::retryIfEligible);
+            for (StoredEvent event : events) {
+                if (event.retry()) {
+                    log.info("Manual retry for event id={}", event.eventId());
+                    retryEvent(event);
+                } else {
+                    retryIfEligible(event);
+                }
+            }
         } catch (Exception e) {
             log.error("Error during retry cycle", e);
         }
-    }
-
-    private static int countByStatus(List<StoredEvent> events, EventStatus status) {
-        int count = 0;
-        for (StoredEvent event : events) {
-            if (event.status() == status) count++;
-        }
-        return count;
     }
 
     private void retryIfEligible(StoredEvent event) {

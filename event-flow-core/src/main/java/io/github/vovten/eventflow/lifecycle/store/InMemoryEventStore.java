@@ -39,7 +39,7 @@ public class InMemoryEventStore implements EventStore {
             if (status == EventStatus.NEW) {
                 return event.withRetry().withStatus(EventStatus.NEW, errorDetails);
             }
-            return event.withStatus(status, errorDetails);
+            return event.withStatus(status, errorDetails).withRetryFlag(false);
         });
         if (existing == null) {
             throw new NoSuchElementException("Event not found: " + eventId);
@@ -62,6 +62,29 @@ public class InMemoryEventStore implements EventStore {
         Set<EventStatus> statusSet = EnumSet.copyOf(statuses);
         return store.values().stream()
                 .filter(e -> statusSet.contains(e.status()))
+                .filter(e -> e.updatedAt().isBefore(before))
+                .limit(batchSize)
+                .collect(toList());
+    }
+
+    @Override
+    public void markForRetry(UUID eventId) {
+        StoredEvent existing = store.computeIfPresent(eventId, (id, event) ->
+                event.withRetryFlag(true).withStatus(event.status(), null)
+        );
+        if (existing == null) {
+            throw new NoSuchElementException("Event not found: " + eventId);
+        }
+    }
+
+    @Override
+    public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize) {
+        if (statuses.isEmpty() || batchSize <= 0) {
+            return List.of();
+        }
+        Set<EventStatus> statusSet = EnumSet.copyOf(statuses);
+        return store.values().stream()
+                .filter(e -> statusSet.contains(e.status()) || e.retry())
                 .filter(e -> e.updatedAt().isBefore(before))
                 .limit(batchSize)
                 .collect(toList());

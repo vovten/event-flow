@@ -18,6 +18,8 @@ import java.util.UUID;
  * @param processId    optional process/correlation ID for event correlation
  * @param status       current lifecycle status
  * @param retryCount   number of retry attempts so far
+ * @param retry        manual retry flag — when {@code true}, the event is eligible for retry
+ *                     regardless of its lifecycle status
  * @param createdAt    timestamp when the event was first saved
  * @param updatedAt    timestamp when the event was last updated
  * @param errorDetails error details from the last failure, or null if none
@@ -32,6 +34,7 @@ public record StoredEvent(
         UUID processId,
         EventStatus status,
         int retryCount,
+        boolean retry,
         Instant createdAt,
         Instant updatedAt,
         String errorDetails
@@ -75,7 +78,7 @@ public record StoredEvent(
         Instant now = Instant.now();
         return new StoredEvent(
                 eventId, eventType, service, payload, processId,
-                status, 0, now, now, null
+                status, 0, false, now, now, null
         );
     }
 
@@ -89,7 +92,7 @@ public record StoredEvent(
     public StoredEvent withStatus(EventStatus newStatus, String error) {
         return new StoredEvent(
                 eventId, eventType, service, payload, processId,
-                newStatus, retryCount, createdAt, Instant.now(), error
+                newStatus, retryCount, retry, createdAt, Instant.now(), error
         );
     }
 
@@ -101,7 +104,20 @@ public record StoredEvent(
     public StoredEvent withRetry() {
         return new StoredEvent(
                 eventId, eventType, service, payload, processId,
-                EventStatus.NEW, retryCount + 1, createdAt, Instant.now(), null
+                EventStatus.NEW, retryCount + 1, retry, createdAt, Instant.now(), null
+        );
+    }
+
+    /**
+     * Returns a copy with the given {@code retry} flag value.
+     *
+     * @param retry the new retry flag value
+     * @return updated copy
+     */
+    public StoredEvent withRetryFlag(boolean retry) {
+        return new StoredEvent(
+                eventId, eventType, service, payload, processId,
+                status, retryCount, retry, createdAt, updatedAt, errorDetails
         );
     }
 

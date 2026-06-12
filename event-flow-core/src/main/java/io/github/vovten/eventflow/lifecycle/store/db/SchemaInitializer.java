@@ -17,7 +17,7 @@ import java.sql.*;
  * This class is package-private and used exclusively by {@link JdbcEventStore}.
  *
  * @author Vladimir Aleshkov
- * @since 1.3.2
+ * @since 1.2.0
  */
 public class SchemaInitializer {
 
@@ -32,6 +32,7 @@ public class SchemaInitializer {
             COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
             COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
             COMMENT ON COLUMN %s.retry_count IS 'Number of retry attempts for failed events';
+            COMMENT ON COLUMN %s.retry IS 'Manual retry flag: when TRUE, the event is eligible for retry regardless of lifecycle status';
             COMMENT ON COLUMN %s.created_at IS 'Timestamp when the event was first stored';
             COMMENT ON COLUMN %s.updated_at IS 'Timestamp of the last status update';
             COMMENT ON COLUMN %s.error_details IS 'Error description for failed events';
@@ -152,7 +153,7 @@ public class SchemaInitializer {
         String[] lines = COMMENT_ON_COLUMNS.formatted(
                 tableName, tableName, tableName, tableName, tableName,
                 tableName, tableName, tableName, tableName, tableName,
-                tableName
+                tableName, tableName
         ).split(";");
         for (String line : lines) {
             String sql = line.trim();
@@ -180,6 +181,7 @@ public class SchemaInitializer {
                     created_at      %s NOT NULL,
                     updated_at      %s NOT NULL,
                     retry_count     INT DEFAULT 0 NOT NULL,
+                    retry           BOOLEAN DEFAULT FALSE NOT NULL,
                     error_details   %s
                 )
                 """.formatted(uuidDdl, textDdl, uuidDdl, tsDdl, tsDdl, textDdl);

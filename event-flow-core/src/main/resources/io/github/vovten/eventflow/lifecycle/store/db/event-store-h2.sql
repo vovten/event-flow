@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS event_store (
     created_at      TIMESTAMP NOT NULL,
     updated_at      TIMESTAMP NOT NULL,
     retry_count     INT DEFAULT 0 NOT NULL,
+    retry           BOOLEAN DEFAULT FALSE NOT NULL,
     error_details   TEXT
 );
 
@@ -38,6 +39,7 @@ COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
 COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
 COMMENT ON COLUMN event_store.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
 COMMENT ON COLUMN event_store.retry_count IS 'Number of retry attempts for failed events';
+COMMENT ON COLUMN event_store.retry IS 'Manual retry flag: when TRUE, the event is eligible for retry regardless of lifecycle status';
 COMMENT ON COLUMN event_store.created_at IS 'Timestamp when the event was first stored';
 COMMENT ON COLUMN event_store.updated_at IS 'Timestamp of the last status update';
 COMMENT ON COLUMN event_store.error_details IS 'Error description for failed events';
