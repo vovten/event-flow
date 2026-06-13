@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
+import io.github.vovten.eventflow.publisher.FailureTracker;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,16 +37,29 @@ public final class AckHandler implements EventSubscriber {
 
     private final String serviceName;
     private final EventStore eventStore;
+    private final FailureTracker failureTracker;
 
     /**
      * Creates a new AckHandler.
      *
-     * @param eventStore the event store to update
+     * @param eventStore     the event store to update
      * @param serviceName    the local service name for ack filtering, or empty to accept all acks
+     * @param failureTracker optional failure tracker for circuit breaker integration
      */
-    public AckHandler(EventStore eventStore, String serviceName) {
+    public AckHandler(EventStore eventStore, String serviceName, FailureTracker failureTracker) {
         this.serviceName = serviceName;
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
+        this.failureTracker = failureTracker;
+    }
+
+    /**
+     * Creates a new AckHandler without circuit breaker integration.
+     *
+     * @param eventStore  the event store to update
+     * @param serviceName the local service name for ack filtering, or empty to accept all acks
+     */
+    public AckHandler(EventStore eventStore, String serviceName) {
+        this(eventStore, serviceName, null);
     }
 
     @Override
@@ -67,6 +81,9 @@ public final class AckHandler implements EventSubscriber {
     }
 
     private void handle(FailureAck ack) {
+        if (failureTracker != null) {
+            failureTracker.recordFailure(ack.eventType());
+        }
         updateEventStatus(ack.originalEventId(), ack.eventType(), ack.originalService(), FAILED, ack.error());
     }
 

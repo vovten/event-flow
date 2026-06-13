@@ -55,6 +55,26 @@ event-flow:
       log-levels:
         HeartbeatEvent: DEBUG
 
+    # Circuit breaker configuration for event publishing
+    # Protects transport layer by rejecting publishes when failure rate is high.
+    # Groups failures by event type — when one event type fails, other types are unaffected.
+    # Events are persisted before the breaker check, so no events are lost when open.
+    # Scheduler retries bypass the breaker automatically.
+    circuit-breaker:
+      # Enable or disable circuit breaker protection
+      enabled: false
+      # Minimum requests before evaluating the failure rate
+      failure-threshold: 10
+      # Failure rate (0.0-1.0) that triggers circuit open (0.8 = 80%)
+      failure-rate-threshold: 0.8
+      # Cooldown before transitioning from OPEN to HALF_OPEN
+      cooldown: 60s
+      # Max failed attempts in HALF_OPEN before re-opening
+      half-open-max-attempts: 3
+      # Maximum number of circuit breaker entries in the cache
+      # Idle CLOSED entries are evicted automatically; OPEN entries stay active
+      max-cache-size: 1000
+
     # ---------------------------------------------------------------------------
     # Lifecycle-aware event publishing (event lifecycle tracking)
     # ---------------------------------------------------------------------------

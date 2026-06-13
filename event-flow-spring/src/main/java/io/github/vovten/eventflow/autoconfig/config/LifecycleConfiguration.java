@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties.LifecyclePublisherConfig;
 import io.github.vovten.eventflow.lifecycle.AckHandler;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.publisher.FailureTracker;
 import io.github.vovten.eventflow.lifecycle.EventCleanupScheduler;
 import io.github.vovten.eventflow.lifecycle.EventRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
@@ -121,20 +122,27 @@ public class LifecycleConfiguration {
      * This bean implements {@code EventSubscriber} and is automatically discovered
      * by the {@code SpringEventSubscriberRegistry}.
      *
-     * @param eventStore the event store to update
+     * @param eventStore               the event store to update
+     * @param failureTrackerProvider   optional provider for circuit breaker failure tracker
      * @return the ack handler
      * @throws IllegalStateException if service-name is not configured
      */
     @Bean
     @ConditionalOnMissingBean
-    public AckHandler ackHandler(EventStore eventStore) {
+    public AckHandler ackHandler(EventStore eventStore,
+                                  ObjectProvider<FailureTracker> failureTrackerProvider) {
         String service = properties.getPublisher().getLifecycle().getServiceName();
         if (StringUtils.isEmpty(service)) {
             throw new IllegalStateException(
                     "event-flow.publisher.lifecycle.service-name must be configured when lifecycle tracking is enabled"
             );
         }
-        log.info("Creating AckHandler with service: {}", service);
+        FailureTracker failureTracker = failureTrackerProvider.getIfAvailable();
+        if (failureTracker != null) {
+            log.info("Creating AckHandler with circuit breaker integration (service: {})", service);
+            return new AckHandler(eventStore, service, failureTracker);
+        }
+        log.info("Creating AckHandler without circuit breaker integration (service: {})", service);
         return new AckHandler(eventStore, service);
     }
 

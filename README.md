@@ -30,6 +30,7 @@
 - **Structured Logging** — Decorators for publisher and dispatcher with machine-parseable JSON output
 - **Retry Mechanism** — Exponential backoff with configurable parameters
 - **Lifecycle Tracking** — End-to-end event lifecycle with persistent storage, status tracking, automatic retry of failed events, and acknowledgment-based monitoring
+- **Circuit Breaker** — Per-event-type failure protection with automatic recovery, cooldown, and half-open probing. Scheduler retries bypass the breaker automatically
 - **Extensible Serialization** — JSON and MessagePack with support for custom formats
 
 ## 🏗 Architecture
@@ -531,6 +532,60 @@ Periodically scans the `EventStore` for failed (`FAILED`), stuck (`PUBLISHED`), 
 
 An `EventSubscriber` that processes incoming lifecycle acknowledgment events (`SuccessAck`/`FailureAck`) and updates the event status in the `EventStore`. Filters by service name to allow multiple publisher instances to share the same channel. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
 
+### CircuitBreakerEventPublisher
+
+Decorator for `EventPublisher` that protects the transport layer from cascading failures using a per-event-type circuit breaker. When a configurable failure rate is exceeded for a specific event type, the circuit opens and subsequent publish attempts for that event type are rejected immediately — preventing the transport from being overwhelmed while the downstream system recovers. Events are persisted before the breaker check (when combined with `EventLifecyclePublisher`), so no events are lost when the circuit is open — the scheduler will retry them later.
+
+**State machine:**
+
+```
+         ┌──────────┐
+         │  CLOSED  │ ── failure rate > threshold ──→ ┌──────┐
+         └──────────┘                                 │ OPEN │
+              ↑                                       └──────┘
+              │              cooldown elapsed             │
+              │         ┌────────────┐                    │
+              └─────────│ HALF_OPEN  │ ◄──────────────────┘
+                        └────────────┘
+                         success → CLOSED
+                         failure ≥ halfOpenMaxAttempts → OPEN
+```
+
+- **CLOSED** — normal operation, requests pass through. Failure rate is evaluated after `failure-threshold` requests
+- **OPEN** — failures detected, requests rejected immediately. After `cooldown` the circuit transitions to `HALF_OPEN`
+- **HALF_OPEN** — limited attempts are allowed to probe recovery. A single success closes the circuit; `half-open-max-attempts` failures re-open it
+
+**Key features:**
+- **Per-event-type isolation** — one event type failing doesn't affect others (grouped by payload class name for `Envelope` events)
+- **Thread-safe** — uses a `Caffeine` cache with atomic state transitions; idle CLOSED entries are evicted automatically when the cache reaches `max-cache-size`
+- **Bypass mechanism** — `CircuitBreakerEventPublisher.runWithBypass()` allows scheduler retries to bypass the breaker without affecting breaker state. Used internally by `EventRetryScheduler`
+- **No event loss** — when combined with `EventLifecyclePublisher`, events are persisted before the breaker check; open-circuit rejections result in `FAILED` status, and the scheduler retries later with bypass
+
+**Configuration (Spring Boot):**
+```yaml
+event-flow:
+  publisher:
+    circuit-breaker:
+      enabled: true
+      failure-threshold: 10
+      failure-rate-threshold: 0.8
+      cooldown: 60s
+      half-open-max-attempts: 3
+      max-cache-size: 1000
+```
+
+**Integration with lifecycle tracking:**
+
+```
+Event ──► EventLifecyclePublisher ──► CircuitBreakerEventPublisher ──► Transport
+              │                                  │
+              │ persist before breaker            │ reject if OPEN (event safe in store)
+              ▼                                  ▼
+           EventStore                    EventRetryScheduler (bypasses breaker)
+```
+
+When the breaker is disabled or not configured, it simply passes through all requests.
+
 ### EventTransport
 
 Transports for event delivery.
@@ -1000,6 +1055,24 @@ For detailed configuration examples, see:
 | `event-flow.publisher.lifecycle.retry.retry-interval` | `30s` | Interval between retry cycles |
 | `event-flow.publisher.lifecycle.retry.min-age` | `30s` | Base backoff for exponential retry |
 | `event-flow.dispatcher.lifecycle.enabled` | `false` | Enable ack-based lifecycle tracking on dispatcher |
+
+### Circuit Breaker Configuration
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `event-flow.publisher.circuit-breaker.enabled` | `false` | Enable circuit breaker protection |
+| `event-flow.publisher.circuit-breaker.failure-threshold` | `10` | Minimum requests before evaluating failure rate |
+| `event-flow.publisher.circuit-breaker.failure-rate-threshold` | `0.8` | Failure rate (0.0–1.0) that triggers circuit open |
+| `event-flow.publisher.circuit-breaker.cooldown` | `60s` | Time to wait before transitioning from OPEN to HALF_OPEN |
+| `event-flow.publisher.circuit-breaker.half-open-max-attempts` | `3` | Max failed attempts in HALF_OPEN before re-opening |
+| `event-flow.publisher.circuit-breaker.max-cache-size` | `1000` | Max circuit breaker entries in the cache; idle CLOSED entries are evicted automatically |
+
+**Important notes:**
+- **Disabled by default** — enable explicitly in production environments with external service dependencies
+- **Per-event-type grouping** — for `Envelope` events, failures are grouped by the payload class name; for other events, by `event.type()`
+- **Bypass for scheduler** — `EventRetryScheduler` calls `CircuitBreakerEventPublisher.runWithBypass()` so retries are never blocked by an open circuit
+- **Caffeine cache** — uses W-TinyLFU eviction; actively failing (OPEN/HALF_OPEN) entries are accessed on every publish and stay in the cache; only idle CLOSED entries are evicted
+- **Business errors** — circuit breaker does not distinguish between transient and permanent failures. If an event type fails at a constant rate (e.g., due to a business validation error), the breaker will cycle through OPEN ↔ HALF_OPEN states. This is typically harmless — scheduler bypass continues to work, and the probe requests occur at most once per `cooldown` interval
 
 ### LocalQueue
 

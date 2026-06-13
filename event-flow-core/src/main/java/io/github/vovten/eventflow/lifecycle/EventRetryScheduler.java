@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
+import io.github.vovten.eventflow.publisher.CircuitBreakerEventPublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.util.EventUtils;
 import org.slf4j.Logger;
@@ -187,7 +188,8 @@ public final class EventRetryScheduler implements AutoCloseable {
     private void retryEvent(StoredEvent stored) {
         try {
             Event event = EventUtils.fromJson(stored.payload(), Event.class);
-            publisher.publish(event);
+            // Bypass circuit breaker to ensure retries are never blocked
+            CircuitBreakerEventPublisher.runWithBypass(() -> publisher.publish(event));
             log.info("Retried event id={} (attempt {}/{})", stored.eventId(), stored.retryCount() + 1, maxRetries);
         } catch (Exception e) {
             log.error("Failed to retry event id={}: {}", stored.eventId(), e.getMessage());

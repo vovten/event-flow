@@ -34,6 +34,13 @@ import java.util.Map;
  *         max-retries: 3
  *         retry-interval: 30s
  *         min-age: 30s
+ *     circuit-breaker:
+ *       enabled: false
+ *       failure-threshold: 10
+ *       failure-rate-threshold: 0.8
+ *       cooldown: 60s
+ *       half-open-max-attempts: 3
+ *       max-cache-size: 1000
  *     retry:
  *       enabled: true
  *       max-attempts: 3
@@ -124,6 +131,7 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private LoggingConfig logging = new LoggingConfig();
         private RetryConfig retry = new RetryConfig();
+        private CircuitBreakerConfig circuitBreaker = new CircuitBreakerConfig();
         private LifecyclePublisherConfig lifecycle = new LifecyclePublisherConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
@@ -159,6 +167,14 @@ public class EventFlowProperties {
             this.retry = retry;
         }
 
+        public CircuitBreakerConfig getCircuitBreaker() {
+            return circuitBreaker;
+        }
+
+        public void setCircuitBreaker(CircuitBreakerConfig circuitBreaker) {
+            this.circuitBreaker = circuitBreaker;
+        }
+
         public LifecyclePublisherConfig getLifecycle() {
             return lifecycle;
         }
@@ -173,6 +189,124 @@ public class EventFlowProperties {
 
         public void setChannels(List<ChannelConfig> channels) {
             this.channels = channels;
+        }
+    }
+
+    /**
+     * Circuit breaker configuration for event publishing.
+     * <p>
+     * When enabled, the circuit breaker monitors publish failures per event type.
+     * If the failure rate exceeds {@code failure-rate-threshold} within the
+     * evaluation window ({@code failure-threshold} requests), the circuit opens
+     * and subsequent publishes for that event type are rejected immediately.
+     * After {@code cooldown}, limited attempts are allowed in half-open state
+     * to probe recovery.
+     * <p>
+     * The circuit breaker wraps the transport publisher chain and sits between
+     * the lifecycle publisher and the transport layer. Events are persisted
+     * before the breaker check, so no events are lost when the circuit is open.
+     * The scheduler can bypass the breaker via a dedicated mechanism.
+     * <p>
+     * Disabled by default — enable explicitly in production environments with
+     * external service dependencies.
+     */
+    public static class CircuitBreakerConfig {
+        /**
+         * Enable circuit breaker protection for event publishing.
+         */
+        private boolean enabled = false;
+
+        /**
+         * Minimum number of requests before failure rate is evaluated.
+         * The breaker waits for at least this many requests before checking
+         * the failure rate against the threshold.
+         */
+        private int failureThreshold = 10;
+
+        /**
+         * Failure rate threshold (0.0–1.0) that triggers circuit opening.
+         * E.g., {@code 0.8} means 80% of requests must fail to open.
+         */
+        private double failureRateThreshold = 0.8;
+
+        /**
+         * Duration to wait before transitioning from OPEN to HALF_OPEN state.
+         * During this period, all requests are rejected immediately.
+         */
+        private Duration cooldown = Duration.ofSeconds(60);
+
+        /**
+         * Maximum number of failed attempts in HALF_OPEN state before
+         * the circuit re-opens. A single success in HALF_OPEN closes the circuit.
+         */
+        private int halfOpenMaxAttempts = 3;
+
+        /**
+         * Maximum number of circuit breaker entries in the internal cache.
+         * When the cache is full, the least recently used CLOSED breakers are
+         * evicted automatically. OPEN and HALF_OPEN breakers remain active
+         * because they are accessed on every publish attempt.
+         */
+        private int maxCacheSize = 1000;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getFailureThreshold() {
+            return failureThreshold;
+        }
+
+        public void setFailureThreshold(int failureThreshold) {
+            this.failureThreshold = failureThreshold;
+        }
+
+        public double getFailureRateThreshold() {
+            return failureRateThreshold;
+        }
+
+        public void setFailureRateThreshold(double failureRateThreshold) {
+            this.failureRateThreshold = failureRateThreshold;
+        }
+
+        public Duration getCooldown() {
+            return cooldown;
+        }
+
+        public void setCooldown(Duration cooldown) {
+            this.cooldown = cooldown;
+        }
+
+        public int getHalfOpenMaxAttempts() {
+            return halfOpenMaxAttempts;
+        }
+
+        public void setHalfOpenMaxAttempts(int halfOpenMaxAttempts) {
+            this.halfOpenMaxAttempts = halfOpenMaxAttempts;
+        }
+
+        public int getMaxCacheSize() {
+            return maxCacheSize;
+        }
+
+        public void setMaxCacheSize(int maxCacheSize) {
+            this.maxCacheSize = maxCacheSize;
+        }
+
+        @Override
+        public String toString() {
+            return "CircuitBreakerConfig{" +
+                    "enabled=" + enabled +
+                    ", failureThreshold=" + failureThreshold +
+                    ", failureRateThreshold=" + failureRateThreshold +
+                    ", cooldown=" + cooldown +
+                    ", halfOpenMaxAttempts=" + halfOpenMaxAttempts +
+                    ", maxCacheSize=" + maxCacheSize +
+                    '}';
         }
     }
 

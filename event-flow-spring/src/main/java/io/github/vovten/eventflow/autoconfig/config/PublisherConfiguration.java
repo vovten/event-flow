@@ -4,7 +4,9 @@ import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
+import io.github.vovten.eventflow.publisher.CircuitBreakerEventPublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.publisher.FailureTracker;
 import io.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import org.apache.commons.lang3.StringUtils;
@@ -38,6 +40,7 @@ public class PublisherConfiguration {
 
     private final EventFlowProperties properties;
     private final Map<String, OutTransportFactory> publisherTransportFactories;
+    private CircuitBreakerEventPublisher circuitBreaker;
 
     public PublisherConfiguration(EventFlowProperties properties,
                                   List<OutTransportFactory> publisherTransportFactories) {
@@ -105,6 +108,22 @@ public class PublisherConfiguration {
 
         EventPublisher publisher = builder.build();
 
+        // Apply circuit breaker if enabled (wraps transport layer, before lifecycle)
+        var cbConfig = publisherConfig.getCircuitBreaker();
+        if (cbConfig.isEnabled()) {
+            circuitBreaker = new CircuitBreakerEventPublisher(
+                    publisher,
+                    cbConfig.getFailureThreshold(),
+                    cbConfig.getFailureRateThreshold(),
+                    cbConfig.getCooldown(),
+                    cbConfig.getHalfOpenMaxAttempts(),
+                    cbConfig.getMaxCacheSize()
+            );
+            publisher = circuitBreaker;
+            log.info("Wrapped EventPublisher with CircuitBreakerEventPublisher (maxCacheSize={})",
+                    cbConfig.getMaxCacheSize());
+        }
+
         // Wrap with lifecycle-aware publisher if enabled
         if (eventStore != null && publisherConfig.getLifecycle().isEnabled()) {
             String service = publisherConfig.getLifecycle().getServiceName();
@@ -116,13 +135,27 @@ public class PublisherConfiguration {
             log.info("Wrapped EventPublisher with EventLifecyclePublisher (service: {})", service);
         }
 
-        log.info("Built EventPublisher with configuration: channels={}, retry={}, lifecycle={}, customDecorators={}",
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, circuitBreaker={}, lifecycle={}, customDecorators={}",
                 eventChannels.size(),
                 retry.isEnabled() ? "enabled" : "disabled",
+                cbConfig.isEnabled() ? "enabled" : "disabled",
                 publisherConfig.getLifecycle().isEnabled() ? "enabled" : "disabled",
                 "0"
         );
         return publisher;
+    }
+
+    /**
+     * Exposes the circuit breaker as a {@link FailureTracker} bean for lifecycle
+     * integration. When present, {@link AckHandler} uses this to record handler-side
+     * failures into the circuit breaker.
+     *
+     * @return the circuit breaker as a FailureTracker, or null if circuit breaker is disabled
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "event-flow.publisher.circuit-breaker", name = "enabled", havingValue = "true")
+    public FailureTracker circuitBreakerFailureTracker() {
+        return circuitBreaker;
     }
 
     private static void logInfo(List<EventChannel> eventChannels) {
