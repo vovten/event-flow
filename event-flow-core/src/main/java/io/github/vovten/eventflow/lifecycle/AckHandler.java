@@ -106,6 +106,11 @@ public final class AckHandler implements EventSubscriber {
         if (StringUtils.isEmpty(serviceName)) {
             return false;
         }
+        // null means service info is not available (e.g. non-Envelope MANAGED events).
+        // Treat it as ours — do not skip.
+        if (ackService == null) {
+            return false;
+        }
         if (!serviceName.equals(ackService)) {
             log.trace("Skipping ack for foreign service (local: {})", serviceName);
             return true;
