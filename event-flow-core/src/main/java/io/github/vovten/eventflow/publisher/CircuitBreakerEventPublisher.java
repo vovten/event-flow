@@ -89,7 +89,6 @@ public final class CircuitBreakerEventPublisher implements EventPublisher, Failu
     private final double failureRateThreshold;
     private final Duration cooldown;
     private final int halfOpenMaxAttempts;
-    private final int maxCacheSize;
 
     /**
      * Creates a new circuit breaker event publisher.
@@ -109,7 +108,6 @@ public final class CircuitBreakerEventPublisher implements EventPublisher, Failu
         this.failureRateThreshold = failureRateThreshold;
         this.cooldown = Objects.requireNonNull(cooldown, "cooldown must not be null");
         this.halfOpenMaxAttempts = halfOpenMaxAttempts;
-        this.maxCacheSize = maxCacheSize;
         this.breakers = Caffeine.newBuilder()
                 .maximumSize(maxCacheSize)
                 .build();
