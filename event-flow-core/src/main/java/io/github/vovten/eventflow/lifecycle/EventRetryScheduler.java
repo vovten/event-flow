@@ -147,8 +147,7 @@ public final class EventRetryScheduler implements AutoCloseable {
             }
             for (StoredEvent event : events) {
                 if (event.retry()) {
-                    log.info("Manual retry for event id={}", event.eventId());
-                    retryEvent(event);
+                    manualRetryEvent(event);
                 } else {
                     retryIfEligible(event);
                 }
@@ -188,11 +187,31 @@ public final class EventRetryScheduler implements AutoCloseable {
     private void retryEvent(StoredEvent stored) {
         try {
             Event event = EventUtils.fromJson(stored.payload(), Event.class);
-            // Bypass circuit breaker to ensure retries are never blocked
-            CircuitBreakerEventPublisher.runWithBypass(() -> publisher.publish(event));
+            publisher.publish(event);
             log.info("Retried event id={} (attempt {}/{})", stored.eventId(), stored.retryCount() + 1, maxRetries);
         } catch (Exception e) {
             log.error("Failed to retry event id={}: {}", stored.eventId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Retries an event with circuit breaker bypass (manual retry).
+     * <p>
+     * Manual retries are initiated by the user (retry flag is true) and:
+     * <ul>
+     *   <li>Bypass the circuit breaker — the user explicitly wants to try again</li>
+     *   <li>Retry count is incremented the same as for automatic retries</li>
+     * </ul>
+     *
+     * @param stored the stored event to retry
+     */
+    private void manualRetryEvent(StoredEvent stored) {
+        try {
+            Event event = EventUtils.fromJson(stored.payload(), Event.class);
+            CircuitBreakerEventPublisher.runWithBypass(() -> publisher.publish(event));
+            log.info("Manual retry for event id={}", stored.eventId());
+        } catch (Exception e) {
+            log.error("Failed to manual retry event id={}: {}", stored.eventId(), e.getMessage());
         }
     }
 
