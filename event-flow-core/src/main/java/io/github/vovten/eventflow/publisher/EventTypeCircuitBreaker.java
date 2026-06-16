@@ -103,8 +103,8 @@ final class EventTypeCircuitBreaker {
         if (s == State.OPEN) {
             Instant opened = openedAt.get();
             if (opened != null && opened.plus(cooldown).isBefore(Instant.now())) {
-                halfOpenAttempts.set(0);
                 if (state.compareAndSet(State.OPEN, State.HALF_OPEN)) {
+                    halfOpenAttempts.set(0);
                     log.info("Circuit breaker transitioned from OPEN to HALF_OPEN for event type: {}", eventType);
                     return false;
                 }
