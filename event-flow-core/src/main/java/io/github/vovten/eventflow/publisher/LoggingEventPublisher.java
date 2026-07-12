@@ -10,7 +10,11 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -46,6 +50,8 @@ public final class LoggingEventPublisher implements EventPublisher {
 
     private final EventPublisher origin;
     private final int maxPayloadLength;
+    private final Set<String> excludedEvents;
+    private final Map<String, String> logLevels;
 
     /**
      * Create logging decorator with default settings.
@@ -54,7 +60,7 @@ public final class LoggingEventPublisher implements EventPublisher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventPublisher(EventPublisher origin) {
-        this(origin, 1024);
+        this(origin, 1024, Collections.emptySet(), Collections.emptyMap());
     }
 
     /**
@@ -65,12 +71,43 @@ public final class LoggingEventPublisher implements EventPublisher {
      * @throws NullPointerException if origin is null
      */
     public LoggingEventPublisher(EventPublisher origin, int maxPayloadLength) {
+        this(origin, maxPayloadLength, Collections.emptySet(), Collections.emptyMap());
+    }
+
+    /**
+     * Create logging decorator with custom max payload length and excluded event types.
+     *
+     * @param origin             the delegate publisher to wrap
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @throws NullPointerException if origin is null
+     */
+    public LoggingEventPublisher(EventPublisher origin, int maxPayloadLength, Set<String> excludedEvents) {
+        this(origin, maxPayloadLength, excludedEvents, Collections.emptyMap());
+    }
+
+    /**
+     * Create logging decorator with full configuration.
+     *
+     * @param origin             the delegate publisher to wrap
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @param logLevels     per-event log level overrides (event simple class name → level name)
+     * @throws NullPointerException if origin is null
+     */
+    public LoggingEventPublisher(EventPublisher origin, int maxPayloadLength,
+                                 Set<String> excludedEvents, Map<String, String> logLevels) {
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.maxPayloadLength = maxPayloadLength;
+        this.excludedEvents = Objects.requireNonNullElseGet(excludedEvents, Collections::emptySet);
+        this.logLevels = Objects.requireNonNullElseGet(logLevels, HashMap::new);
     }
 
     @Override
     public CompletableFuture<SendResults> publish(Event event) {
+        if (isExcluded(event)) {
+            return origin.publish(event);
+        }
         Instant start = Instant.now();
         String traceId = MDC.get("traceId");
         String spanId = MDC.get("spanId");
@@ -80,17 +117,46 @@ public final class LoggingEventPublisher implements EventPublisher {
                         logEvent(event, result, error, start, traceId, spanId, deliveredFrom));
     }
 
+    private boolean isExcluded(Event event) {
+        if (excludedEvents.isEmpty()) {
+            return false;
+        }
+        Object payload = EventLogUtils.extractPayload(event);
+        return excludedEvents.contains(payload.getClass().getSimpleName());
+    }
+
     private void logEvent(Event event, SendResults result, Throwable error,
                           Instant start, String traceId, String spanId, String deliveredFrom) {
         String entry = buildLogEntry(event, result, error, start, traceId, spanId, deliveredFrom);
+        String eventType = resolveEventType(event);
+        String overrideLevel = logLevels.get(eventType);
+        boolean isError = error != null || (result != null && result.isAllFailure());
+        boolean isWarn = !isError && result != null && result.isPartialSuccess();
 
-        if (error != null || (result != null && result.isAllFailure())) {
+        if (overrideLevel != null && !isLoggable(isError, isWarn, overrideLevel)) {
+            return;
+        }
+        if (isError) {
             log.error(entry);
-        } else if (result != null && result.isPartialSuccess()) {
+        } else if (isWarn) {
             log.warn(entry);
         } else {
             log.info(entry);
         }
+    }
+
+    private String resolveEventType(Event event) {
+        return EventLogUtils.extractPayload(event).getClass().getSimpleName();
+    }
+
+    private static boolean isLoggable(boolean isError, boolean isWarn, String minLevel) {
+        int natural = isError ? 3 : isWarn ? 2 : 1;
+        int min = switch (minLevel.toUpperCase()) {
+            case "ERROR" -> 3;
+            case "WARN"  -> 2;
+            default      -> 1; // INFO, DEBUG, TRACE — log everything
+        };
+        return natural >= min;
     }
 
     private String buildLogEntry(Event event, SendResults result, Throwable error,

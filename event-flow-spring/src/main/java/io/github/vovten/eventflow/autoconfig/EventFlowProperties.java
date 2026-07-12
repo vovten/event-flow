@@ -4,7 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Configuration properties for Event Flow auto-configuration.
@@ -20,6 +22,18 @@ import java.util.List;
  *   publisher:
  *     enabled: true
  *     transactional: true
+ *     lifecycle:
+ *       enabled: false
+ *       service-name: ""
+ *       store:
+ *         type: db
+ *         table-name: event_store
+ *         auto-init-schema: true
+ *       retry:
+ *         enabled: true
+ *         max-retries: 3
+ *         retry-interval: 30s
+ *         min-age: 30s
  *     retry:
  *       enabled: true
  *       max-attempts: 3
@@ -110,6 +124,7 @@ public class EventFlowProperties {
         private boolean transactional = true;
         private LoggingConfig logging = new LoggingConfig();
         private RetryConfig retry = new RetryConfig();
+        private LifecyclePublisherConfig lifecycle = new LifecyclePublisherConfig();
         private List<ChannelConfig> channels = new ArrayList<>();
 
         public boolean isEnabled() {
@@ -144,6 +159,14 @@ public class EventFlowProperties {
             this.retry = retry;
         }
 
+        public LifecyclePublisherConfig getLifecycle() {
+            return lifecycle;
+        }
+
+        public void setLifecycle(LifecyclePublisherConfig lifecycle) {
+            this.lifecycle = lifecycle;
+        }
+
         public List<ChannelConfig> getChannels() {
             return channels;
         }
@@ -154,11 +177,304 @@ public class EventFlowProperties {
     }
 
     /**
+     * Lifecycle-aware publisher configuration for event lifecycle tracking.
+     * <p>
+     * When enabled, events are persisted to an {@code EventStore} according to their
+     * {@code EventLifecycle} level:
+     * <ul>
+     *   <li>{@code PERSISTED} — saved with {@code UNDEFINED} status, no further tracking</li>
+     *   <li>{@code MANAGED} — saved with {@code NEW} status, full lifecycle tracking
+     *       via acknowledgment events</li>
+     * </ul>
+     * <p>
+     * Requires a {@code DataSource} bean to be present for the {@code "db"} store type.
+     */
+    public static class LifecyclePublisherConfig {
+        private boolean enabled = false;
+        private String serviceName = "";
+        private StoreConfig store = new StoreConfig();
+        private RetryTrackingConfig retry = new RetryTrackingConfig();
+        private CleanupConfig cleanup = new CleanupConfig();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getServiceName() {
+            return serviceName;
+        }
+
+        public void setServiceName(String serviceName) {
+            this.serviceName = serviceName;
+        }
+
+        public StoreConfig getStore() {
+            return store;
+        }
+
+        public void setStore(StoreConfig store) {
+            this.store = store;
+        }
+
+        public RetryTrackingConfig getRetry() {
+            return retry;
+        }
+
+        public void setRetry(RetryTrackingConfig retry) {
+            this.retry = retry;
+        }
+
+        public CleanupConfig getCleanup() {
+            return cleanup;
+        }
+
+        public void setCleanup(CleanupConfig cleanup) {
+            this.cleanup = cleanup;
+        }
+
+        @Override
+        public String toString() {
+            return "LifecyclePublisherConfig{" +
+                    "enabled=" + enabled +
+                    ", serviceName='" + serviceName + '\'' +
+                    ", store=" + store +
+                    ", retry=" + retry +
+                    ", cleanup=" + cleanup +
+                    '}';
+        }
+
+        /**
+         * Event store configuration.
+         */
+        public static class StoreConfig {
+            /**
+             * Store type identifier. Built-in values: {@code "db"}, {@code "in-memory"}.
+             * Custom types are supported by defining a custom {@code @Bean EventStore}
+             * — the framework auto-discovers it and returns it when the type matches.
+             */
+            private String type = "db";
+
+            /**
+             * Name of the database table for event storage (only for {@code type: "db"}).
+             */
+            private String tableName = "event_store";
+
+            /**
+             * Automatically create the table on startup (only for {@code type: "db"}).
+             * Set to false in production and manage schema via Flyway/Liquibase.
+             */
+            private boolean autoInitSchema = false;
+
+            public String getType() {
+                return type;
+            }
+
+            public void setType(String type) {
+                this.type = type;
+            }
+
+            public String getTableName() {
+                return tableName;
+            }
+
+            public void setTableName(String tableName) {
+                this.tableName = tableName;
+            }
+
+            public boolean isAutoInitSchema() {
+                return autoInitSchema;
+            }
+
+            public void setAutoInitSchema(boolean autoInitSchema) {
+                this.autoInitSchema = autoInitSchema;
+            }
+
+            @Override
+            public String toString() {
+                return "StoreConfig{" +
+                        "type='" + type + '\'' +
+                        ", tableName='" + tableName + '\'' +
+                        ", autoInitSchema=" + autoInitSchema +
+                        '}';
+            }
+        }
+
+        /**
+         * Retry configuration for lifecycle event tracking.
+         * <p>
+         * Controls automatic retry of failed and stuck (PUBLISHED) events.
+         */
+        public static class RetryTrackingConfig {
+            private boolean enabled = true;
+            private int maxRetries = 3;
+            private Duration retryInterval = Duration.ofSeconds(30);
+            private Duration minAge = Duration.ofSeconds(30);
+            private int batchSize = 1000;
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
+
+            public int getMaxRetries() {
+                return maxRetries;
+            }
+
+            public void setMaxRetries(int maxRetries) {
+                this.maxRetries = maxRetries;
+            }
+
+            public Duration getRetryInterval() {
+                return retryInterval;
+            }
+
+            public void setRetryInterval(Duration retryInterval) {
+                this.retryInterval = retryInterval;
+            }
+
+            public Duration getMinAge() {
+                return minAge;
+            }
+
+            public void setMinAge(Duration minAge) {
+                this.minAge = minAge;
+            }
+
+            public int getBatchSize() {
+                return batchSize;
+            }
+
+            public void setBatchSize(int batchSize) {
+                this.batchSize = batchSize;
+            }
+
+            @Override
+            public String toString() {
+                return "RetryTrackingConfig{" +
+                        "enabled=" + enabled +
+                        ", maxRetries=" + maxRetries +
+                        ", retryInterval=" + retryInterval +
+                        ", minAge=" + minAge +
+                        ", batchSize=" + batchSize +
+                        '}';
+            }
+        }
+
+        /**
+         * Cleanup configuration for lifecycle event tracking.
+         * <p>
+         * Controls automatic deletion of old terminal events (HANDLED, UNDEFINED)
+         * from the event store. Events older than {@code maxAge} are deleted
+         * in batches of {@code batchSize} with a pause between batches to
+         * reduce database load.
+         * <p>
+         * Only terminal events that are no longer needed for retry or tracking
+         * are cleaned up. {@code FAILED} events are preserved for manual inspection.
+         */
+        public static class CleanupConfig {
+            /**
+             * Enable the periodic cleanup scheduler.
+             */
+            private boolean enabled = false;
+
+            /**
+             * How often the cleanup cycle runs.
+             */
+            private Duration interval = Duration.ofMinutes(60);
+
+            /**
+             * Events older than this duration are eligible for deletion.
+             */
+            private Duration maxAge = Duration.ofDays(7);
+
+            /**
+             * Maximum number of events to delete in a single batch.
+             */
+            private int batchSize = 1000;
+
+            /**
+             * Pause between consecutive batches to spread database load.
+             */
+            private Duration pauseBetweenBatches = Duration.ofMillis(100);
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
+
+            public Duration getInterval() {
+                return interval;
+            }
+
+            public void setInterval(Duration interval) {
+                this.interval = interval;
+            }
+
+            public Duration getMaxAge() {
+                return maxAge;
+            }
+
+            public void setMaxAge(Duration maxAge) {
+                this.maxAge = maxAge;
+            }
+
+            public int getBatchSize() {
+                return batchSize;
+            }
+
+            public void setBatchSize(int batchSize) {
+                this.batchSize = batchSize;
+            }
+
+            public Duration getPauseBetweenBatches() {
+                return pauseBetweenBatches;
+            }
+
+            public void setPauseBetweenBatches(Duration pauseBetweenBatches) {
+                this.pauseBetweenBatches = pauseBetweenBatches;
+            }
+
+            @Override
+            public String toString() {
+                return "CleanupConfig{" +
+                        "enabled=" + enabled +
+                        ", interval=" + interval +
+                        ", maxAge=" + maxAge +
+                        ", batchSize=" + batchSize +
+                        ", pauseBetweenBatches=" + pauseBetweenBatches +
+                        '}';
+            }
+        }
+    }
+
+    /**
      * Logging configuration for event publishing.
      */
     public static class LoggingConfig {
         private boolean enabled = false;
         private int maxPayloadLength = 500;
+        /**
+         * List of event simple class names to exclude from logging.
+         * Default: SuccessAck, FailureAck (lifecycle acknowledgment events).
+         */
+        private List<String> excludedEvents = new ArrayList<>(List.of("SuccessAck", "FailureAck"));
+        /**
+         * Per-event log level overrides.
+         * Key: event simple class name (e.g., "HeartbeatEvent").
+         * Value: log level name (DEBUG, INFO, WARN, ERROR).
+         * When set, overrides the default status-based log level for matching events.
+         */
+        private Map<String, String> logLevels = new HashMap<>();
 
         public boolean isEnabled() {
             return enabled;
@@ -174,6 +490,22 @@ public class EventFlowProperties {
 
         public void setMaxPayloadLength(int maxPayloadLength) {
             this.maxPayloadLength = maxPayloadLength;
+        }
+
+        public List<String> getExcludedEvents() {
+            return excludedEvents;
+        }
+
+        public void setExcludedEvents(List<String> excludedEvents) {
+            this.excludedEvents = excludedEvents;
+        }
+
+        public Map<String, String> getLogLevels() {
+            return logLevels;
+        }
+
+        public void setLogLevels(Map<String, String> logLevels) {
+            this.logLevels = logLevels;
         }
     }
 
@@ -261,6 +593,7 @@ public class EventFlowProperties {
         private IdempotentConfig idempotent = new IdempotentConfig();
         private LoggingConfig logging = new LoggingConfig();
         private DeserializationConfig deserialization = new DeserializationConfig();
+        private LifecycleConfig lifecycle = new LifecycleConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -316,6 +649,38 @@ public class EventFlowProperties {
 
         public void setDeserialization(DeserializationConfig deserialization) {
             this.deserialization = deserialization;
+        }
+
+        public LifecycleConfig getLifecycle() {
+            return lifecycle;
+        }
+
+        public void setLifecycle(LifecycleConfig lifecycle) {
+            this.lifecycle = lifecycle;
+        }
+    }
+
+    /**
+     * Lifecycle configuration for the dispatcher.
+     * <p>
+     * When enabled, the dispatcher publishes {@code SuccessAck} or
+     * {@code FailureAck} acknowledgment events back to the source channels
+     * after handler execution, enabling the publisher to track event lifecycle.
+     */
+    public static class LifecycleConfig {
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        @Override
+        public String toString() {
+            return "LifecycleConfig{enabled=" + enabled + '}';
         }
     }
 

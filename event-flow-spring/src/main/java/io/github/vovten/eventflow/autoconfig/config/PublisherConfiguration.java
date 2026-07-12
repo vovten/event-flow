@@ -3,10 +3,14 @@ package io.github.vovten.eventflow.autoconfig.config;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import io.github.vovten.eventflow.channel.EventChannel;
+import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +18,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 import static java.util.stream.Collectors.joining;
@@ -45,12 +50,15 @@ public class PublisherConfiguration {
      * Creates event publisher with all configured channels.
      *
      * @param eventChannels list of event channels to configure
+     * @param eventStore    optional event store for persistent publishing (auto-injected)
      * @return configured event publisher
+     * @throws IllegalStateException if lifecycle is enabled but service-name is not configured
      */
     @Bean
     @ConditionalOnMissingBean(name = "eventPublisher")
     @ConditionalOnProperty(prefix = "event-flow.publisher", name = "enabled", havingValue = "true")
-    public EventPublisher eventPublisher(List<EventChannel> eventChannels) {
+    public EventPublisher eventPublisher(List<EventChannel> eventChannels,
+                                         @Autowired(required = false) EventStore eventStore) {
         if (eventChannels.isEmpty()) {
             log.warn("""
 
@@ -72,16 +80,16 @@ public class PublisherConfiguration {
         }
         logInfo(eventChannels);
         EventFlowProperties.PublisherConfig publisherConfig = properties.getPublisher();
-        
+
         // Use Spring-aware builder
         SpringEventPublisherBuilder builder = SpringEventPublisherBuilder.create(eventChannels);
-        
+
         // Apply retry if enabled
         var retry = publisherConfig.getRetry();
         if (retry.isEnabled()) {
             builder.retryable(retry.getMaxAttempts(), retry.getInitialDelay(), retry.getMultiplier());
         }
-        
+
         // Apply transactional if enabled
         if (publisherConfig.isTransactional()) {
             builder.transactional();
@@ -90,10 +98,31 @@ public class PublisherConfiguration {
         // Apply logging if enabled
         var loggingConfig = publisherConfig.getLogging();
         if (loggingConfig.isEnabled()) {
-            builder.loggable(loggingConfig.getMaxPayloadLength());
+            builder.loggable(loggingConfig.getMaxPayloadLength(),
+                    Set.copyOf(loggingConfig.getExcludedEvents()),
+                    loggingConfig.getLogLevels());
         }
 
-        return builder.buildAndLog();
+        EventPublisher publisher = builder.build();
+
+        // Wrap with lifecycle-aware publisher if enabled
+        if (eventStore != null && publisherConfig.getLifecycle().isEnabled()) {
+            String service = publisherConfig.getLifecycle().getServiceName();
+            if (StringUtils.isEmpty(service)) {
+                throw new IllegalStateException(
+                        "event-flow.publisher.lifecycle.service-name must be configured when lifecycle tracking is enabled");
+            }
+            publisher = new EventLifecyclePublisher(publisher, eventStore, service);
+            log.info("Wrapped EventPublisher with EventLifecyclePublisher (service: {})", service);
+        }
+
+        log.info("Built EventPublisher with configuration: channels={}, retry={}, lifecycle={}, customDecorators={}",
+                eventChannels.size(),
+                retry.isEnabled() ? "enabled" : "disabled",
+                publisherConfig.getLifecycle().isEnabled() ? "enabled" : "disabled",
+                "0"
+        );
+        return publisher;
     }
 
     private static void logInfo(List<EventChannel> eventChannels) {

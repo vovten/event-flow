@@ -7,8 +7,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
+import io.github.vovten.eventflow.lifecycle.EventLifecycle;
+import io.github.vovten.eventflow.lifecycle.LifecycleResolver;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,6 +86,47 @@ public final class Envelope<T> implements TraceableEvent {
         return new Envelope<>(
                 UUID.randomUUID(),
                 null,
+                Instant.now(),
+                payload,
+                Map.of(),
+                null
+        );
+    }
+
+    /**
+     * Create envelope with specified eventId, null processId, and current timestamp.
+     * Channels are resolved from payload's {@link Event} annotation, or default to internal.
+     *
+     * @param <T>     the payload type
+     * @param eventId the explicit event identifier
+     * @param payload the event to wrap
+     * @return new envelope instance
+     */
+    public static <T> Envelope<T> of(UUID eventId, T payload) {
+        return new Envelope<>(
+                eventId,
+                null,
+                Instant.now(),
+                payload,
+                Map.of(),
+                null
+        );
+    }
+
+    /**
+     * Create envelope with specified eventId, specified processId, and current timestamp.
+     * Channels are resolved from payload's {@link Event} annotation, or default to internal.
+     *
+     * @param <T>        the payload type
+     * @param eventId    the explicit event identifier
+     * @param processId  the process identifier (e.g., saga ID)
+     * @param payload    the domain event to wrap
+     * @return new envelope instance
+     */
+    public static <T> Envelope<T> of(UUID eventId, UUID processId, T payload) {
+        return new Envelope<>(
+                eventId,
+                processId,
                 Instant.now(),
                 payload,
                 Map.of(),
@@ -180,6 +224,23 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
+     * Returns a new {@code Envelope} with the same properties plus an additional
+     * metadata entry. The explicit {@code targetChannels} (if any) are preserved.
+     *
+     * @param key   metadata key
+     * @param value metadata value
+     * @return a new envelope with the merged metadata
+     */
+    public Envelope<T> withAdditionalMetadata(String key, String value) {
+        Map<String, String> newMetadata = new HashMap<>(this.metadata);
+        newMetadata.put(key, value);
+        return new Envelope<>(
+                this.eventId, this.processId, this.occurredAt, this.payload,
+                newMetadata, this.targetChannels
+        );
+    }
+
+    /**
      * @return the actual type of the wrapped payload
      */
     @Override
@@ -207,6 +268,23 @@ public final class Envelope<T> implements TraceableEvent {
             return Arrays.asList(annotation.channels());
         }
         return List.of(InternalEventChannel.class);
+    }
+
+    /**
+     * Resolves the lifecycle level for this envelope.
+     * <p>
+     * Resolution priority:
+     * <ol>
+     *   <li>{@link Event @Event} annotation on the payload class</li>
+     *   <li>{@link Event#lifecycle()} default method (if payload implements Event)</li>
+     *   <li>{@link EventLifecycle#PERSISTED} as fallback for POJO payloads</li>
+     * </ol>
+     *
+     * @return resolved lifecycle level
+     */
+    @Override
+    public EventLifecycle lifecycle() {
+        return LifecycleResolver.standard().resolve(this);
     }
 
     @Override

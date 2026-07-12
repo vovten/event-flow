@@ -258,6 +258,14 @@ Fluent builder for creating publishers:
 | `withDecorator(fn)` | Add custom decorator to the publisher chain |
 | `build()` | Build the publisher |
 | `buildAndLog()` | Build the publisher and log the configuration |
+| `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
+| `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
+| `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
+
+### Structured Logging
+
+See [Main README — Structured Logging](../README.md#-structured-logging) for details.
 
 ### Retry Configuration
 
@@ -290,6 +298,14 @@ Fluent builder for creating dispatchers:
 | `withDecorator(fn)` | Add custom decorator |
 | `build()` | Build the dispatcher |
 | `buildAndLog()` | Build the dispatcher and log the configuration |
+| `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
+| `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
+| `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
+
+### Structured Logging
+
+See [Main README — Structured Logging](../README.md#-structured-logging) for details.
 
 ### Idempotent Dispatcher
 

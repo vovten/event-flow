@@ -4,7 +4,10 @@ import io.github.vovten.eventflow.channel.EventChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Spring-aware fluent builder for creating configured {@link EventPublisher} instances.
@@ -57,6 +60,8 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     private boolean transactional = false;
     private boolean loggable = false;
     private int logMaxPayloadLength = 500;
+    private Set<String> logExcludedEventTypes = Collections.emptySet();
+    private Map<String, String> logLevels = Collections.emptyMap();
 
     /**
      * Start building a new SpringEventPublisher.
@@ -128,8 +133,38 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
      * @return this builder
      */
     public SpringEventPublisherBuilder loggable(int maxPayloadLength) {
+        return loggable(maxPayloadLength, Collections.emptySet());
+    }
+
+    /**
+     * Enable logging of published events with custom max payload length and excluded event types.
+     *
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @return this builder
+     */
+    public SpringEventPublisherBuilder loggable(int maxPayloadLength, Set<String> excludedEvents) {
         this.loggable = true;
         this.logMaxPayloadLength = maxPayloadLength;
+        this.logExcludedEventTypes = excludedEvents;
+        return this;
+    }
+
+    /**
+     * Enable logging of published events with custom max payload length, excluded event types,
+     * and per-event log level overrides.
+     *
+     * @param maxPayloadLength   maximum length of payload in log output
+     * @param excludedEvents set of event simple class names to exclude from logging
+     * @param logLevels     per-event log level overrides (event simple class name → level name)
+     * @return this builder
+     */
+    public SpringEventPublisherBuilder loggable(int maxPayloadLength, Set<String> excludedEvents,
+                                                Map<String, String> logLevels) {
+        this.loggable = true;
+        this.logMaxPayloadLength = maxPayloadLength;
+        this.logExcludedEventTypes = excludedEvents;
+        this.logLevels = logLevels;
         return this;
     }
 
@@ -147,8 +182,9 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
         EventPublisher result = publisher;
 
         if (loggable) {
-            log.debug("Applying logging decorator with maxPayloadLength={}", logMaxPayloadLength);
-            result = new LoggingEventPublisher(result, logMaxPayloadLength);
+            log.debug("Applying logging decorator with maxPayloadLength={}, excludedEvents={}",
+                    logMaxPayloadLength, logExcludedEventTypes);
+            result = new LoggingEventPublisher(result, logMaxPayloadLength, logExcludedEventTypes, logLevels);
         }
 
         if (transactional) {

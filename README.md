@@ -13,6 +13,7 @@
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
 - [Core Components](#-core-components)
+- [Lifecycle Tracking](#-lifecycle-tracking)
 - [Usage Examples](#-usage-examples)
 - [Configuration](#-configuration)
 - [Interaction Diagrams](#-interaction-diagrams)
@@ -28,6 +29,7 @@
 - **Transactional Publishing** — Send events after transaction commit
 - **Structured Logging** — Decorators for publisher and dispatcher with machine-parseable JSON output
 - **Retry Mechanism** — Exponential backoff with configurable parameters
+- **Lifecycle Tracking** — End-to-end event lifecycle with persistent storage, status tracking, automatic retry of failed events, and acknowledgment-based monitoring
 - **Extensible Serialization** — JSON and MessagePack with support for custom formats
 
 ## 🏗 Architecture
@@ -425,6 +427,10 @@ EventPublisher publisher = EventPublisherBuilder.create(internalChannel, externa
 | `withDecorator(fn)` | Add custom decorator to the publisher chain |
 | `build()` | Build the publisher |
 | `buildAndLog()` | Build the publisher and log the configuration |
+| `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
+| `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
+| `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
 
 ### EventDispatcher
 
@@ -453,6 +459,10 @@ public interface EventDispatcher {
 | `withDecorator(fn)` | Add custom decorator |
 | `build()` | Build the dispatcher |
 | `buildAndLog()` | Build the dispatcher and log the configuration |
+| `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
+| `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
+| `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
 
 ### EventHandlerRegistry
 
@@ -485,6 +495,41 @@ public interface EventHandlerRegistry {
 | `withDecorator(fn)` | Add a decorator |
 | `build()` | Build the registry |
 | `buildAndLog()` | Build the registry and log the configuration |
+
+### EventLifecycle
+
+An enum that controls how an event's journey is tracked. Three levels:
+
+| Level | Behaviour |
+|-------|-----------|
+| `NONE` | Fire-and-forget — event passes through without any persistence |
+| `PERSISTED` | Event is stored in the `EventStore` (with `UNDEFINED` status) but not actively tracked |
+| `MANAGED` | Full lifecycle tracking — event status transitions through `NEW → PUBLISHED → HANDLED`, with automatic retry on failure |
+
+Set via `@Event(lifecycle = ...)` annotation or the `lifecycle()` default method on `Event`.
+
+### EventStore
+
+Persistence layer for lifecycle tracking. Stores serialised events and tracks their status as they flow through the system.
+
+- **`JdbcEventStore`** — production-grade, backed by a relational database (PostgreSQL, H2, MySQL, etc.)
+- **`InMemoryEventStore`** — in-JVM `ConcurrentHashMap`-backed store for testing and single-JVM scenarios
+
+### EventLifecyclePublisher
+
+Decorator for `EventPublisher` that persists events to the `EventStore` before they are sent and updates their status (`NEW → PUBLISHED/FAILED`) after publishing. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
+
+### EventLifecycleDispatcher
+
+Decorator for `EventDispatcher` that publishes `SuccessAck` or `FailureAck` events back to the source channels after handler execution — enabling end-to-end status tracking. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
+
+### EventRetryScheduler
+
+Periodically scans the `EventStore` for failed (`FAILED`), stuck (`PUBLISHED`), and orphaned (`NEW`) events and re-publishes them with exponential backoff. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
+
+### AckHandler
+
+An `EventSubscriber` that processes incoming lifecycle acknowledgment events (`SuccessAck`/`FailureAck`) and updates the event status in the `EventStore`. Filters by service name to allow multiple publisher instances to share the same channel. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
 
 ### EventTransport
 
@@ -543,6 +588,150 @@ EventTypeRegistry.allowPackage("com.example.events");
 // Allow a specific class
 EventTypeRegistry.allowClass(MyEvent.class);
 ```
+
+---
+
+## 🔄 Lifecycle Tracking
+
+Event Flow provides an end-to-end **lifecycle tracking** system that answers three questions about every event:
+
+- **Was it saved?** — the event persisted before publication (crash recovery)
+- **Was it delivered?** — the event reached all target channels successfully
+- **Was it handled?** — all registered handlers processed the event without errors
+
+This turns event publishing from a fire-and-forget operation into a **reliable, observable process** — essential for critical business events (orders, payments, notifications) where you need guarantees and visibility.
+
+### When you need it
+
+| Scenario | Without lifecycle | With lifecycle (`MANAGED`) |
+|----------|------------------|---------------------------|
+| Service crashes mid-publish | Event lost | Event safe in store, retried on restart |
+| Handler throws an exception | Silent failure | Status updated to `FAILED`, automatic retry |
+| Ack lost in transit | Event stuck in limbo | Detected as `PUBLISHED` → retried |
+| Debugging production issues | Logs only | Queryable event store with full history |
+
+You choose the level per event — `NONE` for high-throughput fire-and-forget, `PERSISTED` for audit without monitoring, `MANAGED` when you need guarantees.
+
+### How it works
+
+```
+┌─────────────────────────── PUBLISHER ────────────────────────────┐
+│                                                                  │
+│  Event ──► EventLifecyclePublisher ──► EventStore ──► Channel    │
+│                    │                         │                   │
+│                    │  saves & tracks status  │                   │
+│                    │  (NEW→PUBLISHED/FAILED) │                   │
+│                    │                         │                   │
+│  ◄── EventRetryScheduler scans FAILED, PUBLISHED, NEW ──► retry  │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+         │                                  ▲
+         │         SuccessAck / FailureAck  │
+         ▼                                  │
+┌────────────────────────── DISPATCHER ────────────────────────────┐
+│                                                                  │
+│  Channel ──► EventLifecycleDispatcher ──► Handlers               │
+│                      │                                           │
+│                      │  publishes ack after handler execution    │
+│                                                                  │
+│  ◄── AckHandler processes ack, updates store (HANDLED/FAILED)    │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**The flow:**
+1. `EventLifecyclePublisher` saves the event to `EventStore` with status `NEW`, then publishes it
+2. On successful delivery, status updates to `PUBLISHED`; on failure, to `FAILED`
+3. `EventLifecycleDispatcher` (on the consumer side) publishes `SuccessAck` or `FailureAck` back through the channel
+4. `AckHandler` (on the publisher side) catches the ack and updates status to `HANDLED` or `FAILED`
+5. `EventRetryScheduler` periodically rescans `FAILED`, stuck `PUBLISHED`, and orphaned `NEW` events and retries them with exponential backoff
+
+### Three lifecycle levels
+
+| Level | Behaviour | Use case |
+|-------|-----------|----------|
+| `NONE` | No persistence, no tracking. Event passes straight through | High-throughput notifications, ephemeral events |
+| `PERSISTED` | Event saved to store but status stays `UNDEFINED`. No retry, no ack | Audit trail without operational guarantees |
+| `MANAGED` | Full tracking: `NEW → PUBLISHED → HANDLED`, automatic retry on failure, ack-based end-to-end confirmation | Orders, payments, critical business events |
+
+Set via `@Event` annotation:
+
+```java
+@Event(channels = InternalEventChannel.class, lifecycle = EventLifecycle.MANAGED)
+public record OrderCreated(String orderId) {}
+```
+
+Or via `Event.lifecycle()` default method — the annotation takes precedence when both are present.
+
+### Configuration
+
+Enable lifecycle tracking in Spring Boot with three properties:
+
+```yaml
+event-flow:
+  publisher:
+    lifecycle:
+      enabled: true              # Enable lifecycle-aware publishing
+      service-name: order-service # Required! Identifies this service for ack filtering
+      store:
+        type: db                 # "db" (PostgreSQL/H2/MySQL) or "in-memory" (testing)
+        table-name: event_store
+        auto-init-schema: true    # Disable in production, manage DDL via Flyway
+      retry:
+        enabled: true
+        max-retries: 3
+        retry-interval: 30s
+        min-age: 30s              # Backoff: 30s, then 60s, then 120s
+  dispatcher:
+    lifecycle:
+      enabled: true               # Enable ack generation on the dispatcher side
+```
+
+The `service-name` is mandatory — it identifies this service instance so that `AckHandler` only processes acknowledgments meant for it (multiple services can share the same ack channel without interference).
+
+### Retry mechanism
+
+`EventRetryScheduler` scans for three categories of events that need retry:
+
+| Status | Why it happens |
+|--------|---------------|
+| `FAILED` | Publication or handler threw an error |
+| `PUBLISHED` | Event was sent but ack was lost in transit (stuck) |
+| `NEW` | Event was saved but the application crashed before publishing finished (orphaned) |
+
+Backoff is exponential: `delay = minAge × 2^retryCount`. First retry at 30s, second at 60s, third at 120s.
+
+### Cleanup
+
+`EventCleanupScheduler` periodically deletes old terminal events (`HANDLED` and `UNDEFINED`) from the `EventStore` to prevent unbounded growth. Deletion is performed in configurable batches with pauses between batches to reduce database load.
+
+```yaml
+event-flow:
+  publisher:
+    lifecycle:
+      cleanup:
+        enabled: true
+        max-age: 7d           # Events older than this are deleted
+        batch-size: 500       # Rows per DELETE
+        interval: 60m         # How often the scheduler runs
+        pause-between-batches: 100ms  # Throttle between batches
+```
+
+**Safety:**
+- Only terminal statuses (`HANDLED`, `UNDEFINED`) are cleaned up — `FAILED` events are preserved for manual inspection
+- A single cycle deletes at most 100 000 events; leftover events are picked up by the next cycle
+- A random jitter (up to `interval`) is added to the first run to avoid thundering herd when multiple instances start
+
+### Storage
+
+The `EventStore` interface has two built-in implementations:
+
+- **`JdbcEventStore`** — production grade, backed by a relational database. Table is created automatically by default. Dialect-specific DDL scripts are shipped at `io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql` for manual migration tooling.
+- **`InMemoryEventStore`** — `ConcurrentHashMap`-backed, for testing and single-JVM scenarios where persistence is not needed.
+
+You can also implement `EventStore` with your own backend (Redis, MongoDB, etc.) and configure it via `store.type`.
+
+---
 
 ## 📝 Usage Examples
 
@@ -795,7 +984,22 @@ For transactional publishing in Spring Boot applications, see [event-flow-spring
 
 For detailed configuration examples, see:
 - **[Event Flow Core](event-flow-core/README.md)** — LocalQueue, Kafka, custom transports, serialization
-- **[Event Flow Spring](event-flow-spring/README.md)** — YAML auto-configuration, transactional publishing, retry support
+- **[Event Flow Spring](event-flow-spring/README.md)** — YAML auto-configuration, transactional publishing, retry support, lifecycle tracking
+
+### Lifecycle Tracking Configuration
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `event-flow.publisher.lifecycle.enabled` | `false` | Enable lifecycle-aware event publishing |
+| `event-flow.publisher.lifecycle.service-name` | `""` | **Required!** Service name for ack filtering |
+| `event-flow.publisher.lifecycle.store.type` | `db` | Store type: `db`, `in-memory`, or custom |
+| `event-flow.publisher.lifecycle.store.table-name` | `event_store` | Custom table name (for `db` type) |
+| `event-flow.publisher.lifecycle.store.auto-init-schema` | `true` | Auto-create table on startup |
+| `event-flow.publisher.lifecycle.retry.enabled` | `true` | Enable automatic retry of failed events |
+| `event-flow.publisher.lifecycle.retry.max-retries` | `3` | Maximum retry attempts |
+| `event-flow.publisher.lifecycle.retry.retry-interval` | `30s` | Interval between retry cycles |
+| `event-flow.publisher.lifecycle.retry.min-age` | `30s` | Base backoff for exponential retry |
+| `event-flow.dispatcher.lifecycle.enabled` | `false` | Enable ack-based lifecycle tracking on dispatcher |
 
 ### LocalQueue
 
@@ -808,6 +1012,77 @@ Kafka transport for external event communication. See [event-flow-core/README.md
 ### Custom Transport
 
 Implement `OutTransport` or `InTransport` interfaces to add custom transport types. See [event-flow-core/README.md](event-flow-core/README.md#custom-transport) for an example.
+
+## 🔊 Structured Logging
+
+Event Flow provides structured JSON logging decorators for both the publisher and the dispatcher. Each log entry captures: event status, envelope metadata (eventId, processId, occurredAt), payload (truncated), handler/transport results, duration, and distributed tracing context (traceId, spanId, deliveredFrom).
+
+### Enabling Logging
+
+Use `buildAndLog()` or the `loggable()` builder methods:
+
+```java
+// Publisher
+EventPublisher publisher = EventPublisherBuilder.create(channel)
+    .loggable()                                    // defaults: 1024 char payload
+    .loggable(500)                                 // custom payload truncation
+    .loggable(500, Set.of("HeartbeatEvent"))       // exclude noisy events
+    .loggable(500, Set.of(), Map.of("HeartbeatEvent", "ERROR"))  // with log overrides
+    .build();
+
+// Dispatcher
+EventDispatcher dispatcher = EventDispatcherBuilder.create()
+    .executor(executor)
+    .handlerRegistry(registry)
+    .loggable()
+    .build();
+```
+
+### Per-Event Log Level Overrides
+
+By default, log level is determined by the outcome:
+
+| Outcome | Default level |
+|---------|---------------|
+| All handlers/transports succeed | `INFO` |
+| Partial success (some fail) | `WARN` |
+| All fail or exception | `ERROR` |
+
+With `logLevels` you can override the minimum log level for specific event types. The override acts as a **threshold**:
+
+| Override | ERROR outcome | WARN outcome | INFO outcome |
+|----------|:------------:|:------------:|:------------:|
+| `ERROR`  | `log.error`  | suppressed   | suppressed   |
+| `WARN`   | `log.error`  | `log.warn`   | suppressed   |
+| `INFO`   | `log.error`  | `log.warn`   | `log.info`   |
+
+**Example:** Suppress logging for a high-frequency heartbeat event, only show errors:
+
+```yaml
+event-flow:
+  dispatcher:
+    logging:
+      enabled: true
+      log-levels:
+        HeartbeatEvent: ERROR
+        HealthCheckEvent: WARN
+```
+
+In Spring Boot, these settings go into `event-flow.yml` or `application.yml`. When using the builder directly (without Spring), pass the map via `loggable(maxPayloadLength, excludedEvents, logLevels)`:
+
+```java
+Map<String, String> logLevels = Map.of(
+    "HeartbeatEvent", "ERROR",
+    "HealthCheckEvent", "WARN"
+);
+EventDispatcher dispatcher = EventDispatcherBuilder.create()
+    .executor(executor)
+    .handlerRegistry(registry)
+    .loggable(1024, Set.of(), logLevels)
+    .build();
+```
+
+Valid level names: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`.
 
 ## 📊 Interaction Diagrams
 
@@ -866,7 +1141,47 @@ Implement `OutTransport` or `InTransport` interfaces to add custom transport typ
      │               │                  │                │◀────────────────────│
 ```
 
-### 3. Event Dispatch to Multiple Handlers
+### 3. Event Lifecycle Tracking (MANAGED)
+
+```
+┌──────────┐  ┌───────────────────┐  ┌──────────────┐  ┌────────────────┐  ┌──────────┐  ┌─────────┐
+│ Service  │  │EventLifecycle     │  │  EventStore  │  │   EventChannel │  │Lifecycle │  │AckHandler│
+│          │  │   Publisher       │  │  (persistent)│  │   + Dispatcher │  │Dispatcher│  │         │
+└────┬─────┘  └────────┬──────────┘  └──────┬───────┘  └───────┬────────┘  └────┬─────┘  └────┬────┘
+     │                 │                    │                  │                │             │
+     │ publish(event)  │                    │                  │                │             │
+     │────────────────▶│                    │                  │                │             │
+     │                 │                    │                  │                │             │
+     │                 │ save(NEW)          │                  │                │             │
+     │                 │───────────────────▶│                  │                │             │
+     │                 │                    │                  │                │             │
+     │                 │ send(event)        │                  │                │             │
+     │                 │──────────────────────────────────────▶│                │             │
+     │                 │                    │                  │                │             │
+     │                 │                    │                  │ dispatch(event)│             │
+     │                 │                    │                  │───────────────▶│             │
+     │                 │                    │                  │                │             │
+     │                 │                    │                  │                │ handlers    │
+     │                 │                    │                  │                │─────────▶   │
+     │                 │                    │                  │                │◀────────    │
+     │                 │                    │                  │                │ results     │
+     │                 │                    │                  │                │             │
+     │                 │ update(PUBLISHED)  │                  │                │             │
+     │                 │◀───────────────────│                  │                │             │
+     │                 │                    │                  │                │             │
+     │                 │                    │                  │                │ publish ack │
+     │                 │                    │                  │                │─────────────│──────────▶
+     │                 │                    │                  │                │  (Success/  │           │
+     │                 │                    │                  │                │   Failure)  │           │
+     │                 │                    │                  │                │             │           │
+     │                 │                    │                  │                │             │ ack event │
+     │                 │                    │ update(HANDLED/  │                │             │◀──────────│
+     │                 │                    │   FAILED)        │                │             │           │
+     │                 │◀───────────────────│                  │                │             │           │
+     │◀────────────────│ (CompletableFuture)│                  │                │             │           │
+```
+
+### 4. Event Dispatch to Multiple Handlers
 
 ```
 ┌──────────────┐   ┌───────────────┐   ┌─────────────────────────────────────┐

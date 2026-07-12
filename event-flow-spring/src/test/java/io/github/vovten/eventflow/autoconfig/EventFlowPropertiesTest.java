@@ -209,6 +209,54 @@ class EventFlowPropertiesTest {
     }
 
     @Test
+    @DisplayName("Should bind lifecycle cleanup defaults correctly")
+    void shouldBindLifecycleCleanupDefaults() {
+        // given
+        Map<String, String> properties = Map.of();
+        ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
+        Binder binder = new Binder(source);
+
+        // when
+        EventFlowProperties eventFlowProperties = binder.bind("event-flow", EventFlowProperties.class)
+                .orElseGet(EventFlowProperties::new);
+
+        // then
+        var cleanup = eventFlowProperties.getPublisher().getLifecycle().getCleanup();
+        assertThat(cleanup.isEnabled()).isFalse();
+        assertThat(cleanup.getInterval()).isEqualTo(Duration.ofMinutes(60));
+        assertThat(cleanup.getMaxAge()).isEqualTo(Duration.ofDays(7));
+        assertThat(cleanup.getBatchSize()).isEqualTo(1000);
+        assertThat(cleanup.getPauseBetweenBatches()).isEqualTo(Duration.ofMillis(100));
+    }
+
+    @Test
+    @DisplayName("Should bind lifecycle cleanup custom configuration")
+    void shouldBindLifecycleCleanupCustomConfiguration() {
+        // given
+        Map<String, String> properties = Map.of(
+                "event-flow.publisher.lifecycle.cleanup.enabled", "true",
+                "event-flow.publisher.lifecycle.cleanup.interval", "30m",
+                "event-flow.publisher.lifecycle.cleanup.max-age", "3d",
+                "event-flow.publisher.lifecycle.cleanup.batch-size", "500",
+                "event-flow.publisher.lifecycle.cleanup.pause-between-batches", "200ms"
+        );
+        ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
+        Binder binder = new Binder(source);
+
+        // when
+        EventFlowProperties eventFlowProperties = binder.bind("event-flow", EventFlowProperties.class)
+                .orElseGet(EventFlowProperties::new);
+
+        // then
+        var cleanup = eventFlowProperties.getPublisher().getLifecycle().getCleanup();
+        assertThat(cleanup.isEnabled()).isTrue();
+        assertThat(cleanup.getInterval()).isEqualTo(Duration.ofMinutes(30));
+        assertThat(cleanup.getMaxAge()).isEqualTo(Duration.ofDays(3));
+        assertThat(cleanup.getBatchSize()).isEqualTo(500);
+        assertThat(cleanup.getPauseBetweenBatches()).isEqualTo(Duration.ofMillis(200));
+    }
+
+    @Test
     @DisplayName("Should bind complex configuration with all features")
     void shouldBindComplexConfigurationWithAllFeatures() {
         // given

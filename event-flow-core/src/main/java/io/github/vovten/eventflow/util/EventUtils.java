@@ -81,4 +81,5 @@ public final class EventUtils {
             throw new EventSerializationException("Error converting json to object", e);
         }
     }
+
 }

@@ -44,6 +44,66 @@ event-flow:
       enabled: false
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
+      # Event types (simple class names) to exclude from logging
+      # Default: SuccessAck, FailureAck (lifecycle acknowledgment events)
+      excluded-events:
+        - SuccessAck
+        - FailureAck
+      # Per-event log level overrides
+      # Key: event simple class name, Value: log level name (TRACE, DEBUG, INFO, WARN, ERROR)
+      # When set, overrides the default status-based log level for matching events
+      log-levels:
+        HeartbeatEvent: DEBUG
+
+    # ---------------------------------------------------------------------------
+    # Lifecycle-aware event publishing (event lifecycle tracking)
+    # ---------------------------------------------------------------------------
+    lifecycle:
+      # Enable or disable lifecycle-aware event publishing and lifecycle tracking
+      enabled: false
+      # Service name stamped on outgoing events for ack filtering
+      service-name: ""
+
+      # Event store configuration
+      store:
+        # Store type: "db" (database, default), "in-memory" (non-persistent), or custom
+        type: db
+        # Name of the database table for event storage (only for type: db)
+        table-name: event_store
+        # Automatically create the table on startup (requires DDL privileges)
+        # Set to false in production and manage schema via Flyway/Liquibase.
+        # Dialect-specific DDL scripts are available in the classpath at:
+        #   io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql
+        auto-init-schema: false
+
+      # Retry configuration for lifecycle event tracking
+      retry:
+        # Enable or disable automatic retry of failed and stuck events
+        enabled: true
+        # Maximum number of retry attempts
+        max-retries: 3
+        # Interval between retry cycles
+        retry-interval: 30s
+        # Base backoff interval for retries (delay = min-age × 2^retryCount)
+        # Examples with 30s: 1st retry=30s, 2nd=60s, 3rd=120s
+        min-age: 30s
+        # Maximum number of events to fetch per retry cycle
+        batch-size: 1000
+
+      # Cleanup configuration for lifecycle event tracking
+      # Removes old terminal events (HANDLED, UNDEFINED) to prevent unbounded growth
+      # FAILED events are never cleaned up automatically — preserved for manual inspection
+      cleanup:
+        # Enable or disable automatic cleanup of old terminal events
+        enabled: false
+        # How often the cleanup cycle runs
+        interval: 60m
+        # Events older than this duration are eligible for deletion
+        max-age: 7d
+        # Maximum number of events to delete in a single batch
+        batch-size: 1000
+        # Pause between consecutive delete batches to spread database load
+        pause-between-batches: 100ms
 
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
@@ -138,3 +198,20 @@ event-flow:
       enabled: false
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
+      # Event types (simple class names) to exclude from logging
+      # Default: SuccessAck, FailureAck (lifecycle acknowledgment events)
+      excluded-events:
+        - SuccessAck
+        - FailureAck
+      # Per-event log level overrides
+      # Key: event simple class name, Value: log level name (TRACE, DEBUG, INFO, WARN, ERROR)
+      # When set, overrides the default status-based log level for matching events
+      log-levels:
+        HeartbeatEvent: DEBUG
+
+    # Lifecycle configuration
+    # When enabled, the dispatcher publishes SuccessAck / FailureAck events
+    # back to the source channels after handler execution
+    lifecycle:
+      # Enable or disable ack-based lifecycle tracking
+      enabled: false
