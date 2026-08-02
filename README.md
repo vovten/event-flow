@@ -185,7 +185,7 @@ Add the dependency to your `pom.xml`:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.1</version>
 </dependency>
 ```
 
@@ -195,7 +195,7 @@ For Spring Boot integration:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.1</version>
 </dependency>
 ```
 
