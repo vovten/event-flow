@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-08-04
+
+### Changed
+
+- Upgrade Jackson to 2.22.1 (`jackson-bom` 2.18.2 → 2.22.1) to fix known vulnerabilities in `jackson-databind` (CVE-2026-54512–54518, CVE-2026-59888, CVE-2026-59889)
+
+## [1.2.1] - 2026-08-02
+
+### Changed
+
+- Upgrade Spring Boot from 3.5.14 to 3.5.16
+- Upgrade `commons-lang3` from 3.18.0 to 3.20.0
+- Upgrade `jackson-dataformat-msgpack` from 0.9.11 to 0.9.12
+
 ## [1.2.0] - 2026-07-12
 
 ### Added
@@ -27,5 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structured logging, retry mechanism, transports, serialization
 - Spring Boot auto-configuration and transactional publishing
 
+[1.2.2]: https://github.com/vovten/event-flow/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/vovten/event-flow/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/vovten/event-flow/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/vovten/event-flow/releases/tag/v1.1.0
