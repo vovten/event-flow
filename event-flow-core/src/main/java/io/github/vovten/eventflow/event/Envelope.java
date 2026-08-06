@@ -253,6 +253,7 @@ public final class Envelope<T> implements TraceableEvent {
      * <ol>
      *   <li>Channels specified via factory method</li>
      *   <li>Channels from payload's {@link Event} annotation</li>
+     *   <li>Channels from payload's {@link Event} interface override</li>
      *   <li>{@link InternalEventChannel} as default</li>
      * </ol>
      *
@@ -266,6 +267,9 @@ public final class Envelope<T> implements TraceableEvent {
         var annotation = payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
         if (annotation != null) {
             return Arrays.asList(annotation.channels());
+        }
+        if (payload instanceof Event evt) {
+            return evt.channels();
         }
         return List.of(InternalEventChannel.class);
     }

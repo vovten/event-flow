@@ -32,7 +32,7 @@ class EnvelopeTest {
         Envelope<PojoEvent> envelope = Envelope.of(pojoEvent);
         List<Class<? extends EventChannel>> channels = envelope.channels();
         assertEquals(1, channels.size());
-        assertEquals(InternalEventChannel.class, channels.get(0));
+        assertEquals(InternalEventChannel.class, channels.getFirst());
     }
 
     @Test
@@ -42,7 +42,7 @@ class EnvelopeTest {
         Envelope<PojoEvent> envelope = Envelope.of(pojoEvent, ExternalEventChannel.class);
         List<Class<? extends EventChannel>> channels = envelope.channels();
         assertEquals(1, channels.size());
-        assertEquals(ExternalEventChannel.class, channels.get(0));
+        assertEquals(ExternalEventChannel.class, channels.getFirst());
     }
 
     @Test
@@ -79,7 +79,7 @@ class EnvelopeTest {
         Envelope<AnnotatedEvent> envelope = Envelope.of(annotatedEvent);
         List<Class<? extends EventChannel>> channels = envelope.channels();
         assertEquals(1, channels.size());
-        assertEquals(ExternalEventChannel.class, channels.get(0));
+        assertEquals(ExternalEventChannel.class, channels.getFirst());
     }
 
     @Test
@@ -95,13 +95,23 @@ class EnvelopeTest {
     }
 
     @Test
+    @DisplayName("Should resolve channels from Event interface override on payload")
+    void shouldResolveChannelsFromEventInterfaceOverride() {
+        InterfaceEvent interfaceEvent = new InterfaceEvent("test");
+        Envelope<InterfaceEvent> envelope = Envelope.of(interfaceEvent);
+        List<Class<? extends EventChannel>> channels = envelope.channels();
+        assertEquals(1, channels.size());
+        assertEquals(ExternalEventChannel.class, channels.getFirst());
+    }
+
+    @Test
     @DisplayName("Factory method channels should take priority over @Event annotation")
     void factoryMethodChannelsShouldTakePriorityOverEventAnnotation() {
         AnnotatedEvent annotatedEvent = new AnnotatedEvent("test");
         Envelope<AnnotatedEvent> envelope = Envelope.of(annotatedEvent, BroadcastEventChannel.class);
         List<Class<? extends EventChannel>> channels = envelope.channels();
         assertEquals(1, channels.size());
-        assertEquals(BroadcastEventChannel.class, channels.get(0));
+        assertEquals(BroadcastEventChannel.class, channels.getFirst());
     }
 
     @Test
@@ -216,6 +226,30 @@ class EnvelopeTest {
 
         public void setData(String data) {
             this.data = data;
+        }
+    }
+
+    /**
+     * Payload that overrides {@code channels()} via the {@code Event} interface
+     * but has no {@code @Event} annotation. Its channel list must be respected
+     * when wrapped in an {@link Envelope}.
+     */
+    private static final class InterfaceEvent implements io.github.vovten.eventflow.event.Event {
+
+        private final String data;
+
+        InterfaceEvent(String data) {
+            this.data = data;
+        }
+
+        @Override
+        public Class<?> type() {
+            return InterfaceEvent.class;
+        }
+
+        @Override
+        public List<Class<? extends EventChannel>> channels() {
+            return List.of(ExternalEventChannel.class);
         }
     }
 
