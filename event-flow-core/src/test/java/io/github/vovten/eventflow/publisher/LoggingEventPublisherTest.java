@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.publisher;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +12,7 @@ import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
+import io.github.vovten.eventflow.util.EventLogUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +22,7 @@ import org.slf4j.MDC;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -308,6 +311,55 @@ class LoggingEventPublisherTest {
 
         assertThat(listAppender.list).hasSize(1);
         assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.ERROR);
+    }
+
+    @Test
+    @DisplayName("Should warn about invalid log-levels keys and values at construction")
+    void shouldWarnAboutInvalidLogLevelConfig() {
+        Logger utilsLogger = (Logger) LoggerFactory.getLogger(EventLogUtils.class);
+        ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> utilsAppender = new ListAppender<>();
+        utilsAppender.start();
+        utilsLogger.addAppender(utilsAppender);
+        try {
+            Map<String, String> invalid = new HashMap<>();
+            invalid.put("com.example.OrderCreated", "ERROR");  // FQCN key — can never match
+            invalid.put("", "INFO");                            // empty key
+            invalid.put("HeartbeatEvent", "BANANA");            // unknown level
+
+            new LoggingEventPublisher(
+                    e -> CompletableFuture.completedFuture(SendResults.of(List.of(SendResult.success("ch1")))),
+                    1024, Collections.emptySet(), invalid);
+
+            assertThat(utilsAppender.list).isNotEmpty();
+            assertThat(utilsAppender.list)
+                    .allSatisfy(e -> assertThat(e.getLevel()).isEqualTo(Level.WARN));
+            assertThat(utilsAppender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .anySatisfy(msg -> assertThat(msg).contains("com.example.OrderCreated"))
+                    .anySatisfy(msg -> assertThat(msg).contains("HeartbeatEvent"));
+        } finally {
+            utilsLogger.detachAppender(utilsAppender);
+        }
+    }
+
+    @Test
+    @DisplayName("Should not warn when log-levels config is valid")
+    void shouldNotWarnAboutValidLogLevelConfig() {
+        Logger utilsLogger = (Logger) LoggerFactory.getLogger(EventLogUtils.class);
+        ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> utilsAppender = new ListAppender<>();
+        utilsAppender.start();
+        utilsLogger.addAppender(utilsAppender);
+        try {
+            Map<String, String> valid = Map.of("HeartbeatEvent", "ERROR", "HealthCheckEvent", "WARN");
+
+            new LoggingEventPublisher(
+                    e -> CompletableFuture.completedFuture(SendResults.of(List.of(SendResult.success("ch1")))),
+                    1024, Collections.emptySet(), valid);
+
+            assertThat(utilsAppender.list).isEmpty();
+        } finally {
+            utilsLogger.detachAppender(utilsAppender);
+        }
     }
 
     @Test

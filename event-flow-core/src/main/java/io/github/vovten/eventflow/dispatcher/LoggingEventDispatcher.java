@@ -102,6 +102,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
         this.maxPayloadLength = maxPayloadLength;
         this.excludedEvents = Objects.requireNonNullElseGet(excludedEvents, Collections::emptySet);
         this.logLevels = Objects.requireNonNullElseGet(logLevels, HashMap::new);
+        EventLogUtils.validateLogLevelConfig(this.logLevels, "dispatcher logging config");
     }
 
     @Override

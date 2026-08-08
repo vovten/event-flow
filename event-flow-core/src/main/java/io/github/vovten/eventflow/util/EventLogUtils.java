@@ -3,8 +3,14 @@ package io.github.vovten.eventflow.util;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Shared utility methods for structured event logging.
@@ -18,8 +24,54 @@ import java.time.Instant;
  */
 public final class EventLogUtils {
 
+    private static final Logger log = LoggerFactory.getLogger(EventLogUtils.class);
+
+    /**
+     * A valid Java simple class name, as returned by {@code Class.getSimpleName()}.
+     */
+    private static final Pattern SIMPLE_CLASS_NAME = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*");
+
+    /**
+     * Accepted log level names. {@code TRACE}/{@code DEBUG} mean no suppression,
+     * only {@code ERROR} and {@code WARN} narrow the output.
+     */
+    private static final Set<String> VALID_LOG_LEVELS = Set.of("TRACE", "DEBUG", "INFO", "WARN", "ERROR");
+
     private EventLogUtils() {
         // utility class
+    }
+
+    /**
+     * Validate a {@code log-levels} configuration map at startup.
+     * <p>
+     * Keys must be valid simple class names (no package): a fully-qualified name,
+     * empty value, or malformed identifier can never match an event type and is
+     * reported with a {@code WARN} so misconfiguration is not silent.
+     * Values must be a known log level ({@code TRACE}, {@code DEBUG}, {@code INFO},
+     * {@code WARN}, {@code ERROR}).
+     * <p>
+     * The map itself is not modified; the decorator still behaves as before for
+     * entries that could not be validated.
+     *
+     * @param logLevels the configured map (may be {@code null} or empty)
+     * @param context   human-readable description of the config source for log messages
+     */
+    public static void validateLogLevelConfig(Map<String, String> logLevels, String context) {
+        if (logLevels == null || logLevels.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : logLevels.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || !SIMPLE_CLASS_NAME.matcher(key).matches()) {
+                log.warn("Invalid log-levels key '{}' in {}: expected a simple class name without a package "
+                        + "(e.g. \"HeartbeatEvent\"). This entry will never match an event type.", key, context);
+            }
+            String level = entry.getValue();
+            if (level == null || !VALID_LOG_LEVELS.contains(level.toUpperCase(Locale.ROOT))) {
+                log.warn("Invalid log-levels value '{}' for key '{}' in {}: expected one of {}. "
+                        + "This entry is ignored.", level, key, context, VALID_LOG_LEVELS);
+            }
+        }
     }
 
     /**
