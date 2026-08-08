@@ -1,5 +1,7 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import io.github.vovten.eventflow.channel.EventChannel;
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
@@ -11,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
@@ -202,11 +205,65 @@ public final class EventRetryScheduler implements AutoCloseable {
     private void retryEvent(StoredEvent stored) {
         try {
             Event event = EventUtils.fromJson(stored.payload(), Event.class);
+            event = restoreChannels(event, stored.channels());
             publisher.publish(event);
             log.info("Retried event id={} (attempt {}/{})", stored.eventId(), stored.retryCount() + 1, maxRetries);
         } catch (Exception e) {
             log.error("Failed to retry event id={}: {}", stored.eventId(), e.getMessage());
         }
+    }
+
+    /**
+     * Re-applies the channels that were routed when the event was first published.
+     * The channels are stored separately in the event store (not in the wire
+     * format), so a deserialized envelope needs them restored before re-publishing.
+     *
+     * @param event    the deserialized event
+     * @param channels comma-separated channel class names from the store, may be null
+     * @return the event with channels restored, or the original if not applicable
+     */
+    private Event restoreChannels(Event event, String channels) {
+        if (channels == null || channels.isBlank() || !(event instanceof Envelope<?> envelope)) {
+            return event;
+        }
+        List<Class<? extends EventChannel>> parsed = parseChannels(channels);
+        if (parsed.isEmpty()) {
+            return event;
+        }
+        return new Envelope<>(
+                envelope.eventId(), envelope.processId(), envelope.occurredAt(),
+                envelope.payload(), envelope.metadata(), parsed);
+    }
+
+    /**
+     * Parses a comma-separated string of channel class names into channel classes.
+     * <p>
+     * Unknown or non-{@link EventChannel} class names are skipped, so an
+     * unresolvable value falls back to annotation-based resolution.
+     *
+     * @param names comma-separated channel class names, may be null or blank
+     * @return the resolved channel classes (empty list if none could be resolved)
+     */
+    private static List<Class<? extends EventChannel>> parseChannels(String names) {
+        if (names == null || names.isBlank()) {
+            return List.of();
+        }
+        List<Class<? extends EventChannel>> result = new ArrayList<>();
+        for (String name : names.split(",")) {
+            String trimmed = name.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            try {
+                Class<?> type = Class.forName(trimmed, false, EventRetryScheduler.class.getClassLoader());
+                if (EventChannel.class.isAssignableFrom(type)) {
+                    result.add(type.asSubclass(EventChannel.class));
+                }
+            } catch (ClassNotFoundException e) {
+                // Unknown channel class — skip, annotation-based resolution applies
+            }
+        }
+        return List.copyOf(result);
     }
 
     @Override

@@ -108,13 +108,14 @@ public final class StoredEventMapper {
         ps.setString(2, event.eventType());
         setOptionalString(ps, 3, event.service());
         ps.setString(4, event.payload());
-        setUuidNullable(ps, 5, event.processId());
-        ps.setString(6, String.valueOf(event.status().getCode()));
-        ps.setInt(7, event.retryCount());
-        ps.setBoolean(8, event.retry());
-        ps.setTimestamp(9, Timestamp.from(event.createdAt()), UTC);
-        ps.setTimestamp(10, Timestamp.from(event.updatedAt()), UTC);
-        setOptionalString(ps, 11, event.errorDetails());
+        setOptionalString(ps, 5, event.channels());
+        setUuidNullable(ps, 6, event.processId());
+        ps.setString(7, String.valueOf(event.status().getCode()));
+        ps.setInt(8, event.retryCount());
+        ps.setBoolean(9, event.retry());
+        ps.setTimestamp(10, Timestamp.from(event.createdAt()), UTC);
+        ps.setTimestamp(11, Timestamp.from(event.updatedAt()), UTC);
+        setOptionalString(ps, 12, event.errorDetails());
     }
 
     /**
@@ -187,6 +188,7 @@ public final class StoredEventMapper {
                 rs.getString("event_type"),
                 rs.getString("service"),
                 rs.getString("payload"),
+                rs.getString("channels"),
                 getUuid(rs, "process_id"),
                 EventStatus.fromCode(rs.getString("status").charAt(0)),
                 rs.getInt("retry_count"),

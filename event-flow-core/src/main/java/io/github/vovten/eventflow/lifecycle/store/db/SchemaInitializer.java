@@ -29,6 +29,7 @@ public class SchemaInitializer {
             COMMENT ON COLUMN %s.event_type IS 'Event class name';
             COMMENT ON COLUMN %s.service IS 'Service that published the event';
             COMMENT ON COLUMN %s.payload IS 'JSON-serialized event body';
+            COMMENT ON COLUMN %s.channels IS 'Comma-separated channel class names (local routing metadata for retry)';
             COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
             COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
             COMMENT ON COLUMN %s.retry_count IS 'Number of retry attempts for failed events';
@@ -153,7 +154,7 @@ public class SchemaInitializer {
         String[] lines = COMMENT_ON_COLUMNS.formatted(
                 tableName, tableName, tableName, tableName, tableName,
                 tableName, tableName, tableName, tableName, tableName,
-                tableName, tableName
+                tableName, tableName, tableName
         ).split(";");
         for (String line : lines) {
             String sql = line.trim();
@@ -177,6 +178,7 @@ public class SchemaInitializer {
                     service         VARCHAR(255),
                     status          CHAR(1) NOT NULL DEFAULT 'U',
                     payload         %s NOT NULL,
+                    channels        %s,
                     process_id      %s,
                     created_at      %s NOT NULL,
                     updated_at      %s NOT NULL,
@@ -184,7 +186,7 @@ public class SchemaInitializer {
                     retry           BOOLEAN DEFAULT FALSE NOT NULL,
                     error_details   %s
                 )
-                """.formatted(uuidDdl, textDdl, uuidDdl, tsDdl, tsDdl, textDdl);
+                """.formatted(uuidDdl, textDdl, textDdl, uuidDdl, tsDdl, tsDdl, textDdl);
     }
 
     private boolean tableExists(Connection conn, String tableName) throws SQLException {

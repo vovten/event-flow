@@ -323,6 +323,37 @@ class JdbcEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should store and retrieve channels")
+    void shouldStoreChannels() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        String channels = "io.github.vovten.eventflow.channel.ExternalEventChannel";
+        StoredEvent event = new StoredEvent(eventId, "test.T", "svc-a", "{}",
+                channels, null, EventStatus.NEW, 0, false,
+                Instant.now(), Instant.now(), null);
+
+        store.save(event);
+
+        StoredEvent found = store.findById(eventId).orElseThrow();
+        assertThat(found.channels()).isEqualTo(channels);
+    }
+
+    @Test
+    @DisplayName("Should store event with null channels")
+    void shouldStoreNullChannels() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        StoredEvent event = new StoredEvent(eventId, "test.T", "svc-a", "{}",
+                null, null, EventStatus.NEW, 0, false,
+                Instant.now(), Instant.now(), null);
+
+        store.save(event);
+
+        StoredEvent found = store.findById(eventId).orElseThrow();
+        assertThat(found.channels()).isNull();
+    }
+
+    @Test
     @DisplayName("Should work with BINARY(16) UUID strategy")
     void shouldWorkWithBinaryUuidStrategy() {
         JdbcEventStore store = new JdbcEventStore(dataSource, "event_store", UuidType.BINARY);

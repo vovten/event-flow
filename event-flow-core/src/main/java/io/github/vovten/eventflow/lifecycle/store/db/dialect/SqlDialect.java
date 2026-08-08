@@ -121,7 +121,7 @@ public interface SqlDialect {
             placeholders.append("?");
         }
         String template = """
-                SELECT event_id, event_type, service, payload, process_id,
+                SELECT event_id, event_type, service, payload, channels, process_id,
                        status, retry_count, retry, created_at, updated_at, error_details
                 FROM %%s
                 WHERE (status IN (%s) OR retry = TRUE)

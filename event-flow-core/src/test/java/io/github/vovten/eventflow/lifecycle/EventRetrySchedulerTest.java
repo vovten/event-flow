@@ -2,6 +2,9 @@ package io.github.vovten.eventflow.lifecycle;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.github.vovten.eventflow.channel.ExternalEventChannel;
+import io.github.vovten.eventflow.channel.InternalEventChannel;
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
@@ -19,8 +22,10 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -103,7 +108,7 @@ class EventRetrySchedulerTest {
         TestEvent event = new TestEvent(id, "data");
         String payload = EventUtils.toJson(event);
         StoredEvent stored = new StoredEvent(
-                id, TestEvent.class.getName(), SERVICE, payload, null,
+                id, TestEvent.class.getName(), SERVICE, payload, null, null,
                 status, retryCount, retryFlag, updatedAt, updatedAt, errorDetails
         );
         eventStore.save(stored);
@@ -123,7 +128,7 @@ class EventRetrySchedulerTest {
         TestEvent event = new TestEvent(id, "data");
         String payload = EventUtils.toJson(event);
         StoredEvent stored = new StoredEvent(
-                id, TestEvent.class.getName(), service, payload, null,
+                id, TestEvent.class.getName(), service, payload, null, null,
                 EventStatus.FAILED, retryCount, false,
                 Instant.now().minusSeconds(10), Instant.now().minusSeconds(10), "test error"
         );
@@ -190,7 +195,7 @@ class EventRetrySchedulerTest {
         void invalidJsonPayload() {
             UUID eventId = UUID.randomUUID();
             StoredEvent invalid = new StoredEvent(
-                    eventId, TestEvent.class.getName(), SERVICE, "{invalid-json", null,
+                    eventId, TestEvent.class.getName(), SERVICE, "{invalid-json", null, null,
                     EventStatus.FAILED, 0, false, Instant.now().minusSeconds(10),
                     Instant.now().minusSeconds(10), "error"
             );
@@ -198,6 +203,77 @@ class EventRetrySchedulerTest {
 
             // Should not throw
             scheduler(3).retryCycle();
+        }
+
+        @Test
+        @DisplayName("restores explicit channels from the store when retrying an envelope")
+        void restoresChannelsFromStoreOnRetry() {
+            AtomicReference<Event> captured = new AtomicReference<>();
+            EventPublisher capturingOrigin = e -> {
+                captured.set(e);
+                return CompletableFuture.completedFuture(
+                        SendResults.of(List.of(SendResult.success("dest"))));
+            };
+            EventLifecyclePublisher capturingLifecycle =
+                    new EventLifecyclePublisher(capturingOrigin, eventStore, SERVICE);
+            EventRetryScheduler scheduler = new EventRetryScheduler(
+                    eventStore, capturingLifecycle,
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000, SERVICE);
+
+            UUID eventId = UUID.randomUUID();
+            Envelope<?> envelope = new Envelope<>(
+                    eventId, null, Instant.now(), new TestEvent(eventId, "data"),
+                    Map.of(), List.of(ExternalEventChannel.class));
+            String payload = EventUtils.toJson(envelope);
+            StoredEvent stored = new StoredEvent(
+                    eventId, TestEvent.class.getName(), SERVICE, payload,
+                    ExternalEventChannel.class.getName(), null,
+                    EventStatus.FAILED, 0, false,
+                    Instant.now().minusSeconds(10), Instant.now().minusSeconds(10), "test error"
+            );
+            eventStore.save(stored);
+
+            scheduler.retryCycle();
+
+            assertThat(captured.get()).isNotNull();
+            assertThat(captured.get().channels()).containsExactly(ExternalEventChannel.class);
+            StoredEvent updated = eventStore.findById(eventId).orElseThrow();
+            assertThat(updated.status()).isEqualTo(EventStatus.PUBLISHED);
+        }
+
+        @Test
+        @DisplayName("falls back to annotation-based channels when stored channel names are unresolvable")
+        void fallsBackToAnnotationChannelsWhenStoredNamesUnresolvable() {
+            AtomicReference<Event> captured = new AtomicReference<>();
+            EventPublisher capturingOrigin = e -> {
+                captured.set(e);
+                return CompletableFuture.completedFuture(
+                        SendResults.of(List.of(SendResult.success("dest"))));
+            };
+            EventLifecyclePublisher capturingLifecycle =
+                    new EventLifecyclePublisher(capturingOrigin, eventStore, SERVICE);
+            EventRetryScheduler scheduler = new EventRetryScheduler(
+                    eventStore, capturingLifecycle,
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000, SERVICE);
+
+            UUID eventId = UUID.randomUUID();
+            Envelope<?> envelope = new Envelope<>(
+                    eventId, null, Instant.now(), new TestEvent(eventId, "data"),
+                    Map.of(), List.of(ExternalEventChannel.class));
+            StoredEvent stored = new StoredEvent(
+                    eventId, TestEvent.class.getName(), SERVICE, EventUtils.toJson(envelope),
+                    "com.example.UnknownChannel,java.lang.String", null,
+                    EventStatus.FAILED, 0, false,
+                    Instant.now().minusSeconds(10), Instant.now().minusSeconds(10), "test error"
+            );
+            eventStore.save(stored);
+
+            scheduler.retryCycle();
+
+            assertThat(captured.get()).isNotNull();
+            assertThat(captured.get().channels()).containsExactly(InternalEventChannel.class);
+            StoredEvent updated = eventStore.findById(eventId).orElseThrow();
+            assertThat(updated.status()).isEqualTo(EventStatus.PUBLISHED);
         }
 
         @Test

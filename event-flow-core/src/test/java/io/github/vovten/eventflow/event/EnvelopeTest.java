@@ -12,7 +12,9 @@ import io.github.vovten.eventflow.event.annotation.Event;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -139,6 +141,40 @@ class EnvelopeTest {
         assertThrows(IllegalArgumentException.class, () ->
                 Envelope.of(pojoEvent, (Class<? extends EventChannel>[]) new Class[0])
         );
+    }
+
+    @Test
+    @DisplayName("Should resolve channels eagerly and expose them as an immutable list")
+    void shouldExposeImmutableResolvedChannelList() {
+        Envelope<PojoEvent> envelope = Envelope.of(new PojoEvent("test"));
+        assertEquals(List.of(InternalEventChannel.class), envelope.channels());
+        assertThrows(UnsupportedOperationException.class,
+                () -> envelope.channels().add(ExternalEventChannel.class));
+    }
+
+    @Test
+    @DisplayName("Should construct envelope with explicit channels, preserving other fields")
+    void shouldConstructWithExplicitChannels() {
+        UUID eventId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        PojoEvent pojoEvent = new PojoEvent("test");
+        Envelope<PojoEvent> envelope = new Envelope<>(
+                eventId, null, Instant.now(), pojoEvent, Map.of("k", "v"),
+                List.of(ExternalEventChannel.class, BroadcastEventChannel.class));
+
+        assertEquals(eventId, envelope.eventId());
+        assertSame(pojoEvent, envelope.payload());
+        assertEquals(Map.of("k", "v"), envelope.metadata());
+        assertEquals(List.of(ExternalEventChannel.class, BroadcastEventChannel.class), envelope.channels());
+    }
+
+    @Test
+    @DisplayName("Should resolve channels from payload when explicit list is null")
+    void shouldResolveChannelsFromPayloadWhenExplicitListIsNull() {
+        PojoEvent pojoEvent = new PojoEvent("test");
+        Envelope<PojoEvent> envelope = new Envelope<>(
+                UUID.randomUUID(), null, Instant.now(), pojoEvent, Map.of(), null);
+
+        assertEquals(List.of(InternalEventChannel.class), envelope.channels());
     }
 
     @Test

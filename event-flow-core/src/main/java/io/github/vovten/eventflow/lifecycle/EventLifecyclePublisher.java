@@ -123,7 +123,8 @@ public final class EventLifecyclePublisher implements EventPublisher {
         String eventType = resolveEventType(event);
         UUID processId = resolveProcessId(event);
         String payload = EventUtils.toJson(event);
-        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, service, payload, processId, EventStatus.UNDEFINED);
+        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, service, payload,
+                resolveChannels(event), processId, EventStatus.UNDEFINED);
         eventStore.save(stored);
         log.debug("Saved new event with UNDEFINED status: {} ({})", eventId, eventType);
     }
@@ -138,7 +139,8 @@ public final class EventLifecyclePublisher implements EventPublisher {
         }
         UUID processId = resolveProcessId(event);
         String payload = EventUtils.toJson(event);
-        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, service, payload, processId, EventStatus.NEW);
+        StoredEvent stored = StoredEvent.newEvent(eventId, eventType, service, payload,
+                resolveChannels(event), processId, EventStatus.NEW);
         eventStore.save(stored);
         log.debug("Saved new event to store: {} ({})", eventId, eventType);
     }
@@ -168,6 +170,20 @@ public final class EventLifecyclePublisher implements EventPublisher {
             return event;
         }
         return env.withAdditionalMetadata(PUBLISHER_SERVICE_KEY, service);
+    }
+
+    /**
+     * Resolves the channels to persist as local routing metadata for retry.
+     * Only envelopes carry explicit channels, so plain events return null.
+     *
+     * @param event the event being persisted
+     * @return comma-separated channel class names, or null if not applicable
+     */
+    private String resolveChannels(Event event) {
+        if (event instanceof Envelope<?> envelope) {
+            return String.join(",", envelope.channels().stream().map(Class::getName).toList());
+        }
+        return null;
     }
 
     private UUID resolveEventId(Event event) {

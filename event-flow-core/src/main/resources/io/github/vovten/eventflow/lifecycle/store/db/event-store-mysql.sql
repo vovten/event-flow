@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS event_store (
     service         VARCHAR(255) COMMENT 'Service that published the event',
     status          CHAR(1) NOT NULL DEFAULT 'U' COMMENT 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED',
     payload         TEXT NOT NULL COMMENT 'JSON-serialized event body',
+    channels        TEXT COMMENT 'Comma-separated channel class names (local routing metadata for retry)',
     process_id      BINARY(16) COMMENT 'Correlation or process identifier',
     created_at      TIMESTAMP NOT NULL COMMENT 'Timestamp when the event was first stored',
     updated_at      TIMESTAMP NOT NULL COMMENT 'Timestamp of the last status update',

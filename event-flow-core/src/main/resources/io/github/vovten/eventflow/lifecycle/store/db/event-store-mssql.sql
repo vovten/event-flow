@@ -21,6 +21,7 @@ CREATE TABLE event_store (
     service         NVARCHAR(255),
     status          CHAR(1) NOT NULL DEFAULT 'U',
     payload         NVARCHAR(MAX) NOT NULL,
+    channels        NVARCHAR(MAX),
     process_id      BINARY(16),
     created_at      DATETIME2 NOT NULL,
     updated_at      DATETIME2 NOT NULL,
@@ -62,6 +63,11 @@ EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'JSON-serialized event body',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'payload';
+
+EXEC sys.sp_addextendedproperty
+    @name=N'MS_Description', @value=N'Comma-separated channel class names (local routing metadata for retry)',
+    @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
+    @level2type=N'COLUMN', @level2name=N'channels';
 
 EXEC sys.sp_addextendedproperty
     @name=N'MS_Description', @value=N'Correlation or process identifier',

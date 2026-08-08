@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-08
+
+### Added
+
+- Local routing metadata: explicit envelope channels are now persisted in the `channels` column of the event store, so a retry republishes the event on the originally requested channels even when the consumer does not know the envelope's channel contract. The wire format of the envelope is unchanged.
+
+### Changed
+
+- New installations get the `channels` column automatically from the DDL scripts. Existing installations must migrate the event store table manually:
+
+```sql
+-- PostgreSQL / H2 / MySQL
+ALTER TABLE event_store ADD COLUMN channels TEXT NULL;
+
+-- Oracle
+ALTER TABLE event_store ADD (channels CLOB NULL);
+
+-- SQL Server
+ALTER TABLE event_store ADD channels NVARCHAR(MAX) NULL;
+```
+
+### Fixed
+
+- `Envelope` now rejects another `Envelope` as payload, preventing double-wrapping
+- `EventRetryScheduler` now requires a service name so retries are limited to events owned by the current service
+
 ## [1.2.3] - 2026-08-06
 
 ### Fixed
@@ -47,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structured logging, retry mechanism, transports, serialization
 - Spring Boot auto-configuration and transactional publishing
 
+[1.3.0]: https://github.com/vovten/event-flow/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/vovten/event-flow/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/vovten/event-flow/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/vovten/event-flow/compare/v1.2.0...v1.2.1

@@ -10,11 +10,17 @@ import java.util.UUID;
  * <p>
  * Contains the JSON payload, lifecycle status, optional process correlation ID,
  * and the service name that originated the event.
+ * <p>
+ * The {@code channels} field stores the comma-separated class names of the
+ * channels the event was routed to (only when explicitly specified). It is
+ * local routing metadata used to reproduce the original routing on retry —
+ * it is never part of the wire format delivered to consumers.
  *
  * @param eventId      unique event identifier
  * @param eventType    simple class name of the event type (for display and queries)
  * @param service      name of the service that originated the event, or null if unknown
  * @param payload      JSON-serialized event data
+ * @param channels     comma-separated channel class names, or null if none were explicitly specified
  * @param processId    optional process/correlation ID for event correlation
  * @param status       current lifecycle status
  * @param retryCount   number of retry attempts so far
@@ -31,6 +37,7 @@ public record StoredEvent(
         String eventType,
         String service,
         String payload,
+        String channels,
         UUID processId,
         EventStatus status,
         int retryCount,
@@ -75,9 +82,25 @@ public record StoredEvent(
      * @return a new StoredEvent with the given status, retryCount 0, and timestamps set to now
      */
     public static StoredEvent newEvent(UUID eventId, String eventType, String service, String payload, UUID processId, EventStatus status) {
+        return newEvent(eventId, eventType, service, payload, null, processId, status);
+    }
+
+    /**
+     * Creates a new event with the given status, channels, and attributes.
+     *
+     * @param eventId   unique event identifier
+     * @param eventType simple class name of the event type (for display and queries)
+     * @param service   name of the originating service, or null
+     * @param payload   JSON-serialized event data
+     * @param channels  comma-separated channel class names, or null
+     * @param processId optional process correlation ID, or null
+     * @param status    the initial lifecycle status
+     * @return a new StoredEvent with the given status, retryCount 0, and timestamps set to now
+     */
+    public static StoredEvent newEvent(UUID eventId, String eventType, String service, String payload, String channels, UUID processId, EventStatus status) {
         Instant now = Instant.now();
         return new StoredEvent(
-                eventId, eventType, service, payload, processId,
+                eventId, eventType, service, payload, channels, processId,
                 status, 0, false, now, now, null
         );
     }
@@ -91,7 +114,7 @@ public record StoredEvent(
      */
     public StoredEvent withStatus(EventStatus newStatus, String error) {
         return new StoredEvent(
-                eventId, eventType, service, payload, processId,
+                eventId, eventType, service, payload, channels, processId,
                 newStatus, retryCount, retry, createdAt, Instant.now(), error
         );
     }
@@ -103,7 +126,7 @@ public record StoredEvent(
      */
     public StoredEvent withRetry() {
         return new StoredEvent(
-                eventId, eventType, service, payload, processId,
+                eventId, eventType, service, payload, channels, processId,
                 EventStatus.NEW, retryCount + 1, retry, createdAt, Instant.now(), null
         );
     }
@@ -116,7 +139,7 @@ public record StoredEvent(
      */
     public StoredEvent withRetryFlag(boolean retry) {
         return new StoredEvent(
-                eventId, eventType, service, payload, processId,
+                eventId, eventType, service, payload, channels, processId,
                 status, retryCount, retry, createdAt, updatedAt, errorDetails
         );
     }

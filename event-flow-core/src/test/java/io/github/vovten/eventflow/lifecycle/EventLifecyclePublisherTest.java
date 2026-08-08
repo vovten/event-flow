@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.channel.EventChannel;
+import io.github.vovten.eventflow.channel.ExternalEventChannel;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
@@ -11,6 +12,7 @@ import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.transport.OutTransport;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
+import io.github.vovten.eventflow.util.EventUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -60,6 +62,43 @@ class EventLifecyclePublisherTest {
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
             assertThat(stored.eventType()).contains("TestEvent");
+        }
+
+        @Test
+        @DisplayName("Should persist explicit channels as local routing metadata without leaking into wire format")
+        void shouldPersistChannelsInStoreButNotInWire() {
+            AtomicReference<Event> captured = new AtomicReference<>();
+            EventPublisher origin = e -> {
+                captured.set(e);
+                return CompletableFuture.completedFuture(
+                        SendResults.of(List.of(SendResult.success("dest"))));
+            };
+            EventLifecyclePublisher publisher = new EventLifecyclePublisher(
+                    origin, eventStore, "test-service");
+
+            Envelope<?> envelope = Envelope.of(event, ExternalEventChannel.class);
+            publisher.publish(envelope).join();
+
+            StoredEvent stored = eventStore.findById(envelope.eventId()).orElseThrow();
+            assertThat(stored.channels()).isEqualTo(ExternalEventChannel.class.getName());
+
+            Event published = captured.get();
+            assertThat(published.channels()).containsExactly(ExternalEventChannel.class);
+            assertThat(EventUtils.toJson(published)).doesNotContain("ExternalEventChannel");
+        }
+
+        @Test
+        @DisplayName("Should not persist channels for plain events")
+        void shouldNotPersistChannelsForPlainEvents() {
+            EventPublisher origin = e -> CompletableFuture.completedFuture(
+                    SendResults.of(List.of(SendResult.success("dest"))));
+            EventLifecyclePublisher publisher = new EventLifecyclePublisher(
+                    origin, eventStore, "test-service");
+
+            publisher.publish(event).join();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.channels()).isNull();
         }
 
         @Test

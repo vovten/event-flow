@@ -18,6 +18,7 @@ CREATE TABLE event_store (
     service         VARCHAR2(255),
     status          CHAR(1) NOT NULL DEFAULT 'U',
     payload         CLOB NOT NULL,
+    channels        CLOB,
     process_id      RAW(16),
     created_at      TIMESTAMP NOT NULL,
     updated_at      TIMESTAMP NOT NULL,
@@ -37,6 +38,7 @@ COMMENT ON COLUMN event_store.event_id IS 'Unique event identifier';
 COMMENT ON COLUMN event_store.event_type IS 'Simple event class name (for display and queries)';
 COMMENT ON COLUMN event_store.service IS 'Service that published the event';
 COMMENT ON COLUMN event_store.payload IS 'JSON-serialized event body';
+COMMENT ON COLUMN event_store.channels IS 'Comma-separated channel class names (local routing metadata for retry)';
 COMMENT ON COLUMN event_store.process_id IS 'Correlation or process identifier';
 COMMENT ON COLUMN event_store.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
 COMMENT ON COLUMN event_store.retry_count IS 'Number of retry attempts for failed events';

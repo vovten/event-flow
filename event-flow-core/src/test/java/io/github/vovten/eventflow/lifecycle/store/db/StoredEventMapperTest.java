@@ -55,6 +55,7 @@ class StoredEventMapperTest {
                         service         VARCHAR(255),
                         status          CHAR(1) NOT NULL DEFAULT 'U',
                         payload         TEXT NOT NULL,
+                        channels        TEXT,
                         process_id      UUID,
                         created_at      TIMESTAMP NOT NULL,
                         updated_at      TIMESTAMP NOT NULL,
@@ -167,18 +168,18 @@ class StoredEventMapperTest {
         UUID eventId = UUID.randomUUID();
         Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         StoredEvent event = new StoredEvent(eventId, "test.TestEvent", "my-service",
-                "{\"key\":\"value\"}", null, EventStatus.NEW, 0, false, now, now, null);
+                "{\"key\":\"value\"}", null, null, EventStatus.NEW, 0, false, now, now, null);
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO event_store (event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                        "INSERT INTO event_store (event_id, event_type, service, payload, channels, process_id, status, retry_count, retry, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             mapper.setInsertParameters(ps, event);
             ps.executeUpdate();
         }
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "SELECT event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details FROM event_store WHERE event_id = ?")) {
+                        "SELECT event_id, event_type, service, payload, channels, process_id, status, retry_count, retry, created_at, updated_at, error_details FROM event_store WHERE event_id = ?")) {
             mapper.setUuid(ps, 1, eventId);
             StoredEvent read;
             try (ResultSet rs = ps.executeQuery()) {
@@ -189,6 +190,7 @@ class StoredEventMapperTest {
             assertThat(read.eventType()).isEqualTo("test.TestEvent");
             assertThat(read.service()).isEqualTo("my-service");
             assertThat(read.payload()).isEqualTo("{\"key\":\"value\"}");
+            assertThat(read.channels()).isNull();
             assertThat(read.status()).isEqualTo(EventStatus.NEW);
             assertThat(read.retryCount()).isZero();
             // Timestamps are affected by H2 timezone handling;
@@ -210,7 +212,7 @@ class StoredEventMapperTest {
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO event_store (event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                        "INSERT INTO event_store (event_id, event_type, service, payload, channels, process_id, status, retry_count, retry, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             mapper.setInsertParameters(ps, event);
             ps.executeUpdate();
         }
@@ -329,7 +331,7 @@ class StoredEventMapperTest {
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(
-                        "SELECT event_id, event_type, service, payload, process_id, status, retry_count, retry, created_at, updated_at, error_details FROM event_store ORDER BY created_at ASC")) {
+                        "SELECT event_id, event_type, service, payload, channels, process_id, status, retry_count, retry, created_at, updated_at, error_details FROM event_store ORDER BY created_at ASC")) {
             List<StoredEvent> results = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -407,6 +409,36 @@ class StoredEventMapperTest {
             // Verify by executing — should return no rows since service IS NULL won't match
             try (ResultSet rs = ps.executeQuery()) {
                 assertThat(rs.next()).isFalse();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Should round-trip channels column via setInsertParameters and mapRow")
+    void shouldRoundTripChannels() throws SQLException {
+        StoredEventMapper mapper = new StoredEventMapper(UuidType.NATIVE);
+        UUID eventId = UUID.randomUUID();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        String channels = "io.github.vovten.eventflow.channel.ExternalEventChannel,"
+                + "io.github.vovten.eventflow.channel.BroadcastEventChannel";
+        StoredEvent event = new StoredEvent(eventId, "test.T", "svc-a", "{}",
+                channels, null, EventStatus.NEW, 0, false, now, now, null);
+
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO event_store (event_id, event_type, service, payload, channels, process_id, status, retry_count, retry, created_at, updated_at, error_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+            mapper.setInsertParameters(ps, event);
+            ps.executeUpdate();
+        }
+
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(
+                        "SELECT event_id, event_type, service, payload, channels, process_id, status, retry_count, retry, created_at, updated_at, error_details FROM event_store WHERE event_id = ?")) {
+            mapper.setUuid(ps, 1, eventId);
+            try (ResultSet rs = ps.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                StoredEvent read = mapper.mapRow(rs);
+                assertThat(read.channels()).isEqualTo(channels);
             }
         }
     }

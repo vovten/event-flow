@@ -33,16 +33,34 @@ import java.util.UUID;
  */
 public final class Envelope<T> implements TraceableEvent {
 
+    /**
+     * Unique event identifier.
+     */
     private final UUID eventId;
+    /**
+     * Process identifier for correlation (e.g., saga ID), may be null.
+     */
     private final UUID processId;
+    /**
+     * Timestamp when the event occurred.
+     */
     private final Instant occurredAt;
+    /**
+     * Additional metadata entries.
+     */
     private final Map<String, String> metadata;
 
+    /**
+     * Wrapped event payload.
+     */
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
     private final T payload;
 
+    /**
+     * Resolved routing channels
+     */
     @JsonIgnore
-    private final transient List<Class<? extends EventChannel>> targetChannels;
+    private final transient List<Class<? extends EventChannel>> channels;
 
     @JsonCreator
     public Envelope(
@@ -56,39 +74,37 @@ public final class Envelope<T> implements TraceableEvent {
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
         this.payload = requirePayload(payload);
         this.metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
-        this.targetChannels = null;
+        this.channels = resolveChannels(payload);
     }
 
-    Envelope(
+    /**
+     * Creates an envelope with explicitly routed channels.
+     * <p>
+     * The given channels take priority over the payload's {@link Event} annotation.
+     * A null or empty list falls back to payload-based resolution. Used by the
+     * retry scheduler to reconstruct an envelope whose channels were stored
+     * separately in the event store.
+     *
+     * @param eventId        the unique event identifier
+     * @param processId      the process identifier, may be null
+     * @param occurredAt     the timestamp when the event occurred
+     * @param payload        the wrapped event payload
+     * @param metadata       additional metadata, may be null
+     * @param channels       explicit channel classes, may be null or empty
+     */
+    public Envelope(
             UUID eventId,
             UUID processId,
             Instant occurredAt,
             T payload,
             Map<String, String> metadata,
-            List<Class<? extends EventChannel>> targetChannels) {
+            List<Class<? extends EventChannel>> channels) {
         this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
         this.processId = processId;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
         this.payload = requirePayload(payload);
         this.metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
-        this.targetChannels = targetChannels;
-    }
-
-    /**
-     * Validates the payload: it must be non-null and must not be another
-     * {@link Envelope}, to prevent nested envelopes.
-     *
-     * @param payload the payload to validate
-     * @param <T>     the payload type
-     * @return the validated payload
-     * @throws IllegalArgumentException if the payload is another {@link Envelope}
-     */
-    private static <T> T requirePayload(T payload) {
-        Objects.requireNonNull(payload, "payload must not be null");
-        if (payload instanceof Envelope<?>) {
-            throw new IllegalArgumentException("payload must not be an Envelope");
-        }
-        return payload;
+        this.channels = resolveChannels(payload, channels);
     }
 
     /**
@@ -242,7 +258,7 @@ public final class Envelope<T> implements TraceableEvent {
 
     /**
      * Returns a new {@code Envelope} with the same properties plus an additional
-     * metadata entry. The explicit {@code targetChannels} (if any) are preserved.
+     * metadata entry. The explicit {@code channels} (if any) are preserved.
      *
      * @param key   metadata key
      * @param value metadata value
@@ -253,7 +269,7 @@ public final class Envelope<T> implements TraceableEvent {
         newMetadata.put(key, value);
         return new Envelope<>(
                 this.eventId, this.processId, this.occurredAt, this.payload,
-                newMetadata, this.targetChannels
+                newMetadata, this.channels
         );
     }
 
@@ -266,29 +282,12 @@ public final class Envelope<T> implements TraceableEvent {
     }
 
     /**
-     * Resolves channels in the following priority:
-     * <ol>
-     *   <li>Channels specified via factory method</li>
-     *   <li>Channels from payload's {@link Event} annotation</li>
-     *   <li>Channels from payload's {@link Event} interface override</li>
-     *   <li>{@link InternalEventChannel} as default</li>
-     * </ol>
-     *
-     * @return resolved list of channel classes
+     * @return the resolved channels for this envelope, determined at construction
+     *         time (explicit channels → annotation → interface override → internal)
      */
     @Override
     public List<Class<? extends EventChannel>> channels() {
-        if (targetChannels != null) {
-            return targetChannels;
-        }
-        var annotation = payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
-        if (annotation != null) {
-            return Arrays.asList(annotation.channels());
-        }
-        if (payload instanceof Event evt) {
-            return evt.channels();
-        }
-        return List.of(InternalEventChannel.class);
+        return channels;
     }
 
     /**
@@ -325,5 +324,59 @@ public final class Envelope<T> implements TraceableEvent {
     public String toString() {
         return String.format("Envelope{eventId=%s, processId=%s, occurredAt=%s, payload=%s}",
                 eventId, processId, occurredAt, payload);
+    }
+
+    /**
+     * Validates the payload: it must be non-null and must not be another
+     * {@link Envelope}, to prevent nested envelopes.
+     *
+     * @param payload the payload to validate
+     * @param <T>     the payload type
+     * @return the validated payload
+     * @throws IllegalArgumentException if the payload is another {@link Envelope}
+     */
+    private static <T> T requirePayload(T payload) {
+        Objects.requireNonNull(payload, "payload must not be null");
+        if (payload instanceof Envelope<?>) {
+            throw new IllegalArgumentException("payload must not be an Envelope");
+        }
+        return payload;
+    }
+
+    /**
+     * Resolves channels from the payload when no explicit channels were given:
+     * annotation → {@link Event} interface override → {@link InternalEventChannel}.
+     *
+     * @param payload the wrapped payload (must not be null)
+     * @param <T>     the payload type
+     * @return immutable, non-null list of channel classes
+     */
+    private static <T> List<Class<? extends EventChannel>> resolveChannels(T payload) {
+        return resolveChannels(payload, null);
+    }
+
+    /**
+     * Resolves channels: explicit channels take priority, otherwise channels are
+     * resolved from the payload:
+     * annotation → {@link Event} interface override → {@link InternalEventChannel}.
+     *
+     * @param payload  the wrapped payload (must not be null)
+     * @param explicit explicitly specified channels, may be null or empty
+     * @param <T>      the payload type
+     * @return immutable, non-null list of channel classes
+     */
+    private static <T> List<Class<? extends EventChannel>> resolveChannels(
+            T payload, List<Class<? extends EventChannel>> explicit) {
+        if (explicit != null && !explicit.isEmpty()) {
+            return List.copyOf(explicit);
+        }
+        var annotation = payload.getClass().getAnnotation(io.github.vovten.eventflow.event.annotation.Event.class);
+        if (annotation != null) {
+            return List.copyOf(Arrays.asList(annotation.channels()));
+        }
+        if (payload instanceof Event evt) {
+            return List.copyOf(evt.channels());
+        }
+        return List.of(InternalEventChannel.class);
     }
 }
