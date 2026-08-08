@@ -98,16 +98,21 @@ public interface SqlDialect {
     String selectByStatusesStatement(int statusCount);
 
     /**
-     * SELECT for events eligible for retry: matching any of the given statuses
-     * <b>or</b> having the manual retry flag set ({@code retry = TRUE}),
-     * with an updated-at cutoff and limit.
+     * SELECT for events eligible for retry belonging to a specific service:
+     * matching any of the given statuses <b>or</b> having the manual retry flag
+     * set ({@code retry = TRUE}), with an updated-at cutoff, a service filter,
+     * and a limit.
      * <p>
-     * This is a unified replacement for separate status-based and retry-flag
-     * queries. The caller can distinguish retry-flagged events by checking
+     * The service filter is mandatory: when the event store is shared between
+     * multiple services, each scheduler must only re-publish events it
+     * originally published itself. Retrying events from all services is not
+     * supported.
+     * <p>
+     * The caller can distinguish retry-flagged events by checking
      * {@code retry} — those bypass maxRetries/backoff checks.
      *
      * @param statusCount number of status values for the IN clause
-     * @return SELECT SQL with placeholders for statuses, cutoff, and limit
+     * @return SELECT SQL with placeholders for statuses, cutoff, service, and limit
      */
     default String selectRetryableEventsStatement(int statusCount) {
         StringBuilder placeholders = new StringBuilder();
@@ -121,6 +126,7 @@ public interface SqlDialect {
                 FROM %%s
                 WHERE (status IN (%s) OR retry = TRUE)
                   AND updated_at < ?
+                  AND service = ?
                 ORDER BY updated_at ASC
                 %s
                 """;

@@ -112,6 +112,31 @@ class LifecycleConfigurationTest {
     }
 
     @Test
+    @DisplayName("Should throw IllegalStateException when retry enabled but service-name not configured")
+    void shouldThrowWhenRetryEnabledButNoServiceName() {
+        AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
+        addInlinedPropertiesToEnvironment(ctx,
+                "event-flow.publisher.lifecycle.enabled=true",
+                "event-flow.publisher.lifecycle.retry.enabled=true");
+        ctx.registerBean("properties", EventFlowProperties.class, () -> {
+            EventFlowProperties props = new EventFlowProperties();
+            props.getPublisher().setEnabled(true);
+            props.getPublisher().getLifecycle().setEnabled(true);
+            props.getPublisher().getLifecycle().getStore().setType("in-memory");
+            props.getPublisher().getLifecycle().getRetry().setEnabled(true);
+            // service-name is not configured
+            return props;
+        });
+        ctx.register(LifecycleConfiguration.class);
+
+        assertThatThrownBy(ctx::refresh)
+                .isInstanceOf(BeanCreationException.class)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("service-name must be configured");
+    }
+
+    @Test
     @DisplayName("Should create EventCleanupScheduler when cleanup.enabled=true")
     void shouldCreateEventCleanupScheduler() {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
@@ -263,7 +288,7 @@ class LifecycleConfigurationTest {
         }
 
         @Override
-        public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize) {
+        public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize, String service) {
             return Collections.emptyList();
         }
     }

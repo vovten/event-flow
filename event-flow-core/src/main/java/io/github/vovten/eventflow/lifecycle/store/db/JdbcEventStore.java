@@ -235,20 +235,22 @@ public class JdbcEventStore implements EventStore {
     }
 
     @Override
-    public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize) {
+    public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize, String service) {
         if (statuses.isEmpty() || batchSize <= 0) {
             return List.of();
         }
+        Objects.requireNonNull(service, "service must not be null");
         String sql = selectRetryableEventsCache.computeIfAbsent(Set.copyOf(statuses), key ->
                 sqlDialect.selectRetryableEventsStatement(key.size()).formatted(tableName));
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
             mapper.setStatusCodes(ps, statuses);
             mapper.setBeforeTimestamp(ps, statuses.size() + 1, before);
-            ps.setInt(statuses.size() + 2, batchSize);
+            ps.setString(statuses.size() + 2, service);
+            ps.setInt(statuses.size() + 3, batchSize);
             return mapResultList(ps);
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find events eligible for retry", e);
+            throw new RuntimeException("Failed to find events eligible for retry for service: " + service, e);
         }
     }
 

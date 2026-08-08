@@ -142,11 +142,12 @@ public class LifecycleConfiguration {
      * Creates the event retry scheduler.
      * <p>
      * Periodically scans for failed events (FAILED status) and stuck events
-     * (PUBLISHED status) and re-publishes them.
+     * (PUBLISHED status) belonging to this service and re-publishes them.
      *
      * @param eventStore     the event store to scan
      * @param eventPublisher the publisher for re-publishing events
      * @return the retry scheduler
+     * @throws IllegalStateException if service-name is not configured
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     @ConditionalOnMissingBean
@@ -154,15 +155,22 @@ public class LifecycleConfiguration {
             havingValue = "true", matchIfMissing = true)
     public EventRetryScheduler eventRetryScheduler(EventStore eventStore, EventPublisher eventPublisher) {
         LifecyclePublisherConfig.RetryTrackingConfig retry = properties.getPublisher().getLifecycle().getRetry();
-        log.info("Creating EventRetryScheduler: interval={}, minAge={}, maxRetries={}, batchSize={}",
-                retry.getRetryInterval(), retry.getMinAge(), retry.getMaxRetries(), retry.getBatchSize());
+        String service = properties.getPublisher().getLifecycle().getServiceName();
+        if (StringUtils.isEmpty(service)) {
+            throw new IllegalStateException(
+                    "event-flow.publisher.lifecycle.service-name must be configured when lifecycle retry is enabled"
+            );
+        }
+        log.info("Creating EventRetryScheduler: interval={}, minAge={}, maxRetries={}, batchSize={}, service={}",
+                retry.getRetryInterval(), retry.getMinAge(), retry.getMaxRetries(), retry.getBatchSize(), service);
         return new EventRetryScheduler(
                 eventStore,
                 eventPublisher,
                 retry.getRetryInterval(),
                 retry.getMinAge(),
                 retry.getMaxRetries(),
-                retry.getBatchSize()
+                retry.getBatchSize(),
+                service
         );
     }
 

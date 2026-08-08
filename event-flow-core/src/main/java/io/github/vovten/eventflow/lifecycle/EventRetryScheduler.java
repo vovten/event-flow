@@ -56,10 +56,17 @@ public final class EventRetryScheduler implements AutoCloseable {
     private final Duration minAge;
     private final int maxRetries;
     private final int batchSize;
+    private final String service;
     private final ScheduledExecutorService scheduler;
 
     /**
-     * Creates a new EventRetryScheduler.
+     * Creates a new EventRetryScheduler that only retries events attributed to
+     * the given service name.
+     * <p>
+     * When the event store is shared between multiple services, the scheduler
+     * must only re-publish events it originally published itself. The service
+     * name is therefore required — retrying events from all services is not
+     * supported.
      *
      * @param eventStore the event store to scan for failed events
      * @param publisher  the publisher for re-publishing failed events
@@ -67,19 +74,27 @@ public final class EventRetryScheduler implements AutoCloseable {
      * @param minAge     base backoff interval for retries (delay = minAge × 2^retryCount)
      * @param maxRetries maximum number of retry attempts before giving up
      * @param batchSize  maximum number of events to fetch per retry cycle
+     * @param service    the local service name to filter retry candidates by
+     *                   (must not be null or blank)
+     * @throws IllegalArgumentException if service is null or blank
      */
     public EventRetryScheduler(EventStore eventStore,
                                 EventPublisher publisher,
                                 Duration interval,
                                 Duration minAge,
                                 int maxRetries,
-                                int batchSize) {
+                                int batchSize,
+                                String service) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.publisher = Objects.requireNonNull(publisher, "publisher must not be null");
         this.interval = Objects.requireNonNull(interval, "interval must not be null");
         this.minAge = Objects.requireNonNull(minAge, "minAge must not be null");
         this.maxRetries = maxRetries;
         this.batchSize = batchSize;
+        if (service == null || service.isBlank()) {
+            throw new IllegalArgumentException("service must not be null or blank");
+        }
+        this.service = service;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "event-retry-scheduler");
             t.setDaemon(true);
@@ -135,7 +150,7 @@ public final class EventRetryScheduler implements AutoCloseable {
         try {
             Instant deadline = Instant.now().minus(minAge);
             List<EventStatus> statuses = List.of(EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.NEW);
-            List<StoredEvent> events = eventStore.findRetryableEvents(statuses, deadline, batchSize);
+            List<StoredEvent> events = eventStore.findRetryableEvents(statuses, deadline, batchSize, service);
             if (events.isEmpty()) {
                 log.trace("No events to retry");
                 return;

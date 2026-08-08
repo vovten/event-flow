@@ -23,9 +23,12 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("EventRetryScheduler Tests")
 class EventRetrySchedulerTest {
+
+    private static final String SERVICE = "test-service";
 
     private InMemoryEventStore eventStore;
     private EventPublisher lifecyclePublisher;
@@ -37,15 +40,11 @@ class EventRetrySchedulerTest {
                 CompletableFuture.completedFuture(
                         SendResults.of(List.of(SendResult.success("dest"))));
         lifecyclePublisher = new EventLifecyclePublisher(
-                originPublisher, eventStore, null);
+                originPublisher, eventStore, SERVICE);
     }
 
     private EventRetryScheduler scheduler(Duration minAge, int maxRetries, int batchSize) {
-        return new EventRetryScheduler(
-                eventStore, lifecyclePublisher,
-                Duration.ofMinutes(1),
-                minAge, maxRetries, batchSize
-        );
+        return scheduler(minAge, maxRetries, batchSize, SERVICE);
     }
 
     private EventRetryScheduler scheduler(Duration minAge, int maxRetries) {
@@ -54,6 +53,14 @@ class EventRetrySchedulerTest {
 
     private EventRetryScheduler scheduler(int maxRetries) {
         return scheduler(Duration.ZERO, maxRetries, 1000);
+    }
+
+    private EventRetryScheduler scheduler(Duration minAge, int maxRetries, int batchSize, String service) {
+        return new EventRetryScheduler(
+                eventStore, lifecyclePublisher,
+                Duration.ofMinutes(1),
+                minAge, maxRetries, batchSize, service
+        );
     }
 
     /**
@@ -96,7 +103,7 @@ class EventRetrySchedulerTest {
         TestEvent event = new TestEvent(id, "data");
         String payload = EventUtils.toJson(event);
         StoredEvent stored = new StoredEvent(
-                id, TestEvent.class.getName(), null, payload, null,
+                id, TestEvent.class.getName(), SERVICE, payload, null,
                 status, retryCount, retryFlag, updatedAt, updatedAt, errorDetails
         );
         eventStore.save(stored);
@@ -105,6 +112,23 @@ class EventRetrySchedulerTest {
 
     private UUID createRetryFlaggedEvent(EventStatus status, int retryCount, Instant updatedAt) {
         return createEvent(status, retryCount, updatedAt, null, true);
+    }
+
+    /**
+     * Creates a FAILED event attributed to the given service, updated 10 seconds ago
+     * so it is immediately eligible for retry with minAge=Duration.ZERO.
+     */
+    private UUID createFailedEventForService(String service, int retryCount) {
+        UUID id = UUID.randomUUID();
+        TestEvent event = new TestEvent(id, "data");
+        String payload = EventUtils.toJson(event);
+        StoredEvent stored = new StoredEvent(
+                id, TestEvent.class.getName(), service, payload, null,
+                EventStatus.FAILED, retryCount, false,
+                Instant.now().minusSeconds(10), Instant.now().minusSeconds(10), "test error"
+        );
+        eventStore.save(stored);
+        return id;
     }
 
     @Nested
@@ -166,7 +190,7 @@ class EventRetrySchedulerTest {
         void invalidJsonPayload() {
             UUID eventId = UUID.randomUUID();
             StoredEvent invalid = new StoredEvent(
-                    eventId, TestEvent.class.getName(), null, "{invalid-json", null,
+                    eventId, TestEvent.class.getName(), SERVICE, "{invalid-json", null,
                     EventStatus.FAILED, 0, false, Instant.now().minusSeconds(10),
                     Instant.now().minusSeconds(10), "error"
             );
@@ -188,6 +212,23 @@ class EventRetrySchedulerTest {
                     assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
             assertThat(eventStore.findById(id2)).hasValueSatisfying(e ->
                     assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+        }
+
+        @Test
+        @DisplayName("retries only events published by its own service")
+        void retriesOnlyOwnServiceEvents() {
+            UUID ownId = createFailedEventForService("svc-a", 0);
+            UUID foreignId = createFailedEventForService("svc-b", 0);
+
+            scheduler(Duration.ZERO, 3, 1000, "svc-a").retryCycle();
+
+            StoredEvent own = eventStore.findById(ownId).orElseThrow();
+            assertThat(own.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(own.retryCount()).isEqualTo(1);
+
+            StoredEvent foreign = eventStore.findById(foreignId).orElseThrow();
+            assertThat(foreign.status()).isEqualTo(EventStatus.FAILED);
+            assertThat(foreign.retryCount()).isZero();
         }
 
         @Test
@@ -438,6 +479,31 @@ class EventRetrySchedulerTest {
     }
 
     @Nested
+    @DisplayName("constructor")
+    class Constructor {
+
+        @Test
+        @DisplayName("rejects null service")
+        void rejectsNullService() {
+            assertThatThrownBy(() -> new EventRetryScheduler(
+                    eventStore, lifecyclePublisher,
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000, null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("service must not be null or blank");
+        }
+
+        @Test
+        @DisplayName("rejects blank service")
+        void rejectsBlankService() {
+            assertThatThrownBy(() -> new EventRetryScheduler(
+                    eventStore, lifecyclePublisher,
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000, "  "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("service must not be null or blank");
+        }
+    }
+
+    @Nested
     @DisplayName("lifecycle")
     class Lifecycle {
 
@@ -446,7 +512,7 @@ class EventRetrySchedulerTest {
         void startAndStop() {
             try (var scheduler = new EventRetryScheduler(
                     eventStore, lifecyclePublisher,
-                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000, SERVICE
             )) {
                 scheduler.start();
                 scheduler.stop();
@@ -458,7 +524,7 @@ class EventRetrySchedulerTest {
         void close() {
             EventRetryScheduler scheduler = new EventRetryScheduler(
                     eventStore, lifecyclePublisher,
-                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000, SERVICE
             );
             scheduler.start();
             scheduler.close();

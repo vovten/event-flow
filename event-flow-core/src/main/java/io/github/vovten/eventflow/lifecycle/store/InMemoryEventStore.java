@@ -78,13 +78,15 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
-    public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize) {
+    public List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize, String service) {
         if (statuses.isEmpty() || batchSize <= 0) {
             return List.of();
         }
+        Objects.requireNonNull(service, "service must not be null");
         Set<EventStatus> statusSet = EnumSet.copyOf(statuses);
         return store.values().stream()
                 .filter(e -> statusSet.contains(e.status()) || e.retry())
+                .filter(e -> service.equals(e.service()))
                 .filter(e -> e.updatedAt().isBefore(before))
                 .limit(batchSize)
                 .collect(toList());

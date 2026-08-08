@@ -196,6 +196,53 @@ class JdbcEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should filter retryable events by service when service is provided")
+    void shouldFilterRetryableEventsByService() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID ownId = UUID.randomUUID();
+        UUID foreignId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(ownId, "test.A", "svc-a", "{}", null));
+        store.save(StoredEvent.newEvent(foreignId, "test.B", "svc-b", "{}", null));
+        store.updateStatus(ownId, EventStatus.FAILED, "err");
+        store.updateStatus(foreignId, EventStatus.FAILED, "err");
+
+        Instant deadline = Instant.now().plus(1, ChronoUnit.DAYS);
+        List<StoredEvent> results = store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, "svc-a");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().eventId()).isEqualTo(ownId);
+    }
+
+    @Test
+    @DisplayName("Should throw NullPointerException when service is null")
+    void shouldRejectNullService() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", "svc-a", "{}", null));
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
+
+        Instant deadline = Instant.now().plus(1, ChronoUnit.DAYS);
+        assertThatThrownBy(() -> store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("service must not be null");
+    }
+
+    @Test
+    @DisplayName("Should return no events when service does not match")
+    void shouldReturnEmptyWhenServiceDoesNotMatch() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", "svc-a", "{}", null));
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
+
+        Instant deadline = Instant.now().plus(1, ChronoUnit.DAYS);
+        assertThat(store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, "other-service")).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should find events by status and age")
     void shouldFindByStatusAndAge() {
         JdbcEventStore store = new JdbcEventStore(dataSource);

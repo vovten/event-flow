@@ -17,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("InMemoryEventStore Tests")
 class InMemoryEventStoreTest {
 
+    private static final String SERVICE = "test-service";
+
     private InMemoryEventStore store;
     private StoredEvent event;
     private UUID eventId;
@@ -25,7 +27,7 @@ class InMemoryEventStoreTest {
     void setUp() {
         store = new InMemoryEventStore();
         eventId = UUID.randomUUID();
-        event = StoredEvent.newEvent(eventId, "test.TestEvent", null, "{\"data\":\"test\"}", null);
+        event = StoredEvent.newEvent(eventId, "test.TestEvent", SERVICE, "{\"data\":\"test\"}", null);
     }
 
     @Test
@@ -125,7 +127,7 @@ class InMemoryEventStoreTest {
 
         Instant deadline = Instant.now().plusSeconds(10);
         List<StoredEvent> results = store.findRetryableEvents(
-                List.of(EventStatus.FAILED), deadline, 10);
+                List.of(EventStatus.FAILED), deadline, 10, SERVICE);
         assertThat(results).hasSize(1);
         assertThat(results.getFirst().eventId()).isEqualTo(eventId);
         assertThat(results.getFirst().retry()).isTrue();
@@ -139,7 +141,7 @@ class InMemoryEventStoreTest {
 
         Instant deadline = Instant.now().plusSeconds(10);
         List<StoredEvent> results = store.findRetryableEvents(
-                List.of(EventStatus.FAILED), deadline, 10);
+                List.of(EventStatus.FAILED), deadline, 10, SERVICE);
         assertThat(results).hasSize(1);
         assertThat(results.getFirst().status()).isEqualTo(EventStatus.FAILED);
     }
@@ -149,12 +151,55 @@ class InMemoryEventStoreTest {
     void shouldLimitFindEligibleForRetry() {
         for (int i = 0; i < 3; i++) {
             UUID id = UUID.randomUUID();
-            store.save(StoredEvent.newEvent(id, "test.A", null, "{}", null));
+            store.save(StoredEvent.newEvent(id, "test.A", SERVICE, "{}", null));
             store.markForRetry(id);
         }
         Instant deadline = Instant.now().plusSeconds(10);
         assertThat(store.findRetryableEvents(
-                List.of(EventStatus.FAILED), deadline, 2)).hasSize(2);
+                List.of(EventStatus.FAILED), deadline, 2, SERVICE)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Should filter retryable events by service when service is provided")
+    void shouldFilterRetryableEventsByService() {
+        UUID ownId = UUID.randomUUID();
+        UUID foreignId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(ownId, "test.A", "svc-a", "{}", null));
+        store.save(StoredEvent.newEvent(foreignId, "test.B", "svc-b", "{}", null));
+        store.updateStatus(ownId, EventStatus.FAILED, "err");
+        store.updateStatus(foreignId, EventStatus.FAILED, "err");
+
+        Instant deadline = Instant.now().plusSeconds(10);
+        List<StoredEvent> results = store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, "svc-a");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().eventId()).isEqualTo(ownId);
+    }
+
+    @Test
+    @DisplayName("Should throw NullPointerException when service is null")
+    void shouldRejectNullService() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
+
+        Instant deadline = Instant.now().plusSeconds(10);
+        assertThatThrownBy(() -> store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("service must not be null");
+    }
+
+    @Test
+    @DisplayName("Should return no events when service does not match")
+    void shouldReturnEmptyWhenServiceDoesNotMatch() {
+        UUID ownId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(ownId, "test.A", "svc-a", "{}", null));
+        store.updateStatus(ownId, EventStatus.FAILED, "err");
+
+        Instant deadline = Instant.now().plusSeconds(10);
+        assertThat(store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, "  ")).isEmpty();
     }
 
     @Test

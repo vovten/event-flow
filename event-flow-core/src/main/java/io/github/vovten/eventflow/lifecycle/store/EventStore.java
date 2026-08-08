@@ -99,21 +99,29 @@ public interface EventStore {
     void markForRetry(UUID eventId);
 
     /**
-     * Finds events eligible for retry: those matching any of the given statuses
-     * <b>or</b> having the manual retry flag set ({@code retry = TRUE}),
-     * limited by updated-at cutoff and batch size.
+     * Finds events eligible for retry that belong to the given service:
+     * those matching any of the given statuses <b>or</b> having the manual
+     * retry flag set ({@code retry = TRUE}), limited by updated-at cutoff
+     * and batch size.
      * <p>
-     * This is a unified replacement for separate status-based and retry-flag
-     * queries. The caller can distinguish retry-flagged events by checking
+     * When the store is shared between multiple services, retry schedulers
+     * must only re-publish events they originally published themselves.
+     * The {@code service} filter is therefore mandatory and is pushed down
+     * to the underlying store — implementations must not fetch all matching
+     * events and filter in memory.
+     * <p>
+     * The caller can distinguish retry-flagged events by checking
      * {@link StoredEvent#retry()} — those bypass maxRetries/backoff checks.
      *
      * @param statuses  statuses to include in the query
      * @param before    only return events updated before this time
      * @param batchSize maximum number of events to return
+     * @param service   the originating service to filter by (must not be null)
      * @return matching events, at most {@code batchSize} (never null)
+     * @throws NullPointerException if service is null
      * @since 1.2.0
      */
-    List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize);
+    List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize, String service);
 
     /**
      * Finds an event by its unique identifier.
