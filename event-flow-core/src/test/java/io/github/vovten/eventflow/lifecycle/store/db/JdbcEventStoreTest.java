@@ -232,6 +232,29 @@ class JdbcEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should return retry-flagged event even when its updatedAt is after the deadline")
+    void shouldFindRetryFlaggedEventAfterDeadline() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID markedId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(markedId, "test.A", "svc-a", "{}", null));
+        store.markForRetry(markedId);
+
+        UUID failedId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(failedId, "test.B", "svc-a", "{}", null));
+        store.updateStatus(failedId, EventStatus.FAILED, "err");
+
+        // Both events were touched "now", which is NOT before this past deadline
+        Instant deadline = Instant.now().minus(1, ChronoUnit.SECONDS);
+        List<StoredEvent> results = store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, "svc-a");
+
+        // Manual retry bypasses the backoff cutoff, the ordinary FAILED event does not
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().eventId()).isEqualTo(markedId);
+        assertThat(results.getFirst().retry()).isTrue();
+    }
+
+    @Test
     @DisplayName("Should throw NullPointerException when service is null")
     void shouldRejectNullService() {
         JdbcEventStore store = new JdbcEventStore(dataSource);

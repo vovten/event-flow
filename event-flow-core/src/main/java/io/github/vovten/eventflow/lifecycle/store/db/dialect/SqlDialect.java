@@ -147,9 +147,13 @@ public interface SqlDialect {
 
     /**
      * SELECT for events eligible for retry belonging to a specific service:
-     * matching any of the given statuses <b>or</b> having the manual retry flag
-     * set ({@code retry = TRUE}), with an updated-at cutoff, a service filter,
-     * and a limit.
+     * matching any of the given statuses with an updated-at cutoff, <b>or</b>
+     * having the manual retry flag set ({@code retry = TRUE}) regardless of age,
+     * with a service filter and a limit.
+     * <p>
+     * Manually flagged events bypass the updated-at cutoff so that a manual
+     * retry takes effect on the next scheduler cycle instead of waiting for
+     * the backoff interval.
      * <p>
      * The service filter is mandatory: when the event store is shared between
      * multiple services, each scheduler must only re-publish events it
@@ -172,8 +176,7 @@ public interface SqlDialect {
                 SELECT event_id, event_type, service, payload, channels, process_id,
                        status, retry_count, retry, created_at, updated_at, error_details
                 FROM %%s
-                WHERE (status IN (%s) OR retry = %s)
-                  AND updated_at < ?
+                WHERE ((status IN (%s) AND updated_at < ?) OR retry = %s)
                   AND service = ?
                 ORDER BY updated_at ASC
                 %s

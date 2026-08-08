@@ -88,9 +88,8 @@ public class InMemoryEventStore implements EventStore {
         Objects.requireNonNull(service, "service must not be null");
         Set<EventStatus> statusSet = EnumSet.copyOf(statuses);
         return store.values().stream()
-                .filter(e -> statusSet.contains(e.status()) || e.retry())
+                .filter(e -> (statusSet.contains(e.status()) && e.updatedAt().isBefore(before)) || e.retry())
                 .filter(e -> service.equals(e.service()))
-                .filter(e -> e.updatedAt().isBefore(before))
                 .limit(batchSize)
                 .collect(toList());
     }

@@ -161,6 +161,30 @@ class InMemoryEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should return retry-flagged event even when its updatedAt is after the deadline")
+    void shouldFindRetryFlaggedEventAfterDeadline() {
+        Instant future = Instant.now().plusSeconds(60);
+        StoredEvent retryEvent = new StoredEvent(
+                UUID.randomUUID(), "test.A", SERVICE, "{}", null, null,
+                EventStatus.FAILED, 3, true, Instant.now(), future, null);
+        store.save(retryEvent);
+
+        // An ordinary FAILED event with the same fresh updatedAt is not eligible yet
+        StoredEvent plainEvent = new StoredEvent(
+                UUID.randomUUID(), "test.B", SERVICE, "{}", null, null,
+                EventStatus.FAILED, 0, false, Instant.now(), future, null);
+        store.save(plainEvent);
+
+        Instant deadline = Instant.now();
+        List<StoredEvent> results = store.findRetryableEvents(
+                List.of(EventStatus.FAILED), deadline, 10, SERVICE);
+
+        // Manual retry bypasses the backoff cutoff, the ordinary event does not
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().retry()).isTrue();
+    }
+
+    @Test
     @DisplayName("Should limit results in findRetryableEvents")
     void shouldLimitFindEligibleForRetry() {
         for (int i = 0; i < 3; i++) {
