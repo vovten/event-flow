@@ -3,6 +3,8 @@ package io.github.vovten.eventflow.publisher;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.TestEvent;
+import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.transport.OutTransport;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
@@ -14,6 +16,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -105,6 +108,80 @@ class PublisherIntegrationTest {
 
             assertThat(sendCalled.get()).isFalse();
             // The caller must never block on a future that can never complete
+            assertThat(capturedFuture.get().isDone()).isTrue();
+            assertThat(capturedFuture.get().isCompletedExceptionally()).isTrue();
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    @DisplayName("Should defer both persistence and delivery until commit when lifecycle and transactional are combined")
+    void shouldPersistAndDeliverOnlyAfterCommit() {
+        AtomicBoolean sendCalled = new AtomicBoolean(false);
+        OutTransport transport = createMockTransport(sendCalled);
+        InternalEventChannel channel = new InternalEventChannel(transport);
+        InMemoryEventStore store = new InMemoryEventStore();
+
+        EventPublisher publisher = SpringEventPublisherBuilder.create(channel)
+                .transactional()
+                .lifecycleAware(store)
+                .service("test-service")
+                .build();
+
+        TestEvent event = TestEvent.create("Lifecycle transaction test event");
+
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            publisher.publish(event);
+
+            // Nothing happens before the transaction completes
+            assertThat(sendCalled.get()).isFalse();
+            assertThat(store.findById(event.eventId())).isEmpty();
+
+            for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCommit();
+            }
+
+            assertThat(sendCalled.get()).isTrue();
+            Optional<StoredEvent> stored = store.findById(event.eventId());
+            assertThat(stored).isPresent();
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    @DisplayName("Should not persist or deliver when lifecycle and transactional are combined and transaction rolls back")
+    void shouldNotPersistOrDeliverWhenTransactionRolledBack() {
+        AtomicBoolean sendCalled = new AtomicBoolean(false);
+        OutTransport transport = createMockTransport(sendCalled);
+        InternalEventChannel channel = new InternalEventChannel(transport);
+        InMemoryEventStore store = new InMemoryEventStore();
+
+        EventPublisher publisher = SpringEventPublisherBuilder.create(channel)
+                .transactional()
+                .lifecycleAware(store)
+                .service("test-service")
+                .build();
+
+        TestEvent event = TestEvent.create("Lifecycle rollback test event");
+
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            AtomicReference<CompletableFuture<SendResults>> capturedFuture = new AtomicReference<>();
+            capturedFuture.set(publisher.publish(event));
+
+            assertThat(sendCalled.get()).isFalse();
+            assertThat(store.findById(event.eventId())).isEmpty();
+
+            for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+            }
+
+            // No delivery and no persistence: no phantom events for a rolled-back operation
+            assertThat(sendCalled.get()).isFalse();
+            assertThat(store.findById(event.eventId())).isEmpty();
             assertThat(capturedFuture.get().isDone()).isTrue();
             assertThat(capturedFuture.get().isCompletedExceptionally()).isTrue();
         } finally {

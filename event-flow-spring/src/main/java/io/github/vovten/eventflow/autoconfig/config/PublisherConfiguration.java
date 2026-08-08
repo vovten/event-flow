@@ -3,7 +3,6 @@ package io.github.vovten.eventflow.autoconfig.config;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import io.github.vovten.eventflow.channel.EventChannel;
-import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
@@ -103,18 +102,20 @@ public class PublisherConfiguration {
                     loggingConfig.getLogLevels());
         }
 
-        EventPublisher publisher = builder.build();
-
-        // Wrap with lifecycle-aware publisher if enabled
+        // Apply lifecycle-aware publishing via the builder so that persistence is wrapped
+        // INSIDE the transactional decorator. This keeps the outbox guarantee: when both are
+        // enabled, the event is persisted and delivered only after the transaction commits.
         if (eventStore != null && publisherConfig.getLifecycle().isEnabled()) {
             String service = publisherConfig.getLifecycle().getServiceName();
             if (StringUtils.isEmpty(service)) {
                 throw new IllegalStateException(
                         "event-flow.publisher.lifecycle.service-name must be configured when lifecycle tracking is enabled");
             }
-            publisher = new EventLifecyclePublisher(publisher, eventStore, service);
-            log.info("Wrapped EventPublisher with EventLifecyclePublisher (service: {})", service);
+            builder.lifecycleAware(eventStore).service(service);
+            log.info("Configured EventPublisher with EventLifecyclePublisher (service: {})", service);
         }
+
+        EventPublisher publisher = builder.build();
 
         log.info("Built EventPublisher with configuration: channels={}, retry={}, lifecycle={}, customDecorators={}",
                 eventChannels.size(),
