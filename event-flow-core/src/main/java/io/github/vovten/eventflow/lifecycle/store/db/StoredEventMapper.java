@@ -193,8 +193,8 @@ public final class StoredEventMapper {
                 EventStatus.fromCode(rs.getString("status").charAt(0)),
                 rs.getInt("retry_count"),
                 rs.getBoolean("retry"),
-                rs.getTimestamp("created_at").toInstant(),
-                rs.getTimestamp("updated_at").toInstant(),
+                rs.getTimestamp("created_at", UTC).toInstant(),
+                rs.getTimestamp("updated_at", UTC).toInstant(),
                 rs.getString("error_details")
         );
     }
