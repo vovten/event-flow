@@ -97,6 +97,29 @@ class SqlDialectTest {
     }
 
     @Test
+    @DisplayName("Should include channels column in INSERT and SELECT statements for every dialect")
+    void allDialectsContainChannelsColumn() {
+        for (DatabaseDialect type : DatabaseDialect.values()) {
+            SqlDialect dialect = SqlDialect.forDialect(type);
+            assertThat(dialect.insertStatement())
+                    .as("%s INSERT", type)
+                    .contains("channels");
+            assertThat(dialect.selectByIdStatement())
+                    .as("%s SELECT BY ID", type)
+                    .contains("channels");
+            assertThat(dialect.selectByStatusStatement())
+                    .as("%s SELECT BY STATUS", type)
+                    .contains("channels");
+            assertThat(dialect.selectByStatusesStatement(2))
+                    .as("%s SELECT BY STATUSES", type)
+                    .contains("channels");
+            assertThat(dialect.selectRetryableEventsStatement(2))
+                    .as("%s SELECT RETRYABLE", type)
+                    .contains("channels");
+        }
+    }
+
+    @Test
     @DisplayName("Should generate INSERT statement with table placeholder")
     void insertStatementContainsPlaceholder() {
         SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.POSTGRESQL);

@@ -262,6 +262,22 @@ class EventLifecyclePublisherTest {
             assertThat(eventStore.findById(persistedEvent.eventId()))
                     .hasValueSatisfying(e -> assertThat(e.status()).isEqualTo(EventStatus.UNDEFINED));
         }
+
+        @Test
+        @DisplayName("Should persist explicit channels for a PERSISTED envelope")
+        void shouldPersistEnvelopeChannels() {
+            EventPublisher origin = e -> CompletableFuture.completedFuture(
+                    SendResults.of(List.of(SendResult.success("dest"))));
+            EventLifecyclePublisher publisher = new EventLifecyclePublisher(
+                    origin, eventStore, "test-service");
+
+            Envelope<?> envelope = Envelope.of(persistedEvent, TestExternalChannel.class);
+            publisher.publish(envelope).join();
+
+            StoredEvent stored = eventStore.findById(envelope.eventId()).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.UNDEFINED);
+            assertThat(stored.channels()).isEqualTo(TestExternalChannel.class.getName());
+        }
     }
 
     // -------------------------------------------------------
