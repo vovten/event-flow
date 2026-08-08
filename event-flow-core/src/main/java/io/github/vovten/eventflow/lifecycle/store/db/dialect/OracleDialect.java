@@ -62,22 +62,18 @@ public class OracleDialect implements SqlDialect {
     }
 
     @Override
-    public String updateStatusOnlyStatement() {
-        return """
-                UPDATE %s
-                SET status = ?, error_details = ?, updated_at = ?, retry = FALSE
-                WHERE event_id = ?
-                """;
+    public String booleanLiteral(boolean value) {
+        return value ? "1" : "0";
     }
 
     @Override
-    public String updateStatusWithRetryStatement() {
-        return """
-                UPDATE %s
-                SET status = ?, error_details = ?, updated_at = ?,
-                    retry_count = CASE WHEN retry THEN retry_count ELSE retry_count + 1 END
-                WHERE event_id = ?
-                """;
+    public String booleanPredicate(String column) {
+        return column + " = 1";
+    }
+
+    @Override
+    public String booleanType() {
+        return "NUMBER(1)";
     }
 
     @Override

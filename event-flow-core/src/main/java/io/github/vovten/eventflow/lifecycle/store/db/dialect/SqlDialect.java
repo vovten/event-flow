@@ -53,6 +53,41 @@ public interface SqlDialect {
     }
 
     /**
+     * SQL literal for the given boolean value.
+     * <p>
+     * Databases without a native boolean type (Oracle before 23c, SQL Server)
+     * use numeric literals {@code 1}/{@code 0} instead.
+     *
+     * @param value the boolean value
+     * @return the dialect-specific literal, e.g. {@code "TRUE"} or {@code "1"}
+     */
+    default String booleanLiteral(boolean value) {
+        return value ? "TRUE" : "FALSE";
+    }
+
+    /**
+     * SQL predicate asserting that the given boolean column is true.
+     * <p>
+     * Databases without a native boolean type cannot use a bare column in a
+     * condition (e.g. {@code CASE WHEN retry}); they compare it against a literal.
+     *
+     * @param column the boolean column name
+     * @return the predicate, e.g. {@code "retry"} or {@code "retry = 1"}
+     */
+    default String booleanPredicate(String column) {
+        return column;
+    }
+
+    /**
+     * SQL data type for boolean columns (e.g. {@code retry}).
+     *
+     * @return e.g. {@code "BOOLEAN"}, {@code "BIT"}, or {@code "NUMBER(1)"}
+     */
+    default String booleanType() {
+        return "BOOLEAN";
+    }
+
+    /**
      * INSERT statement template. The placeholder {@code %s} in table names
      * is already resolved by the caller.
      *
@@ -79,14 +114,27 @@ public interface SqlDialect {
      *
      * @return UPDATE SQL with placeholders for status, error_details, updated_at, event_id
      */
-    String updateStatusOnlyStatement();
+    default String updateStatusOnlyStatement() {
+        return """
+                UPDATE %s
+                SET status = ?, error_details = ?, updated_at = ?, retry = %s
+                WHERE event_id = ?
+                """.formatted("%s", booleanLiteral(false));
+    }
 
     /**
      * UPDATE status with retry count increment.
      *
      * @return UPDATE SQL with placeholders for status, error_details, updated_at, event_id
      */
-    String updateStatusWithRetryStatement();
+    default String updateStatusWithRetryStatement() {
+        return """
+                UPDATE %s
+                SET status = ?, error_details = ?, updated_at = ?,
+                    retry_count = CASE WHEN %s THEN retry_count ELSE retry_count + 1 END
+                WHERE event_id = ?
+                """.formatted("%s", booleanPredicate("retry"));
+    }
 
     /**
      * SELECT by multiple statuses with cutoff and limit.
@@ -124,13 +172,13 @@ public interface SqlDialect {
                 SELECT event_id, event_type, service, payload, channels, process_id,
                        status, retry_count, retry, created_at, updated_at, error_details
                 FROM %%s
-                WHERE (status IN (%s) OR retry = TRUE)
+                WHERE (status IN (%s) OR retry = %s)
                   AND updated_at < ?
                   AND service = ?
                 ORDER BY updated_at ASC
                 %s
                 """;
-        return String.format(template, placeholders.toString(), limitClause());
+        return String.format(template, placeholders, booleanLiteral(true), limitClause());
     }
 
     /**
@@ -146,9 +194,9 @@ public interface SqlDialect {
     default String markForRetryStatement() {
         return """
                 UPDATE %s
-                SET retry = TRUE, error_details = NULL, updated_at = ?
+                SET retry = %s, error_details = NULL, updated_at = ?
                 WHERE event_id = ?
-                """;
+                """.formatted("%s", booleanLiteral(true));
     }
 
     /**

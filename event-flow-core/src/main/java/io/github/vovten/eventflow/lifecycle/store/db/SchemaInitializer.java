@@ -183,10 +183,11 @@ public class SchemaInitializer {
                     created_at      %s NOT NULL,
                     updated_at      %s NOT NULL,
                     retry_count     INT DEFAULT 0 NOT NULL,
-                    retry           BOOLEAN DEFAULT FALSE NOT NULL,
+                    retry           %s DEFAULT %s NOT NULL,
                     error_details   %s
                 )
-                """.formatted(uuidDdl, textDdl, textDdl, uuidDdl, tsDdl, tsDdl, textDdl);
+                """.formatted(uuidDdl, textDdl, textDdl, uuidDdl, tsDdl, tsDdl,
+                sqlDialect.booleanType(), sqlDialect.booleanLiteral(false), textDdl);
     }
 
     private boolean tableExists(Connection conn, String tableName) throws SQLException {

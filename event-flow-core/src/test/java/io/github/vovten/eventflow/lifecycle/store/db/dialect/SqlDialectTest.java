@@ -259,4 +259,64 @@ class SqlDialectTest {
         assertThat(sql).contains("UPDATE events");
         assertThat(sql).contains("CASE WHEN retry THEN retry_count ELSE retry_count + 1 END");
     }
+
+    @Test
+    @DisplayName("Should use boolean literals and types for every dialect")
+    void booleanSupportPerDialect() {
+        for (DatabaseDialect type : DatabaseDialect.values()) {
+            SqlDialect dialect = SqlDialect.forDialect(type);
+            assertThat(dialect.booleanLiteral(true))
+                    .as("%s TRUE literal", type)
+                    .isIn("TRUE", "1");
+            assertThat(dialect.booleanLiteral(false))
+                    .as("%s FALSE literal", type)
+                    .isIn("FALSE", "0");
+            assertThat(dialect.booleanPredicate("retry"))
+                    .as("%s retry predicate", type)
+                    .isIn("retry", "retry = 1");
+        }
+    }
+
+    @Test
+    @DisplayName("Should use numeric boolean literals and types for Oracle")
+    void oracleBooleanSupport() {
+        SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.ORACLE);
+        assertThat(dialect.booleanLiteral(true)).isEqualTo("1");
+        assertThat(dialect.booleanLiteral(false)).isEqualTo("0");
+        assertThat(dialect.booleanPredicate("retry")).isEqualTo("retry = 1");
+        assertThat(dialect.booleanType()).isEqualTo("NUMBER(1)");
+        assertThat(dialect.updateStatusOnlyStatement().formatted("events")).contains("retry = 0");
+        assertThat(dialect.updateStatusWithRetryStatement().formatted("events"))
+                .contains("CASE WHEN retry = 1 THEN retry_count ELSE retry_count + 1 END");
+        assertThat(dialect.markForRetryStatement().formatted("events")).contains("retry = 1");
+        assertThat(dialect.selectRetryableEventsStatement(2).formatted("events")).contains("retry = 1");
+    }
+
+    @Test
+    @DisplayName("Should use numeric boolean literals and types for SQL Server")
+    void sqlServerBooleanSupport() {
+        SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.SQLSERVER);
+        assertThat(dialect.booleanLiteral(true)).isEqualTo("1");
+        assertThat(dialect.booleanLiteral(false)).isEqualTo("0");
+        assertThat(dialect.booleanPredicate("retry")).isEqualTo("retry = 1");
+        assertThat(dialect.booleanType()).isEqualTo("BIT");
+        assertThat(dialect.updateStatusOnlyStatement().formatted("events")).contains("retry = 0");
+        assertThat(dialect.updateStatusWithRetryStatement().formatted("events"))
+                .contains("CASE WHEN retry = 1 THEN retry_count ELSE retry_count + 1 END");
+        assertThat(dialect.markForRetryStatement().formatted("events")).contains("retry = 1");
+        assertThat(dialect.selectRetryableEventsStatement(2).formatted("events")).contains("retry = 1");
+    }
+
+    @Test
+    @DisplayName("Should keep textual boolean literals for PostgreSQL, H2, and MySQL")
+    void booleanLiteralDialects() {
+        SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.POSTGRESQL);
+        assertThat(dialect.booleanLiteral(true)).isEqualTo("TRUE");
+        assertThat(dialect.booleanLiteral(false)).isEqualTo("FALSE");
+        assertThat(dialect.booleanPredicate("retry")).isEqualTo("retry");
+        assertThat(dialect.booleanType()).isEqualTo("BOOLEAN");
+        assertThat(dialect.updateStatusOnlyStatement().formatted("events")).contains("retry = FALSE");
+        assertThat(dialect.markForRetryStatement().formatted("events")).contains("retry = TRUE");
+        assertThat(dialect.selectRetryableEventsStatement(2).formatted("events")).contains("retry = TRUE");
+    }
 }

@@ -70,25 +70,6 @@ public class H2Dialect implements SqlDialect {
     }
 
     @Override
-    public String updateStatusOnlyStatement() {
-        return """
-                UPDATE %s
-                SET status = ?, error_details = ?, updated_at = ?, retry = FALSE
-                WHERE event_id = ?
-                """;
-    }
-
-    @Override
-    public String updateStatusWithRetryStatement() {
-        return """
-                UPDATE %s
-                SET status = ?, error_details = ?, updated_at = ?,
-                    retry_count = CASE WHEN retry THEN retry_count ELSE retry_count + 1 END
-                WHERE event_id = ?
-                """;
-    }
-
-    @Override
     public String selectByStatusesStatement(int statusCount) {
         String placeholders = placeholders(statusCount);
         return "SELECT event_id, event_type, service, payload, channels, process_id,"
