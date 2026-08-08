@@ -430,7 +430,7 @@ EventPublisher publisher = EventPublisherBuilder.create(internalChannel, externa
 | `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
 | `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
 | `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
-| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level suppression thresholds |
 
 ### EventDispatcher
 
@@ -462,7 +462,7 @@ public interface EventDispatcher {
 | `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
 | `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
 | `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
-| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level suppression thresholds |
 
 ### EventHandlerRegistry
 
@@ -1027,7 +1027,7 @@ EventPublisher publisher = EventPublisherBuilder.create(channel)
     .loggable()                                    // defaults: 1024 char payload
     .loggable(500)                                 // custom payload truncation
     .loggable(500, Set.of("HeartbeatEvent"))       // exclude noisy events
-    .loggable(500, Set.of(), Map.of("HeartbeatEvent", "ERROR"))  // with log overrides
+    .loggable(500, Set.of(), Map.of("HeartbeatEvent", "ERROR"))  // with per-event log thresholds
     .build();
 
 // Dispatcher
@@ -1038,7 +1038,7 @@ EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .build();
 ```
 
-### Per-Event Log Level Overrides
+### Per-Event Log Level Thresholds
 
 By default, log level is determined by the outcome:
 
@@ -1048,9 +1048,9 @@ By default, log level is determined by the outcome:
 | Partial success (some fail) | `WARN` |
 | All fail or exception | `ERROR` |
 
-With `logLevels` you can override the minimum log level for specific event types. The override acts as a **threshold**:
+With `logLevels` you can set a minimum log level threshold for specific event types. The value acts as a **suppression threshold** — only outcomes at or above it are logged:
 
-| Override | ERROR outcome | WARN outcome | INFO outcome |
+| Threshold | ERROR outcome | WARN outcome | INFO outcome |
 |----------|:------------:|:------------:|:------------:|
 | `ERROR`  | `log.error`  | suppressed   | suppressed   |
 | `WARN`   | `log.error`  | `log.warn`   | suppressed   |
@@ -1082,7 +1082,7 @@ EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .build();
 ```
 
-Valid level names: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`.
+Only `ERROR` and `WARN` are meaningful threshold values: `ERROR` logs only failures, `WARN` also logs partial successes. `INFO`, `DEBUG`, and `TRACE` all mean no suppression (default behavior). Keys are the **payload simple class names**, e.g. `HeartbeatEvent` (if an event is wrapped in an `Envelope`, the payload class name is used, not the envelope type).
 
 ## 📊 Interaction Diagrams
 

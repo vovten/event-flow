@@ -49,11 +49,12 @@ event-flow:
       excluded-events:
         - SuccessAck
         - FailureAck
-      # Per-event log level overrides
-      # Key: event simple class name, Value: log level name (TRACE, DEBUG, INFO, WARN, ERROR)
-      # When set, overrides the default status-based log level for matching events
+      # Per-event minimum log level for suppressing low-severity entries
+      # Key: payload simple class name, Value: minimum threshold (only ERROR and WARN suppress;
+      # INFO/DEBUG/TRACE mean no suppression). The entry is emitted at its natural
+      # status-based level (INFO=success, WARN=partial, ERROR=failure); the value only filters it out.
       log-levels:
-        HeartbeatEvent: DEBUG
+        HeartbeatEvent: ERROR
 
     # ---------------------------------------------------------------------------
     # Lifecycle-aware event publishing (event lifecycle tracking)
@@ -203,11 +204,12 @@ event-flow:
       excluded-events:
         - SuccessAck
         - FailureAck
-      # Per-event log level overrides
-      # Key: event simple class name, Value: log level name (TRACE, DEBUG, INFO, WARN, ERROR)
-      # When set, overrides the default status-based log level for matching events
+      # Per-event minimum log level for suppressing low-severity entries
+      # Key: payload simple class name, Value: minimum threshold (only ERROR and WARN suppress;
+      # INFO/DEBUG/TRACE mean no suppression). The entry is emitted at its natural
+      # status-based level (INFO=success, WARN=partial, ERROR=failure); the value only filters it out.
       log-levels:
-        HeartbeatEvent: DEBUG
+        HeartbeatEvent: ERROR
 
     # Lifecycle configuration
     # When enabled, the dispatcher publishes SuccessAck / FailureAck events

@@ -151,12 +151,13 @@ public final class SpringEventPublisherBuilder extends EventPublisherBuilder<Spr
     }
 
     /**
-     * Enable logging of published events with custom max payload length, excluded event types,
-     * and per-event log level overrides.
+     * Enable logging of published events with custom max payload length, excluded events,
+     * and per-event log level suppression thresholds.
      *
      * @param maxPayloadLength   maximum length of payload in log output
      * @param excludedEvents set of event simple class names to exclude from logging
-     * @param logLevels     per-event log level overrides (event simple class name → level name)
+     * @param logLevels     per-event minimum log level threshold (payload simple class name → level);
+     *                      only ERROR and WARN suppress, other levels mean no suppression
      * @return this builder
      */
     public SpringEventPublisherBuilder loggable(int maxPayloadLength, Set<String> excludedEvents,

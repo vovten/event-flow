@@ -261,7 +261,7 @@ Fluent builder for creating publishers:
 | `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
 | `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
 | `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
-| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level suppression thresholds |
 
 ### Structured Logging
 
@@ -301,7 +301,7 @@ Fluent builder for creating dispatchers:
 | `loggable()` | Enable structured logging (JSON, 1024 char payload limit) |
 | `loggable(maxPayloadLength)` | Enable structured logging with custom payload truncation |
 | `loggable(maxPayloadLength, excludedEvents)` | Enable structured logging with event type exclusion |
-| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level overrides |
+| `loggable(maxPayloadLength, excludedEvents, logLevels)` | Enable structured logging with per-event log level suppression thresholds |
 
 ### Structured Logging
 

@@ -92,7 +92,8 @@ public final class LoggingEventDispatcher implements EventDispatcher {
      * @param origin             the delegate dispatcher to wrap
      * @param maxPayloadLength   maximum length of payload in log output
      * @param excludedEvents set of event simple class names to exclude from logging
-     * @param logLevels     per-event log level overrides (event simple class name → level name)
+     * @param logLevels     per-event minimum log level threshold (payload simple class name → level);
+     *                      only ERROR and WARN suppress, other levels mean no suppression
      * @throws NullPointerException if origin is null
      */
     public LoggingEventDispatcher(EventDispatcher origin, int maxPayloadLength,

@@ -469,10 +469,14 @@ public class EventFlowProperties {
          */
         private List<String> excludedEvents = new ArrayList<>(List.of("SuccessAck", "FailureAck"));
         /**
-         * Per-event log level overrides.
-         * Key: event simple class name (e.g., "HeartbeatEvent").
-         * Value: log level name (DEBUG, INFO, WARN, ERROR).
-         * When set, overrides the default status-based log level for matching events.
+         * Per-event minimum log level for suppressing low-severity entries.
+         * Key: payload simple class name (e.g., "HeartbeatEvent").
+         * Value: minimum level threshold; outcomes below it are skipped.
+         *   - ERROR: log only failures
+         *   - WARN:  log failures and partial success
+         *   - INFO/DEBUG/TRACE: no suppression (default)
+         * The entry is still emitted at its natural status-based level
+         * (INFO=success, WARN=partial, ERROR=failure); the value only filters it out.
          */
         private Map<String, String> logLevels = new HashMap<>();
 
