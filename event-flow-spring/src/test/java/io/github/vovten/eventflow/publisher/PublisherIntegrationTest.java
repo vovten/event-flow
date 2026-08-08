@@ -18,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -77,7 +78,7 @@ class PublisherIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should not publish event when transaction is rolled back")
+    @DisplayName("Should not publish event and complete exceptionally when transaction is rolled back")
     void shouldNotPublishEventWhenTransactionRolledBack() {
         AtomicBoolean sendCalled = new AtomicBoolean(false);
         OutTransport transport = createMockTransport(sendCalled);
@@ -93,7 +94,8 @@ class PublisherIntegrationTest {
         TransactionSynchronizationManager.setActualTransactionActive(true);
 
         try {
-            publisher.publish(event);
+            AtomicReference<CompletableFuture<SendResults>> capturedFuture = new AtomicReference<>();
+            capturedFuture.set(publisher.publish(event));
 
             assertThat(sendCalled.get()).isFalse();
 
@@ -102,6 +104,9 @@ class PublisherIntegrationTest {
             }
 
             assertThat(sendCalled.get()).isFalse();
+            // The caller must never block on a future that can never complete
+            assertThat(capturedFuture.get().isDone()).isTrue();
+            assertThat(capturedFuture.get().isCompletedExceptionally()).isTrue();
         } finally {
             TransactionSynchronizationManager.setActualTransactionActive(false);
         }

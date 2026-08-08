@@ -84,7 +84,7 @@ public class TransactionalEventPublisher implements EventPublisher {
     public CompletableFuture<SendResults> publish(Event event) {
         if (isTransactionActive()) {
             CompletableFuture<SendResults> resultFuture = new CompletableFuture<>();
-            registerTransactionSynchronization(() ->
+            registerTransactionSynchronization(resultFuture, () ->
                     origin.publish(event)
                             .thenAccept(resultFuture::complete)
                             .exceptionally(ex -> {
@@ -110,14 +110,28 @@ public class TransactionalEventPublisher implements EventPublisher {
 
     /**
      * Register synchronization to publish event after transaction commit.
+     * <p>
+     * The returned future completes with the publish result after a successful
+     * commit and completes exceptionally when the transaction rolls back, so
+     * callers never block on a future that can never complete.
      *
+     * @param resultFuture  the future to complete with the outcome
      * @param publishAction the action to execute after commit
      */
-    private void registerTransactionSynchronization(Runnable publishAction) {
+    private void registerTransactionSynchronization(CompletableFuture<SendResults> resultFuture,
+                                                    Runnable publishAction) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 publishAction.run();
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    resultFuture.completeExceptionally(new IllegalStateException(
+                            "Transaction was not committed (status: " + status + "), event publication aborted"));
+                }
             }
         });
     }
