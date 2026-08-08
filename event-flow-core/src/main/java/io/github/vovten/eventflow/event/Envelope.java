@@ -54,7 +54,7 @@ public final class Envelope<T> implements TraceableEvent {
         this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
         this.processId = processId;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
-        this.payload = Objects.requireNonNull(payload, "payload must not be null");
+        this.payload = requirePayload(payload);
         this.metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
         this.targetChannels = null;
     }
@@ -69,9 +69,26 @@ public final class Envelope<T> implements TraceableEvent {
         this.eventId = Objects.requireNonNull(eventId, "eventId must not be null");
         this.processId = processId;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt must not be null");
-        this.payload = Objects.requireNonNull(payload, "payload must not be null");
+        this.payload = requirePayload(payload);
         this.metadata = metadata != null ? Map.copyOf(metadata) : Map.of();
         this.targetChannels = targetChannels;
+    }
+
+    /**
+     * Validates the payload: it must be non-null and must not be another
+     * {@link Envelope}, to prevent nested envelopes.
+     *
+     * @param payload the payload to validate
+     * @param <T>     the payload type
+     * @return the validated payload
+     * @throws IllegalArgumentException if the payload is another {@link Envelope}
+     */
+    private static <T> T requirePayload(T payload) {
+        Objects.requireNonNull(payload, "payload must not be null");
+        if (payload instanceof Envelope<?>) {
+            throw new IllegalArgumentException("payload must not be an Envelope");
+        }
+        return payload;
     }
 
     /**

@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.event;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -141,6 +142,22 @@ class EnvelopeTest {
     }
 
     @Test
+    @DisplayName("Should reject an Envelope as payload to prevent nesting")
+    void shouldRejectEnvelopeAsPayload() {
+        Envelope<String> inner = Envelope.of("test");
+        assertThrows(IllegalArgumentException.class, () -> Envelope.of(inner));
+    }
+
+    @Test
+    @DisplayName("Should reject an Envelope passed to the public constructor")
+    void shouldRejectEnvelopeInPublicConstructor() {
+        Envelope<String> inner = Envelope.of("test");
+        assertThrows(IllegalArgumentException.class, () ->
+                new Envelope<>(UUID.randomUUID(), null, java.time.Instant.now(), inner, null)
+        );
+    }
+
+    @Test
     @DisplayName("Should handle null metadata in constructor")
     void shouldHandleNullMetadataInConstructor() {
         Envelope<String> envelope = new Envelope<>(
@@ -207,6 +224,34 @@ class EnvelopeTest {
         assertNotNull(envelope);
         assertEquals(eventId, envelope.eventId());
         assertTrue(envelope.metadata().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should reject nested Envelope during JSON deserialization")
+    void shouldRejectNestedEnvelopeDuringDeserialization() throws Exception {
+        ObjectMapper mapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
+        UUID outerId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        UUID innerId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
+        String json = String.format("""
+                {
+                    "@class": "io.github.vovten.eventflow.event.Envelope",
+                    "eventId": "%s",
+                    "processId": null,
+                    "occurredAt": "2026-05-20T12:00:00Z",
+                    "payload": {
+                        "@class": "io.github.vovten.eventflow.event.Envelope",
+                        "eventId": "%s",
+                        "processId": null,
+                        "occurredAt": "2026-05-20T12:00:00Z",
+                        "payload": {"@class": "io.github.vovten.eventflow.event.EnvelopeTest$PojoEvent", "data": "test-payload"}
+                    }
+                }
+                """, outerId, innerId);
+
+        assertThrows(JsonMappingException.class, () -> mapper.readValue(json, Envelope.class));
     }
 
     private static final class PojoEvent {
