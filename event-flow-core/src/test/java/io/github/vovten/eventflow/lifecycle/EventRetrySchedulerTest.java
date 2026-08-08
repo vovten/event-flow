@@ -550,7 +550,8 @@ class EventRetrySchedulerTest {
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
             assertThat(stored.retry()).isFalse();
-            assertThat(stored.retryCount()).isEqualTo(6);
+            // manual retries do not consume the automatic retry budget
+            assertThat(stored.retryCount()).isEqualTo(5);
         }
     }
 

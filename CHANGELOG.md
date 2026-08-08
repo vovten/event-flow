@@ -30,6 +30,7 @@ ALTER TABLE event_store ADD channels NVARCHAR(MAX) NULL;
 
 - `Envelope` now rejects another `Envelope` as payload, preventing double-wrapping
 - `EventRetryScheduler` now requires a service name so retries are limited to events owned by the current service
+- Manual retries no longer increment the retry count: the counter reflects only automatic retry attempts, so operator-initiated retries do not consume the `maxRetries` budget or inflate the exponential backoff
 
 ## [1.2.3] - 2026-08-06
 

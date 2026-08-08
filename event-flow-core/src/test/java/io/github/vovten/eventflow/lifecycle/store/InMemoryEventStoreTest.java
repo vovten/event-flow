@@ -90,6 +90,20 @@ class InMemoryEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should not increment retry count on NEW status update for manual retry")
+    void shouldNotIncrementRetryOnManualRetry() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
+        store.markForRetry(eventId);
+        store.updateStatus(eventId, EventStatus.NEW, null);
+
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.NEW);
+        assertThat(updated.retry()).isTrue();
+        assertThat(updated.retryCount()).isZero();
+    }
+
+    @Test
     @DisplayName("Should throw when updating non-existent event")
     void shouldThrowWhenUpdatingNonExistent() {
         assertThatThrownBy(() ->

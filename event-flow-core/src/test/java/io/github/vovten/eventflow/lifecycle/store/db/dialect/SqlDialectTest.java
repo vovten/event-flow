@@ -229,11 +229,11 @@ class SqlDialectTest {
     }
 
     @Test
-    @DisplayName("Should return UPDATE WITH RETRY with table placeholder")
+    @DisplayName("Should return UPDATE WITH RETRY with conditional retry count increment")
     void updateStatusWithRetryStatement() {
         SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.POSTGRESQL);
         String sql = dialect.updateStatusWithRetryStatement().formatted("events");
         assertThat(sql).contains("UPDATE events");
-        assertThat(sql).contains("retry_count = retry_count + 1");
+        assertThat(sql).contains("CASE WHEN retry THEN retry_count ELSE retry_count + 1 END");
     }
 }

@@ -45,8 +45,10 @@ public interface EventStore {
     /**
      * Updates the status of an existing event.
      * <p>
-     * If the new status is {@link EventStatus#NEW}, the retry count is
-     * automatically incremented (retry reset).
+     * If the new status is {@link EventStatus#NEW}, the event is reset for retry
+     * and the retry count is incremented — unless the event is flagged for a
+     * manual retry ({@code retry = TRUE}), in which case the count is left
+     * untouched so manual retries do not consume the automatic retry budget.
      *
      * @param eventId      the event to update
      * @param status       the new status
@@ -90,8 +92,9 @@ public interface EventStore {
      * lifecycle status is preserved. The retry scheduler picks up events
      * by the {@code retry} flag regardless of their status.
      * <p>
-     * The retry count will be incremented by the publisher's retry lifecycle
-     * (via {@code persistOrReset}) when the event is actually re-published.
+     * Manual retries do not increment the retry count: the counter reflects
+     * only automatic retry attempts and is left untouched when the event is
+     * re-published via the manual flag.
      *
      * @param eventId the event to mark for retry
      * @throws java.util.NoSuchElementException if the event is not found

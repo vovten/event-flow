@@ -169,6 +169,23 @@ class JdbcEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should not increment retry count on NEW status update for manual retry")
+    void shouldNotIncrementRetryOnManualRetry() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+
+        store.updateStatus(eventId, EventStatus.FAILED, "err");
+        store.markForRetry(eventId);
+        store.updateStatus(eventId, EventStatus.NEW, null);
+
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.NEW);
+        assertThat(updated.retry()).isTrue();
+        assertThat(updated.retryCount()).isZero();
+    }
+
+    @Test
     @DisplayName("Should throw when updating non-existent event")
     void shouldThrowWhenUpdatingNonExistent() {
         JdbcEventStore store = new JdbcEventStore(dataSource);

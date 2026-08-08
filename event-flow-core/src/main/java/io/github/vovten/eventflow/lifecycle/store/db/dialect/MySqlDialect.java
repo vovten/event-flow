@@ -75,7 +75,8 @@ public class MySqlDialect implements SqlDialect {
     public String updateStatusWithRetryStatement() {
         return """
                 UPDATE %s
-                SET status = ?, error_details = ?, updated_at = ?, retry_count = retry_count + 1
+                SET status = ?, error_details = ?, updated_at = ?,
+                    retry_count = CASE WHEN retry THEN retry_count ELSE retry_count + 1 END
                 WHERE event_id = ?
                 """;
     }

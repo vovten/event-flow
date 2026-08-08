@@ -37,6 +37,9 @@ public class InMemoryEventStore implements EventStore {
     public void updateStatus(UUID eventId, EventStatus status, String errorDetails) {
         StoredEvent existing = store.computeIfPresent(eventId, (id, event) -> {
             if (status == EventStatus.NEW) {
+                if (event.retry()) {
+                    return event.withStatus(EventStatus.NEW, errorDetails);
+                }
                 return event.withRetry().withStatus(EventStatus.NEW, errorDetails);
             }
             return event.withStatus(status, errorDetails).withRetryFlag(false);

@@ -143,7 +143,8 @@ public final class EventRetryScheduler implements AutoCloseable {
      * <p>
      * Events manually marked for retry ({@code retry = true}) are retried
      * regardless of their current status and bypass the maxRetries and backoff
-     * checks. Other events are subject to the configured retry limits.
+     * checks. Manual retries do not increment the retry count — the counter
+     * reflects only automatic retry attempts.
      * <p>
      * NEW events are included to handle cases where the event was persisted
      * but the application crashed before the publish completed. These events
