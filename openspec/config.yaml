@@ -38,7 +38,7 @@ rules:
   proposal:
     - Always include a "Non-goals" section
     - Reference existing specs under openspec/specs/ where relevant
-  spec:
+  specs:
     - Requirements MUST use SHALL / SHALL NOT keywords
     - Each requirement MUST have at least one scenario (GIVEN/WHEN/THEN)
     - Avoid Java-specific implementation details in specs
