@@ -1,0 +1,27 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  Tech stack: Java 21, Maven multi-module build (parent POM), Spring Boot 3.5.x
+  Modules: event-flow-core (transport-agnostic core), event-flow-spring (Spring integration)
+  Domain: lightweight Java framework for building event-driven applications —
+    publishing, routing, and processing events (LocalQueue and Apache Kafka transports)
+  Conventions:
+    - Clean Code (Robert Martin): small functions, single responsibility, meaningful names
+    - Conventional commits (feat, fix, docs, refactor, test)
+    - Checkstyle enforced (config/checkstyle)
+    - Apache 2.0 license
+  Serialization: Jackson (JSON) and MessagePack
+  Quality gates: tests must pass before commit (mvn test)
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
