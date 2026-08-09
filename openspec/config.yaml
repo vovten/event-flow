@@ -4,24 +4,43 @@ schema: spec-driven
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
 context: |
+  Project: event-flow, version 1.3.x, artifactId event-flow
   Tech stack: Java 21, Maven multi-module build (parent POM), Spring Boot 3.5.x
   Modules: event-flow-core (transport-agnostic core), event-flow-spring (Spring integration)
+  Architecture rules:
+    - event-flow-core SHALL NOT depend on Spring Framework
+    - Spring integration lives only in event-flow-spring
   Domain: lightweight Java framework for building event-driven applications —
     publishing, routing, and processing events (LocalQueue and Apache Kafka transports)
+  Core concepts:
+    - Event, Envelope, EventBuilder, EventChannel (internal/external/broadcast)
+    - InTransport/OutTransport (local-queue, Kafka), SendResult/SendResults
+    - EventHandlerRegistry, EventListenerRegistry, EventSubscriberRegistry
+    - EventPublisher, EventDispatcher (Unified/Idempotent/Logging)
+    - EventLifecycle (NONE/PERSISTED/MANAGED), EventStore, EventStatus
+      (UNDEFINED/NEW/PUBLISHED/HANDLED/FAILED)
   Conventions:
     - Clean Code (Robert Martin): small functions, single responsibility, meaningful names
-    - Conventional commits (feat, fix, docs, refactor, test)
+    - Conventional commits (feat, fix, docs, refactor, test, chore)
     - Checkstyle enforced (config/checkstyle)
     - Apache 2.0 license
   Serialization: Jackson (JSON) and MessagePack
-  Quality gates: tests must pass before commit (mvn test)
+  Specs: source of truth is openspec/specs/<capability>/spec.md —
+    always read the relevant spec before proposing or implementing changes
+  Testing:
+    - Core tests: JUnit 5 + AssertJ, @DisplayName annotations on every test
+    - Follows "Принципы юнит-тестирования" (Vladimir Khorikov), AAA pattern
+    - Quality gates: tests must pass before commit (mvn test)
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Always include a "Non-goals" section
+    - Reference existing specs under openspec/specs/ where relevant
+  spec:
+    - Requirements MUST use SHALL / SHALL NOT keywords
+    - Each requirement MUST have at least one scenario (GIVEN/WHEN/THEN)
+    - Avoid Java-specific implementation details in specs
+  tasks:
+    - Break tasks into chunks of max 2 hours
