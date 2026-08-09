@@ -470,7 +470,9 @@ public class EventFlowProperties {
         private List<String> excludedEvents = new ArrayList<>(List.of("SuccessAck", "FailureAck"));
         /**
          * Per-event minimum log level for suppressing low-severity entries.
-         * Key: payload simple class name (e.g., "HeartbeatEvent").
+         * Key: payload simple class name or fully-qualified class name (e.g., "HeartbeatEvent"
+         * or "io.example.HeartbeatEvent"). Fully-qualified keys are validated at startup;
+         * invalid entries fail fast with an IllegalArgumentException.
          * Value: minimum level threshold; outcomes below it are skipped.
          *   - ERROR: log only failures
          *   - WARN:  log failures and partial success

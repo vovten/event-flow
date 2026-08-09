@@ -50,9 +50,12 @@ event-flow:
         - SuccessAck
         - FailureAck
       # Per-event minimum log level for suppressing low-severity entries
-      # Key: payload simple class name, Value: minimum threshold (only ERROR and WARN suppress;
-      # INFO/DEBUG/TRACE mean no suppression). The entry is emitted at its natural
-      # status-based level (INFO=success, WARN=partial, ERROR=failure); the value only filters it out.
+      # Key: payload simple class name or fully-qualified class name (e.g. "HeartbeatEvent"
+      # or "io.example.HeartbeatEvent"); FQCN keys are validated at startup, and invalid
+      # entries fail fast with an IllegalArgumentException.
+      # Value: minimum threshold (only ERROR and WARN suppress; INFO/DEBUG/TRACE mean no
+      # suppression). The entry is emitted at its natural status-based level
+      # (INFO=success, WARN=partial, ERROR=failure); the value only filters it out.
       log-levels:
         HeartbeatEvent: ERROR
 
@@ -205,9 +208,12 @@ event-flow:
         - SuccessAck
         - FailureAck
       # Per-event minimum log level for suppressing low-severity entries
-      # Key: payload simple class name, Value: minimum threshold (only ERROR and WARN suppress;
-      # INFO/DEBUG/TRACE mean no suppression). The entry is emitted at its natural
-      # status-based level (INFO=success, WARN=partial, ERROR=failure); the value only filters it out.
+      # Key: payload simple class name or fully-qualified class name (e.g. "HeartbeatEvent"
+      # or "io.example.HeartbeatEvent"); FQCN keys are validated at startup, and invalid
+      # entries fail fast with an IllegalArgumentException.
+      # Value: minimum threshold (only ERROR and WARN suppress; INFO/DEBUG/TRACE mean no
+      # suppression). The entry is emitted at its natural status-based level
+      # (INFO=success, WARN=partial, ERROR=failure); the value only filters it out.
       log-levels:
         HeartbeatEvent: ERROR
 

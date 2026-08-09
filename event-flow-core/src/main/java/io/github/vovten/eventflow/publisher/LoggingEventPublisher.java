@@ -123,15 +123,13 @@ public final class LoggingEventPublisher implements EventPublisher {
         if (excludedEvents.isEmpty()) {
             return false;
         }
-        Object payload = EventLogUtils.extractPayload(event);
-        return excludedEvents.contains(payload.getClass().getSimpleName());
+        return EventLogUtils.isExcludedType(excludedEvents, EventLogUtils.extractPayload(event));
     }
 
     private void logEvent(Event event, SendResults result, Throwable error,
                           Instant start, String traceId, String spanId, String deliveredFrom) {
         String entry = buildLogEntry(event, result, error, start, traceId, spanId, deliveredFrom);
-        String eventType = resolveEventType(event);
-        String overrideLevel = logLevels.get(eventType);
+        String overrideLevel = EventLogUtils.findLogLevel(logLevels, EventLogUtils.extractPayload(event));
         boolean isError = error != null || (result != null && result.isAllFailure());
         boolean isWarn = !isError && result != null && result.isPartialSuccess();
 
@@ -145,10 +143,6 @@ public final class LoggingEventPublisher implements EventPublisher {
         } else {
             log.info(entry);
         }
-    }
-
-    private String resolveEventType(Event event) {
-        return EventLogUtils.extractPayload(event).getClass().getSimpleName();
     }
 
     private static boolean isLoggable(boolean isError, boolean isWarn, String minLevel) {

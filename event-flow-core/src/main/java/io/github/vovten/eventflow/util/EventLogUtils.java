@@ -3,8 +3,6 @@ package io.github.vovten.eventflow.util;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -24,8 +22,6 @@ import java.util.regex.Pattern;
  */
 public final class EventLogUtils {
 
-    private static final Logger log = LoggerFactory.getLogger(EventLogUtils.class);
-
     /**
      * A valid Java simple class name, as returned by {@code Class.getSimpleName()}.
      */
@@ -44,34 +40,92 @@ public final class EventLogUtils {
     /**
      * Validate a {@code log-levels} configuration map at startup.
      * <p>
-     * Keys must be valid simple class names (no package): a fully-qualified name,
-     * empty value, or malformed identifier can never match an event type and is
-     * reported with a {@code WARN} so misconfiguration is not silent.
+     * Keys may be either a simple class name (no package, e.g. {@code "HeartbeatEvent"})
+     * or a fully-qualified class name (e.g. {@code "io.example.HeartbeatEvent"}).
+     * Fully-qualified keys are resolved via {@link Class#forName(String, boolean, ClassLoader)}
+     * and rejected when no such class exists. Simple-name keys are only format-checked,
+     * since their package is unknown.
+     * <p>
      * Values must be a known log level ({@code TRACE}, {@code DEBUG}, {@code INFO},
      * {@code WARN}, {@code ERROR}).
      * <p>
-     * The map itself is not modified; the decorator still behaves as before for
-     * entries that could not be validated.
+     * Malformed entries are rejected with an {@link IllegalArgumentException} so that
+     * misconfiguration fails fast at startup instead of silently never matching.
      *
      * @param logLevels the configured map (may be {@code null} or empty)
-     * @param context   human-readable description of the config source for log messages
+     * @param context   human-readable description of the config source for exception messages
+     * @throws IllegalArgumentException when any key or value is invalid
      */
     public static void validateLogLevelConfig(Map<String, String> logLevels, String context) {
         if (logLevels == null || logLevels.isEmpty()) {
             return;
         }
         for (Map.Entry<String, String> entry : logLevels.entrySet()) {
-            String key = entry.getKey();
-            if (key == null || !SIMPLE_CLASS_NAME.matcher(key).matches()) {
-                log.warn("Invalid log-levels key '{}' in {}: expected a simple class name without a package "
-                        + "(e.g. \"HeartbeatEvent\"). This entry will never match an event type.", key, context);
-            }
+            validateLogLevelKey(entry.getKey(), context);
             String level = entry.getValue();
             if (level == null || !VALID_LOG_LEVELS.contains(level.toUpperCase(Locale.ROOT))) {
-                log.warn("Invalid log-levels value '{}' for key '{}' in {}: expected one of {}. "
-                        + "This entry is ignored.", level, key, context, VALID_LOG_LEVELS);
+                throw new IllegalArgumentException("Invalid log-levels value '" + level + "' for key '"
+                        + entry.getKey() + "' in " + context + ": expected one of " + VALID_LOG_LEVELS);
             }
         }
+    }
+
+    private static void validateLogLevelKey(String key, String context) {
+        if (key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("Invalid log-levels key in " + context + ": the key must not be empty");
+        }
+        if (key.contains(".")) {
+            try {
+                Class.forName(key, false, EventLogUtils.class.getClassLoader());
+            } catch (ClassNotFoundException e) {
+                throw new IllegalArgumentException("Unknown log-levels key '" + key + "' in " + context
+                        + ": no class with that fully-qualified name was found", e);
+            } catch (LinkageError e) {
+                throw new IllegalArgumentException("Log-levels key '" + key + "' in " + context
+                        + " could not be loaded: " + e.getMessage(), e);
+            }
+            return;
+        }
+        if (!SIMPLE_CLASS_NAME.matcher(key).matches()) {
+            throw new IllegalArgumentException("Invalid log-levels key '" + key + "' in " + context
+                    + ": expected a simple class name without a package (e.g. \"HeartbeatEvent\")");
+        }
+    }
+
+    /**
+     * Resolve a configured log level for an event payload.
+     * <p>
+     * Keys may use either the fully-qualified or the simple class name. The fully-qualified
+     * name wins when both are configured, because it is more specific.
+     *
+     * @param logLevels the configured map (may be {@code null} or empty)
+     * @param payload   the event payload
+     * @return the configured level name, or {@code null} when no entry matches
+     */
+    public static String findLogLevel(Map<String, String> logLevels, Object payload) {
+        if (logLevels == null || logLevels.isEmpty() || payload == null) {
+            return null;
+        }
+        Class<?> type = payload.getClass();
+        String level = logLevels.get(type.getName());
+        return level != null ? level : logLevels.get(type.getSimpleName());
+    }
+
+    /**
+     * Check whether an event payload type is excluded from logging.
+     * <p>
+     * The exclusion set may contain either fully-qualified or simple class names.
+     *
+     * @param excludedEvents the configured set (may be {@code null} or empty)
+     * @param payload        the event payload
+     * @return true when the payload type matches any entry
+     */
+    public static boolean isExcludedType(Set<String> excludedEvents, Object payload) {
+        if (excludedEvents == null || excludedEvents.isEmpty() || payload == null) {
+            return false;
+        }
+        Class<?> type = payload.getClass();
+        return excludedEvents.contains(type.getName()) || excludedEvents.contains(type.getSimpleName());
     }
 
     /**

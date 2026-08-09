@@ -1082,7 +1082,7 @@ EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .build();
 ```
 
-Only `ERROR` and `WARN` are meaningful threshold values: `ERROR` logs only failures, `WARN` also logs partial successes. `INFO`, `DEBUG`, and `TRACE` all mean no suppression (default behavior). Keys are the **payload simple class names**, e.g. `HeartbeatEvent` (if an event is wrapped in an `Envelope`, the payload class name is used, not the envelope type).
+Only `ERROR` and `WARN` are meaningful threshold values: `ERROR` logs only failures, `WARN` also logs partial successes. `INFO`, `DEBUG`, and `TRACE` all mean no suppression (default behavior). Keys may be the **payload simple class name** (e.g. `HeartbeatEvent`) or the **fully-qualified class name** (e.g. `io.example.HeartbeatEvent`) — the fully-qualified form disambiguates classes with the same simple name and is validated against the classpath at startup. If an event is wrapped in an `Envelope`, the payload class name is used, not the envelope type. Invalid entries (unknown fully-qualified class, malformed key, or unrecognized level) fail fast at startup with an `IllegalArgumentException` instead of being silently ignored.
 
 ## 📊 Interaction Diagrams
 

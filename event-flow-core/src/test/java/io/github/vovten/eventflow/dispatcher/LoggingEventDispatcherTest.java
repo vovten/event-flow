@@ -10,7 +10,6 @@ import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
-import io.github.vovten.eventflow.util.EventLogUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,11 +23,13 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * @since 1.1.0
@@ -276,52 +277,99 @@ class LoggingEventDispatcherTest {
     }
 
     @Test
-    @DisplayName("Should warn about invalid log-levels keys and values at construction")
-    void shouldWarnAboutInvalidLogLevelConfig() {
-        Logger utilsLogger = (Logger) LoggerFactory.getLogger(EventLogUtils.class);
-        ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> utilsAppender = new ListAppender<>();
-        utilsAppender.start();
-        utilsLogger.addAppender(utilsAppender);
-        try {
-            Map<String, String> invalid = new HashMap<>();
-            invalid.put("com.example.OrderCreated", "ERROR");  // FQCN key — can never match
-            invalid.put("", "INFO");                            // empty key
-            invalid.put("HeartbeatEvent", "BANANA");            // unknown level
+    @DisplayName("Should reject unknown fully-qualified log-levels key at construction")
+    void shouldRejectUnknownFullyQualifiedKey() {
+        Map<String, String> invalid = Map.of("com.example.OrderCreated", "ERROR");
 
-            new LoggingEventDispatcher(
-                    dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
-                    1024, Collections.emptySet(), invalid);
-
-            assertThat(utilsAppender.list).isNotEmpty();
-            assertThat(utilsAppender.list)
-                    .allSatisfy(e -> assertThat(e.getLevel()).isEqualTo(Level.WARN));
-            assertThat(utilsAppender.list)
-                    .extracting(e -> e.getFormattedMessage())
-                    .anySatisfy(msg -> assertThat(msg).contains("com.example.OrderCreated"))
-                    .anySatisfy(msg -> assertThat(msg).contains("HeartbeatEvent"));
-        } finally {
-            utilsLogger.detachAppender(utilsAppender);
-        }
+        assertThatThrownBy(() -> new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("com.example.OrderCreated");
     }
 
     @Test
-    @DisplayName("Should not warn when log-levels config is valid")
-    void shouldNotWarnAboutValidLogLevelConfig() {
-        Logger utilsLogger = (Logger) LoggerFactory.getLogger(EventLogUtils.class);
-        ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> utilsAppender = new ListAppender<>();
-        utilsAppender.start();
-        utilsLogger.addAppender(utilsAppender);
-        try {
-            Map<String, String> valid = Map.of("HeartbeatEvent", "ERROR", "HealthCheckEvent", "WARN");
+    @DisplayName("Should reject invalid log-levels value at construction")
+    void shouldRejectInvalidLogLevelValue() {
+        Map<String, String> invalid = Map.of("HeartbeatEvent", "BANANA");
 
-            new LoggingEventDispatcher(
-                    dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
-                    1024, Collections.emptySet(), valid);
+        assertThatThrownBy(() -> new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("BANANA")
+                .hasMessageContaining("HeartbeatEvent");
+    }
 
-            assertThat(utilsAppender.list).isEmpty();
-        } finally {
-            utilsLogger.detachAppender(utilsAppender);
-        }
+    @Test
+    @DisplayName("Should reject empty log-levels key at construction")
+    void shouldRejectEmptyLogLevelKey() {
+        Map<String, String> invalid = new HashMap<>();
+        invalid.put("", "INFO");
+
+        assertThatThrownBy(() -> new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not be empty");
+    }
+
+    @Test
+    @DisplayName("Should accept valid log-levels config at construction")
+    void shouldAcceptValidLogLevelConfig() {
+        Map<String, String> valid = new HashMap<>();
+        valid.put("HeartbeatEvent", "ERROR");
+        valid.put("HealthCheckEvent", "WARN");
+        valid.put("java.lang.String", "ERROR");  // existing FQCN — accepted
+
+        new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), valid);
+        // no exception expected
+    }
+
+    @Test
+    @DisplayName("Should suppress INFO when override is ERROR using a fully-qualified key")
+    void shouldSuppressInfoWithFullyQualifiedKey() {
+        Map<String, String> logLevels = Map.of(TestPayload.class.getName(), "ERROR");
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should prefer fully-qualified key over simple name when both are configured")
+    void shouldPreferFullyQualifiedKeyOverSimpleName() {
+        Map<String, String> logLevels = new HashMap<>();
+        logLevels.put("TestPayload", "WARN");                          // would suppress INFO
+        logLevels.put(TestPayload.class.getName(), "INFO");            // more specific: no suppression
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Collections.emptySet(), logLevels);
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).hasSize(1);
+        assertThat(listAppender.list.getFirst().getLevel()).isEqualTo(Level.INFO);
+    }
+
+    @Test
+    @DisplayName("Should exclude event using a fully-qualified class name")
+    void shouldExcludeEventWithFullyQualifiedName() {
+        LoggingEventDispatcher underTest = new LoggingEventDispatcher(
+                dispatcherThatReturns(HandlerResults.of(List.of(HandlerResult.success("h1")))),
+                1024, Set.of(TestPayload.class.getName()), Collections.emptyMap());
+
+        Envelope<TestPayload> envelope = Envelope.of(new TestPayload("x"));
+        underTest.dispatch(envelope).join();
+
+        assertThat(listAppender.list).isEmpty();
     }
 
     @Test

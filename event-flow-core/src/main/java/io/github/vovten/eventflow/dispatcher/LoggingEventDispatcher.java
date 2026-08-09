@@ -125,16 +125,14 @@ public final class LoggingEventDispatcher implements EventDispatcher {
         if (excludedEvents.isEmpty()) {
             return false;
         }
-        Object payload = EventLogUtils.extractPayload(event);
-        return excludedEvents.contains(payload.getClass().getSimpleName());
+        return EventLogUtils.isExcludedType(excludedEvents, EventLogUtils.extractPayload(event));
     }
 
     private void logEvent(Event event, HandlerResults results, Throwable error,
                           long durationMs, Instant start,
                           String traceId, String spanId, String deliveredFrom) {
         String entry = buildLogEntry(event, results, error, durationMs, start, traceId, spanId, deliveredFrom);
-        String eventType = resolveEventType(event);
-        String overrideLevel = logLevels.get(eventType);
+        String overrideLevel = EventLogUtils.findLogLevel(logLevels, EventLogUtils.extractPayload(event));
         boolean isError = error != null || (results != null && results.isAllFailure());
         boolean isWarn = !isError && results != null && results.isPartialSuccess();
 
@@ -148,10 +146,6 @@ public final class LoggingEventDispatcher implements EventDispatcher {
         } else {
             log.info(entry);
         }
-    }
-
-    private String resolveEventType(Event event) {
-        return EventLogUtils.extractPayload(event).getClass().getSimpleName();
     }
 
     private static boolean isLoggable(boolean isError, boolean isWarn, String minLevel) {
