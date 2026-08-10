@@ -111,7 +111,7 @@ event-flow:
 
     # Event channels configuration
     # Each channel defines a logical route with a list of transports
-    # Transport name identifies the type (e.g., "local-queue", "kafka", "broadcast-kafka")
+    # Transport name identifies the type (e.g., "local-queue", "kafka", "broadcast-kafka", "rabbitmq")
     # Channel types: internal (InternalEventChannel), external (ExternalEventChannel), broadcast (BroadcastEventChannel)
     # You can add custom channels with any name (they will use GenericEventChannel)
     # You can also implement custom OutTransportFactory to add your own transport types
@@ -125,6 +125,29 @@ event-flow:
           - name: kafka
             servers: localhost:9092
             topics: events
+            serialization: json
+          # RabbitMQ (AMQP 0-9-1) publisher transport
+          - name: rabbitmq
+            # RabbitMQ broker host
+            host: localhost
+            # RabbitMQ broker port (default 5672)
+            port: 5672
+            # RabbitMQ virtual host
+            virtual-host: /
+            # RabbitMQ user name
+            username: guest
+            # RabbitMQ password
+            password: guest
+            # Queue name consumed by the dispatcher and used as the default routing key
+            queue: events
+            # Exchange name for publishing; empty string "" means the default direct exchange
+            exchange: ""
+            # Routing key for publishing; defaults to the queue name when not set
+            routing-key: events
+            # Whether the dispatcher queue is declared durable (survives broker restart)
+            queue-durable: false
+            # Serialization format for event transport
+            # Supported values: "json" (default), "msgpack"
             serialization: json
       - name: broadcast
         transports:
@@ -182,6 +205,29 @@ event-flow:
         servers: localhost:9092
         topics: events
         consumerGroup: event-flow-group
+      # RabbitMQ (AMQP 0-9-1) dispatcher transport
+      - name: rabbitmq
+        # RabbitMQ broker host
+        host: localhost
+        # RabbitMQ broker port (default 5672)
+        port: 5672
+        # RabbitMQ virtual host
+        virtual-host: /
+        # RabbitMQ user name
+        username: guest
+        # RabbitMQ password
+        password: guest
+        # Queue name to consume from and used as the default routing key
+        queue: events
+        # Exchange name for publishing; empty string "" means the default direct exchange
+        exchange: ""
+        # Routing key for publishing; defaults to the queue name when not set
+        routing-key: events
+        # Whether the dispatcher queue is declared durable (survives broker restart)
+        queue-durable: false
+        # Serialization format for event transport
+        # Supported values: "json" (default), "msgpack"
+        serialization: json
 
     # Idempotent event processing configuration
     # Prevents duplicate event processing using a Caffeine cache

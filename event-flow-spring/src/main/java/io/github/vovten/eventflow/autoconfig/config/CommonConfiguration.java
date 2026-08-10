@@ -3,9 +3,11 @@ package io.github.vovten.eventflow.autoconfig.config;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
 import io.github.vovten.eventflow.autoconfig.transport.incoming.KafkaInTransportFactory;
 import io.github.vovten.eventflow.autoconfig.transport.incoming.LocalQueueInTransportFactory;
+import io.github.vovten.eventflow.autoconfig.transport.incoming.RabbitMqInTransportFactory;
 import io.github.vovten.eventflow.autoconfig.transport.outgoing.BroadcastKafkaOutTransportFactory;
 import io.github.vovten.eventflow.autoconfig.transport.outgoing.KafkaOutTransportFactory;
 import io.github.vovten.eventflow.autoconfig.transport.outgoing.LocalQueueOutTransportFactory;
+import io.github.vovten.eventflow.autoconfig.transport.outgoing.RabbitMqOutTransportFactory;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import org.slf4j.Logger;
@@ -123,5 +125,27 @@ public class CommonConfiguration {
     @Bean
     public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory(EventSerializerFactory serializerFactory) {
         return new BroadcastKafkaOutTransportFactory(serializerFactory);
+    }
+
+    /**
+     * Creates factory for RabbitMQ dispatcher transports.
+     *
+     * @param serializerFactory serializer factory for creating event serializers
+     * @return RabbitMQ dispatcher transport factory
+     */
+    @Bean
+    public RabbitMqInTransportFactory rabbitMqInTransportFactory(EventSerializerFactory serializerFactory) {
+        return new RabbitMqInTransportFactory(serializerFactory);
+    }
+
+    /**
+     * Creates factory for RabbitMQ publisher transports.
+     *
+     * @param serializerFactory serializer factory for creating event serializers
+     * @return RabbitMQ publisher transport factory
+     */
+    @Bean
+    public RabbitMqOutTransportFactory rabbitMqOutTransportFactory(EventSerializerFactory serializerFactory) {
+        return new RabbitMqOutTransportFactory(serializerFactory);
     }
 }

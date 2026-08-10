@@ -81,6 +81,12 @@
             <artifactId>kafka-clients</artifactId>
         </dependency>
 
+        <!-- RabbitMQ -->
+        <dependency>
+            <groupId>com.rabbitmq</groupId>
+            <artifactId>amqp-client</artifactId>
+        </dependency>
+
         <!-- Jakarta Annotation -->
         <dependency>
             <groupId>jakarta.annotation</groupId>
