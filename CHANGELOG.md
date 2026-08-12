@@ -5,11 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0] - 2026-08-08
+## [1.3.0] - 2026-08-12
 
 ### Added
 
 - Local routing metadata: explicit envelope channels are now persisted in the `channels` column of the event store, so a retry republishes the event on the originally requested channels even when the consumer does not know the envelope's channel contract. The wire format of the envelope is unchanged.
+- Dialect-aware BOOLEAN column DDL for Oracle and SQL Server: the schema initializer now emits `BOOLEAN` columns via the dialect layer instead of hard-coded `BIT`/`NUMBER` types, so `is_manual`-style flags are created correctly on every supported database.
 
 ### Changed
 
@@ -26,11 +27,17 @@ ALTER TABLE event_store ADD (channels CLOB NULL);
 ALTER TABLE event_store ADD channels NVARCHAR(MAX) NULL;
 ```
 
+- Log-levels config now accepts fully-qualified class names as keys (e.g. `io.example.HeartbeatEvent`) in addition to simple class names, and entries with unknown/invalid keys are rejected at startup with `IllegalArgumentException` instead of failing silently at runtime.
+
 ### Fixed
 
 - `Envelope` now rejects another `Envelope` as payload, preventing double-wrapping
 - `EventRetryScheduler` now requires a service name so retries are limited to events owned by the current service
 - Manual retries no longer increment the retry count: the counter reflects only automatic retry attempts, so operator-initiated retries do not consume the `maxRetries` budget or inflate the exponential backoff
+- Manual retries now bypass the updated-at cutoff: an event explicitly marked for retry is retried even when it has been recently updated, so operators can force re-delivery without waiting for the staleness window
+- Stored timestamps are now read in UTC: previously `StoredEvent` instants could be shifted by the local timezone, which distorted retry/cleanup age calculations
+- Spring: lifecycle persistence is deferred until after transaction commit, so the event store is not written when the surrounding transaction rolls back
+- Spring: the publication future now completes exceptionally on transaction rollback instead of succeeding silently while no event was actually published
 
 ## [1.2.3] - 2026-08-06
 
