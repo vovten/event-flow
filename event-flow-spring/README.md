@@ -17,7 +17,7 @@
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.2.3</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 

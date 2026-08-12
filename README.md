@@ -185,7 +185,7 @@ Add the dependency to your `pom.xml`:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow</artifactId>
-    <version>1.2.3</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -195,16 +195,16 @@ For Spring Boot integration:
 <dependency>
     <groupId>io.github.vovten</groupId>
     <artifactId>event-flow-spring</artifactId>
-    <version>1.2.3</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.github.vovten:event-flow:1.1.0'
+implementation 'io.github.vovten:event-flow:1.3.0'
 // For Spring Boot:
-implementation 'io.github.vovten:event-flow-spring:1.1.0'
+implementation 'io.github.vovten:event-flow-spring:1.3.0'
 ```
 
 ### Requirements
