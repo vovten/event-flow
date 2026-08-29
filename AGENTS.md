@@ -13,6 +13,7 @@ Event Flow — lightweight framework for event-driven applications (publish, rou
 
 ## Style (enforced by Checkstyle at build time)
 
+- Code must follow Clean Code principles (Robert C. Martin): small functions, intention-revealing names, no magic numbers, single responsibility.
 - Config lives at `config/checkstyle/checkstyle.xml` + `suppressions.xml`; bound to the `validate` phase in both modules (test sources included).
 - Javadoc is required on non-private classes and methods in `src/main` (suppressed for tests). `@param`/`@return`/`@throws` must be ordered and non-empty.
 - Strict rules you will hit often: each annotation on its own line, `DeclarationOrder` (fields, ctors, methods), `NeedBraces`, no catching of `Throwable`, LF line endings (no CRLF), 4-space indent, `UpperEll` for longs.

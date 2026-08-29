@@ -1,32 +1,36 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack: Java 21, Maven multi-module (no wrapper)
+  Modules: event-flow-core (framework-agnostic), event-flow-spring (Spring Boot autoconfig)
+  Root package: io.github.vovten.eventflow.*
+  Core must stay framework-agnostic: never add Spring dependencies there
+  Tests: JUnit 5 + AssertJ + Mockito + Awaitility, all tests use @DisplayName
+  Serialization: magic byte 0x01=JSON, 0x02=MessagePack, custom from 0x03
+  Deserialization is whitelist-gated via EventTypeRegistry
+  Releases: Apache 2.0, published to Maven Central, GPG-signed
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - State which module (core or spring) is affected
+    - Mention backward compatibility of public APIs
+    - Reference existing features before proposing new ones
+  specs:
+    - Use Given/When/Then format for scenarios
+    - Follow Event Flow naming: event types, channels, lifecycle levels
+    - Reference existing transports/serializers before inventing new ones
+  design:
+    - Respect invariants: core stays Spring-free, serializers keep magic bytes
+  tasks:
+    - Break tasks into units that can be verified with a single mvn test command
+    - Note which module the task belongs to
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - Run focused mvn tests before the full suite
+      - Never run mvn verify (GPG + JaCoCo gate), use mvn test/package
+  archive:
+    guidance:
+      - Keep the completion summary concise
+      - Mention any public API changes for CHANGELOG.md
