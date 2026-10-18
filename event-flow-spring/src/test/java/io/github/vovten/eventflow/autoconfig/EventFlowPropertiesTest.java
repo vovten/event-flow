@@ -137,6 +137,30 @@ class EventFlowPropertiesTest {
         assertThat(kafkaTransport.getName()).isEqualTo("kafka");
         assertThat(kafkaTransport.getTopics()).isEqualTo("events-topic");
         assertThat(kafkaTransport.getServers()).isEqualTo("localhost:9092");
+        assertThat(kafkaTransport.getKey()).isEqualTo("none");
+    }
+
+    @Test
+    @DisplayName("Should bind key strategy on kafka transport")
+    void shouldBindKafkaTransportKeyStrategy() {
+        // given
+        Map<String, String> properties = Map.of(
+                "event-flow.publisher.channels[0].name", "external",
+                "event-flow.publisher.channels[0].transports[0].name", "kafka",
+                "event-flow.publisher.channels[0].transports[0].topics", "events-topic",
+                "event-flow.publisher.channels[0].transports[0].servers", "localhost:9092",
+                "event-flow.publisher.channels[0].transports[0].key", "process-id"
+        );
+        ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
+        Binder binder = new Binder(source);
+
+        // when
+        EventFlowProperties eventFlowProperties = binder.bind("event-flow", EventFlowProperties.class)
+                .orElseGet(EventFlowProperties::new);
+
+        // then
+        var kafkaTransport = eventFlowProperties.getPublisher().getChannels().get(0).getTransports().get(0);
+        assertThat(kafkaTransport.getKey()).isEqualTo("process-id");
     }
 
     @Test

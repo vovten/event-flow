@@ -126,6 +126,9 @@ event-flow:
             servers: localhost:9092
             topics: events
             serialization: json
+            # Kafka record key strategy (partition routing).
+            # Values: none (default), process-id, event-type, metadata:<name>, bean:<beanName>
+            # key: process-id
       - name: broadcast
         transports:
           - name: broadcast-kafka

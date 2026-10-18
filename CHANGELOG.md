@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Kafka partition keys via `EventKeyResolver`: the record key can now be resolved from the event's `processId`, event type, `Envelope` metadata, or a custom resolver. This lets all events of the same process/saga or type land in the same Kafka partition (ordering guarantee). The default `none` strategy preserves the previous round-robin behavior. Spring auto-configuration exposes the `key` transport option (`none`, `process-id`, `event-type`, `metadata:<name>`, `bean:<beanName>`).
+
 ## [1.3.0] - 2026-08-12
 
 ### Added

@@ -97,7 +97,7 @@ class KafkaOutTransportResourceTest {
 
     private KafkaOutTransport createTransportWithMockProducer() throws Exception {
         KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic");
-        Field producerField = KafkaOutTransport.class.getDeclaredField("producer");
+        Field producerField = AbstractKafkaOutTransport.class.getDeclaredField("producer");
         producerField.setAccessible(true);
         producerField.set(transport, mockProducer);
         return transport;

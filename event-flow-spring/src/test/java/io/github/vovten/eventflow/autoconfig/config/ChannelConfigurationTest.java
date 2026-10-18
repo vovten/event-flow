@@ -243,7 +243,8 @@ class ChannelConfigurationTest {
             context.registerBean(DefaultLocalQueueProvider.class, () -> new DefaultLocalQueueProvider(1000));
             context.registerBean(EventSerializerFactory.class, () -> new EventSerializerFactory());
             context.registerBean(KafkaOutTransportFactory.class,
-                    () -> new KafkaOutTransportFactory(context.getBean(EventSerializerFactory.class)));
+                    () -> new KafkaOutTransportFactory(context.getBean(EventSerializerFactory.class),
+                            context.getBeanFactory()));
             context.registerBean(SerializerConfiguration.class, () -> new SerializerConfiguration(Map.of(), properties));
             context.register(ChannelConfiguration.class);
             context.refresh();

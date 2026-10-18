@@ -151,6 +151,7 @@ event-flow:
           - name: kafka
             topic: events
             servers: kafka:9092
+            key: process-id
   dispatcher:
     enabled: true
     thread-pool:
@@ -164,6 +165,65 @@ event-flow:
         topic: events
         servers: kafka:9092
         consumerGroup: my-service-group
+```
+
+> **Kafka partition key (`key`)** — optional, applies to outgoing `kafka` transports.
+> Default: `none` (no key, round-robin). Supported strategies are described below.
+
+### Kafka Partition Keys
+
+The `key` option on an outgoing `kafka` transport controls the Kafka record key, which
+determines the target partition (Kafka hashes the key; events with the same key always land
+in the same partition as long as the partition count does not change). A `null` key means
+round-robin.
+
+| `key` value | Behavior |
+|---|---|
+| `none` (default) | No key — Kafka round-robin |
+| `process-id` | Key is the event's `processId` — all events of a process/saga land in the same partition |
+| `event-type` | Key is the event type class name — all events of a type land in the same partition (topic segmentation by type; may create hotspots) |
+| `metadata:<name>` | Key is the named value from the `Envelope` metadata, set by the publisher |
+| `bean:<beanName>` | Key is resolved by a user-defined `EventKeyResolver` Spring bean |
+
+When a strategy cannot resolve a key (e.g. no `processId`, absent metadata entry),
+the event is sent with a `null` key and Kafka distributes it round-robin.
+
+**`metadata:` example** — the publisher sets the value at publish time:
+
+```yaml
+transports:
+  - name: kafka
+    topic: orders
+    servers: kafka:9092
+    key: metadata:orderId
+```
+
+```java
+publisher.prepare(new OrderCreated(orderId, email))
+    .withMetadata("orderId", orderId)
+    .publish();
+```
+
+**`bean:` example** — full flexibility (payload fields, services, DB lookups):
+
+```java
+@Bean
+EventKeyResolver orderKeyResolver() {
+    return event -> {
+        if (event instanceof Envelope<?> env && env.payload() instanceof OrderEvent o) {
+            return o.orderId();
+        }
+        return null;
+    };
+}
+```
+
+```yaml
+transports:
+  - name: kafka
+    topic: orders
+    servers: kafka:9092
+    key: bean:orderKeyResolver
 ```
 
 ### Custom Local-Queue Configuration

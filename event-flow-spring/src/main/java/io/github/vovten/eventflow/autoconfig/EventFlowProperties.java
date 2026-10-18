@@ -811,6 +811,18 @@ public class EventFlowProperties {
          */
         private String serialization = "json";
 
+        /**
+         * Kafka record key strategy for outgoing Kafka transports.
+         * Determines which Kafka partition receives the event.
+         * Supported values:
+         * - "none" (default): no key, Kafka round-robin
+         * - "process-id": key is the event's processId (all events of a process → one partition)
+         * - "event-type": key is the event type class name (all events of a type → one partition)
+         * - "metadata:&lt;name&gt;": key is the named value from the Envelope metadata
+         * - "bean:&lt;beanName&gt;": key resolved by a user-defined {@code EventKeyResolver} Spring bean
+         */
+        private String key = "none";
+
         public String getName() {
             return name;
         }
@@ -857,6 +869,14 @@ public class EventFlowProperties {
 
         public void setSerialization(String serialization) {
             this.serialization = serialization;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
         }
     }
 

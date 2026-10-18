@@ -142,6 +142,51 @@ class KafkaOutTransportTest {
     }
 
     @Test
+    @DisplayName("Should send event with key resolved by key resolver")
+    void shouldSendEventWithResolvedKey() {
+        TestEvent event = TestEvent.create("test-id", "test-message");
+
+        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic",
+                new JsonEventSerializer(), EventKeyResolver.eventType());
+        transport.producer = mockProducer;
+
+        // Mock async send with immediate success callback
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata("test-topic", 0, 100), null);
+            return null;
+        }).when(mockProducer).send(recordCaptor.capture(), callbackCaptor.capture());
+
+        CompletableFuture<SendResult> future = transport.send(event);
+        future.join();
+
+        ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
+        assertThat(capturedRecord.key()).isEqualTo(event.type().getName());
+    }
+
+    @Test
+    @DisplayName("Should send event without key for none resolver")
+    void shouldSendEventWithoutKeyForNoneResolver() {
+        TestEvent event = TestEvent.create("test-id", "test-message");
+
+        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic");
+        transport.producer = mockProducer;
+
+        // Mock async send with immediate success callback
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata("test-topic", 0, 100), null);
+            return null;
+        }).when(mockProducer).send(recordCaptor.capture(), callbackCaptor.capture());
+
+        CompletableFuture<SendResult> future = transport.send(event);
+        future.join();
+
+        ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
+        assertThat(capturedRecord.key()).isNull();
+    }
+
+    @Test
     @DisplayName("Should handle send failure")
     void shouldHandleSendFailure() {
         TestEvent event = TestEvent.create("test-id", "test-message");

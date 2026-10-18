@@ -541,7 +541,7 @@ Transports for event delivery.
 
 **Outgoing Transports (`OutTransport`):**
 - `LocalQueueOutTransport` — send to local queue
-- `KafkaOutTransport` — send to Kafka topic
+- `KafkaOutTransport` — send to Kafka topic (supports partition keys via `EventKeyResolver`)
 - `BroadcastKafkaOutTransport` — send to all Kafka topic partitions
 
 ### LocalQueueTransportsBuilder
@@ -964,6 +964,30 @@ EventDispatcher dispatcher = EventDispatcherBuilder.create()
 
 dispatcher.start(dispatcher::dispatch);
 ```
+
+#### Kafka Partition Keys
+
+The Kafka record key determines which partition receives the event: Kafka hashes the key, so
+events with the same key always land in the same partition (as long as the topic partition
+count does not change). A `null` key falls back to Kafka round-robin.
+
+```java
+// No key — round-robin (default, backward compatible)
+OutTransport kafkaOut = new KafkaOutTransport("localhost:9092", "events");
+
+// Key = processId: all events of a process/saga land in the same partition
+OutTransport kafkaProcessKeyed = new KafkaOutTransport(
+    "localhost:9092", "events", new JsonEventSerializer(),
+    EventKeyResolver.processId()
+);
+
+// Key = event type, metadata entry, or custom resolver (see event-flow-core README)
+```
+
+Built-in strategies: `none()` (default), `processId()`, `eventType()`, `metadata(name)`.
+In Spring Boot auto-configuration, select a strategy per transport via `key`
+(e.g. `key: process-id`, `key: metadata:orderId`, `key: bean:myResolver`) —
+see [event-flow-spring/README.md](event-flow-spring/README.md#kafka-partition-keys).
 
 ### Idempotent Dispatcher
 

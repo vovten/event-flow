@@ -10,6 +10,7 @@ import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.transport.DefaultLocalQueueProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -96,11 +97,13 @@ public class CommonConfiguration {
      * Creates factory for Kafka publisher transports.
      *
      * @param serializerFactory serializer factory for creating event serializers
+     * @param beanFactory       Spring bean factory for resolving custom {@code bean:} key resolvers
      * @return Kafka publisher transport factory
      */
     @Bean
-    public KafkaOutTransportFactory kafkaPublisherTransportFactory(EventSerializerFactory serializerFactory) {
-        return new KafkaOutTransportFactory(serializerFactory);
+    public KafkaOutTransportFactory kafkaPublisherTransportFactory(EventSerializerFactory serializerFactory,
+                                                                   BeanFactory beanFactory) {
+        return new KafkaOutTransportFactory(serializerFactory, beanFactory);
     }
 
     /**

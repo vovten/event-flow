@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.transport.outgoing;
 
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.serialization.EventSerializer;
+import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.TransportException;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -14,8 +15,14 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 
+import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG;
+
 /**
  * Kafka transport that sends events to all topic partitions.
+ * <p>
+ * The record key does not influence partition routing here (every partition is
+ * targeted explicitly); it is only written into the record metadata. The default
+ * key strategy is {@link EventKeyResolver#eventType()}.
  * <p>
  * If all partitions fail, the result contains the error.
  * If some partitions fail, a warning is logged and the first successful result is returned.
@@ -23,7 +30,7 @@ import java.util.concurrent.CompletableFuture;
  * @author Vladimir Aleshkov
  * @since 1.0.0
  */
-public class BroadcastKafkaOutTransport extends KafkaOutTransport {
+public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
 
     private static final Logger log = LoggerFactory.getLogger(BroadcastKafkaOutTransport.class);
 
@@ -34,7 +41,31 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
      * @param topic      Kafka topic name
      */
     public BroadcastKafkaOutTransport(Properties properties, String topic) {
-        super(properties, topic);
+        this(properties, topic, new JsonEventSerializer(), EventKeyResolver.eventType());
+    }
+
+    /**
+     * Create broadcast Kafka transport with custom configuration and serializer.
+     *
+     * @param properties Kafka producer configuration
+     * @param topic      Kafka topic name
+     * @param serializer the event serializer to use
+     */
+    public BroadcastKafkaOutTransport(Properties properties, String topic, EventSerializer serializer) {
+        this(properties, topic, serializer, EventKeyResolver.eventType());
+    }
+
+    /**
+     * Create broadcast Kafka transport with custom configuration, serializer and key resolver.
+     *
+     * @param properties  Kafka producer configuration
+     * @param topic       Kafka topic name
+     * @param serializer  the event serializer to use
+     * @param keyResolver key resolver strategy (used only for the record key, not routing)
+     */
+    public BroadcastKafkaOutTransport(Properties properties, String topic, EventSerializer serializer,
+                                      EventKeyResolver keyResolver) {
+        super(properties, topic, serializer, keyResolver);
     }
 
     /**
@@ -44,7 +75,7 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
      * @param topic            Kafka topic name
      */
     public BroadcastKafkaOutTransport(String bootstrapServers, String topic) {
-        super(bootstrapServers, topic);
+        this(createDefaultProperties(bootstrapServers), topic, new JsonEventSerializer(), EventKeyResolver.eventType());
     }
 
     /**
@@ -55,7 +86,26 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
      * @param serializer       custom event serializer
      */
     public BroadcastKafkaOutTransport(String bootstrapServers, String topic, EventSerializer serializer) {
-        super(bootstrapServers, topic, serializer);
+        this(createDefaultProperties(bootstrapServers), topic, serializer, EventKeyResolver.eventType());
+    }
+
+    /**
+     * Create broadcast Kafka transport with bootstrap servers, topic, serializer and key resolver.
+     *
+     * @param bootstrapServers Kafka bootstrap servers (e.g., "localhost:9092")
+     * @param topic            Kafka topic name
+     * @param serializer       custom event serializer
+     * @param keyResolver      key resolver strategy (used only for the record key, not routing)
+     */
+    public BroadcastKafkaOutTransport(String bootstrapServers, String topic, EventSerializer serializer,
+                                      EventKeyResolver keyResolver) {
+        super(createDefaultProperties(bootstrapServers), topic, serializer, keyResolver);
+    }
+
+    private static Properties createDefaultProperties(String bootstrapServers) {
+        Properties props = new Properties();
+        props.setProperty(BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        return props;
     }
 
     /**
@@ -64,8 +114,8 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
      * This method retrieves partition metadata and sends the event to each partition.
      * It tracks successes and failures to provide detailed error handling:
      * <ul>
-     *   <li>If all sends fail — throws an exception</li>
-     *   <li>If some sends fail — logs a warning with partition details</li>
+     *   <li>If all sends fail — the result contains the error</li>
+     *   <li>If some sends fail — a warning is logged with partition details</li>
      * </ul>
      *
      * @param event the event to send
@@ -79,7 +129,7 @@ public class BroadcastKafkaOutTransport extends KafkaOutTransport {
                     String.format("Topic '%s' has no partitions for event %s", topic, event.type().getSimpleName())
             );
         }
-        String key = event.type().getName();
+        String key = keyResolver.resolveKey(event);
         byte[] value = serializer.serialize(event);
         List<CompletableFuture<PartitionSendResult>> futures = new ArrayList<>();
 

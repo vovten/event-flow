@@ -194,6 +194,52 @@ OutTransport broadcastKafkaOut = new BroadcastKafkaOutTransport(
 );
 ```
 
+#### Kafka Partition Keys (`EventKeyResolver`)
+
+The Kafka record key determines which partition receives the event: Kafka hashes the key,
+so events with the same key always land in the same partition (as long as the topic partition
+count does not change). A `null` key falls back to Kafka round-robin.
+
+```java
+// No key — round-robin (default, backward compatible)
+OutTransport kafkaOut = new KafkaOutTransport("localhost:9092", "events");
+
+// Key = processId: all events of a process/saga land in the same partition
+OutTransport kafkaProcessKeyed = new KafkaOutTransport(
+    "localhost:9092", "events", new JsonEventSerializer(),
+    EventKeyResolver.processId()
+);
+
+// Key = event type: all events of a type land in the same partition (topic segmentation)
+OutTransport kafkaTypeKeyed = new KafkaOutTransport(
+    "localhost:9092", "events", new JsonEventSerializer(),
+    EventKeyResolver.eventType()
+);
+
+// Key = value from Envelope metadata, set by the publisher at publish time
+OutTransport kafkaMetadataKeyed = new KafkaOutTransport(
+    "localhost:9092", "events", new JsonEventSerializer(),
+    EventKeyResolver.metadata("orderId")
+);
+
+// Custom resolver (any logic: payload fields, DB lookups, ...)
+OutTransport kafkaCustomKeyed = new KafkaOutTransport(
+    "localhost:9092", "events", new JsonEventSerializer(),
+    event -> event.type().getSimpleName()
+);
+```
+
+Built-in strategies: `none()` (default), `processId()`, `eventType()`, `metadata(name)`.
+When a strategy cannot resolve a key (e.g. no `processId`), the event is sent with a `null`
+key and Kafka distributes it round-robin.
+
+```java
+// Publisher sets the metadata value used by EventKeyResolver.metadata("orderId")
+publisher.prepare(new OrderCreated(orderId, email))
+    .withMetadata("orderId", orderId)
+    .publish();
+```
+
 **Incoming Transport:**
 
 ```java
