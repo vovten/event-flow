@@ -22,8 +22,8 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  * Abstract base class for Kafka transport implementations.
  * <p>
  * Provides common functionality for sending events to Kafka topics with a configurable
- * {@link EventKeyResolver}. Subclasses may override {@link #send(Event)} to provide
- * specific delivery semantics (e.g., broadcasting to all partitions).
+ * {@link EventKeyResolver}. Subclasses may override {@link #dispatch(Event, String, byte[])}
+ * to provide specific delivery semantics (e.g., broadcasting to all partitions).
  * <p>
  * <b>Default configuration:</b>
  * <ul>
@@ -115,27 +115,50 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
      * Send event to Kafka asynchronously. Returns immediately with a CompletableFuture
      * that completes when Kafka acknowledges the send.
      * <p>
-     * The record key is resolved by the configured {@link EventKeyResolver}, which
-     * determines the target partition.
+     * This is a template method: it checks the transport state, resolves the record
+     * key via the configured {@link EventKeyResolver}, serializes the event and
+     * delegates the actual delivery to {@link #dispatch(Event, String, byte[])}.
+     * Any failure — key resolution, serialization or dispatch — completes the
+     * returned future exceptionally, so subclasses share one error contract.
      *
      * @param event the event to send
      * @return CompletableFuture with SendResult
      * @throws IllegalStateException if transport is closed
      */
     @Override
-    public CompletableFuture<SendResult> send(Event event) {
+    public final CompletableFuture<SendResult> send(Event event) {
         if (closed) {
-            throw new IllegalStateException("KafkaOutTransport is already closed");
+            throw new IllegalStateException("%s is already closed".formatted(getClass().getSimpleName()));
         }
-        CompletableFuture<SendResult> future = new CompletableFuture<>();
         try {
             String key = keyResolver.resolveKey(event);
             byte[] value = serializer.serialize(event);
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
-            producer.send(record, createSendCallback(future, topic));
+            return dispatch(event, key, value);
         } catch (Exception e) {
-            future.completeExceptionally(e);
+            CompletableFuture<SendResult> failed = new CompletableFuture<>();
+            failed.completeExceptionally(e);
+            return failed;
         }
+    }
+
+    /**
+     * Dispatch the serialized event to Kafka. The base implementation sends a single
+     * record without an explicit partition, letting Kafka route it by the resolved key
+     * (round-robin when the key is {@code null}).
+     * <p>
+     * Subclasses may override to provide specific delivery semantics
+     * (e.g., broadcasting to all partitions). Exceptions thrown here are captured by
+     * {@link #send(Event)} and surfaced through the returned future.
+     *
+     * @param event the event being sent (for error reporting)
+     * @param key   the Kafka record key resolved by the {@link EventKeyResolver}, may be null
+     * @param value the serialized event payload
+     * @return CompletableFuture with SendResult
+     */
+    protected CompletableFuture<SendResult> dispatch(Event event, String key, byte[] value) {
+        CompletableFuture<SendResult> future = new CompletableFuture<>();
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
+        producer.send(record, createSendCallback(future, topic));
         return future;
     }
 

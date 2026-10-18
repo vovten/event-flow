@@ -117,20 +117,23 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
      *   <li>If all sends fail — the result contains the error</li>
      *   <li>If some sends fail — a warning is logged with partition details</li>
      * </ul>
+     * A failure to resolve the key, serialize the event or enumerate partitions
+     * (e.g., when the topic has no partitions) is surfaced through the returned
+     * future, consistent with the base {@link #send(Event)} contract.
      *
      * @param event the event to send
+     * @param key   the Kafka record key (does not influence routing, partitions are explicit)
+     * @param value the serialized event payload
      * @return CompletableFuture with SendResult from the first successful partition
      */
     @Override
-    public CompletableFuture<SendResult> send(Event event) {
+    protected CompletableFuture<SendResult> dispatch(Event event, String key, byte[] value) {
         List<PartitionInfo> partitions = producer.partitionsFor(topic);
         if (partitions.isEmpty()) {
             throw new TransportException(
                     String.format("Topic '%s' has no partitions for event %s", topic, event.type().getSimpleName())
             );
         }
-        String key = keyResolver.resolveKey(event);
-        byte[] value = serializer.serialize(event);
         List<CompletableFuture<PartitionSendResult>> futures = new ArrayList<>();
 
         for (PartitionInfo partition : partitions) {

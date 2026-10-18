@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.transport.outgoing;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.test.TestEvent;
+import io.github.vovten.eventflow.serialization.json.JsonEventSerializer;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.TransportException;
 import org.apache.kafka.clients.producer.Callback;
@@ -148,8 +149,8 @@ class BroadcastKafkaOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when topic has no partitions")
-    void shouldThrowExceptionWhenTopicHasNoPartitions() {
+    @DisplayName("Should fail the future when topic has no partitions")
+    void shouldFailFutureWhenTopicHasNoPartitions() {
         when(mockProducer.partitionsFor("test-topic")).thenReturn(List.of());
 
         TestEvent event = TestEvent.create("test-id", "test-message");
@@ -157,9 +158,36 @@ class BroadcastKafkaOutTransportTest {
         BroadcastKafkaOutTransport transport = new BroadcastKafkaOutTransport("localhost:9092", "test-topic");
         transport.producer = mockProducer;
 
-        assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(TransportException.class)
-                .hasMessageContaining("has no partitions");
+        assertThatThrownBy(() -> transport.send(event).join())
+                .hasRootCauseInstanceOf(TransportException.class)
+                .hasStackTraceContaining("has no partitions");
+    }
+
+    @Test
+    @DisplayName("Should fail the future when key resolver throws, like the base send contract")
+    void shouldFailFutureWhenKeyResolverThrows() {
+        TestEvent event = TestEvent.create("test-id", "test-message");
+
+        BroadcastKafkaOutTransport transport = new BroadcastKafkaOutTransport(
+                "localhost:9092", "test-topic", new JsonEventSerializer(),
+                ignored -> {
+                    throw new IllegalStateException("resolver exploded");
+                });
+
+        assertThatThrownBy(() -> transport.send(event).join())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasStackTraceContaining("resolver exploded");
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalStateException when sending on a closed transport")
+    void shouldThrowWhenSendingOnClosedTransport() {
+        BroadcastKafkaOutTransport transport = new BroadcastKafkaOutTransport("localhost:9092", "test-topic");
+        transport.close();
+
+        assertThatThrownBy(() -> transport.send(TestEvent.create("test-id", "test-message")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("already closed");
     }
 
     @Test
