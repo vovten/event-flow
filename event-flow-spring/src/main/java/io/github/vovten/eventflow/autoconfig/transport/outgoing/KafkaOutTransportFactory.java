@@ -7,6 +7,7 @@ import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.transport.OutTransport;
 import io.github.vovten.eventflow.transport.outgoing.EventKeyResolver;
+import io.github.vovten.eventflow.transport.outgoing.EventKeyResolverBuilder;
 import io.github.vovten.eventflow.transport.outgoing.KafkaOutTransport;
 import org.springframework.beans.factory.BeanFactory;
 
@@ -17,7 +18,8 @@ import org.springframework.beans.factory.BeanFactory;
  * - "json" (default): UTF-8 encoded JSON, readable in Kafka UI tools
  * - "msgpack": Compact binary format for better performance
  * <p>
- * Supports a configurable Kafka record key strategy via {@code key}:
+ * Supports a configurable Kafka record key strategy via {@code key}, parsed by the
+ * framework-neutral {@link EventKeyResolverBuilder}:
  * - "none" (default), "process-id", "event-type", "metadata:&lt;name&gt;",
  *   or "bean:&lt;beanName&gt;" to resolve a user-defined {@link EventKeyResolver} bean.
  *
@@ -26,12 +28,15 @@ import org.springframework.beans.factory.BeanFactory;
  */
 public class KafkaOutTransportFactory implements OutTransportFactory {
 
-    private static final String PREFIX_METADATA = "metadata:";
-    private static final String PREFIX_BEAN = "bean:";
-
     private final EventSerializerFactory serializerFactory;
     private final BeanFactory beanFactory;
 
+    /**
+     * Creates the factory.
+     *
+     * @param serializerFactory factory for event serializers
+     * @param beanFactory       Spring bean factory backing the {@code bean:} key strategy
+     */
     public KafkaOutTransportFactory(EventSerializerFactory serializerFactory, BeanFactory beanFactory) {
         this.serializerFactory = serializerFactory;
         this.beanFactory = beanFactory;
@@ -71,44 +76,18 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
     }
 
     /**
-     * Resolve the {@link EventKeyResolver} strategy from the {@code key} configuration.
+     * Resolve the {@link EventKeyResolver} strategy from the {@code key} configuration
+     * using {@link EventKeyResolverBuilder}, wiring the {@code bean:} strategy to the
+     * Spring {@link BeanFactory}.
      *
      * @param key the configured key strategy (may be null or blank)
      * @return the resolved key resolver
-     * @throws IllegalArgumentException if the strategy is unknown
+     * @throws IllegalArgumentException if the strategy is unknown or malformed
      */
     private EventKeyResolver createKeyResolver(String key) {
-        if (key == null || key.isBlank() || "none".equalsIgnoreCase(key)) {
-            return EventKeyResolver.none();
-        }
-        if ("process-id".equalsIgnoreCase(key)) {
-            return EventKeyResolver.processId();
-        }
-        if ("event-type".equalsIgnoreCase(key)) {
-            return EventKeyResolver.eventType();
-        }
-        if (key.regionMatches(true, 0, PREFIX_METADATA, 0, PREFIX_METADATA.length())) {
-            String metadataKey = key.substring(PREFIX_METADATA.length());
-            if (metadataKey.isBlank()) {
-                throw new IllegalArgumentException(
-                        "Kafka 'key' strategy 'metadata:' requires a metadata name, e.g. 'metadata:orderId'"
-                );
-            }
-            return EventKeyResolver.metadata(metadataKey);
-        }
-        if (key.regionMatches(true, 0, PREFIX_BEAN, 0, PREFIX_BEAN.length())) {
-            String beanName = key.substring(PREFIX_BEAN.length());
-            if (beanName.isBlank()) {
-                throw new IllegalArgumentException(
-                        "Kafka 'key' strategy 'bean:' requires a bean name, e.g. 'bean:orderKeyResolver'"
-                );
-            }
-            return beanFactory.getBean(beanName, EventKeyResolver.class);
-        }
-        throw new IllegalArgumentException(
-                "Unknown Kafka 'key' strategy '" + key + "'. Supported values: "
-                        + "none, process-id, event-type, metadata:<name>, bean:<beanName>"
-        );
+        return new EventKeyResolverBuilder(key)
+                .withBeanLookup(beanName -> beanFactory.getBean(beanName, EventKeyResolver.class))
+                .build();
     }
 
     @Override
