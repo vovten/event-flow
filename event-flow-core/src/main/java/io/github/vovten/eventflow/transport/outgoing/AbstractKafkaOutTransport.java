@@ -205,7 +205,7 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
             closed = true;
             producer.close();
             if (log.isDebugEnabled()) {
-                log.debug("KafkaOutTransport closed for topic '{}'", topic);
+                log.debug("{} closed for topic '{}'", getClass().getSimpleName(), topic);
             }
         }
     }
