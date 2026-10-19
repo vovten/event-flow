@@ -70,7 +70,8 @@ public final class EventKeyResolverBuilder {
     }
 
     /**
-     * Builds the resolver described by the specification.
+     * Builds the resolver described by the specification. Surrounding whitespace of
+     * the specification and of the name part after a prefix is ignored.
      *
      * @return the resolved {@link EventKeyResolver}, never null
      * @throws IllegalArgumentException if the specification is unknown or malformed,
@@ -78,7 +79,7 @@ public final class EventKeyResolverBuilder {
      *                                  a configured lookup, or if the lookup returns null
      */
     public EventKeyResolver build() {
-        String strategy = spec == null ? "" : spec;
+        String strategy = spec == null ? "" : spec.trim();
         if (strategy.isBlank() || STRATEGY_NONE.equalsIgnoreCase(strategy)) {
             return EventKeyResolver.none();
         }
@@ -131,7 +132,7 @@ public final class EventKeyResolverBuilder {
      * @throws IllegalArgumentException if the name part is blank
      */
     private static String extractName(String strategy, String prefix, String what, String example) {
-        String name = strategy.substring(prefix.length());
+        String name = strategy.substring(prefix.length()).trim();
         if (name.isBlank()) {
             throw new IllegalArgumentException(
                     "Kafka 'key' strategy '" + prefix + "' requires a " + what + ", e.g. '" + prefix + example + "'"

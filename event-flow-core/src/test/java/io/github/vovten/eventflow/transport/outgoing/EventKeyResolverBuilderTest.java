@@ -5,6 +5,8 @@ import io.github.vovten.eventflow.test.TestEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -123,6 +125,29 @@ class EventKeyResolverBuilderTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown Kafka 'key' strategy 'partition-key'")
                 .hasMessageContaining("metadata:<name>");
+    }
+
+    @Test
+    @DisplayName("Should ignore surrounding whitespace in spec and in name parts")
+    void shouldTrimSpecAndNameParts() {
+        UUID processId = UUID.randomUUID();
+        Envelope<String> envelope = Envelope.of("payload", processId)
+                .withAdditionalMetadata("orderId", "order-123");
+
+        assertThat(new EventKeyResolverBuilder("  process-id  ").build().resolveKey(envelope))
+                .isEqualTo(processId.toString());
+        assertThat(new EventKeyResolverBuilder(" metadata: orderId ").build().resolveKey(envelope))
+                .isEqualTo("order-123");
+
+        List<String> lookedUpNames = new ArrayList<>();
+        new EventKeyResolverBuilder(" bean: orderKeyResolver ")
+                .withBeanLookup(name -> {
+                    lookedUpNames.add(name);
+                    return EventKeyResolver.none();
+                })
+                .build();
+
+        assertThat(lookedUpNames).containsExactly("orderKeyResolver");
     }
 
     @Test
