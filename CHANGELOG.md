@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-10-19
+
+### Changed
+
+- Upgrade `zstd-jni` (transitive via `kafka-clients`) from 1.5.6-4 to 1.5.7-24 to fix native-memory vulnerabilities: out-of-bounds reads, use-after-free, and missing bounds checks in dictionary and stream APIs (CVE-2026-87795, CVE-2026-87823, CVE-2026-87824, CVE-2026-87825, CVE-2026-87877, CVE-2026-89045, CVE-2026-89046, CVE-2026-90560, CVE-2026-90852)
+
 ## [1.3.0] - 2026-08-12
 
 ### Added
@@ -81,6 +87,7 @@ ALTER TABLE event_store ADD channels NVARCHAR(MAX) NULL;
 - Structured logging, retry mechanism, transports, serialization
 - Spring Boot auto-configuration and transactional publishing
 
+[1.3.1]: https://github.com/vovten/event-flow/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/vovten/event-flow/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/vovten/event-flow/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/vovten/event-flow/compare/v1.2.1...v1.2.2
