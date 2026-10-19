@@ -26,6 +26,7 @@
         <spring-boot.version>3.5.16</spring-boot.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <msgpack.version>0.9.12</msgpack.version>
+        <zstd-jni.version>1.5.7-24</zstd-jni.version>
         <!-- Skip parent deployment -->
         <maven.deploy.skip>true</maven.deploy.skip>
 
@@ -75,6 +76,16 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>${commons-lang3.version}</version>
+            </dependency>
+
+            <!-- zstd-jni (transitive via kafka-clients) - pinned to fix CVEs:
+                 CVE-2026-87795, CVE-2026-87823, CVE-2026-87824, CVE-2026-87825,
+                 CVE-2026-87877, CVE-2026-89045, CVE-2026-89046, CVE-2026-90560,
+                 CVE-2026-90852 (all fixed in 1.5.7-14 and later) -->
+            <dependency>
+                <groupId>com.github.luben</groupId>
+                <artifactId>zstd-jni</artifactId>
+                <version>${zstd-jni.version}</version>
             </dependency>
 
             <!-- Project modules -->

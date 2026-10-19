@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Upgrade `zstd-jni` (transitive via `kafka-clients`) from 1.5.6-4 to 1.5.7-24 to fix native-memory vulnerabilities: out-of-bounds reads, use-after-free, and missing bounds checks in dictionary and stream APIs (CVE-2026-87795, CVE-2026-87823, CVE-2026-87824, CVE-2026-87825, CVE-2026-87877, CVE-2026-89045, CVE-2026-89046, CVE-2026-90560, CVE-2026-90852)
+
 ## [1.3.0] - 2026-08-12
 
 ### Added

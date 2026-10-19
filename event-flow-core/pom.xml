@@ -81,6 +81,13 @@
             <artifactId>kafka-clients</artifactId>
         </dependency>
 
+        <!-- zstd-jni (runtime, transitive via kafka-clients) - pinned to fix CVEs -->
+        <dependency>
+            <groupId>com.github.luben</groupId>
+            <artifactId>zstd-jni</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Jakarta Annotation -->
         <dependency>
             <groupId>jakarta.annotation</groupId>
