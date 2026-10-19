@@ -102,5 +102,8 @@ public class KafkaOutTransportFactory implements OutTransportFactory {
                     "Kafka transport requires topics configuration"
             );
         }
+        // Resolving through the builder doubles as validation: an unknown or malformed
+        // 'key' (including a missing bean reference) fails at startup, not on first send.
+        createKeyResolver(config.getKey());
     }
 }

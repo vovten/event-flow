@@ -217,6 +217,47 @@ class KafkaOutTransportFactoryTest {
                 .hasMessageContaining("requires a bean name");
     }
 
+    @Test
+    @DisplayName("Should reject unknown key strategy during validation")
+    void shouldRejectUnknownKeyStrategyDuringValidation() {
+        // given
+        EventFlowProperties.TransportConfig config = transportConfig();
+        config.setKey("partition-key");
+
+        // when & then
+        assertThatThrownBy(() -> factory.validate(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown Kafka 'key' strategy 'partition-key'");
+    }
+
+    @Test
+    @DisplayName("Should accept built-in and metadata key strategies during validation")
+    void shouldAcceptKnownKeyStrategiesDuringValidation() {
+        // given
+        EventFlowProperties.TransportConfig config = transportConfig();
+
+        // when & then: no exception for any supported strategy
+        for (String key : new String[]{null, "", "none", "process-id", "event-type", "metadata:orderId"}) {
+            config.setKey(key);
+            factory.validate(config);
+        }
+    }
+
+    @Test
+    @DisplayName("Should reject bean strategy referencing a missing bean during validation")
+    void shouldRejectBeanStrategyWithMissingBeanDuringValidation() {
+        // given
+        EventFlowProperties.TransportConfig config = transportConfig();
+        config.setKey("bean:absentResolver");
+        // beanFactory.getBean is intentionally not stubbed: an unstubbed mock returns null,
+        // and the builder translates a null lookup result into a configuration error
+
+        // when & then
+        assertThatThrownBy(() -> factory.validate(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("references unknown EventKeyResolver bean 'absentResolver'");
+    }
+
     private EventFlowProperties.TransportConfig transportConfig() {
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("kafka-publisher");
