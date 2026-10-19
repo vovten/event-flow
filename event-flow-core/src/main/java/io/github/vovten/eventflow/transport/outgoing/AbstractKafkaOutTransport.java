@@ -158,18 +158,18 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
     protected CompletableFuture<SendResult> dispatch(Event event, String key, byte[] value) {
         CompletableFuture<SendResult> future = new CompletableFuture<>();
         ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, value);
-        producer.send(record, createSendCallback(future, topic));
+        producer.send(record, createSendCallback(future));
         return future;
     }
 
     /**
      * Create a Kafka callback that completes the future with success or failure result.
+     * The destination is annotated with the partition taken from the record metadata.
      *
      * @param future the CompletableFuture to complete
-     * @param topic  the Kafka topic name
      * @return Kafka Callback implementation
      */
-    protected Callback createSendCallback(CompletableFuture<SendResult> future, String topic) {
+    protected Callback createSendCallback(CompletableFuture<SendResult> future) {
         return (metadata, exception) -> {
             String destination = name() + "-" + topic + (metadata != null ? "-p" + metadata.partition() : "");
             if (exception != null) {

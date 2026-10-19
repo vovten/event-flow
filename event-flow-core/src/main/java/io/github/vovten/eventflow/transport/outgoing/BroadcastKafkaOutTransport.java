@@ -140,7 +140,7 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
             int partitionId = partition.partition();
             CompletableFuture<SendResult> sendFuture = new CompletableFuture<>();
             ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, partitionId, key, value);
-            producer.send(record, createSendCallback(sendFuture, topic + "-p" + partitionId));
+            producer.send(record, createSendCallback(sendFuture));
             CompletableFuture<PartitionSendResult> partitionFuture = sendFuture
                     .thenApply(result -> new PartitionSendResult(partitionId, result, null))
                     .exceptionally(ex -> new PartitionSendResult(partitionId, null, ex));
