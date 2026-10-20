@@ -144,7 +144,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                     null,
                     Instant.now()
             );
-            ackPublisher.send(handled);
+            ackPublisher.publish(handled);
             log.debug("Published SuccessAck for event: {} ({})", eventId, event.type().getSimpleName());
         } catch (Exception e) {
             log.error("Failed to publish SuccessAck for {}", eventId, e);
@@ -164,7 +164,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                     null,
                     Instant.now()
             );
-            ackPublisher.send(failed);
+            ackPublisher.publish(failed);
             String eventName = event.type().getSimpleName();
             log.warn("Published FailureAck for event: {} ({}) — {}", eventId, eventName, errorMessage);
         } catch (Exception e) {

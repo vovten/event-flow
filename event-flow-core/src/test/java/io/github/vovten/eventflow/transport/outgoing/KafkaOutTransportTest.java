@@ -20,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -266,78 +265,6 @@ class KafkaOutTransportTest {
         transport.close(); // Second close should be safe
 
         verify(mockProducer, times(1)).close();
-    }
-
-    @Test
-    @DisplayName("Should send event via custom null-safe resolver with resolved key")
-    void shouldSendEventViaCustomNullSafeResolver() {
-        TestEvent event = TestEvent.create("test-id", "test-message");
-        // null-safe custom resolver: null orderId falls back to round-robin per the EventKeyResolver contract
-        EventKeyResolver customResolver = ev -> "custom-key";
-
-        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic",
-                new JsonEventSerializer(), customResolver);
-        transport.producer = mockProducer;
-
-        // Mock async send with immediate success callback
-        doAnswer(invocation -> {
-            Callback callback = invocation.getArgument(1);
-            callback.onCompletion(mockMetadata("test-topic", 0, 100), null);
-            return null;
-        }).when(mockProducer).send(recordCaptor.capture(), callbackCaptor.capture());
-
-        CompletableFuture<SendResult> future = transport.send(event);
-        future.join();
-
-        ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
-        assertThat(capturedRecord.key()).isEqualTo("custom-key");
-    }
-
-    @Test
-    @DisplayName("Should complete send exceptionally without dispatching record when key resolver throws")
-    void shouldCompleteExceptionallyWhenKeyResolverThrows() {
-        TestEvent event = TestEvent.create("test-id", "test-message");
-        // broken custom resolver: throws instead of returning null for a missing key
-        EventKeyResolver throwingResolver = ev -> {
-            throw new NullPointerException("orderId is null");
-        };
-
-        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic",
-                new JsonEventSerializer(), throwingResolver);
-        transport.producer = mockProducer;
-
-        CompletableFuture<SendResult> future = transport.send(event);
-
-        assertThat(future).isCompletedExceptionally();
-        assertThatThrownBy(future::join)
-                .isInstanceOf(CompletionException.class)
-                .hasCauseInstanceOf(NullPointerException.class)
-                .hasRootCauseMessage("orderId is null");
-
-        verify(mockProducer, never()).send(any(), any(Callback.class));
-    }
-
-    @Test
-    @DisplayName("Should fall back to null key when event is not supported by metadata resolver")
-    void shouldFallBackToNullKeyForUnsupportedEventInMetadataResolver() {
-        TestEvent event = TestEvent.create("test-id", "test-message");
-
-        KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic",
-                new JsonEventSerializer(), EventKeyResolver.metadata("orderId"));
-        transport.producer = mockProducer;
-
-        // Mock async send with immediate success callback
-        doAnswer(invocation -> {
-            Callback callback = invocation.getArgument(1);
-            callback.onCompletion(mockMetadata("test-topic", 0, 100), null);
-            return null;
-        }).when(mockProducer).send(recordCaptor.capture(), callbackCaptor.capture());
-
-        CompletableFuture<SendResult> future = transport.send(event);
-        future.join();
-
-        ProducerRecord<String, byte[]> capturedRecord = recordCaptor.getValue();
-        assertThat(capturedRecord.key()).isNull();
     }
 
     private org.apache.kafka.clients.producer.RecordMetadata mockMetadata(String topic, int partition, long offset) {

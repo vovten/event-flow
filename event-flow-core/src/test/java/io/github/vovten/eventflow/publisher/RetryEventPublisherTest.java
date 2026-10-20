@@ -110,7 +110,7 @@ class RetryEventPublisherTest {
         AtomicInteger callCount = new AtomicInteger(0);
         EventPublisher origin = new EventPublisher() {
             @Override
-            public CompletableFuture<SendResults> send(Event event) {
+            public CompletableFuture<SendResults> publish(Event event) {
                 if (callCount.incrementAndGet() < 2) {
                     return CompletableFuture.failedFuture(new RuntimeException("Temporary failure"));
                 }
@@ -158,7 +158,7 @@ class RetryEventPublisherTest {
         AtomicInteger callCount = new AtomicInteger(0);
         EventPublisher origin = new EventPublisher() {
             @Override
-            public CompletableFuture<SendResults> send(Event event) {
+            public CompletableFuture<SendResults> publish(Event event) {
                 if (callCount.incrementAndGet() < 3) {
                     return CompletableFuture.failedFuture(new RuntimeException("Temporary failure"));
                 }
@@ -182,7 +182,7 @@ class RetryEventPublisherTest {
         // Arrange
         EventPublisher origin = new EventPublisher() {
             @Override
-            public CompletableFuture<SendResults> send(Event event) {
+            public CompletableFuture<SendResults> publish(Event event) {
                 return CompletableFuture.failedFuture(new RuntimeException("Permanent failure"));
             }
         };
@@ -202,7 +202,7 @@ class RetryEventPublisherTest {
         AtomicInteger callCount = new AtomicInteger(0);
         EventPublisher origin = new EventPublisher() {
             @Override
-            public CompletableFuture<SendResults> send(Event event) {
+            public CompletableFuture<SendResults> publish(Event event) {
                 callCount.incrementAndGet();
                 return CompletableFuture.failedFuture(new EventPublisherConfigException("Config error"));
             }
@@ -223,7 +223,7 @@ class RetryEventPublisherTest {
         AtomicInteger callCount = new AtomicInteger(0);
         EventPublisher origin = new EventPublisher() {
             @Override
-            public CompletableFuture<SendResults> send(Event event) {
+            public CompletableFuture<SendResults> publish(Event event) {
                 callCount.incrementAndGet();
                 return CompletableFuture.failedFuture(new IllegalArgumentException("Invalid argument"));
             }
@@ -244,7 +244,7 @@ class RetryEventPublisherTest {
         AtomicInteger callCount = new AtomicInteger(0);
         EventPublisher origin = new EventPublisher() {
             @Override
-            public CompletableFuture<SendResults> send(Event event) {
+            public CompletableFuture<SendResults> publish(Event event) {
                 if (callCount.incrementAndGet() < 2) {
                     return CompletableFuture.failedFuture(new RuntimeException("Temporary failure"));
                 }
@@ -270,7 +270,7 @@ class RetryEventPublisherTest {
         // Arrange
         EventPublisher origin = new EventPublisher() {
             @Override
-            public CompletableFuture<SendResults> send(Event event) {
+            public CompletableFuture<SendResults> publish(Event event) {
                 return CompletableFuture.failedFuture(new RuntimeException("Failure"));
             }
         };

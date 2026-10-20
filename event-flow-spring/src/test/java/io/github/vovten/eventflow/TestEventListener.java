@@ -1,6 +1,5 @@
 package io.github.vovten.eventflow;
 
-import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import org.springframework.stereotype.Component;
 
@@ -73,11 +72,6 @@ public class TestEventListener implements EventSubscriber {
 
     @Override
     public void onEvent(Event event) {
-        // Interface subscribers receive the event as-is; high-level publications wrap the
-        // payload in an Envelope, so unwrap it to reach the domain event.
-        if (event instanceof Envelope<?> envelope && envelope.payload() instanceof Event payloadEvent) {
-            event = payloadEvent;
-        }
         if (event instanceof TestEvent testEvent) {
             interfaceResult = testEvent.getId();
         } else if (event instanceof ExternalTestEvent externalTestEvent) {

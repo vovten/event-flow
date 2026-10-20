@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
  *     Duration.ofMillis(100),         // initial delay 100ms
  *     2                               // multiplier 2x (100ms → 200ms → 400ms)
  * );
- * retryPublisher.send(event)
+ * retryPublisher.publish(event)
  *     .thenAccept(results -> log.info("Published to {} destinations", results.size()))
  *     .exceptionally(ex -> { log.error("Failed after retries", ex); return null; });
  * }</pre>
@@ -129,7 +129,7 @@ public class RetryEventPublisher implements EventPublisher {
     }
 
     @Override
-    public CompletableFuture<SendResults> send(Event event) {
+    public CompletableFuture<SendResults> publish(Event event) {
         CompletableFuture<SendResults> resultFuture = new CompletableFuture<>();
         retryPublish(event, 1, resultFuture);
         return resultFuture;
@@ -137,7 +137,7 @@ public class RetryEventPublisher implements EventPublisher {
 
     private void retryPublish(Event event, int attempt, CompletableFuture<SendResults> resultFuture) {
         String eventTypeName = event.type().getSimpleName();
-        origin.send(event)
+        origin.publish(event)
                 .thenAccept(resultFuture::complete)
                 .exceptionally(ex -> {
                     Throwable cause = ex instanceof CompletionException && ex.getCause() != null

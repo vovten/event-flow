@@ -106,15 +106,15 @@ public final class LoggingEventPublisher implements EventPublisher {
     }
 
     @Override
-    public CompletableFuture<SendResults> send(Event event) {
+    public CompletableFuture<SendResults> publish(Event event) {
         if (isExcluded(event)) {
-            return origin.send(event);
+            return origin.publish(event);
         }
         Instant start = Instant.now();
         String traceId = MDC.get("traceId");
         String spanId = MDC.get("spanId");
         String deliveredFrom = MDC.get("deliveredFrom");
-        return origin.send(event)
+        return origin.publish(event)
                 .whenComplete((result, error) ->
                         logEvent(event, result, error, start, traceId, spanId, deliveredFrom));
     }

@@ -1,7 +1,6 @@
 package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.channel.InternalEventChannel;
-import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.TestEvent;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
@@ -131,23 +130,21 @@ class PublisherIntegrationTest {
                 .build();
 
         TestEvent event = TestEvent.create("Lifecycle transaction test event");
-        // send() delivers a pre-built event as-is; the envelope carries the persisted eventId
-        Envelope<TestEvent> envelope = Envelope.of(event);
 
         TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
-            publisher.send(envelope);
+            publisher.publish(event);
 
             // Nothing happens before the transaction completes
             assertThat(sendCalled.get()).isFalse();
-            assertThat(store.findById(envelope.eventId())).isEmpty();
+            assertThat(store.findById(event.eventId())).isEmpty();
 
             for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
                 sync.afterCommit();
             }
 
             assertThat(sendCalled.get()).isTrue();
-            Optional<StoredEvent> stored = store.findById(envelope.eventId());
+            Optional<StoredEvent> stored = store.findById(event.eventId());
             assertThat(stored).isPresent();
         } finally {
             TransactionSynchronizationManager.setActualTransactionActive(false);

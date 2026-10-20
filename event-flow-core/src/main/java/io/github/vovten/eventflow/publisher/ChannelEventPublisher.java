@@ -125,7 +125,7 @@ public class ChannelEventPublisher implements EventPublisher {
      * @throws EventPublisherConfigException if required channel is not configured
      */
     @Override
-    public CompletableFuture<SendResults> send(Event event) {
+    public CompletableFuture<SendResults> publish(Event event) {
         try {
             List<CompletableFuture<SendResults>> channelFutures = new ArrayList<>();
             for (Class<? extends EventChannel> channelType : event.channels()) {

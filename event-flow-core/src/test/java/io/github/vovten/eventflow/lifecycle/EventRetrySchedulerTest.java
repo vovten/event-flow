@@ -198,7 +198,7 @@ class EventRetrySchedulerTest {
         void noFailedEvents() {
             // Publish an event successfully — status will be PUBLISHED, not FAILED
             TestEvent event = new TestEvent("data");
-            lifecyclePublisher.send(event).join();
+            lifecyclePublisher.publish(event).join();
 
             scheduler(3).retryCycle();
 

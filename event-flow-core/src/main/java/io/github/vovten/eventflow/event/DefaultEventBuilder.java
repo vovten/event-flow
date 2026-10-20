@@ -87,6 +87,6 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
                 Map.copyOf(metadata),
                 channels
         );
-        return publisher.send(envelope);
+        return publisher.publish(envelope);
     }
 }
