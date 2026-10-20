@@ -303,6 +303,86 @@ class EventLifecyclePublisherTest {
     }
 
     // -------------------------------------------------------
+    // Raw non-traceable events — wrapped for consistent tracking
+    // -------------------------------------------------------
+
+    @Nested
+    @DisplayName("Raw non-traceable events")
+    class RawNonTraceableTest {
+
+        private final AtomicReference<Event> captured = new AtomicReference<>();
+        private final EventPublisher origin = e -> {
+            captured.set(e);
+            return CompletableFuture.completedFuture(
+                    SendResults.of(List.of(SendResult.success("dest"))));
+        };
+        private EventLifecyclePublisher publisher;
+
+        @BeforeEach
+        void setUpPublisher() {
+            // field initializers of a nested class run before the outer setUp(),
+            // so the publisher must be built here once eventStore exists
+            publisher = new EventLifecyclePublisher(origin, eventStore, "test-service");
+        }
+
+        @Test
+        @DisplayName("Should wrap non-traceable raw MANAGED event into envelope so delivery stays ackable")
+        void shouldWrapNonTraceableRawManagedEvent() {
+            ManagedRawEvent raw = new ManagedRawEvent();
+
+            publisher.publish(raw).join();
+
+            Event delivered = captured.get();
+            assertThat(delivered).isInstanceOf(Envelope.class);
+            Envelope<?> envelope = (Envelope<?>) delivered;
+            assertThat(envelope.payload()).isSameAs(raw);
+            assertThat(eventStore.findById(envelope.eventId()).orElseThrow().status())
+                    .isEqualTo(EventStatus.PUBLISHED);
+        }
+
+        @Test
+        @DisplayName("Should wrap non-traceable raw PERSISTED event into envelope with UNDEFINED status")
+        void shouldWrapNonTraceableRawPersistedEvent() {
+            RawPlainEvent raw = new RawPlainEvent();
+
+            publisher.publish(raw).join();
+
+            Event delivered = captured.get();
+            assertThat(delivered).isInstanceOf(Envelope.class);
+            Envelope<?> envelope = (Envelope<?>) delivered;
+            assertThat(eventStore.findById(envelope.eventId()).orElseThrow().status())
+                    .isEqualTo(EventStatus.UNDEFINED);
+        }
+
+        @Test
+        @DisplayName("Should preserve payload channels when wrapping non-traceable raw event")
+        void shouldPreserveChannelsWhenWrappingRawEvent() {
+            AtomicReference<Event> captured2 = new AtomicReference<>();
+            EventPublisher capturingOrigin = e -> {
+                captured2.set(e);
+                return CompletableFuture.completedFuture(
+                        SendResults.of(List.of(SendResult.success("dest"))));
+            };
+            EventLifecyclePublisher publisher2 = new EventLifecyclePublisher(
+                    capturingOrigin, eventStore, "test-service");
+            ManagedRawEvent raw = new ManagedRawEvent();
+            List<Class<? extends EventChannel>> expected = raw.channels();
+
+            publisher2.publish(raw).join();
+
+            assertThat(((Envelope<?>) captured2.get()).channels()).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("Should pass through raw traceable event unwrapped for backward compatibility")
+        void shouldPassThroughTraceableRawEventUnwrapped() {
+            publisher.publish(event).join();
+
+            assertThat(captured.get()).isSameAs(event);
+        }
+    }
+
+    // -------------------------------------------------------
     // Test fixtures
     // -------------------------------------------------------
 
@@ -345,6 +425,23 @@ class EventLifecyclePublisherTest {
         @Override
         public Class<?> type() {
             return NoneLifecycleEvent.class;
+        }
+    }
+
+    /** Non-traceable MANAGED event: the overload-trap shape from defect report. */
+    @io.github.vovten.eventflow.event.annotation.Event(lifecycle = EventLifecycle.MANAGED)
+    private static final class ManagedRawEvent implements Event {
+        @Override
+        public Class<?> type() {
+            return ManagedRawEvent.class;
+        }
+    }
+
+    /** Non-traceable event with the default PERSISTED lifecycle. */
+    private static final class RawPlainEvent implements Event {
+        @Override
+        public Class<?> type() {
+            return RawPlainEvent.class;
         }
     }
 

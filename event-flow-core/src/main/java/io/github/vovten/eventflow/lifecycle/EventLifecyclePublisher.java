@@ -85,7 +85,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
         if (shouldSkipPersistence(event)) {
             return origin.publish(event);
         }
-        Event enriched = enrichWithService(event);
+        Event enriched = enrichWithService(ensureEnvelope(event));
         UUID eventId = resolveEventId(enriched);
         EventLifecycle lifecycle = lifecycleResolver.resolve(event);
 
@@ -112,6 +112,30 @@ public final class EventLifecyclePublisher implements EventPublisher {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Wraps raw non-traceable events into an {@link Envelope} before persistence.
+     * <p>
+     * A raw event that is not {@link TraceableEvent} cannot receive a lifecycle ack
+     * from {@link EventLifecycleDispatcher}; it would stay {@link EventStatus#PUBLISHED}
+     * forever and be re-published by the retry scheduler in a storm. Wrapping gives
+     * the delivery an envelope identity, enriched payload metadata and documented
+     * wire format, matching the {@code prepare()}-path envelope flow.
+     * <p>
+     * Raw {@link TraceableEvent} instances and envelopes pass through unchanged:
+     * they already carry stable identifiers and consume/produce acks correctly
+     * (preserves the 1.3.x wire format for those events).
+     *
+     * @param event the event being published
+     * @return an envelope, or the original event if no wrapping is needed
+     */
+    private Event ensureEnvelope(Event event) {
+        if (event instanceof Envelope<?> || event instanceof TraceableEvent) {
+            return event;
+        }
+        log.debug("Wrapping non-traceable raw event for lifecycle tracking: {}", event.getClass().getName());
+        return Envelope.of(event);
     }
 
     private void persistNewOnly(UUID eventId, Event event) {
