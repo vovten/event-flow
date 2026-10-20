@@ -121,10 +121,12 @@ public class CommonConfiguration {
      * Creates factory for broadcast Kafka publisher transports.
      *
      * @param serializerFactory serializer factory for creating event serializers
+     * @param beanFactory       Spring bean factory for resolving custom {@code bean:} key resolvers
      * @return broadcast Kafka publisher transport factory
      */
     @Bean
-    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory(EventSerializerFactory serializerFactory) {
-        return new BroadcastKafkaOutTransportFactory(serializerFactory);
+    public BroadcastKafkaOutTransportFactory broadcastKafkaPublisherTransportFactory(EventSerializerFactory serializerFactory,
+                                                                                    BeanFactory beanFactory) {
+        return new BroadcastKafkaOutTransportFactory(serializerFactory, beanFactory);
     }
 }
