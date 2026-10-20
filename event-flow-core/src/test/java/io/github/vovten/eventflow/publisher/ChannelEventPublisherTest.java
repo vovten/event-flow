@@ -59,7 +59,7 @@ class ChannelEventPublisherTest {
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
-        CompletableFuture<SendResults> future = publisher.publish(event);
+        CompletableFuture<SendResults> future = publisher.send(event);
         SendResults results = future.join();
 
         assertThat(results.isAllSuccess()).isTrue();
@@ -92,7 +92,7 @@ class ChannelEventPublisherTest {
         ChannelEventPublisher publisher = new ChannelEventPublisher(List.of(channel));
         TestEvent event = new TestEvent();
 
-        CompletableFuture<SendResults> future = publisher.publish(event);
+        CompletableFuture<SendResults> future = publisher.send(event);
         SendResults results = future.join();
 
         assertThat(results.isAllFailure()).isTrue();

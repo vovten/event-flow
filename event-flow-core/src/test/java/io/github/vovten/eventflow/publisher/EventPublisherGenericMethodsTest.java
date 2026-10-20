@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
+import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.EventBuilder;
@@ -147,5 +148,94 @@ class EventPublisherGenericMethodsTest {
                 .containsEntry("source", "order-service");
     }
 
+    @Test
+    @DisplayName("Should wrap payload implementing Event in Envelope when publishing")
+    void shouldWrapEventImplementingPayloadInEnvelope() {
+        // given
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        EventPublisher publisher = newPublisher(queue);
+
+        // when
+        publisher.publish(new DomainEventPayload("order-123")).join();
+
+        // then
+        Event polled = queue.poll();
+        assertThat(polled).isInstanceOf(Envelope.class);
+        assertThat(((Envelope<?>) polled).payload()).isInstanceOf(DomainEventPayload.class);
+    }
+
+    @Test
+    @DisplayName("Should wrap payload extending AbstractTraceableEvent in Envelope when publishing")
+    void shouldWrapTraceablePayloadInEnvelope() {
+        // given
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        EventPublisher publisher = newPublisher(queue);
+
+        // when
+        publisher.publish(new TraceableDomainEvent("order-123")).join();
+
+        // then
+        Event polled = queue.poll();
+        assertThat(polled).isInstanceOf(Envelope.class);
+        assertThat(((Envelope<?>) polled).payload()).isInstanceOf(TraceableDomainEvent.class);
+    }
+
+    @Test
+    @DisplayName("Should keep unwrapped send(Event) as explicit low-level API")
+    void shouldKeepUnwrappedSendEventAsLowLevelApi() {
+        // given
+        BlockingDeque<Event> queue = new LinkedBlockingDeque<>();
+        EventPublisher publisher = newPublisher(queue);
+        DomainEventPayload payload = new DomainEventPayload("order-123");
+
+        // when: explicit low-level call — no Envelope wrapping is documented for this path
+        publisher.send(payload).join();
+
+        // then
+        assertThat(queue.poll()).isSameAs(payload);
+    }
+
+    private EventPublisher newPublisher(BlockingDeque<Event> queue) {
+        OutTransport transport = new LocalQueueOutTransport(queue);
+        EventChannel channel = new InternalEventChannel(transport);
+        return new ChannelEventPublisher(List.of(channel));
+    }
+
     record PlainDomainEvent(String orderId, String customerEmail) {}
+
+    /**
+     * Payload implementing {@link Event}: reproduces the overload-resolution defect —
+     * {@code publish(T)} must wrap it into an {@link Envelope}, but the compiler
+     * selects the more specific non-generic {@code publish(Event)} overload instead.
+     */
+    static class DomainEventPayload implements Event {
+        final String orderId;
+
+        DomainEventPayload(String orderId) {
+            this.orderId = orderId;
+        }
+
+        @Override
+        public Class<?> type() {
+            return DomainEventPayload.class;
+        }
+    }
+
+    /**
+     * Payload extending {@link AbstractTraceableEvent}: the same overload-resolution
+     * defect applies to {@link TraceableEvent} payloads.
+     */
+    static class TraceableDomainEvent extends AbstractTraceableEvent {
+        final String orderId;
+
+        TraceableDomainEvent(String orderId) {
+            super();
+            this.orderId = orderId;
+        }
+
+        @Override
+        public Class<? extends Event> type() {
+            return TraceableDomainEvent.class;
+        }
+    }
 }

@@ -79,11 +79,11 @@ public final class EventLifecyclePublisher implements EventPublisher {
     }
 
     @Override
-    public CompletableFuture<SendResults> publish(Event event) {
+    public CompletableFuture<SendResults> send(Event event) {
         Objects.requireNonNull(event, "event must not be null");
 
         if (shouldSkipPersistence(event)) {
-            return origin.publish(event);
+            return origin.send(event);
         }
         Event enriched = enrichWithService(event);
         UUID eventId = resolveEventId(enriched);
@@ -92,12 +92,12 @@ public final class EventLifecyclePublisher implements EventPublisher {
         if (lifecycle == EventLifecycle.PERSISTED) {
             // Persist with UNDEFINED status, no further tracking
             persistNewOnly(eventId, enriched);
-            return origin.publish(enriched)
+            return origin.send(enriched)
                     .whenComplete((result, error) -> completePersistedRetry(eventId));
         }
         // MANAGED — persist with NEW status, full lifecycle tracking
         persistOrReset(eventId, enriched);
-        return origin.publish(enriched)
+        return origin.send(enriched)
                 .whenComplete((result, error) -> updatePublishResult(eventId, result, error));
     }
 

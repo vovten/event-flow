@@ -81,11 +81,11 @@ public class TransactionalEventPublisher implements EventPublisher {
     }
 
     @Override
-    public CompletableFuture<SendResults> publish(Event event) {
+    public CompletableFuture<SendResults> send(Event event) {
         if (isTransactionActive()) {
             CompletableFuture<SendResults> resultFuture = new CompletableFuture<>();
             registerTransactionSynchronization(resultFuture, () ->
-                    origin.publish(event)
+                    origin.send(event)
                             .thenAccept(resultFuture::complete)
                             .exceptionally(ex -> {
                                 resultFuture.completeExceptionally(ex);
@@ -95,7 +95,7 @@ public class TransactionalEventPublisher implements EventPublisher {
             log.debug("Transaction active, deferred publishing for event {}", event.type().getSimpleName());
             return resultFuture;
         } else {
-            return origin.publish(event);
+            return origin.send(event);
         }
     }
 

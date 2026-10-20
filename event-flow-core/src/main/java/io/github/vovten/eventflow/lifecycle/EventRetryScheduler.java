@@ -207,7 +207,7 @@ public final class EventRetryScheduler implements AutoCloseable {
         try {
             Event event = EventUtils.fromJson(stored.payload(), Event.class);
             event = restoreChannels(event, stored.channels());
-            publisher.publish(event);
+            publisher.send(event);
             log.info("Retried event id={} (attempt {}/{})", stored.eventId(), stored.retryCount() + 1, maxRetries);
         } catch (Exception e) {
             log.error("Failed to retry event id={}: {}", stored.eventId(), e.getMessage());

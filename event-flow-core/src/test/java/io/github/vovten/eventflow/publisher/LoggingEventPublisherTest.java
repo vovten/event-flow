@@ -83,7 +83,7 @@ class LoggingEventPublisherTest {
         });
 
         TestTraceableEvent event = new TestTraceableEvent();
-        underTest.publish(event).join();
+        underTest.send(event).join();
     }
 
     @Test

@@ -57,7 +57,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            publisher.publish(event).join();
+            publisher.send(event).join();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
@@ -95,7 +95,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            publisher.publish(event).join();
+            publisher.send(event).join();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.channels()).isNull();
@@ -108,7 +108,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            var result = publisher.publish(event);
+            var result = publisher.send(event);
 
             assertThrows(Exception.class, result::join);
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
@@ -124,7 +124,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            publisher.publish(event).join();
+            publisher.send(event).join();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
@@ -137,7 +137,7 @@ class EventLifecyclePublisherTest {
             EventPublisher failingOrigin = e -> CompletableFuture.failedFuture(new RuntimeException("Fail"));
             EventLifecyclePublisher failingPublisher = new EventLifecyclePublisher(
                     failingOrigin, eventStore, "test-service");
-            var failingResult = failingPublisher.publish(event);
+            var failingResult = failingPublisher.send(event);
             assertThrows(Exception.class, failingResult::join);
 
             assertThat(eventStore.findById(eventId).orElseThrow().status())
@@ -148,7 +148,7 @@ class EventLifecyclePublisherTest {
                     SendResults.of(List.of(SendResult.success("dest"))));
             EventLifecyclePublisher successPublisher = new EventLifecyclePublisher(
                     successOrigin, eventStore, "test-service");
-            successPublisher.publish(event).join();
+            successPublisher.send(event).join();
 
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
@@ -170,7 +170,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            publisher.publish(ack).join();
+            publisher.send(ack).join();
 
             assertThat(captured.get()).isInstanceOf(LifecycleAckEvent.class);
             assertThat(eventStore.findById(ack.eventId())).isEmpty();
@@ -221,7 +221,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            publisher.publish(persistedEvent).join();
+            publisher.send(persistedEvent).join();
 
             StoredEvent stored = eventStore.findById(persistedEvent.eventId()).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.UNDEFINED);
@@ -235,7 +235,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            var result = publisher.publish(persistedEvent);
+            var result = publisher.send(persistedEvent);
             assertThrows(Exception.class, result::join);
 
             // Event is saved as UNDEFINED but never updated — stays UNDEFINED
@@ -253,12 +253,12 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            publisher.publish(persistedEvent).join();
+            publisher.send(persistedEvent).join();
             assertThat(eventStore.findById(persistedEvent.eventId()))
                     .hasValueSatisfying(e -> assertThat(e.status()).isEqualTo(EventStatus.UNDEFINED));
 
             // Re-publish — should keep UNDEFINED, no status changes
-            publisher.publish(persistedEvent).join();
+            publisher.send(persistedEvent).join();
             assertThat(eventStore.findById(persistedEvent.eventId()))
                     .hasValueSatisfying(e -> assertThat(e.status()).isEqualTo(EventStatus.UNDEFINED));
         }
@@ -296,7 +296,7 @@ class EventLifecyclePublisherTest {
             EventLifecyclePublisher publisher = new EventLifecyclePublisher(
                     origin, eventStore, "test-service");
 
-            publisher.publish(new NoneLifecycleEvent()).join();
+            publisher.send(new NoneLifecycleEvent()).join();
 
             assertThat(eventStore.findById(UUID.randomUUID())).isEmpty();
         }
