@@ -188,6 +188,24 @@ class BroadcastKafkaOutTransportFactoryTest {
         }
     }
 
+    @Test
+    @DisplayName("Should keep deprecated single-argument constructor usable for backward compatibility")
+    void shouldKeepDeprecatedSingleArgumentConstructorUsable() {
+        // given
+        BroadcastKafkaOutTransportFactory factory =
+                new BroadcastKafkaOutTransportFactory(serializerFactory);
+        EventFlowProperties.TransportConfig config = broadcastConfig();
+
+        // when & then: legacy construction path still creates a working transport
+        assertThatCode(() -> factory.createPublisher(config)).doesNotThrowAnyException();
+
+        // and: the bean: strategy fails fast without a bean factory instead of NPE deep in the dispatch
+        config.setKey("bean:myKeyResolver");
+        assertThatThrownBy(() -> factory.createPublisher(config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires a bean lookup");
+    }
+
     private EventFlowProperties.TransportConfig broadcastConfig() {
         EventFlowProperties.TransportConfig config = new EventFlowProperties.TransportConfig();
         config.setName("broadcast-kafka");

@@ -42,6 +42,18 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
         this.beanFactory = beanFactory;
     }
 
+    /**
+     * Creates the factory without a {@link BeanFactory}.
+     *
+     * @param serializerFactory factory for event serializers
+     * @deprecated use {@link #BroadcastKafkaOutTransportFactory(EventSerializerFactory, BeanFactory)}
+     *             (since 1.3.1); the {@code bean:} key strategy is unavailable without a bean factory
+     */
+    @Deprecated
+    public BroadcastKafkaOutTransportFactory(EventSerializerFactory serializerFactory) {
+        this(serializerFactory, null);
+    }
+
     @Override
     public String getName() {
         return "broadcast-kafka";
@@ -75,9 +87,13 @@ public class BroadcastKafkaOutTransportFactory implements OutTransportFactory {
      * @throws IllegalArgumentException if the strategy is unknown or malformed
      */
     private EventKeyResolver createKeyResolver(String key) {
-        return new EventKeyResolverBuilder(key)
-                .withBeanLookup(beanName -> beanFactory.getBean(beanName, EventKeyResolver.class))
-                .build();
+        EventKeyResolverBuilder builder = new EventKeyResolverBuilder(key);
+        if (beanFactory != null) {
+            builder.withBeanLookup(beanName -> beanFactory.getBean(beanName, EventKeyResolver.class));
+        }
+        // without a bean factory the builder rejects a 'bean:' spec with an
+        // IllegalArgumentException instead of an NPE deep in the lookup lambda
+        return builder.build();
     }
 
     @Override
