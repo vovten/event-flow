@@ -274,6 +274,23 @@ Terminal statuses are `HANDLED` and `DEAD`. Acks never overwrite them; only an e
 
 Important: this is an explicit allowed-source set, not a numeric rank. `FAILED → ACCEPTED` is valid when a late `AcceptedAck` arrives after a publish failure.
 
+### 2.6 Configuration invariant: `PROCESSING` requires `DELIVERY`
+
+| `delivery.enabled` | `processing.enabled` | Mode |
+|---|---|---|
+| `false` | `false` | New retry mechanism off; legacy scheduler may run |
+| `true` | `false` | Delivery-only mode; processing failures are recorded but not auto-retried |
+| `true` | `true` | Full two-domain mode |
+| `false` | `true` | **Invalid; fail fast at startup** |
+
+Rules:
+
+- `processing.enabled = true` with `delivery.enabled = false` fails startup with an `IllegalStateException`.
+- The validation runs before any retry scheduler or `LifecycleRepository` is created.
+- Implement it in a small `RetryConfigurationValidator` and unit-test it.
+- In delivery-only mode: `AcceptedAck` and delivery retries work; `FailureAck` sets `FAILED` without a `PROCESSING` row; the processing watchdog is disabled; the legacy scheduler must be off.
+- In both-disabled mode: the new mechanism is off; the legacy scheduler may run until it is removed.
+
 ---
 
 ## 3. PR sequence
@@ -316,7 +333,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
 ## 5.1 Contracts
 
 - [x] **1.1** Confirm the exact ack fields and legacy defaults from section 2.1.
-- [ ] **1.2** Add `RetryKind` enum in `io.github.vovten.eventflow.retry`:
+- [x] **1.2** Add `RetryKind` enum in `io.github.vovten.eventflow.retry`:
   - `DELIVERY`, `PROCESSING`.
   - File: `event-flow-core/src/main/java/io/github/vovten/eventflow/retry/RetryKind.java`.
 - [ ] **1.3** Add `AcceptedAck`:
@@ -683,6 +700,7 @@ Tests for each task are written in the same commit as the task. This list is the
   - `FailureAck(retryable = true)` → `FAILED` + `PROCESSING PENDING`;
   - `FailureAck(retryable = false)` → event `DEAD` + `PROCESSING` row `DEAD`;
   - `SuccessAck` → `HANDLED`, delete `PROCESSING`;
+  - if processing is disabled: `FailureAck` sets `FAILED` with error details and does **not** create a `PROCESSING` row; log WARN and increment a metric;
   - stale-ack guard by `attempt` / `retryKind`.
 - [ ] **3b.6** `EventLifecyclePublisher`:
   - create `DELIVERY PENDING` on publish failure;
@@ -699,6 +717,10 @@ Tests for each task are written in the same commit as the task. This list is the
 
 - [ ] **3b.9** Create `EventRetryStore`, `LifecycleRepository`, and both schedulers as beans.
 - [ ] **3b.10** Add `event-flow.retry.delivery.*` and `event-flow.retry.processing.*`.
+- [ ] **3b.10a** Add `RetryConfigurationValidator`:
+  - fail fast with `IllegalStateException` when `processing.enabled = true` and `delivery.enabled = false`;
+  - run before any retry scheduler or `LifecycleRepository` is created;
+  - unit-test the validator and the Spring startup failure.
 - [ ] **3b.11** Disable the legacy `EventRetryScheduler` when the new mode is enabled.
 - [ ] **3b.12** Update `EventCleanupScheduler` for dead-letter retention.
 
@@ -717,6 +739,8 @@ Tests for each task are written in the same commit as the task. This list is the
 - [ ] **3b.21** Both retry kinds for one event produce one re-publish per cycle.
 - [ ] **3b.22** Cap exhausts into `DEAD`.
 - [ ] **3b.23** Two scheduler instances do not process the same row.
+- [ ] **3b.24** `processing.enabled = true` + `delivery.enabled = false` fails startup.
+- [ ] **3b.25** Delivery-only mode: a handler failure sets `FAILED` and creates no `PROCESSING` row; no processing scheduler runs.
 
 ## 8.5 Definition of Done
 
@@ -796,6 +820,8 @@ Tests for each task are written in the same commit as the task. This list is the
 | Partial failure + idempotency | retry runs, not duplicate |
 | No `@RetryPolicy` | legacy behaviour |
 | Old `FAILED` rows | legacy heuristic or backfill |
+| `processing.enabled=true` + `delivery.enabled=false` | startup fails with `IllegalStateException` |
+| Delivery-only mode + handler failure | `FAILED`, no `PROCESSING` row, no processing retry |
 
 ---
 
@@ -816,7 +842,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 1 commit | Task 1.1 done; next: 1.2 |
+| PR 1 — boundary | In progress | 2 commits | Tasks 1.1–1.2 done; next: 1.3 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -832,7 +858,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 
 | Task | Commit | Tests in the same commit | Confirmed |
 |---|---|---|---|
-| | | | |
+| 1.1 Ack contracts | `dc39e57` | docs-only; baseline suite passed | Yes |
+| 1.2 `RetryKind` | `d5807b9` | `RetryKindTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -845,4 +872,4 @@ Rules:
 
 # 14. Next step
 
-Start PR 1 with task **1.1 only** (contracts and new ack records). Implement the task and its tests, run the relevant tests, report the result, and wait for confirmation. Create the commit only after confirmation. Then proceed to task **1.2**.
+Tasks **1.1** and **1.2** are committed. Start task **1.3** (`AcceptedAck` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.

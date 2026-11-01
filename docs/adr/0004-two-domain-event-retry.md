@@ -297,6 +297,30 @@ The publisher never introspects consumer annotations. The consumer never transpo
 
 `RetryEventPublisher` remains the **immediate in-memory transport retry** (fast network/broker glitches). The durable `DELIVERY` queue is the recovery path after immediate retries are exhausted or after `AcceptedAck` is missing. These are two levels of the same domain, not duplicate mechanisms.
 
+#### D6.1 — Configuration invariant: `PROCESSING` requires `DELIVERY`
+
+The two domains are independent in state, scheduling and metrics, but not in configuration. A processing retry depends on the delivery boundary: without delivery tracking, a processing retry would silently become a delivery retry and the clear separation would be lost.
+
+| `delivery.enabled` | `processing.enabled` | Mode |
+|---|---|---|
+| `false` | `false` | New retry mechanism off; the legacy scheduler may run |
+| `true` | `false` | Delivery-only mode; processing outcomes are recorded but not automatically retried |
+| `true` | `true` | Full two-domain mode |
+| `false` | `true` | **Invalid; fail fast at startup** |
+
+Startup validation rules:
+
+- If `event-flow.retry.processing.enabled = true` and `event-flow.retry.delivery.enabled = false`, application startup fails with an `IllegalStateException` whose message explains that processing retries require the delivery boundary.
+- The check runs before any retry scheduler or `LifecycleRepository` is created. It is a configuration error, not a runtime condition.
+- The validation is implemented in a small, unit-testable `RetryConfigurationValidator` and invoked from the Spring lifecycle configuration.
+
+Delivery-only mode semantics:
+
+- `AcceptedAck` is still tracked; delivery retries and the delivery watchdog work.
+- On `FailureAck`, the event becomes `FAILED` with error details, but no `PROCESSING` retry row is created. The failure is visible to operators and can be recovered by enabling processing or by `markForRetry`.
+- The processing watchdog is disabled. A lost final ack leaves the event in `ACCEPTED` by design; delivery-only mode does not attempt to recover processing.
+- The legacy `EventRetryScheduler` must be disabled when the new mechanism is enabled; otherwise it would retry `FAILED` events outside the two-domain model.
+
 ### D7 — Schedulers, claiming and watchdogs
 
 Two strategies with independent configuration, sharing one retry store:
@@ -488,7 +512,7 @@ Publisher                                      Dispatcher
 | `EventRetryScheduler` | deprecated in favour of the two schedulers; legacy mode retained for old rows |
 | `EventCleanupScheduler` | exclude events with pending `event_retry`; separate `DEAD` retention |
 | `IdempotentEventDispatcher` | invalidate cache on any handler failure |
-| `EventFlowProperties` | new `event-flow.retry.delivery.*`, `event-flow.retry.processing.*`; legacy properties aliased/deprecated |
+| `EventFlowProperties` | new `event-flow.retry.delivery.*`, `event-flow.retry.processing.*`; startup validation (`RetryConfigurationValidator`); legacy properties aliased/deprecated |
 | `RetryEventPublisher` | unchanged: immediate in-memory transport retry |
 | `TransactionalEventPublisher` | unchanged |
 
@@ -675,6 +699,8 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 14. Cleanup does not delete an event with a pending retry row or a dead letter within retention.
 15. `LifecycleRepository` rolls back both writes when one side fails.
 16. Backward compatibility: no `@RetryPolicy`, legacy `FailureAck` constructor, old `FAILED` rows, mixed-fleet `require-accepted-ack = false`.
+17. `processing.enabled = true` with `delivery.enabled = false` fails startup with a clear configuration error.
+18. Delivery-only mode records a handler failure as `FAILED` without creating a `PROCESSING` row and without running a processing retry.
 
 ## Implementation phases
 
@@ -685,7 +711,7 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 `@RetryPolicy`, `RetryPolicyRegistry`, named policies, configuration overrides, async local retry loop, backoff + jitter, global local cap, `FailureAck.retryable`.
 
 **Phase 3 — durable retry queue.**
-`event_retry` table, `EventRetryStore`, `LifecycleRepository`, `ACCEPTED` / `DEAD` statuses, `DeliveryRetryScheduler`, `ProcessingRetryScheduler`, watchdogs, claim/lease, caps, `AckHandler` routing, `EventLifecyclePublisher` delivery-row creation and attempt stamping, schema initialization and migration.
+`event_retry` table, `EventRetryStore`, `LifecycleRepository`, `ACCEPTED` / `DEAD` statuses, `DeliveryRetryScheduler`, `ProcessingRetryScheduler`, watchdogs, claim/lease, caps, `AckHandler` routing, `EventLifecyclePublisher` delivery-row creation and attempt stamping, `RetryConfigurationValidator` startup validation, schema initialization and migration.
 
 **Phase 4 — operations and deferred features.**
 Dead-letter retention, manual retry, overview view, optional backfill, per-handler durable isolation / `PARTIALLY_HANDLED`, per-destination delivery, DB policy table and seeding, DLQ event with payload.
