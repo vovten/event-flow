@@ -100,6 +100,14 @@ class EventRetrySchedulerTest {
         return createEvent(EventStatus.PUBLISHED, retryCount, updatedAt, null);
     }
 
+    private UUID createAcceptedEvent(int retryCount) {
+        return createAcceptedEvent(retryCount, Instant.now().minusSeconds(10));
+    }
+
+    private UUID createAcceptedEvent(int retryCount, Instant updatedAt) {
+        return createEvent(EventStatus.ACCEPTED, retryCount, updatedAt, null);
+    }
+
     private UUID createEvent(EventStatus status, int retryCount, Instant updatedAt, String errorDetails) {
         return createEvent(status, retryCount, updatedAt, errorDetails, false);
     }
@@ -511,6 +519,65 @@ class EventRetrySchedulerTest {
             assertThat(eventStore.findById(failedId)).hasValueSatisfying(e ->
                     assertThat(e.retryCount()).isEqualTo(1));
             assertThat(eventStore.findById(stuckId)).hasValueSatisfying(e ->
+                    assertThat(e.retryCount()).isEqualTo(1));
+        }
+
+        @Test
+        @DisplayName("retries ACCEPTED events within retry limit")
+        void retriesAcceptedEvents() {
+            UUID eventId = createAcceptedEvent(0);
+
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
+            assertThat(stored.retryCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("skips ACCEPTED events that have exceeded max retries")
+        void skipsAcceptedEventsExceedingMaxRetries() {
+            UUID eventId = createAcceptedEvent(3, Instant.now().minusSeconds(10));
+
+            scheduler(3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.ACCEPTED);
+            assertThat(stored.retryCount()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("skips recent ACCEPTED events below minimum age threshold")
+        void skipsRecentAcceptedEvents() {
+            UUID eventId = createAcceptedEvent(0, Instant.now());
+
+            scheduler(Duration.ofSeconds(10), 3).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.ACCEPTED);
+            assertThat(stored.retryCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("retries mix of FAILED, PUBLISHED and ACCEPTED events in one cycle")
+        void retriesMixOfFailedPublishedAndAccepted() {
+            UUID failedId = createFailedEvent(0);
+            UUID publishedId = createPublishedEvent(0);
+            UUID acceptedId = createAcceptedEvent(0);
+
+            scheduler(3).retryCycle();
+
+            assertThat(eventStore.findById(failedId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+            assertThat(eventStore.findById(publishedId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+            assertThat(eventStore.findById(acceptedId)).hasValueSatisfying(e ->
+                    assertThat(e.status()).isEqualTo(EventStatus.PUBLISHED));
+            assertThat(eventStore.findById(failedId)).hasValueSatisfying(e ->
+                    assertThat(e.retryCount()).isEqualTo(1));
+            assertThat(eventStore.findById(publishedId)).hasValueSatisfying(e ->
+                    assertThat(e.retryCount()).isEqualTo(1));
+            assertThat(eventStore.findById(acceptedId)).hasValueSatisfying(e ->
                     assertThat(e.retryCount()).isEqualTo(1));
         }
 

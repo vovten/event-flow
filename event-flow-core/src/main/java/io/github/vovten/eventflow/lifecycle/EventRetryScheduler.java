@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit;
  * Scheduled retry mechanism for failed, stuck, and orphaned events in the {@link EventStore}.
  * <p>
  * Periodically scans for events with status {@link EventStatus#FAILED},
- * {@link EventStatus#PUBLISHED}, or {@link EventStatus#NEW}
+ * {@link EventStatus#PUBLISHED}, {@link EventStatus#ACCEPTED}, or
+ * {@link EventStatus#NEW}
  * that are older than a configured minimum age
  * and have not exceeded the maximum retry count. Eligible events are:
  * <ol>
@@ -36,9 +37,12 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * {@link EventStatus#PUBLISHED} events are retried to handle cases where
  * the acknowledgment event (ack) was lost and the event is stuck in the
- * published state. {@link EventStatus#NEW} events are retried to handle
- * cases where the application crashed before the initial publish completed.
- * The same backoff and retry limit apply for all statuses.
+ * published state. {@link EventStatus#ACCEPTED} events are retried to handle
+ * cases where the consumer accepted the event but the final ack was lost or
+ * the consumer crashed before processing completed. {@link EventStatus#NEW}
+ * events are retried to handle cases where the application crashed before the
+ * initial publish completed. The same backoff and retry limit apply for all
+ * statuses.
  * <p>
  * The delay between retry attempts increases exponentially:
  * {@code minAge × 2^retryCount}. The first retry waits {@code minAge},
@@ -116,7 +120,7 @@ public final class EventRetryScheduler implements AutoCloseable {
                 interval.toMillis(),
                 TimeUnit.MILLISECONDS
         );
-        log.info("Event retry scheduler started: interval={}, minAge={}, maxRetries={}, batchSize={} (FAILED, PUBLISHED, NEW)",
+        log.info("Event retry scheduler started: interval={}, minAge={}, maxRetries={}, batchSize={} (FAILED, PUBLISHED, ACCEPTED, NEW)",
                 interval, minAge, maxRetries, batchSize);
     }
 
@@ -138,7 +142,7 @@ public final class EventRetryScheduler implements AutoCloseable {
 
     /**
      * Performs a single retry cycle: scans for events eligible for retry
-     * (FAILED, PUBLISHED, NEW, or manually marked with {@code retry = true})
+     * (FAILED, PUBLISHED, ACCEPTED, NEW, or manually marked with {@code retry = true})
      * and retries them.
      * <p>
      * Events manually marked for retry ({@code retry = true}) are retried
@@ -153,7 +157,8 @@ public final class EventRetryScheduler implements AutoCloseable {
     void retryCycle() {
         try {
             Instant deadline = Instant.now().minus(minAge);
-            List<EventStatus> statuses = List.of(EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.NEW);
+            List<EventStatus> statuses = List.of(
+                    EventStatus.FAILED, EventStatus.PUBLISHED, EventStatus.ACCEPTED, EventStatus.NEW);
             List<StoredEvent> events = eventStore.findRetryableEvents(statuses, deadline, batchSize, service);
             if (events.isEmpty()) {
                 log.trace("No events to retry");

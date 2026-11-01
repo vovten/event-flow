@@ -422,7 +422,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - keep invalidation on `throwable != null`;
   - do not change duplicate handling.
   - File: `dispatcher/IdempotentEventDispatcher.java`.
-- [ ] **1.13** `EventRetryScheduler`:
+- [x] **1.13** `EventRetryScheduler`:
   - temporarily include `ACCEPTED` in the legacy status list;
   - this preserves recovery of a lost final ack until the durable watchdog exists in PR 3b.
   - File: `lifecycle/EventRetryScheduler.java`.
@@ -883,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 15 commits | Tasks 1.1–1.12 done; next: 1.13 |
+| PR 1 — boundary | In progress | 16 commits | Tasks 1.1–1.13 done; next: 1.13a |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -910,7 +910,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.9 `transitionStatus` | `ed4ae8a` | store transition tests; full core suite passed | Yes |
 | 1.10 Lifecycle dispatcher | `19be94e` | dispatcher ack tests; full core suite passed | Yes |
 | 1.11 `AckHandler` | `97b7ac7` | `AckHandlerTest`; full core suite passed | Yes |
-| 1.12 Idempotency cache | this commit | idempotency tests; full core suite passed | Yes |
+| 1.12 Idempotency cache | `aed048b` | idempotency tests; full core suite passed | Yes |
+| 1.13 ACCEPTED retry scan | this commit | `EventRetrySchedulerTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -923,4 +924,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.12** are committed. Start task **1.13** (`EventRetryScheduler` + `ACCEPTED`): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.13** are committed. Start task **1.13a** (logging exclusions): implement, run the tests, report the result, and wait for confirmation before creating the commit.
