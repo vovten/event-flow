@@ -10,11 +10,13 @@ import java.util.Arrays;
  * PERSISTED:                         UNDEFINED (terminal, no tracking)
  *
  * MANAGED (full lifecycle):
- *   NEW ──publish──► PUBLISHED ──ack──► HANDLED
- *    │                                    │
- *    └──failed──► FAILED ──retry──► NEW   │
- *                                         │
- *                    (ack-failed) ────────┘──► FAILED ──retry──► NEW
+ *   NEW ──publish──► PUBLISHED ──AcceptedAck──► ACCEPTED ──SuccessAck──► HANDLED
+ *    │                   │                          │
+ *    │                   │                          └──FailureAck──► FAILED
+ *    │                   │                                                │
+ *    └──publish fail─────┴────────────────────────────────────────────────┤
+ *                                                                         │
+ *                                             permanent failure / cap ────┴──► DEAD
  * </pre>
  * <p>
  * Each status has a single-character code used for efficient storage in the database.
@@ -41,6 +43,12 @@ public enum EventStatus {
     PUBLISHED('P'),
 
     /**
+     * Event was received by a consumer-side dispatcher. Delivery is confirmed;
+     * the processing outcome is still pending.
+     */
+    ACCEPTED('A'),
+
+    /**
      * Event was successfully handled by all registered handlers. Set via ack from dispatcher.
      */
     HANDLED('H'),
@@ -49,7 +57,13 @@ public enum EventStatus {
      * Event publication or handling failed. Eligible for retry.
      * Check {@link StoredEvent#errorDetails()} for the specific cause.
      */
-    FAILED('F');
+    FAILED('F'),
+
+    /**
+     * Terminal dead-letter state. No automatic retry remains; only manual
+     * {@code markForRetry(eventId)} can resurrect the event.
+     */
+    DEAD('D');
 
     private final char code;
 
@@ -69,7 +83,7 @@ public enum EventStatus {
     /**
      * Resolves a status from its character code.
      *
-     * @param code the character code (e.g., 'U', 'N', 'P', 'H', 'F')
+     * @param code the character code (e.g., 'U', 'N', 'P', 'A', 'H', 'F', 'D')
      * @return the corresponding status
      * @throws IllegalArgumentException if no status matches the code
      */

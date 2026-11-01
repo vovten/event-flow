@@ -34,6 +34,14 @@ class EventStatusTest {
     }
 
     @Test
+    @DisplayName("should return ACCEPTED for code 'A'")
+    void shouldReturnAcceptedForCodeA() {
+        var status = EventStatus.fromCode('A');
+
+        assertThat(status).isEqualTo(EventStatus.ACCEPTED);
+    }
+
+    @Test
     @DisplayName("should return HANDLED for code 'H'")
     void shouldReturnHandledForCodeH() {
         var status = EventStatus.fromCode('H');
@@ -47,6 +55,14 @@ class EventStatusTest {
         var status = EventStatus.fromCode('F');
 
         assertThat(status).isEqualTo(EventStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("should return DEAD for code 'D'")
+    void shouldReturnDeadForCodeD() {
+        var status = EventStatus.fromCode('D');
+
+        assertThat(status).isEqualTo(EventStatus.DEAD);
     }
 
     @Test
@@ -70,7 +86,9 @@ class EventStatusTest {
         assertThat(EventStatus.UNDEFINED.getCode()).isEqualTo('U');
         assertThat(EventStatus.NEW.getCode()).isEqualTo('N');
         assertThat(EventStatus.PUBLISHED.getCode()).isEqualTo('P');
+        assertThat(EventStatus.ACCEPTED.getCode()).isEqualTo('A');
         assertThat(EventStatus.HANDLED.getCode()).isEqualTo('H');
         assertThat(EventStatus.FAILED.getCode()).isEqualTo('F');
+        assertThat(EventStatus.DEAD.getCode()).isEqualTo('D');
     }
 }

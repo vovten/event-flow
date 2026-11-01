@@ -372,7 +372,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
 
 ## 5.2 Statuses and store
 
-- [ ] **1.7** Extend `EventStatus`:
+- [x] **1.7** Extend `EventStatus`:
   - `ACCEPTED('A')`;
   - `DEAD('D')`;
   - update Javadoc and the state diagram.
@@ -883,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 9 commits | Tasks 1.1–1.6 done; next: 1.7 |
+| PR 1 — boundary | In progress | 10 commits | Tasks 1.1–1.7 done; next: 1.8 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -905,6 +905,7 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.4 `NoHandlerAck` | `f64dfb1` | `NoHandlerAckTest`; full core suite passed | Yes |
 | 1.5 `FailureAck` | `2e73dab` | `FailureAckTest`; full core suite passed | Yes |
 | 1.6 `SuccessAck` | `9676a6d` | `SuccessAckTest`; full core suite passed | Yes |
+| 1.7 `EventStatus` | this commit | `EventStatusTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -917,4 +918,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.6** are committed. Start task **1.7** (`EventStatus.ACCEPTED`/`DEAD` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.7** are committed. Start task **1.8** (status comments in the five SQL scripts and `SchemaInitializer`): implement, report the result, and wait for confirmation before creating the commit.
