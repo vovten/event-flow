@@ -4,18 +4,21 @@ import io.github.vovten.eventflow.dispatcher.EventDispatcher;
 import io.github.vovten.eventflow.dispatcher.HandlerResult;
 import io.github.vovten.eventflow.dispatcher.HandlerResults;
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
+import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.retry.RetryKind;
+import io.github.vovten.eventflow.retry.RetryMetadata;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -25,18 +28,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @DisplayName("EventLifecycleDispatcher Tests")
 class EventLifecycleDispatcherTest {
 
-    private AtomicReference<Event> publishedAck;
+    private List<Event> publishedAcks;
     private EventPublisher ackPublisher;
     private TestEvent event;
 
     @BeforeEach
     void setUp() {
         event = new TestEvent("test");
-        publishedAck = new AtomicReference<>();
+        publishedAcks = new ArrayList<>();
         ackPublisher = ack -> {
-            publishedAck.set(ack);
+            publishedAcks.add(ack);
             return CompletableFuture.completedFuture(SendResults.of(List.of(SendResult.success("dest"))));
         };
+    }
+
+    private Event lastAck() {
+        return publishedAcks.get(publishedAcks.size() - 1);
     }
 
     @Test
@@ -47,9 +54,118 @@ class EventLifecycleDispatcherTest {
 
         dispatcher.dispatch(event).join();
 
-        assertThat(publishedAck.get()).isInstanceOf(SuccessAck.class);
-        SuccessAck ack = (SuccessAck) publishedAck.get();
+        assertThat(lastAck()).isInstanceOf(SuccessAck.class);
+        SuccessAck ack = (SuccessAck) lastAck();
         assertThat(ack.originalEventId()).isEqualTo(event.eventId());
+    }
+
+    @Test
+    @DisplayName("Should publish AcceptedAck before SuccessAck")
+    void shouldPublishAcceptedAckBeforeSuccessAck() {
+        EventDispatcher origin = successDispatcher();
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        assertThat(publishedAcks).hasSize(2);
+        assertThat(publishedAcks.get(0)).isInstanceOf(AcceptedAck.class);
+        assertThat(publishedAcks.get(1)).isInstanceOf(SuccessAck.class);
+
+        AcceptedAck accepted = (AcceptedAck) publishedAcks.get(0);
+        assertThat(accepted.originalEventId()).isEqualTo(event.eventId());
+        assertThat(accepted.attempt()).isEqualTo(1);
+        assertThat(accepted.maxProcessingMs()).isZero();
+    }
+
+    @Test
+    @DisplayName("Should publish NoHandlerAck when no handler is resolved")
+    void shouldPublishNoHandlerAckWhenNoHandlers() {
+        EventDispatcher origin = new TestDispatcher(e -> CompletableFuture.completedFuture(HandlerResults.empty()));
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        assertThat(publishedAcks).hasSize(2);
+        assertThat(publishedAcks.get(0)).isInstanceOf(AcceptedAck.class);
+        assertThat(publishedAcks.get(1)).isInstanceOf(NoHandlerAck.class);
+    }
+
+    @Test
+    @DisplayName("Should publish SuccessAck and not NoHandlerAck for a duplicate")
+    void shouldPublishSuccessAckForDuplicate() {
+        EventDispatcher origin = new TestDispatcher(e -> CompletableFuture.completedFuture(HandlerResults.duplicate()));
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        assertThat(publishedAcks).hasSize(2);
+        assertThat(publishedAcks.get(1)).isInstanceOf(SuccessAck.class);
+        assertThat(publishedAcks.get(1)).isNotInstanceOf(NoHandlerAck.class);
+    }
+
+    @Test
+    @DisplayName("Should echo a processing retry context into processing acks")
+    void shouldEchoProcessingRetryContext() {
+        Envelope<TestEvent> envelope = Envelope.of(event)
+                .withAdditionalMetadata(RetryMetadata.RETRY_KIND, RetryKind.PROCESSING.name())
+                .withAdditionalMetadata(RetryMetadata.ATTEMPT, "3");
+        EventDispatcher origin = successDispatcher();
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(envelope).join();
+
+        AcceptedAck accepted = (AcceptedAck) publishedAcks.get(0);
+        SuccessAck success = (SuccessAck) lastAck();
+        assertThat(accepted.attempt()).isEqualTo(1);
+        assertThat(success.retryKind()).isEqualTo(RetryKind.PROCESSING);
+        assertThat(success.attempt()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("Should echo a delivery retry context into processing acks")
+    void shouldEchoDeliveryRetryContext() {
+        Envelope<TestEvent> envelope = Envelope.of(event)
+                .withAdditionalMetadata(RetryMetadata.RETRY_KIND, RetryKind.DELIVERY.name())
+                .withAdditionalMetadata(RetryMetadata.ATTEMPT, "2");
+        EventDispatcher origin = successDispatcher();
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(envelope).join();
+
+        AcceptedAck accepted = (AcceptedAck) publishedAcks.get(0);
+        SuccessAck success = (SuccessAck) lastAck();
+        assertThat(accepted.attempt()).isEqualTo(2);
+        assertThat(success.retryKind()).isEqualTo(RetryKind.DELIVERY);
+        assertThat(success.attempt()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Should default retry context to PROCESSING attempt 1")
+    void shouldDefaultRetryContext() {
+        EventDispatcher origin = successDispatcher();
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        SuccessAck success = (SuccessAck) lastAck();
+        assertThat(success.retryKind()).isEqualTo(RetryKind.PROCESSING);
+        assertThat(success.attempt()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should populate FailureAck retry metadata")
+    void shouldPopulateFailureAckRetryMetadata() {
+        EventDispatcher origin = failureDispatcher(new RuntimeException("Handler error"));
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        FailureAck failure = (FailureAck) lastAck();
+        assertThat(failure.retryKind()).isEqualTo(RetryKind.PROCESSING);
+        assertThat(failure.attempt()).isEqualTo(1);
+        assertThat(failure.retryable()).isTrue();
+        assertThat(failure.failedHandlers()).containsExactly("test-handler");
+        assertThat(failure.errorType()).isEqualTo(RuntimeException.class.getName());
     }
 
     @Test
@@ -60,8 +176,8 @@ class EventLifecycleDispatcherTest {
 
         dispatcher.dispatch(event).join();
 
-        assertThat(publishedAck.get()).isInstanceOf(FailureAck.class);
-        FailureAck ack = (FailureAck) publishedAck.get();
+        assertThat(lastAck()).isInstanceOf(FailureAck.class);
+        FailureAck ack = (FailureAck) lastAck();
         assertThat(ack.originalEventId()).isEqualTo(event.eventId());
         assertThat(ack.error()).contains("Handler error");
     }
@@ -76,8 +192,8 @@ class EventLifecycleDispatcherTest {
         var result = dispatcher.dispatch(event);
 
         assertThrows(Exception.class, result::join);
-        assertThat(publishedAck.get()).isInstanceOf(FailureAck.class);
-        FailureAck ack = (FailureAck) publishedAck.get();
+        assertThat(lastAck()).isInstanceOf(FailureAck.class);
+        FailureAck ack = (FailureAck) lastAck();
         assertThat(ack.originalEventId()).isEqualTo(event.eventId());
         // Should fall back to exception class name when message is null
         assertThat(ack.error()).contains("RuntimeException");
@@ -94,7 +210,7 @@ class EventLifecycleDispatcherTest {
 
         dispatcher.dispatch(ackEvent).join();
 
-        assertThat(publishedAck.get()).isNull();
+        assertThat(publishedAcks).isEmpty();
     }
 
     @Test
@@ -111,7 +227,7 @@ class EventLifecycleDispatcherTest {
 
         dispatcher.dispatch(plainEvent).join();
 
-        assertThat(publishedAck.get()).isNull();
+        assertThat(publishedAcks).isEmpty();
     }
 
     @Test
@@ -128,7 +244,7 @@ class EventLifecycleDispatcherTest {
 
         dispatcher.dispatch(nonManagedEvent).join();
 
-        assertThat(publishedAck.get()).isNull();
+        assertThat(publishedAcks).isEmpty();
     }
 
     @Test

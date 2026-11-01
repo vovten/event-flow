@@ -397,7 +397,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
 
 ## 5.3 Dispatcher and ack handling
 
-- [ ] **1.10** `EventLifecycleDispatcher`:
+- [x] **1.10** `EventLifecycleDispatcher`:
   - keep `LifecycleAckEvent` pass-through;
   - for `MANAGED` + `TraceableEvent`, publish `AcceptedAck` before `origin.dispatch()`;
   - `maxProcessingMs = 0` in PR 1 (real value arrives in PR 2);
@@ -883,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 12 commits | Tasks 1.1–1.9 done; next: 1.10 |
+| PR 1 — boundary | In progress | 13 commits | Tasks 1.1–1.10 done; next: 1.11 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -907,7 +907,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.6 `SuccessAck` | `9676a6d` | `SuccessAckTest`; full core suite passed | Yes |
 | 1.7 `EventStatus` | `a129a74` | `EventStatusTest`; full core suite passed | Yes |
 | 1.8 Status comments | `3b26042` | docs-only; full core suite passed | Yes |
-| 1.9 `transitionStatus` | this commit | store transition tests; full core suite passed | Yes |
+| 1.9 `transitionStatus` | `ed4ae8a` | store transition tests; full core suite passed | Yes |
+| 1.10 Lifecycle dispatcher | this commit | dispatcher ack tests; full core suite passed | Yes |
 
 Rules:
 
@@ -920,4 +921,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.9** are committed. Start task **1.10** (`EventLifecycleDispatcher` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.10** are committed. Start task **1.11** (`AckHandler` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
