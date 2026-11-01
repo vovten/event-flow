@@ -29,8 +29,9 @@ import java.util.UUID;
  * @param sourceChannels  the channels the original event was published to
  * @param processId       the process/correlation ID from the original event
  * @param occurredAt      when this ack was created
- * @param retryKind       the retry domain that produced this failure
- * @param attempt         1-based attempt number of the retry domain
+ * @param retryKind       the retry context of the dispatch that produced this failure
+ *                        ({@code DELIVERY} or {@code PROCESSING})
+ * @param attempt         1-based attempt number within that retry context
  * @param retryable       whether another attempt is allowed
  * @param failedHandlers  names of handlers that failed
  * @param errorType       fully qualified class name of the outermost exception, or {@code null}
