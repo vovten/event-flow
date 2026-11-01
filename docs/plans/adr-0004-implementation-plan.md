@@ -408,7 +408,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - when the metadata is absent, default to `PROCESSING` / `attempt = 1`;
   - a failure to publish `AcceptedAck` is logged but does not fail the dispatch.
   - File: `lifecycle/EventLifecycleDispatcher.java`.
-- [ ] **1.11** `AckHandler`:
+- [x] **1.11** `AckHandler`:
   - declare `AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck`;
   - `AcceptedAck` → `ACCEPTED` only from `NEW`/`PUBLISHED`; from `FAILED` the status is unchanged (the `DELIVERY` cleanup is wired in PR 3b);
   - `NoHandlerAck` → `DEAD`;
@@ -883,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 13 commits | Tasks 1.1–1.10 done; next: 1.11 |
+| PR 1 — boundary | In progress | 14 commits | Tasks 1.1–1.11 done; next: 1.12 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -908,7 +908,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.7 `EventStatus` | `a129a74` | `EventStatusTest`; full core suite passed | Yes |
 | 1.8 Status comments | `3b26042` | docs-only; full core suite passed | Yes |
 | 1.9 `transitionStatus` | `ed4ae8a` | store transition tests; full core suite passed | Yes |
-| 1.10 Lifecycle dispatcher | this commit | dispatcher ack tests; full core suite passed | Yes |
+| 1.10 Lifecycle dispatcher | `19be94e` | dispatcher ack tests; full core suite passed | Yes |
+| 1.11 `AckHandler` | this commit | `AckHandlerTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -921,4 +922,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.10** are committed. Start task **1.11** (`AckHandler` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.11** are committed. Start task **1.12** (`IdempotentEventDispatcher` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
