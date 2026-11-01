@@ -14,11 +14,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -182,6 +184,81 @@ class IdempotentEventDispatcherDefectTest {
                         "of the same event UUID=%s. Idempotent filter is not atomic.",
                         invocationCount.get(), fixedEventId)
                 .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should invalidate cache when only some handlers fail")
+    void shouldInvalidateCacheOnPartialFailure() {
+        AtomicInteger invocations = new AtomicInteger();
+        List<HandlerResults> responses = List.of(
+                HandlerResults.of(List.of(
+                        HandlerResult.success("ok"),
+                        HandlerResult.failure("bad", new RuntimeException("boom")))),
+                HandlerResults.of(List.of(HandlerResult.success("ok")))
+        );
+        EventDispatcher countingDispatcher = new CountingDispatcher(invocations, responses);
+        IdempotentEventDispatcher idempotentDispatcher = new IdempotentEventDispatcher(
+                countingDispatcher, Duration.ofMinutes(10), 100, false);
+        UUID eventId = UUID.randomUUID();
+
+        HandlerResults first = idempotentDispatcher.dispatch(new TestTraceableEvent(eventId)).join();
+        HandlerResults second = idempotentDispatcher.dispatch(new TestTraceableEvent(eventId)).join();
+
+        assertThat(first.isPartialSuccess()).isTrue();
+        assertThat(second.isAllSuccess()).isTrue();
+        assertThat(invocations).hasValue(2);
+    }
+
+    @Test
+    @DisplayName("Should keep cache when all handlers succeed")
+    void shouldKeepCacheOnFullSuccess() {
+        AtomicInteger invocations = new AtomicInteger();
+        List<HandlerResults> responses = List.of(
+                HandlerResults.of(List.of(HandlerResult.success("ok"))),
+                HandlerResults.of(List.of(HandlerResult.success("ok")))
+        );
+        EventDispatcher countingDispatcher = new CountingDispatcher(invocations, responses);
+        IdempotentEventDispatcher idempotentDispatcher = new IdempotentEventDispatcher(
+                countingDispatcher, Duration.ofMinutes(10), 100, false);
+        UUID eventId = UUID.randomUUID();
+
+        idempotentDispatcher.dispatch(new TestTraceableEvent(eventId)).join();
+        HandlerResults second = idempotentDispatcher.dispatch(new TestTraceableEvent(eventId)).join();
+
+        assertThat(second.isDuplicate()).isTrue();
+        assertThat(invocations).hasValue(1);
+    }
+
+    private static final class CountingDispatcher implements EventDispatcher {
+        private final AtomicInteger invocations;
+        private final List<HandlerResults> responses;
+
+        private CountingDispatcher(AtomicInteger invocations, List<HandlerResults> responses) {
+            this.invocations = invocations;
+            this.responses = responses;
+        }
+
+        @Override
+        public CompletableFuture<HandlerResults> dispatch(Event event) {
+            return CompletableFuture.completedFuture(responses.get(invocations.getAndIncrement()));
+        }
+
+        @Override
+        public void register(Object listener) {
+        }
+
+        @Override
+        public boolean isRegistered(Object listener) {
+            return false;
+        }
+
+        @Override
+        public void start(Consumer<Event> dispatchConsumer) {
+        }
+
+        @Override
+        public void stop() {
+        }
     }
 
     /**

@@ -80,9 +80,9 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
                     if (throwable != null) {
                         cache.invalidate(eventId);
                         log.debug("Event dispatch failed, removed from cache: {}", eventId);
-                    } else if (results != null && results.isAllFailure()) {
+                    } else if (results == null || !results.isAllSuccess()) {
                         cache.invalidate(eventId);
-                        log.debug("All handlers failed, removed from cache: {}", eventId);
+                        log.debug("Event was not fully processed, removed from cache: {}", eventId);
                     } else {
                         log.debug("Event processed: {}", eventId);
                     }

@@ -417,7 +417,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - all transitions use `transitionStatus` with the allowed source statuses;
   - terminal statuses (`HANDLED`, `DEAD`) are never overwritten by late acks.
   - File: `lifecycle/AckHandler.java`.
-- [ ] **1.12** `IdempotentEventDispatcher`:
+- [x] **1.12** `IdempotentEventDispatcher`:
   - invalidate the cache when `results != null && !results.isAllSuccess()`;
   - keep invalidation on `throwable != null`;
   - do not change duplicate handling.
@@ -883,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 14 commits | Tasks 1.1–1.11 done; next: 1.12 |
+| PR 1 — boundary | In progress | 15 commits | Tasks 1.1–1.12 done; next: 1.13 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -909,7 +909,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.8 Status comments | `3b26042` | docs-only; full core suite passed | Yes |
 | 1.9 `transitionStatus` | `ed4ae8a` | store transition tests; full core suite passed | Yes |
 | 1.10 Lifecycle dispatcher | `19be94e` | dispatcher ack tests; full core suite passed | Yes |
-| 1.11 `AckHandler` | this commit | `AckHandlerTest`; full core suite passed | Yes |
+| 1.11 `AckHandler` | `97b7ac7` | `AckHandlerTest`; full core suite passed | Yes |
+| 1.12 Idempotency cache | this commit | idempotency tests; full core suite passed | Yes |
 
 Rules:
 
@@ -922,4 +923,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.11** are committed. Start task **1.12** (`IdempotentEventDispatcher` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.12** are committed. Start task **1.13** (`EventRetryScheduler` + `ACCEPTED`): implement, run the tests, report the result, and wait for confirmation before creating the commit.
