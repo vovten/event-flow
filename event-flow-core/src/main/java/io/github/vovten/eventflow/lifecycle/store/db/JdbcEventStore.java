@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Each database family has its own {@link SqlDialect} implementation
  * that provides dialect-specific SQL statements and type mappings.
  * <p>
- * The {@code status} column uses {@code CHAR(1)} with single-character codes (U, N, P, H, F)
+ * The {@code status} column uses {@code CHAR(1)} with single-character codes (U, N, P, A, H, F, D)
  * defined in {@link EventStatus}.
  * The {@code payload} column uses {@code TEXT} (or {@code CLOB} / {@code NVARCHAR(MAX)} depending on dialect)
  * for JSON-serialized event data.

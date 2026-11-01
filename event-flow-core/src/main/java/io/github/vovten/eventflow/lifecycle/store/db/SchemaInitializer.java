@@ -31,7 +31,7 @@ public class SchemaInitializer {
             COMMENT ON COLUMN %s.payload IS 'JSON-serialized event body';
             COMMENT ON COLUMN %s.channels IS 'Comma-separated channel class names (local routing metadata for retry)';
             COMMENT ON COLUMN %s.process_id IS 'Correlation or process identifier';
-            COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED';
+            COMMENT ON COLUMN %s.status IS 'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, A=ACCEPTED, H=HANDLED, F=FAILED, D=DEAD';
             COMMENT ON COLUMN %s.retry_count IS 'Number of retry attempts for failed events';
             COMMENT ON COLUMN %s.retry IS 'Manual retry flag: when TRUE, the event is eligible for retry regardless of lifecycle status';
             COMMENT ON COLUMN %s.created_at IS 'Timestamp when the event was first stored';

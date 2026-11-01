@@ -75,7 +75,7 @@ EXEC sys.sp_addextendedproperty
     @level2type=N'COLUMN', @level2name=N'process_id';
 
 EXEC sys.sp_addextendedproperty
-    @name=N'MS_Description', @value=N'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, H=HANDLED, F=FAILED',
+    @name=N'MS_Description', @value=N'Lifecycle status: U=UNDEFINED, N=NEW, P=PUBLISHED, A=ACCEPTED, H=HANDLED, F=FAILED, D=DEAD',
     @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'event_store',
     @level2type=N'COLUMN', @level2name=N'status';
 
