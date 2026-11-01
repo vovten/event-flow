@@ -304,6 +304,8 @@ Rules:
 - The validation runs before any retry scheduler or `LifecycleRepository` is created.
 - Implement it in a small `RetryConfigurationValidator` and unit-test it.
 - In delivery-only mode: `AcceptedAck` and delivery retries work; `FailureAck` sets `FAILED` without a `PROCESSING` row; the processing watchdog is disabled; the legacy scheduler must be off.
+- `ACCEPTED` belongs to the processing domain. It is **never** retried by the delivery layer: `DeliveryRetryScheduler` only selects `DELIVERY` rows. In delivery-only mode `ACCEPTED` is not retried at all and stays `ACCEPTED` if the final ack is lost.
+- The legacy `EventRetryScheduler`'s `ACCEPTED` scan is a PR 1 transitional safety net. It is disabled together with the legacy scheduler when the two-domain mode is enabled.
 - In both-disabled mode: the new mechanism is off; the legacy scheduler may run until it is removed.
 
 ---
@@ -390,7 +392,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - a rejected transition is logged and ignored, not thrown;
   - `FAILED → ACCEPTED` is **not** allowed; a late `AcceptedAck` from `FAILED` only clears the `DELIVERY` row (wired in PR 3b).
   - Files: `EventStore.java`, `JdbcEventStore.java`, `InMemoryEventStore.java`.
-- [ ] **1.9a** `EventLifecyclePublisher.updatePublishResult`:
+- [x] **1.9a** `EventLifecyclePublisher.updatePublishResult`:
   - use `transitionStatus` for publish success/failure (`NEW`/`FAILED` → `PUBLISHED`/`FAILED`);
   - a late publish result must not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
   - File: `lifecycle/EventLifecyclePublisher.java`.
@@ -424,7 +426,8 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - File: `dispatcher/IdempotentEventDispatcher.java`.
 - [x] **1.13** `EventRetryScheduler`:
   - temporarily include `ACCEPTED` in the legacy status list;
-  - this preserves recovery of a lost final ack until the durable watchdog exists in PR 3b.
+  - this preserves recovery of a lost final ack until the durable watchdog exists in PR 3b;
+  - the scan is transitional and must be disabled together with the legacy scheduler when the two-domain mode is enabled.
   - File: `lifecycle/EventRetryScheduler.java`.
 - [x] **1.13a** Update logging exclusions:
   - add `AcceptedAck` and `NoHandlerAck` to the default `excludedEvents`;
@@ -437,51 +440,51 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
 
 Tests for each task are written in the same commit as the task. This list is the minimum coverage checklist.
 
-- [ ] **1.14** `EventLifecycleDispatcherTest`:
+- [x] **1.14** `EventLifecycleDispatcherTest`:
   - `AcceptedAck` is published before handlers run;
   - an empty registry emits `AcceptedAck` and then `NoHandlerAck`;
   - a duplicate result does not produce `NoHandlerAck`;
   - `LifecycleAckEvent` passes through.
-- [ ] **1.15** `AckHandlerTest`:
+- [x] **1.15** `AckHandlerTest`:
   - `AcceptedAck` → `ACCEPTED`;
   - `NoHandlerAck` → `DEAD`;
   - a late `AcceptedAck` does not roll back `HANDLED`;
   - a late `AcceptedAck` after `FailureAck` keeps `FAILED`;
   - a late `FailureAck` does not roll back `DEAD`;
   - foreign-service acks are still ignored.
-- [ ] **1.16** `IdempotentEventDispatcherDefectTest`:
+- [x] **1.16** `IdempotentEventDispatcherDefectTest`:
   - partial failure invalidates the cache;
   - the next dispatch actually invokes the handler.
-- [ ] **1.17** `EventStatusTest`:
+- [x] **1.17** `EventStatusTest`:
   - codes `A` and `D`;
   - `fromCode`.
-- [ ] **1.18** `JdbcEventStoreTest` / `InMemoryEventStoreTest`:
+- [x] **1.18** `JdbcEventStoreTest` / `InMemoryEventStoreTest`:
   - allowed `transitionStatus`;
   - rejected `transitionStatus` leaves the row unchanged;
   - concurrent transition safety.
-- [ ] **1.18a** `EventLifecyclePublisherTest`:
+- [x] **1.18a** `EventLifecyclePublisherTest`:
   - a late publish result does not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
-- [ ] **1.19** Verify old `FailureAck` / `SuccessAck` call sites compile through the legacy constructors.
+- [x] **1.19** Verify old `FailureAck` / `SuccessAck` call sites compile through the legacy constructors.
 
 ## 5.5 Documentation and build
 
-- [ ] **1.20** README: ack flow and new statuses `A`, `D`.
-- [ ] **1.21** CHANGELOG: new technical ack, new statuses, idempotency fix.
-- [ ] **1.22** Javadoc for all new public types.
-- [ ] **1.23** Run `mvn -pl event-flow-core test`.
-- [ ] **1.24** Run `mvn -pl event-flow-spring test`.
-- [ ] **1.25** Run `mvn verify` (checkstyle).
-- [ ] **1.26** Confirm no new compiler warnings.
+- [x] **1.20** README: ack flow and new statuses `A`, `D`.
+- [x] **1.21** CHANGELOG: new technical ack, new statuses, idempotency fix.
+- [x] **1.22** Javadoc for all new public types.
+- [x] **1.23** Run `mvn -pl event-flow-core test`.
+- [x] **1.24** Run `mvn -pl event-flow-spring test`.
+- [x] **1.25** Run `mvn verify` (checkstyle).
+- [x] **1.26** Confirm no new compiler warnings.
 
 ## 5.6 Definition of Done
 
-- [ ] Publish → `AcceptedAck` → `ACCEPTED`.
-- [ ] No handler → `NoHandlerAck` → `DEAD`.
-- [ ] Partial failure does not block reprocessing.
-- [ ] Late acks cannot roll back terminal statuses.
-- [ ] No DDL changes beyond status comments.
-- [ ] All existing tests pass.
-- [ ] No breaking changes for custom `EventStore` implementations or user acks.
+- [x] Publish → `AcceptedAck` → `ACCEPTED`.
+- [x] No handler → `NoHandlerAck` → `DEAD`.
+- [x] Partial failure does not block reprocessing.
+- [x] Late acks cannot roll back terminal statuses.
+- [x] No DDL changes beyond status comments.
+- [x] All existing tests pass.
+- [x] No breaking changes for custom `EventStore` implementations or user acks.
 
 ## 5.7 Out of scope for PR 1
 
@@ -700,6 +703,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 - [ ] **3b.1** `DeliveryRetryScheduler`:
   - due `DELIVERY` → claim → re-publish;
+  - never selects `ACCEPTED`; only `DELIVERY` rows;
   - wait for `AcceptedAck`;
   - timeout → `PENDING` + `attempt++`;
   - cap → retry row `DEAD` + event status `DEAD`.
@@ -713,7 +717,7 @@ Tests for each task are written in the same commit as the task. This list is the
   - group by `eventId` to avoid double publish.
 - [ ] **3b.4** Watchdogs:
   - `PUBLISHED` older than `deliveryAckTimeout` → create/raise `DELIVERY`;
-  - `ACCEPTED` older than `processingAckTimeout` → create/raise `PROCESSING`.
+  - `ACCEPTED` older than `processingAckTimeout` → create/raise `PROCESSING`; only when `processing.enabled = true`.
 
 ## 8.2 Ack routing
 
@@ -751,7 +755,7 @@ Tests for each task are written in the same commit as the task. This list is the
   - fail fast with `IllegalStateException` when `processing.enabled = true` and `delivery.enabled = false`;
   - run before any retry scheduler or `LifecycleRepository` is created;
   - unit-test the validator and the Spring startup failure.
-- [ ] **3b.11** Disable the legacy `EventRetryScheduler` when the new mode is enabled.
+- [ ] **3b.11** Disable the legacy `EventRetryScheduler` when the new mode is enabled, including its transitional `ACCEPTED` scan.
 - [ ] **3b.12** Update `EventCleanupScheduler` for dead-letter retention.
 
 ## 8.4 Test coverage checklist (not a separate task)
@@ -776,6 +780,9 @@ Tests for each task are written in the same commit as the task. This list is the
 - [ ] **3b.28** `SuccessAck(retryKind = DELIVERY)` closes the delivery row and sets `HANDLED`.
 - [ ] **3b.29** `FailureAck(retryKind = DELIVERY)` closes the delivery row and creates a `PROCESSING` row.
 - [ ] **3b.30** Stale ack with an older `attempt` is ignored.
+- [ ] **3b.31** Delivery-only mode does not retry `ACCEPTED`; the event remains `ACCEPTED`.
+- [ ] **3b.32** `DeliveryRetryScheduler` ignores `ACCEPTED` and creates no `DELIVERY` row for it.
+- [ ] **3b.33** Enabling the two-domain mode disables the legacy `ACCEPTED` scan.
 
 ## 8.5 Definition of Done
 
@@ -863,6 +870,9 @@ Tests for each task are written in the same commit as the task. This list is the
 | Old `FAILED` rows | legacy heuristic or backfill |
 | `processing.enabled=true` + `delivery.enabled=false` | startup fails with `IllegalStateException` |
 | Delivery-only mode + handler failure | `FAILED`, no `PROCESSING` row, no processing retry |
+| Delivery-only mode + final ack lost | remains `ACCEPTED`; no processing retry |
+| `DeliveryRetryScheduler` sees `ACCEPTED` | ignores it; no `DELIVERY` row created |
+| Two-domain mode + legacy scheduler | legacy off, including the `ACCEPTED` scan |
 
 ---
 
@@ -883,7 +893,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 17 commits | Tasks 1.1–1.13a done; next: 1.14 |
+| PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -912,7 +922,9 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.11 `AckHandler` | `97b7ac7` | `AckHandlerTest`; full core suite passed | Yes |
 | 1.12 Idempotency cache | `aed048b` | idempotency tests; full core suite passed | Yes |
 | 1.13 ACCEPTED retry scan | `6d0559b` | `EventRetrySchedulerTest`; full core suite passed | Yes |
-| 1.13a Logging exclusions | this commit | `EventFlowPropertiesTest`; full spring suite passed | Yes |
+| 1.13a Logging exclusions | `d7efb49` | `EventFlowPropertiesTest`; full spring suite passed | Yes |
+| 1.9a Publish result transitions | `f033efc` | `EventLifecyclePublisherTest`; full verify passed | Yes |
+| 1.20–1.26 Docs and verification | this commit | full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -925,4 +937,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.13a** are committed. Start task **1.14** (README, CHANGELOG, Javadoc and full `mvn verify`): update the docs, run the full verification, report the result, and wait for confirmation before creating the commit.
+PR 1 is complete. Start **PR 2 — local processing retry**: `@RetryPolicy`, policy registry, async local retry loop, failure classification, and `FailureAck.retryable`. Follow the one-task-one-commit rule and update this plan as work advances.

@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Kafka partition keys via `EventKeyResolver`: the record key can now be resolved from the event's `processId`, event type, `Envelope` metadata, or a custom resolver. This lets all events of the same process/saga or type land in the same Kafka partition (ordering guarantee). The default `none` strategy preserves the previous round-robin behavior. Spring auto-configuration exposes the `key` transport option (`none`, `process-id`, `event-type`, `metadata:<name>`, `bean:<beanName>`).
+- `AcceptedAck`: a consumer-side delivery confirmation published before handler execution. Together with `SuccessAck` / `FailureAck` it separates "was the event delivered?" from "was the event processed?".
+- `NoHandlerAck`: published when a managed event is received but no listener is resolved. The event moves to the terminal `DEAD` status instead of being treated as successfully handled.
+- `EventStatus.ACCEPTED` and `EventStatus.DEAD`: explicit delivery-confirmed and terminal dead-letter states. No schema migration is required; only status comments change.
+- `EventStore.transitionStatus(...)`: conditional status updates that reject stale or out-of-order acknowledgments instead of overwriting a newer state.
+
+### Changed
+
+- `EventLifecycleDispatcher` now publishes `AcceptedAck` before handler execution and `SuccessAck` / `FailureAck` / `NoHandlerAck` afterwards.
+- `AckHandler` handles all four lifecycle acks through conditional transitions. Late acks cannot roll back `HANDLED` or `DEAD`, and a late `AcceptedAck` after a processing failure keeps `FAILED`.
+- `EventRetryScheduler` now also scans `ACCEPTED` events, recovering events whose final ack was lost after consumer acceptance.
+- Lifecycle ack events (`AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck`) are excluded from structured logs by default.
+- `SuccessAck` and `FailureAck` carry `retryKind` and `attempt`, identifying the retry context of the dispatch that produced the ack.
+
+### Fixed
+
+- `IdempotentEventDispatcher` now invalidates its cache on any handler failure, not only when all handlers fail. A partial failure is therefore eligible for a processing retry instead of being dropped as a duplicate.
+- `EventStatus` status comments in all SQL dialects and `SchemaInitializer` now document the new `A` and `D` codes.
 
 ## [1.3.1] - 2026-10-19
 

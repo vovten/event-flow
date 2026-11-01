@@ -504,7 +504,7 @@ An enum that controls how an event's journey is tracked. Three levels:
 |-------|-----------|
 | `NONE` | Fire-and-forget — event passes through without any persistence |
 | `PERSISTED` | Event is stored in the `EventStore` (with `UNDEFINED` status) but not actively tracked |
-| `MANAGED` | Full lifecycle tracking — event status transitions through `NEW → PUBLISHED → HANDLED`, with automatic retry on failure |
+| `MANAGED` | Full lifecycle tracking — event status transitions through `NEW → PUBLISHED → ACCEPTED → HANDLED`, with automatic retry on failure and terminal `DEAD` for unrecoverable events |
 
 Set via `@Event(lifecycle = ...)` annotation or the `lifecycle()` default method on `Event`.
 
@@ -521,15 +521,15 @@ Decorator for `EventPublisher` that persists events to the `EventStore` before t
 
 ### EventLifecycleDispatcher
 
-Decorator for `EventDispatcher` that publishes `SuccessAck` or `FailureAck` events back to the source channels after handler execution — enabling end-to-end status tracking. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
+Decorator for `EventDispatcher` that publishes a delivery confirmation (`AcceptedAck`) before handler execution and a processing outcome (`SuccessAck`, `FailureAck`, or `NoHandlerAck`) after it — enabling end-to-end status tracking. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
 
 ### EventRetryScheduler
 
-Periodically scans the `EventStore` for failed (`FAILED`), stuck (`PUBLISHED`), and orphaned (`NEW`) events and re-publishes them with exponential backoff. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
+Periodically scans the `EventStore` for failed (`FAILED`), stuck (`PUBLISHED`), accepted-but-unconfirmed (`ACCEPTED`), and orphaned (`NEW`) events and re-publishes them with exponential backoff. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
 
 ### AckHandler
 
-An `EventSubscriber` that processes incoming lifecycle acknowledgment events (`SuccessAck`/`FailureAck`) and updates the event status in the `EventStore`. Filters by service name to allow multiple publisher instances to share the same channel. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
+An `EventSubscriber` that processes incoming lifecycle acknowledgment events (`AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck`) and applies conditional status transitions in the `EventStore`. Late or out-of-order acks cannot roll back a terminal status. Filters by service name to allow multiple publisher instances to share the same channel. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
 
 ### EventTransport
 
@@ -596,8 +596,8 @@ EventTypeRegistry.allowClass(MyEvent.class);
 Event Flow provides an end-to-end **lifecycle tracking** system that answers three questions about every event:
 
 - **Was it saved?** — the event persisted before publication (crash recovery)
-- **Was it delivered?** — the event reached all target channels successfully
-- **Was it handled?** — all registered handlers processed the event without errors
+- **Was it delivered?** — the consumer received the event (`AcceptedAck`)
+- **Was it handled?** — all registered handlers processed the event without errors (`SuccessAck`); otherwise `FailureAck` or `NoHandlerAck` reports the outcome
 
 This turns event publishing from a fire-and-forget operation into a **reliable, observable process** — essential for critical business events (orders, payments, notifications) where you need guarantees and visibility.
 
@@ -607,7 +607,9 @@ This turns event publishing from a fire-and-forget operation into a **reliable, 
 |----------|------------------|---------------------------|
 | Service crashes mid-publish | Event lost | Event safe in store, retried on restart |
 | Handler throws an exception | Silent failure | Status updated to `FAILED`, automatic retry |
-| Ack lost in transit | Event stuck in limbo | Detected as `PUBLISHED` → retried |
+| No handler is registered | Silent failure | Status updated to terminal `DEAD` |
+| Delivery ack lost in transit | Event stuck in limbo | Detected as `PUBLISHED` → retried |
+| Final ack lost after receipt | Event stuck in limbo | Detected as `ACCEPTED` → retried |
 | Debugging production issues | Logs only | Queryable event store with full history |
 
 You choose the level per event — `NONE` for high-throughput fire-and-forget, `PERSISTED` for audit without monitoring, `MANAGED` when you need guarantees.
@@ -622,29 +624,32 @@ You choose the level per event — `NONE` for high-throughput fire-and-forget, `
 │                    │  saves & tracks status  │                   │
 │                    │  (NEW→PUBLISHED/FAILED) │                   │
 │                    │                         │                   │
-│  ◄── EventRetryScheduler scans FAILED, PUBLISHED, NEW ──► retry  │
+│  ◄── EventRetryScheduler scans FAILED, PUBLISHED, ACCEPTED, NEW  │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
          │                                  ▲
-         │         SuccessAck / FailureAck  │
+         │  AcceptedAck / SuccessAck        │
+         │  FailureAck / NoHandlerAck       │
          ▼                                  │
 ┌────────────────────────── DISPATCHER ────────────────────────────┐
 │                                                                  │
 │  Channel ──► EventLifecycleDispatcher ──► Handlers               │
 │                      │                                           │
-│                      │  publishes ack after handler execution    │
+│                      │  AcceptedAck before handlers              │
+│                      │  outcome ack after handlers               │
 │                                                                  │
-│  ◄── AckHandler processes ack, updates store (HANDLED/FAILED)    │
+│  ◄── AckHandler updates store (ACCEPTED/HANDLED/FAILED/DEAD)     │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 **The flow:**
 1. `EventLifecyclePublisher` saves the event to `EventStore` with status `NEW`, then publishes it
-2. On successful delivery, status updates to `PUBLISHED`; on failure, to `FAILED`
-3. `EventLifecycleDispatcher` (on the consumer side) publishes `SuccessAck` or `FailureAck` back through the channel
-4. `AckHandler` (on the publisher side) catches the ack and updates status to `HANDLED` or `FAILED`
-5. `EventRetryScheduler` periodically rescans `FAILED`, stuck `PUBLISHED`, and orphaned `NEW` events and retries them with exponential backoff
+2. On successful publish, status updates to `PUBLISHED`; on failure, to `FAILED`
+3. `EventLifecycleDispatcher` (on the consumer side) publishes `AcceptedAck` before handler execution
+4. After execution it publishes `SuccessAck`, `FailureAck`, or `NoHandlerAck`
+5. `AckHandler` (on the publisher side) applies a conditional transition: `ACCEPTED`, `HANDLED`, `FAILED`, or `DEAD`. Late or out-of-order acks never roll back a terminal status
+6. `EventRetryScheduler` periodically rescans `FAILED`, stuck `PUBLISHED`, `ACCEPTED`, and orphaned `NEW` events and retries them with exponential backoff
 
 ### Three lifecycle levels
 
@@ -652,7 +657,7 @@ You choose the level per event — `NONE` for high-throughput fire-and-forget, `
 |-------|-----------|----------|
 | `NONE` | No persistence, no tracking. Event passes straight through | High-throughput notifications, ephemeral events |
 | `PERSISTED` | Event saved to store but status stays `UNDEFINED`. No retry, no ack | Audit trail without operational guarantees |
-| `MANAGED` | Full tracking: `NEW → PUBLISHED → HANDLED`, automatic retry on failure, ack-based end-to-end confirmation | Orders, payments, critical business events |
+| `MANAGED` | Full tracking: `NEW → PUBLISHED → ACCEPTED → HANDLED`, automatic retry on failure, ack-based end-to-end confirmation, terminal `DEAD` for unrecoverable failures | Orders, payments, critical business events |
 
 Set via `@Event` annotation:
 
@@ -691,12 +696,13 @@ The `service-name` is mandatory — it identifies this service instance so that 
 
 ### Retry mechanism
 
-`EventRetryScheduler` scans for three categories of events that need retry:
+`EventRetryScheduler` scans for four categories of events that need retry:
 
 | Status | Why it happens |
 |--------|---------------|
 | `FAILED` | Publication or handler threw an error |
-| `PUBLISHED` | Event was sent but ack was lost in transit (stuck) |
+| `PUBLISHED` | Event was sent but the delivery ack was lost in transit (stuck) |
+| `ACCEPTED` | Consumer received the event but the final ack was lost or the consumer crashed before completion |
 | `NEW` | Event was saved but the application crashed before publishing finished (orphaned) |
 
 Backoff is exponential: `delay = minAge × 2^retryCount`. First retry at 30s, second at 60s, third at 120s.
@@ -718,7 +724,7 @@ event-flow:
 ```
 
 **Safety:**
-- Only terminal statuses (`HANDLED`, `UNDEFINED`) are cleaned up — `FAILED` events are preserved for manual inspection
+- Only terminal statuses (`HANDLED`, `UNDEFINED`) are cleaned up — `FAILED` and `DEAD` events are preserved for manual inspection
 - A single cycle deletes at most 100 000 events; leftover events are picked up by the next cycle
 - A random jitter (up to `interval`) is added to the first run to avoid thundering herd when multiple instances start
 
@@ -1061,6 +1067,12 @@ EventDispatcher dispatcher = EventDispatcherBuilder.create()
     .loggable()
     .build();
 ```
+
+### Default exclusions
+
+Lifecycle acknowledgment events are excluded from structured logs by default:
+`AcceptedAck`, `NoHandlerAck`, `SuccessAck`, and `FailureAck`. Override
+`excluded-events` if you need to log them.
 
 ### Per-Event Log Level Thresholds
 

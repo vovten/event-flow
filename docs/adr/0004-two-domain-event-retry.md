@@ -321,7 +321,8 @@ Delivery-only mode semantics:
 - `AcceptedAck` is still tracked; delivery retries and the delivery watchdog work.
 - On `FailureAck`, the event becomes `FAILED` with error details, but no `PROCESSING` retry row is created. The failure is visible to operators and can be recovered by enabling processing or by `markForRetry`.
 - The processing watchdog is disabled. A lost final ack leaves the event in `ACCEPTED` by design; delivery-only mode does not attempt to recover processing.
-- The legacy `EventRetryScheduler` must be disabled when the new mechanism is enabled; otherwise it would retry `FAILED` events outside the two-domain model.
+- **`ACCEPTED` is never retried by the delivery layer.** It belongs to the processing domain. In delivery-only mode it is not retried at all: `DeliveryRetryScheduler` only selects `DELIVERY` rows, and the processing watchdog does not run.
+- The legacy `EventRetryScheduler` must be disabled when the new mechanism is enabled; otherwise it would retry `FAILED` events outside the two-domain model. Its current `ACCEPTED` scan is a transitional safety net for PR 1 and is disabled together with the legacy scheduler.
 
 ### D7 — Schedulers, claiming and watchdogs
 
@@ -356,9 +357,10 @@ Scheduling rules:
 - Every scheduler-initiated re-publish stamps `retryKind` and `attempt` into the Envelope metadata. The consumer echoes them in `SuccessAck` / `FailureAck`; `retryKind` identifies the retry row/context, not the semantic ack domain.
 - A scheduler-initiated `PROCESSING` re-publish that fails at the transport stage is recorded against the `PROCESSING` row with reason `PUBLISH_FAILED`, not as a new `DELIVERY` row. The retry's purpose remains processing; the delivery failure is the cause.
 - If both a `DELIVERY` and a `PROCESSING` row are due for the same event, group by `event_id` in a cycle and perform one re-publish. The same delivery can satisfy the delivery ack and provide the processing attempt.
+- `DeliveryRetryScheduler` selects only `DELIVERY` rows. It never selects an `ACCEPTED` event and never creates a delivery row for one: `ACCEPTED` belongs to the processing domain.
 - Watchdogs avoid a row per healthy event:
   - scan `event_store` for `PUBLISHED` older than `deliveryAckTimeout` → create or raise a `DELIVERY` row;
-  - scan `event_store` for `ACCEPTED` older than `processingAckTimeout` → create or raise a `PROCESSING` row.
+  - scan `event_store` for `ACCEPTED` older than `processingAckTimeout` → create or raise a `PROCESSING` row; this watchdog runs only when `processing.enabled = true`.
 - `claimed_until` must exceed the maximum expected publish + ack window. An expired lease returns the row to `PENDING`; this is at-least-once, not exactly-once.
 - Manual `markForRetry(eventId)` resets the relevant row to `PENDING` and the event to `FAILED`/`NEW` atomically. It bypasses the current backoff but not the hard safety cap unless an explicit operator override is configured.
 
@@ -717,6 +719,9 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 22. A `SuccessAck` with `retryKind = DELIVERY` closes the delivery row and marks the event `HANDLED`; a stale success with an older attempt is ignored.
 23. A `FailureAck` with `retryKind = DELIVERY` closes the delivery row and creates a `PROCESSING` retry row.
 24. A first-publish ack without retry metadata defaults to `PROCESSING` / `attempt = 1` and does not require an existing retry row.
+25. Delivery-only mode does not retry `ACCEPTED` events; an `ACCEPTED` event without a final ack remains `ACCEPTED`.
+26. `DeliveryRetryScheduler` ignores `ACCEPTED` events and creates no `DELIVERY` row for them.
+27. Enabling the two-domain mode disables the legacy `EventRetryScheduler`, including its transitional `ACCEPTED` scan.
 
 ## Implementation phases
 
