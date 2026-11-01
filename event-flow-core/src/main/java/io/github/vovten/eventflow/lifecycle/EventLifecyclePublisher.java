@@ -46,6 +46,28 @@ public final class EventLifecyclePublisher implements EventPublisher {
 
     private static final String PUBLISHER_SERVICE_KEY = "pubSrv";
 
+    /**
+     * Statuses from which a retry publish may reset the event to {@code NEW}.
+     * Terminal statuses are intentionally excluded.
+     */
+    private static final Set<EventStatus> RETRY_RESET_SOURCES =
+            Set.of(EventStatus.NEW, EventStatus.PUBLISHED, EventStatus.ACCEPTED, EventStatus.FAILED);
+
+    /**
+     * A manual retry is an explicit operator override and may resurrect any
+     * status, including {@code UNDEFINED}, {@code HANDLED} and {@code DEAD}.
+     */
+    private static final Set<EventStatus> MANUAL_RETRY_SOURCES =
+            Set.of(EventStatus.values());
+
+    /**
+     * Statuses from which the result of the current publish may update the
+     * event. A late publish result must not overwrite {@code ACCEPTED},
+     * {@code HANDLED} or {@code DEAD}.
+     */
+    private static final Set<EventStatus> PUBLISH_RESULT_SOURCES =
+            Set.of(EventStatus.NEW, EventStatus.FAILED);
+
     private final String service;
     private final EventPublisher origin;
     private final EventStore eventStore;
@@ -96,7 +118,10 @@ public final class EventLifecyclePublisher implements EventPublisher {
                     .whenComplete((result, error) -> completePersistedRetry(eventId));
         }
         // MANAGED — persist with NEW status, full lifecycle tracking
-        persistOrReset(eventId, enriched);
+        if (!persistOrReset(eventId, enriched)) {
+            log.debug("Skipping publish: event {} is not eligible for retry", eventId);
+            return CompletableFuture.completedFuture(SendResults.empty());
+        }
         return origin.publish(enriched)
                 .whenComplete((result, error) -> updatePublishResult(eventId, result, error));
     }
@@ -153,13 +178,19 @@ public final class EventLifecyclePublisher implements EventPublisher {
         log.debug("Saved new event with UNDEFINED status: {} ({})", eventId, eventType);
     }
 
-    private void persistOrReset(UUID eventId, Event event) {
+    private boolean persistOrReset(UUID eventId, Event event) {
         String eventType = resolveEventType(event);
         Optional<StoredEvent> existing = eventStore.findById(eventId);
         if (existing.isPresent()) {
-            eventStore.updateStatus(eventId, EventStatus.NEW, null);
-            log.debug("Reset event status for retry: {} ({})", eventId, eventType);
-            return;
+            Set<EventStatus> allowedSources = existing.get().retry()
+                    ? MANUAL_RETRY_SOURCES
+                    : RETRY_RESET_SOURCES;
+            boolean reset = eventStore.transitionStatus(
+                    eventId, allowedSources, EventStatus.NEW, null);
+            if (!reset) {
+                log.debug("Cannot reset event for retry: {} ({})", eventId, eventType);
+            }
+            return reset;
         }
         UUID processId = resolveProcessId(event);
         String payload = EventUtils.toJson(event);
@@ -167,22 +198,35 @@ public final class EventLifecyclePublisher implements EventPublisher {
                 resolveChannels(event), processId, EventStatus.NEW);
         eventStore.save(stored);
         log.debug("Saved new event to store: {} ({})", eventId, eventType);
+        return true;
     }
 
     private void updatePublishResult(UUID eventId, SendResults result, Throwable error) {
         if (error != null) {
-            eventStore.updateStatus(eventId, EventStatus.FAILED, error.getMessage());
-            log.warn("Event publication failed: {} — {}", eventId, error.getMessage());
+            updatePublishFailed(eventId, error.getMessage());
             return;
         }
         if (result == null || result.isAllFailure()) {
-            String errorMsg = result != null ? result.getSummary() : "null result";
-            eventStore.updateStatus(eventId, EventStatus.FAILED, errorMsg);
-            log.warn("Event publication failed: {} — {}", eventId, errorMsg);
+            updatePublishFailed(eventId, result != null ? result.getSummary() : "null result");
             return;
         }
-        eventStore.updateStatus(eventId, EventStatus.PUBLISHED, null);
-        log.debug("Event published successfully: {}", eventId);
+        boolean applied = eventStore.transitionStatus(
+                eventId, PUBLISH_RESULT_SOURCES, EventStatus.PUBLISHED, null);
+        if (applied) {
+            log.debug("Event published successfully: {}", eventId);
+        } else {
+            log.debug("Ignoring late publish success for event {}: status is already newer or terminal", eventId);
+        }
+    }
+
+    private void updatePublishFailed(UUID eventId, String errorMessage) {
+        boolean applied = eventStore.transitionStatus(
+                eventId, PUBLISH_RESULT_SOURCES, EventStatus.FAILED, errorMessage);
+        if (applied) {
+            log.warn("Event publication failed: {} — {}", eventId, errorMessage);
+        } else {
+            log.debug("Ignoring late publish failure for event {}: status is already newer or terminal", eventId);
+        }
     }
 
     private void completePersistedRetry(UUID eventId) {

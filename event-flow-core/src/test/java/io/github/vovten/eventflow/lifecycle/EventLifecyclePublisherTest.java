@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
@@ -153,6 +154,49 @@ class EventLifecyclePublisherTest {
             StoredEvent stored = eventStore.findById(eventId).orElseThrow();
             assertThat(stored.status()).isEqualTo(EventStatus.PUBLISHED);
             assertThat(stored.retryCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Should not overwrite HANDLED with a late publish result")
+        void shouldNotOverwriteHandledWithLatePublishResult() {
+            CompletableFuture<SendResults> pending = new CompletableFuture<>();
+            EventPublisher origin = e -> pending;
+            EventLifecyclePublisher publisher = new EventLifecyclePublisher(
+                    origin, eventStore, "test-service");
+
+            CompletableFuture<SendResults> publication = publisher.publish(event);
+            assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
+
+            boolean handled = eventStore.transitionStatus(eventId,
+                    Set.of(EventStatus.NEW, EventStatus.PUBLISHED, EventStatus.ACCEPTED, EventStatus.FAILED),
+                    EventStatus.HANDLED, null);
+            assertThat(handled).isTrue();
+
+            pending.complete(SendResults.of(List.of(SendResult.success("dest"))));
+            publication.join();
+
+            assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.HANDLED);
+        }
+
+        @Test
+        @DisplayName("Should skip publishing for a terminal event")
+        void shouldSkipPublishingForTerminalEvent() {
+            eventStore.save(StoredEvent.newEvent(
+                    eventId, "TestEvent", "test-service", "{}", null, EventStatus.HANDLED));
+            AtomicReference<Boolean> originCalled = new AtomicReference<>(false);
+            EventPublisher origin = e -> {
+                originCalled.set(true);
+                return CompletableFuture.completedFuture(
+                        SendResults.of(List.of(SendResult.success("dest"))));
+            };
+            EventLifecyclePublisher publisher = new EventLifecyclePublisher(
+                    origin, eventStore, "test-service");
+
+            SendResults results = publisher.publish(event).join();
+
+            assertThat(originCalled).hasValue(false);
+            assertThat(results.isEmpty()).isTrue();
+            assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.HANDLED);
         }
 
         @Test
