@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.lifecycle.store;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -56,6 +57,33 @@ public interface EventStore {
      * @throws java.util.NoSuchElementException if the event is not found
      */
     void updateStatus(UUID eventId, EventStatus status, String errorDetails);
+
+    /**
+     * Conditionally updates the status of an existing event.
+     * <p>
+     * The update is applied only when the event's current status is one of
+     * {@code allowedSources}. A rejected transition (current status not allowed,
+     * or event not found) is logged and returned as {@code false}; it is not
+     * thrown, so late or out-of-order acknowledgments cannot break the
+     * dispatcher.
+     * <p>
+     * Built-in stores override this method with an atomic conditional update.
+     * The default implementation delegates to {@link #updateStatus(UUID, EventStatus, String)}
+     * and ignores {@code allowedSources}; it exists only for backward
+     * compatibility with custom stores.
+     *
+     * @param eventId        the event to update
+     * @param allowedSources current statuses from which the transition is allowed
+     * @param target         the new status
+     * @param errorDetails   optional error details (null if none)
+     * @return {@code true} if the transition was applied, {@code false} if it was rejected
+     * @since 1.4.0
+     */
+    default boolean transitionStatus(UUID eventId, Set<EventStatus> allowedSources,
+                                     EventStatus target, String errorDetails) {
+        updateStatus(eventId, target, errorDetails);
+        return true;
+    }
 
     /**
      * Finds all events with the given status that were last updated before

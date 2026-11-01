@@ -383,7 +383,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - `event-store-oracle.sql`;
   - `event-store-mssql.sql`;
   - `SchemaInitializer` column comments.
-- [ ] **1.9** Add `EventStore.transitionStatus(...)`:
+- [x] **1.9** Add `EventStore.transitionStatus(...)`:
   - default method delegates to `updateStatus` with a Javadoc warning that the default is non-atomic;
   - `JdbcEventStore` overrides with `UPDATE ... WHERE event_id = ? AND status IN (...)`;
   - `InMemoryEventStore` overrides with `computeIfPresent` and an explicit allowed-source set;
@@ -883,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 11 commits | Tasks 1.1–1.8 done; next: 1.9 |
+| PR 1 — boundary | In progress | 12 commits | Tasks 1.1–1.9 done; next: 1.10 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -906,7 +906,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.5 `FailureAck` | `2e73dab` | `FailureAckTest`; full core suite passed | Yes |
 | 1.6 `SuccessAck` | `9676a6d` | `SuccessAckTest`; full core suite passed | Yes |
 | 1.7 `EventStatus` | `a129a74` | `EventStatusTest`; full core suite passed | Yes |
-| 1.8 Status comments | this commit | docs-only; full core suite passed | Yes |
+| 1.8 Status comments | `3b26042` | docs-only; full core suite passed | Yes |
+| 1.9 `transitionStatus` | this commit | store transition tests; full core suite passed | Yes |
 
 Rules:
 
@@ -919,4 +920,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.8** are committed. Start task **1.9** (`EventStore.transitionStatus` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.9** are committed. Start task **1.10** (`EventLifecycleDispatcher` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.

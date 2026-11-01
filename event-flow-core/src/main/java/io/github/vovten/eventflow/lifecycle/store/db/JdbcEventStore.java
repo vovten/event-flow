@@ -69,6 +69,8 @@ public class JdbcEventStore implements EventStore {
     private final Map<Set<EventStatus>, String> selectByStatusesCache = new ConcurrentHashMap<>();
     private final Map<Set<EventStatus>, String> selectRetryableEventsCache = new ConcurrentHashMap<>();
     private final Map<Set<EventStatus>, String> deleteByStatusesCache = new ConcurrentHashMap<>();
+    private final Map<Set<EventStatus>, String> transitionStatusSqlCache = new ConcurrentHashMap<>();
+    private final Map<Set<EventStatus>, String> transitionToNewSqlCache = new ConcurrentHashMap<>();
 
     /**
      * Creates a new JdbcEventStore with the default table name {@value #DEFAULT_TABLE_NAME}
@@ -202,6 +204,61 @@ public class JdbcEventStore implements EventStore {
 
     private String selectUpdateSql(EventStatus status) {
         return status == EventStatus.NEW ? updateStatusWithRetrySql : updateStatusOnlySql;
+    }
+
+    @Override
+    public boolean transitionStatus(UUID eventId, Set<EventStatus> allowedSources,
+                                    EventStatus target, String errorDetails) {
+        Objects.requireNonNull(eventId, "eventId must not be null");
+        Objects.requireNonNull(allowedSources, "allowedSources must not be null");
+        Objects.requireNonNull(target, "target must not be null");
+        if (allowedSources.isEmpty()) {
+            log.debug("Rejected status transition for event {}: allowedSources is empty", eventId);
+            return false;
+        }
+        Set<EventStatus> sources = EnumSet.copyOf(allowedSources);
+        String sql = transitionSql(target, sources);
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+            mapper.setUpdateParameters(ps, eventId, target, errorDetails);
+            int index = 5;
+            for (EventStatus source : sources) {
+                ps.setString(index++, String.valueOf(source.getCode()));
+            }
+            int affected = ps.executeUpdate();
+            if (affected == 0) {
+                log.debug("Rejected status transition for event {}: current status is not in {}",
+                        eventId, sources);
+                return false;
+            }
+            return true;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to transition status for event: " + eventId, e);
+        }
+    }
+
+    private String transitionSql(EventStatus target, Set<EventStatus> sources) {
+        if (target == EventStatus.NEW) {
+            return transitionToNewSqlCache.computeIfAbsent(sources, s -> buildTransitionSql(target, s));
+        }
+        return transitionStatusSqlCache.computeIfAbsent(sources, s -> buildTransitionSql(target, s));
+    }
+
+    private String buildTransitionSql(EventStatus target, Set<EventStatus> sources) {
+        StringBuilder sql = new StringBuilder("UPDATE ")
+                .append(tableName)
+                .append(" SET status = ?, error_details = ?, updated_at = ?");
+        if (target == EventStatus.NEW) {
+            sql.append(", retry_count = CASE WHEN ")
+                    .append(sqlDialect.booleanPredicate("retry"))
+                    .append(" THEN retry_count ELSE retry_count + 1 END");
+        } else {
+            sql.append(", retry = ").append(sqlDialect.booleanLiteral(false));
+        }
+        sql.append(" WHERE event_id = ? AND status IN (")
+                .append(String.join(", ", Collections.nCopies(sources.size(), "?")))
+                .append(")");
+        return sql.toString();
     }
 
     @Override

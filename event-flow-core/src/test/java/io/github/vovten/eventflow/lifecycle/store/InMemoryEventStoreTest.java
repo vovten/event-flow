@@ -9,6 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -371,6 +372,83 @@ class InMemoryEventStoreTest {
 
         assertThat(deleted).isZero();
         assertThat(store.findById(eventId)).isPresent();
+    }
+
+    @Test
+    @DisplayName("Should apply a transition from an allowed source status")
+    void shouldApplyAllowedTransition() {
+        store.save(event);
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.NEW), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isTrue();
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PUBLISHED);
+    }
+
+    @Test
+    @DisplayName("Should reject a transition from a non-allowed source status")
+    void shouldRejectTransitionFromNonAllowedStatus() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.NEW), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isFalse();
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.HANDLED);
+    }
+
+    @Test
+    @DisplayName("Should reject a transition when the event is missing")
+    void shouldRejectTransitionWhenEventMissing() {
+        boolean applied = store.transitionStatus(
+                UUID.randomUUID(), Set.of(EventStatus.NEW), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should reject a transition when allowed sources are empty")
+    void shouldRejectTransitionWithEmptyAllowedSources() {
+        store.save(event);
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isFalse();
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
+    }
+
+    @Test
+    @DisplayName("Should increment retry count when transitioning to NEW")
+    void shouldIncrementRetryCountWhenTransitioningToNew() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.FAILED), EventStatus.NEW, null);
+
+        assertThat(applied).isTrue();
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.NEW);
+        assertThat(updated.retryCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should not increment retry count for a manual retry transition to NEW")
+    void shouldNotIncrementRetryCountForManualRetry() {
+        store.save(event);
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
+        store.markForRetry(eventId);
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.FAILED), EventStatus.NEW, null);
+
+        assertThat(applied).isTrue();
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.NEW);
+        assertThat(updated.retryCount()).isZero();
     }
 
     @Test

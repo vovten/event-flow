@@ -1,8 +1,12 @@
 package io.github.vovten.eventflow.lifecycle.store;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.stream.Collectors.toList;
 
@@ -16,6 +20,8 @@ import static java.util.stream.Collectors.toList;
  * @since 1.2.0
  */
 public class InMemoryEventStore implements EventStore {
+
+    private static final Logger log = LoggerFactory.getLogger(InMemoryEventStore.class);
 
     private final Map<UUID, StoredEvent> store = new ConcurrentHashMap<>();
 
@@ -47,6 +53,37 @@ public class InMemoryEventStore implements EventStore {
         if (existing == null) {
             throw new NoSuchElementException("Event not found: " + eventId);
         }
+    }
+
+    @Override
+    public boolean transitionStatus(UUID eventId, Set<EventStatus> allowedSources,
+                                    EventStatus target, String errorDetails) {
+        Objects.requireNonNull(eventId, "eventId must not be null");
+        Objects.requireNonNull(allowedSources, "allowedSources must not be null");
+        Objects.requireNonNull(target, "target must not be null");
+        if (allowedSources.isEmpty()) {
+            log.debug("Rejected status transition for event {}: allowedSources is empty", eventId);
+            return false;
+        }
+        AtomicBoolean applied = new AtomicBoolean(false);
+        StoredEvent result = store.computeIfPresent(eventId, (id, event) -> {
+            if (!allowedSources.contains(event.status())) {
+                log.debug("Rejected status transition for event {}: current status {} is not in {}",
+                        eventId, event.status(), allowedSources);
+                return event;
+            }
+            applied.set(true);
+            if (target == EventStatus.NEW) {
+                return event.retry()
+                        ? event.withStatus(EventStatus.NEW, errorDetails)
+                        : event.withRetry().withStatus(EventStatus.NEW, errorDetails);
+            }
+            return event.withStatus(target, errorDetails).withRetryFlag(false);
+        });
+        if (result == null) {
+            log.debug("Rejected status transition for event {}: event not found", eventId);
+        }
+        return applied.get();
     }
 
     @Override

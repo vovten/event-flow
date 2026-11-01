@@ -19,7 +19,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -581,6 +587,132 @@ class JdbcEventStoreTest {
             assertThat(rs.next()).isTrue();
             assertThat(rs.getString("REMARKS"))
                     .isEqualTo("Event store for persistent event lifecycle tracking");
+        }
+    }
+
+    @Test
+    @DisplayName("Should apply a transition from an allowed source status")
+    void shouldApplyAllowedTransition() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.NEW), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isTrue();
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.PUBLISHED);
+    }
+
+    @Test
+    @DisplayName("Should reject a transition from a non-allowed source status")
+    void shouldRejectTransitionFromNonAllowedStatus() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.HANDLED, null);
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.NEW), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isFalse();
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.HANDLED);
+    }
+
+    @Test
+    @DisplayName("Should reject a transition when the event is missing")
+    void shouldRejectTransitionWhenEventMissing() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+
+        boolean applied = store.transitionStatus(
+                UUID.randomUUID(), Set.of(EventStatus.NEW), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should reject a transition when allowed sources are empty")
+    void shouldRejectTransitionWithEmptyAllowedSources() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(), EventStatus.PUBLISHED, null);
+
+        assertThat(applied).isFalse();
+        assertThat(store.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
+    }
+
+    @Test
+    @DisplayName("Should increment retry count when transitioning to NEW")
+    void shouldIncrementRetryCountWhenTransitioningToNew() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.FAILED), EventStatus.NEW, null);
+
+        assertThat(applied).isTrue();
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.NEW);
+        assertThat(updated.retryCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should not increment retry count for a manual retry transition to NEW")
+    void shouldNotIncrementRetryCountForManualRetry() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.FAILED, "error");
+        store.markForRetry(eventId);
+
+        boolean applied = store.transitionStatus(
+                eventId, Set.of(EventStatus.FAILED), EventStatus.NEW, null);
+
+        assertThat(applied).isTrue();
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.NEW);
+        assertThat(updated.retryCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("Should apply exactly one of two concurrent transitions")
+    void shouldApplyExactlyOneConcurrentTransition() throws Exception {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Boolean> first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return store.transitionStatus(
+                        eventId, Set.of(EventStatus.NEW), EventStatus.PUBLISHED, null);
+            });
+            Future<Boolean> second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return store.transitionStatus(
+                        eventId, Set.of(EventStatus.NEW), EventStatus.FAILED, "concurrent");
+            });
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            long applied = (first.get(5, TimeUnit.SECONDS) ? 1 : 0)
+                    + (second.get(5, TimeUnit.SECONDS) ? 1 : 0);
+            assertThat(applied).isEqualTo(1);
+            assertThat(store.findById(eventId).orElseThrow().status())
+                    .isIn(EventStatus.PUBLISHED, EventStatus.FAILED);
+        } finally {
+            executor.shutdownNow();
         }
     }
 
