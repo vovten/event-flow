@@ -106,13 +106,14 @@ Publisher                         Dispatcher
 
 Acks and ordering:
 
-- `AcceptedAck` and `NoHandlerAck` are mutually exclusive outcomes of the resolution step.
+- `AcceptedAck` confirms receipt and is emitted before handler resolution. `NoHandlerAck` reports that no listener was resolved. Both may be emitted for the same event; `NoHandlerAck` moves the event to the terminal `DEAD` state, and a late `AcceptedAck` is ignored.
 - `AcceptedAck` confirms **delivery only**. It does not mean the handler succeeded.
 - `SuccessAck` / `FailureAck` close the processing domain.
 - If `AcceptedAck` is lost, a delivery retry may produce a duplicate. This is accepted at-least-once behaviour.
 - If the final ack is lost, a processing retry may produce a duplicate. This is also accepted at-least-once behaviour.
 - All acks `implement LifecycleAckEvent`: they are not persisted and get no lifecycle acks, so no additional loop guard is required.
 - Acks carry `retryKind` and `attempt` so a stale ack from an older attempt cannot overwrite a newer attempt.
+- **Ack order is not guaranteed.** A `SuccessAck` may arrive before `AcceptedAck`. Processing acks (`SuccessAck`, `FailureAck`, `NoHandlerAck`) also prove delivery and must clear the `DELIVERY` row. A late `AcceptedAck` must never roll back `HANDLED`, `DEAD`, or a `FAILED` processing state; from `FAILED` it only clears the delivery row and leaves the status unchanged.
 - `AcceptedAck` carries `maxProcessingMs` — the estimated maximum local processing time (including local backoff). The publisher uses it to size the processing timeout and avoid retrying while the consumer is still legitimately retrying locally.
 
 Proposed contracts (fields shown for review; legacy constructors retained):
@@ -363,8 +364,14 @@ Scheduling rules:
 
 1. **Hard caps per kind.** `maxDeliveryRetries` and `maxProcessingRetries` are absolute ceilings. Even a consumer that always reports `retryable = true` cannot cause an infinite loop.
 2. **Jitter.** Every durable backoff uses jitter (full jitter or ±15%) to avoid re-publish herds.
-3. **Monotonic status transitions.** `AcceptedAck` may arrive before `EventLifecyclePublisher` records `PUBLISHED`. Status updates must be conditional and may only move forward: `NEW → PUBLISHED → ACCEPTED → HANDLED`, with `FAILED`/`DEAD` as failure outcomes. A late `PUBLISHED` must never overwrite `ACCEPTED`, `HANDLED` or `DEAD`.
+3. **Conditional, out-of-order-safe status transitions.** `AcceptedAck` may arrive before or after `EventLifecyclePublisher` records `PUBLISHED`, and `SuccessAck` may arrive before `AcceptedAck`. Status updates must be conditional:
+   - `NEW → PUBLISHED → ACCEPTED → HANDLED` is the normal forward path;
+   - `HANDLED` and `DEAD` are terminal and are never overwritten by acks;
+   - `AcceptedAck` transitions to `ACCEPTED` only from `NEW`/`PUBLISHED`; from `FAILED` it only clears the `DELIVERY` row and leaves the status unchanged;
+   - a late `PUBLISHED` must never overwrite `ACCEPTED`, `HANDLED` or `DEAD`.
 4. **Stale-ack protection.** Acks carry `retryKind` and `attempt`; an ack with an older attempt than the current row is ignored. This prevents an old `FailureAck` from overwriting a newer success.
+
+   A `DELIVERY` row is cleared by `AcceptedAck` and by any processing ack (`SuccessAck`, `FailureAck`, `NoHandlerAck`), because all of them prove delivery. A late `AcceptedAck` after a processing ack must not leave a delivery row behind.
 5. **Idempotency correction.** `IdempotentEventDispatcher` must invalidate the event-id cache on **any** handler failure (`!isAllSuccess()`), not only on `isAllFailure()`. Otherwise a partial failure is cached and the processing retry is dropped as a duplicate.
 6. **Processing timeout vs local retry.** The processing timeout must exceed the maximum local retry budget. Use `AcceptedAck.maxProcessingMs` when present, otherwise the configured global value plus margin.
 7. **Cleanup safety.** `EventCleanupScheduler` must not delete an `event_store` row while an `event_retry` row exists for it. Prefer an FK with `ON DELETE CASCADE` plus a cleanup predicate `NOT EXISTS (SELECT 1 FROM event_retry WHERE event_id = ...)`. Dead-letter rows get a separate, longer retention.
@@ -447,7 +454,8 @@ Deferred until the MVP proves the model:
 | first publish, before transport result | `NEW` | — | — | `EventLifecyclePublisher` |
 | publish failed / all destinations failed | `FAILED` | `DELIVERY` | `PENDING` | `LifecycleRepository` on publish failure |
 | published, no `AcceptedAck` by timeout | `PUBLISHED` | `DELIVERY` | `PENDING` | watchdog |
-| `AcceptedAck` received | `ACCEPTED` | — | row deleted | `AckHandler` |
+| `AcceptedAck` received, current `NEW`/`PUBLISHED` | `ACCEPTED` | — | row deleted | `AckHandler` |
+| `AcceptedAck` received, current `FAILED` | unchanged (`FAILED`) | — | `DELIVERY` row deleted | `AckHandler` |
 | no handler resolved | `DEAD` | `PROCESSING` | `DEAD` | `AckHandler` on `NoHandlerAck` |
 | handler failed, retryable | `FAILED` | `PROCESSING` | `PENDING` | `AckHandler` on `FailureAck` |
 | handler failed, permanent | `DEAD` | `PROCESSING` | `DEAD` | `AckHandler` on `FailureAck` |
@@ -456,7 +464,7 @@ Deferred until the MVP proves the model:
 | budget exhausted | `DEAD` | same as failed domain | `DEAD` | scheduler |
 | manual retry after `DEAD` | `FAILED` → `NEW` | same kind | `PENDING` | operator / `markForRetry` |
 
-Invariant: a `DELIVERY` row is deleted only on `AcceptedAck`; a `PROCESSING` row is deleted only on `SuccessAck`. A `DEAD` row is retained for diagnostics and manual resurrection.
+Invariant: a `DELIVERY` row is deleted on `AcceptedAck` **or any processing ack** (`SuccessAck`, `FailureAck`, `NoHandlerAck`), because every processing ack proves delivery. A `PROCESSING` row is deleted only on `SuccessAck`. A `DEAD` row is retained for diagnostics and manual resurrection.
 
 ## Ack flow
 
@@ -701,6 +709,9 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 16. Backward compatibility: no `@RetryPolicy`, legacy `FailureAck` constructor, old `FAILED` rows, mixed-fleet `require-accepted-ack = false`.
 17. `processing.enabled = true` with `delivery.enabled = false` fails startup with a clear configuration error.
 18. Delivery-only mode records a handler failure as `FAILED` without creating a `PROCESSING` row and without running a processing retry.
+19. `SuccessAck` arriving before `AcceptedAck` moves the event to `HANDLED`; the late `AcceptedAck` is ignored for status and does not leave a delivery row.
+20. `FailureAck` arriving before `AcceptedAck` keeps the event `FAILED` with a `PROCESSING` row; the late `AcceptedAck` only clears the delivery row and does not change the status.
+21. A late publish result must not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
 
 ## Implementation phases
 

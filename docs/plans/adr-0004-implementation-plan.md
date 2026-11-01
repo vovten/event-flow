@@ -259,7 +259,7 @@ Field semantics:
 
 | Trigger | Allowed source statuses | Target |
 |---|---|---|
-| `AcceptedAck` | `NEW`, `PUBLISHED`, `FAILED` | `ACCEPTED` |
+| `AcceptedAck` | `NEW`, `PUBLISHED` | `ACCEPTED` |
 | `NoHandlerAck` | `NEW`, `PUBLISHED`, `ACCEPTED`, `FAILED` | `DEAD` |
 | `SuccessAck` | `NEW`, `PUBLISHED`, `ACCEPTED`, `FAILED` | `HANDLED` |
 | `FailureAck(retryable = false)` | `NEW`, `PUBLISHED`, `ACCEPTED`, `FAILED` | `DEAD` |
@@ -272,7 +272,16 @@ Field semantics:
 
 Terminal statuses are `HANDLED` and `DEAD`. Acks never overwrite them; only an explicit operator action may resurrect a `DEAD` event.
 
-Important: this is an explicit allowed-source set, not a numeric rank. `FAILED → ACCEPTED` is valid when a late `AcceptedAck` arrives after a publish failure.
+Important: this is an explicit allowed-source set, not a numeric rank.
+
+Out-of-order ack rules:
+
+- Ack order is not guaranteed. `SuccessAck` may arrive before `AcceptedAck`.
+- `SuccessAck`/`FailureAck`/`NoHandlerAck` prove delivery and must clear the `DELIVERY` row.
+- `SuccessAck` before `AcceptedAck` → `HANDLED`; the late `AcceptedAck` is ignored for status, and no `DELIVERY` row remains.
+- `FailureAck` before `AcceptedAck` → `FAILED` + `PROCESSING` row; the late `AcceptedAck` only clears the `DELIVERY` row and does not change the status.
+- `AcceptedAck` from `FAILED` never transitions to `ACCEPTED`; it only clears the delivery row.
+- A late publish result must not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
 
 ### 2.6 Configuration invariant: `PROCESSING` requires `DELIVERY`
 
@@ -336,7 +345,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
 - [x] **1.2** Add `RetryKind` enum in `io.github.vovten.eventflow.retry`:
   - `DELIVERY`, `PROCESSING`.
   - File: `event-flow-core/src/main/java/io/github/vovten/eventflow/retry/RetryKind.java`.
-- [ ] **1.3** Add `AcceptedAck`:
+- [x] **1.3** Add `AcceptedAck`:
   - implements `LifecycleAckEvent`, `TraceableEvent`;
   - validates non-null fields;
   - `type()` returns `AcceptedAck.class`;
@@ -373,8 +382,12 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - `JdbcEventStore` overrides with `UPDATE ... WHERE event_id = ? AND status IN (...)`;
   - `InMemoryEventStore` overrides with `computeIfPresent` and an explicit allowed-source set;
   - a rejected transition is logged and ignored, not thrown;
-  - `FAILED → ACCEPTED` is allowed for a late `AcceptedAck`.
+  - `FAILED → ACCEPTED` is **not** allowed; a late `AcceptedAck` from `FAILED` only clears the `DELIVERY` row (wired in PR 3b).
   - Files: `EventStore.java`, `JdbcEventStore.java`, `InMemoryEventStore.java`.
+- [ ] **1.9a** `EventLifecyclePublisher.updatePublishResult`:
+  - use `transitionStatus` for publish success/failure (`NEW`/`FAILED` → `PUBLISHED`/`FAILED`);
+  - a late publish result must not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
+  - File: `lifecycle/EventLifecyclePublisher.java`.
 
 ## 5.3 Dispatcher and ack handling
 
@@ -389,7 +402,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - File: `lifecycle/EventLifecycleDispatcher.java`.
 - [ ] **1.11** `AckHandler`:
   - declare `AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck`;
-  - `AcceptedAck` → `ACCEPTED`;
+  - `AcceptedAck` → `ACCEPTED` only from `NEW`/`PUBLISHED`; from `FAILED` the status is unchanged (the `DELIVERY` cleanup is wired in PR 3b);
   - `NoHandlerAck` → `DEAD`;
   - `SuccessAck` → `HANDLED`;
   - `FailureAck` → `FAILED`;
@@ -418,13 +431,14 @@ Tests for each task are written in the same commit as the task. This list is the
 
 - [ ] **1.14** `EventLifecycleDispatcherTest`:
   - `AcceptedAck` is published before handlers run;
-  - `NoHandlerAck` is published for an empty registry;
+  - an empty registry emits `AcceptedAck` and then `NoHandlerAck`;
   - a duplicate result does not produce `NoHandlerAck`;
   - `LifecycleAckEvent` passes through.
 - [ ] **1.15** `AckHandlerTest`:
   - `AcceptedAck` → `ACCEPTED`;
   - `NoHandlerAck` → `DEAD`;
   - a late `AcceptedAck` does not roll back `HANDLED`;
+  - a late `AcceptedAck` after `FailureAck` keeps `FAILED`;
   - a late `FailureAck` does not roll back `DEAD`;
   - foreign-service acks are still ignored.
 - [ ] **1.16** `IdempotentEventDispatcherDefectTest`:
@@ -437,6 +451,8 @@ Tests for each task are written in the same commit as the task. This list is the
   - allowed `transitionStatus`;
   - rejected `transitionStatus` leaves the row unchanged;
   - concurrent transition safety.
+- [ ] **1.18a** `EventLifecyclePublisherTest`:
+  - a late publish result does not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
 - [ ] **1.19** Verify old `FailureAck` / `SuccessAck` call sites compile through the legacy constructors.
 
 ## 5.5 Documentation and build
@@ -695,7 +711,9 @@ Tests for each task are written in the same commit as the task. This list is the
 
 - [ ] **3b.5** `AckHandler`:
   - use `LifecycleRepository`;
-  - `AcceptedAck` → delete `DELIVERY`, set `ACCEPTED`;
+  - `AcceptedAck` → delete `DELIVERY`, set `ACCEPTED` only from `NEW`/`PUBLISHED`;
+  - `AcceptedAck` from `FAILED` → only delete `DELIVERY`, leave status unchanged;
+  - any processing ack (`SuccessAck`/`FailureAck`/`NoHandlerAck`) → delete `DELIVERY`, because it proves delivery;
   - `NoHandlerAck` → event `DEAD` + `PROCESSING` row `DEAD`;
   - `FailureAck(retryable = true)` → `FAILED` + `PROCESSING PENDING`;
   - `FailureAck(retryable = false)` → event `DEAD` + `PROCESSING` row `DEAD`;
@@ -741,6 +759,8 @@ Tests for each task are written in the same commit as the task. This list is the
 - [ ] **3b.23** Two scheduler instances do not process the same row.
 - [ ] **3b.24** `processing.enabled = true` + `delivery.enabled = false` fails startup.
 - [ ] **3b.25** Delivery-only mode: a handler failure sets `FAILED` and creates no `PROCESSING` row; no processing scheduler runs.
+- [ ] **3b.26** `SuccessAck` before `AcceptedAck` → `HANDLED`, late `AcceptedAck` ignored, `DELIVERY` row gone.
+- [ ] **3b.27** `FailureAck` before `AcceptedAck` → `FAILED` with `PROCESSING` row; late `AcceptedAck` only clears `DELIVERY` and keeps `FAILED`.
 
 ## 8.5 Definition of Done
 
@@ -814,6 +834,9 @@ Tests for each task are written in the same commit as the task. This list is the
 | Permanent handler failure | `FailureAck(retryable = false)` → `DEAD` |
 | No handler | `NoHandlerAck` → `DEAD` |
 | Final ack lost | `ACCEPTED` + timeout → processing retry |
+| `SuccessAck` before `AcceptedAck` | `HANDLED`; late `AcceptedAck` ignored; `DELIVERY` row gone |
+| `FailureAck` before `AcceptedAck` | `FAILED` + `PROCESSING`; late `AcceptedAck` only clears `DELIVERY` |
+| Late publish result after success | does not overwrite `HANDLED`/`ACCEPTED`/`DEAD` |
 | Stale ack | ignored |
 | Cap exhausted | `DEAD` |
 | Two scheduler instances | one row processed once |
@@ -842,7 +865,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 2 commits | Tasks 1.1–1.2 done; next: 1.3 |
+| PR 1 — boundary | In progress | 4 commits | Tasks 1.1–1.3 done; next: 1.4 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -860,6 +883,7 @@ Record one row per task. A row is completed only after the task's commit is conf
 |---|---|---|---|
 | 1.1 Ack contracts | `dc39e57` | docs-only; baseline suite passed | Yes |
 | 1.2 `RetryKind` | `d5807b9` | `RetryKindTest`; full core suite passed | Yes |
+| 1.3 `AcceptedAck` | `8c6cc06` | `AcceptedAckTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -872,4 +896,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1** and **1.2** are committed. Start task **1.3** (`AcceptedAck` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.3** are committed. Start task **1.4** (`NoHandlerAck` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
