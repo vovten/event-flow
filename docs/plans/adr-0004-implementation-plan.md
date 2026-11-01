@@ -354,7 +354,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
 - [x] **1.4** Add `NoHandlerAck`:
   - same shape as `AcceptedAck` without `maxProcessingMs`.
   - File: `event-flow-core/src/main/java/io/github/vovten/eventflow/lifecycle/NoHandlerAck.java`.
-- [ ] **1.5** Extend `FailureAck`:
+- [x] **1.5** Extend `FailureAck`:
   - add `retryKind`, `attempt`, `retryable`, `failedHandlers`, `errorType`;
   - retain the legacy 8-argument constructor;
   - validate `attempt >= 1` and non-null `failedHandlers`.
@@ -865,7 +865,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 6 commits | Tasks 1.1–1.4 done; next: 1.5 |
+| PR 1 — boundary | In progress | 7 commits | Tasks 1.1–1.5 done; next: 1.6 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -884,7 +884,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.1 Ack contracts | `dc39e57` | docs-only; baseline suite passed | Yes |
 | 1.2 `RetryKind` | `d5807b9` | `RetryKindTest`; full core suite passed | Yes |
 | 1.3 `AcceptedAck` | `8c6cc06` | `AcceptedAckTest`; full core suite passed | Yes |
-| 1.4 `NoHandlerAck` | this commit | `NoHandlerAckTest`; full core suite passed | Yes |
+| 1.4 `NoHandlerAck` | `f64dfb1` | `NoHandlerAckTest`; full core suite passed | Yes |
+| 1.5 `FailureAck` | this commit | `FailureAckTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -897,4 +898,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.4** are committed. Start task **1.5** (`FailureAck` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.5** are committed. Start task **1.6** (`SuccessAck` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
