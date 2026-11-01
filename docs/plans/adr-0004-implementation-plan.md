@@ -214,7 +214,10 @@ public record SuccessAck(
 
 Field semantics:
 
-- `attempt` is 1-based: the first delivery or processing attempt is `1`.
+- `attempt` is 1-based and counts attempts within the ack's retry context.
+- In `SuccessAck` / `FailureAck`, `retryKind` is the **context of the dispatch that produced the ack**, not the semantic domain of the ack: `DELIVERY` when the event was re-published by the delivery scheduler, `PROCESSING` when re-published by the processing scheduler.
+- A first publish has no retry context and defaults to `PROCESSING` / `attempt = 1`.
+- `AcceptedAck` is always delivery and carries only the delivery attempt.
 - `maxProcessingMs = 0` means "unknown; use the global processing timeout". PR 1 always sends `0`; PR 2 computes the real value.
 - `retryable` is meaningful for `PROCESSING` acks. The legacy default is `true` to preserve old behaviour.
 - `failedHandlers` contains handler `name()` values; it is empty for delivery acks.
@@ -282,6 +285,9 @@ Out-of-order ack rules:
 - `FailureAck` before `AcceptedAck` → `FAILED` + `PROCESSING` row; the late `AcceptedAck` only clears the `DELIVERY` row and does not change the status.
 - `AcceptedAck` from `FAILED` never transitions to `ACCEPTED`; it only clears the delivery row.
 - A late publish result must not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
+- A `SuccessAck` with `retryKind = DELIVERY` closes the delivery row and marks the event `HANDLED`.
+- A `FailureAck` with `retryKind = DELIVERY` closes the delivery row and creates a `PROCESSING` retry row.
+- A stale ack whose `attempt` is older than the current retry row is ignored.
 
 ### 2.6 Configuration invariant: `PROCESSING` requires `DELIVERY`
 
@@ -359,7 +365,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - retain the legacy 8-argument constructor;
   - validate `attempt >= 1` and non-null `failedHandlers`.
   - File: `lifecycle/FailureAck.java`.
-- [ ] **1.6** Extend `SuccessAck`:
+- [x] **1.6** Extend `SuccessAck`:
   - add `retryKind`, `attempt`;
   - retain the legacy 7-argument constructor.
   - File: `lifecycle/SuccessAck.java`.
@@ -398,6 +404,8 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - after dispatch:
     - `results.isEmpty() && !results.isDuplicate()` → `NoHandlerAck`;
     - otherwise existing `SuccessAck` / `FailureAck` logic;
+  - `SuccessAck` / `FailureAck` echo `retryKind` and `attempt` from Envelope metadata;
+  - when the metadata is absent, default to `PROCESSING` / `attempt = 1`;
   - a failure to publish `AcceptedAck` is logged but does not fail the dispatch.
   - File: `lifecycle/EventLifecycleDispatcher.java`.
 - [ ] **1.11** `AckHandler`:
@@ -711,13 +719,17 @@ Tests for each task are written in the same commit as the task. This list is the
 
 - [ ] **3b.5** `AckHandler`:
   - use `LifecycleRepository`;
+  - resolve the retry row by `(eventId, ack.retryKind)` and compare `ack.attempt` with the row attempt;
   - `AcceptedAck` → delete `DELIVERY`, set `ACCEPTED` only from `NEW`/`PUBLISHED`;
   - `AcceptedAck` from `FAILED` → only delete `DELIVERY`, leave status unchanged;
+  - `SuccessAck(retryKind = DELIVERY)` → delete `DELIVERY`, set `HANDLED`;
+  - `SuccessAck(retryKind = PROCESSING)` → delete `PROCESSING` and any `DELIVERY`, set `HANDLED`;
+  - `FailureAck(retryKind = DELIVERY)` → delete `DELIVERY`, create `PROCESSING PENDING`;
+  - `FailureAck(retryKind = PROCESSING)` → update `PROCESSING` (or `DEAD` when permanent);
   - any processing ack (`SuccessAck`/`FailureAck`/`NoHandlerAck`) → delete `DELIVERY`, because it proves delivery;
   - `NoHandlerAck` → event `DEAD` + `PROCESSING` row `DEAD`;
   - `FailureAck(retryable = true)` → `FAILED` + `PROCESSING PENDING`;
   - `FailureAck(retryable = false)` → event `DEAD` + `PROCESSING` row `DEAD`;
-  - `SuccessAck` → `HANDLED`, delete `PROCESSING`;
   - if processing is disabled: `FailureAck` sets `FAILED` with error details and does **not** create a `PROCESSING` row; log WARN and increment a metric;
   - stale-ack guard by `attempt` / `retryKind`.
 - [ ] **3b.6** `EventLifecyclePublisher`:
@@ -761,6 +773,9 @@ Tests for each task are written in the same commit as the task. This list is the
 - [ ] **3b.25** Delivery-only mode: a handler failure sets `FAILED` and creates no `PROCESSING` row; no processing scheduler runs.
 - [ ] **3b.26** `SuccessAck` before `AcceptedAck` → `HANDLED`, late `AcceptedAck` ignored, `DELIVERY` row gone.
 - [ ] **3b.27** `FailureAck` before `AcceptedAck` → `FAILED` with `PROCESSING` row; late `AcceptedAck` only clears `DELIVERY` and keeps `FAILED`.
+- [ ] **3b.28** `SuccessAck(retryKind = DELIVERY)` closes the delivery row and sets `HANDLED`.
+- [ ] **3b.29** `FailureAck(retryKind = DELIVERY)` closes the delivery row and creates a `PROCESSING` row.
+- [ ] **3b.30** Stale ack with an older `attempt` is ignored.
 
 ## 8.5 Definition of Done
 
@@ -837,6 +852,9 @@ Tests for each task are written in the same commit as the task. This list is the
 | `SuccessAck` before `AcceptedAck` | `HANDLED`; late `AcceptedAck` ignored; `DELIVERY` row gone |
 | `FailureAck` before `AcceptedAck` | `FAILED` + `PROCESSING`; late `AcceptedAck` only clears `DELIVERY` |
 | Late publish result after success | does not overwrite `HANDLED`/`ACCEPTED`/`DEAD` |
+| `SuccessAck(DELIVERY, N)` | closes delivery row and sets `HANDLED` |
+| `FailureAck(DELIVERY, N)` | closes delivery row and creates `PROCESSING` |
+| First-publish ack without metadata | defaults to `PROCESSING` / `attempt = 1` |
 | Stale ack | ignored |
 | Cap exhausted | `DEAD` |
 | Two scheduler instances | one row processed once |
@@ -865,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 7 commits | Tasks 1.1–1.5 done; next: 1.6 |
+| PR 1 — boundary | In progress | 9 commits | Tasks 1.1–1.6 done; next: 1.7 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -885,7 +903,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.2 `RetryKind` | `d5807b9` | `RetryKindTest`; full core suite passed | Yes |
 | 1.3 `AcceptedAck` | `8c6cc06` | `AcceptedAckTest`; full core suite passed | Yes |
 | 1.4 `NoHandlerAck` | `f64dfb1` | `NoHandlerAckTest`; full core suite passed | Yes |
-| 1.5 `FailureAck` | this commit | `FailureAckTest`; full core suite passed | Yes |
+| 1.5 `FailureAck` | `2e73dab` | `FailureAckTest`; full core suite passed | Yes |
+| 1.6 `SuccessAck` | `9676a6d` | `SuccessAckTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -898,4 +917,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.5** are committed. Start task **1.6** (`SuccessAck` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.6** are committed. Start task **1.7** (`EventStatus.ACCEPTED`/`DEAD` + tests): implement, run the tests, report the result, and wait for confirmation before creating the commit.

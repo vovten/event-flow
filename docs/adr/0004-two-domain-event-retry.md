@@ -112,6 +112,7 @@ Acks and ordering:
 - If `AcceptedAck` is lost, a delivery retry may produce a duplicate. This is accepted at-least-once behaviour.
 - If the final ack is lost, a processing retry may produce a duplicate. This is also accepted at-least-once behaviour.
 - All acks `implement LifecycleAckEvent`: they are not persisted and get no lifecycle acks, so no additional loop guard is required.
+- **`retryKind` is the dispatch context, not the ack domain.** In `SuccessAck` / `FailureAck`, `retryKind` identifies which retry row produced the current dispatch: `DELIVERY` when the event was re-published by the delivery scheduler, `PROCESSING` when re-published by the processing scheduler. `attempt` is the 1-based attempt within that context. The publisher stamps both into the Envelope metadata; the consumer echoes them. A first publish has no retry context and defaults to `PROCESSING` / `attempt = 1`. `AcceptedAck` is always delivery and carries only the delivery attempt.
 - Acks carry `retryKind` and `attempt` so a stale ack from an older attempt cannot overwrite a newer attempt.
 - **Ack order is not guaranteed.** A `SuccessAck` may arrive before `AcceptedAck`. Processing acks (`SuccessAck`, `FailureAck`, `NoHandlerAck`) also prove delivery and must clear the `DELIVERY` row. A late `AcceptedAck` must never roll back `HANDLED`, `DEAD`, or a `FAILED` processing state; from `FAILED` it only clears the delivery row and leaves the status unchanged.
 - `AcceptedAck` carries `maxProcessingMs` — the estimated maximum local processing time (including local backoff). The publisher uses it to size the processing timeout and avoid retrying while the consumer is still legitimately retrying locally.
@@ -352,6 +353,7 @@ Two strategies with independent configuration, sharing one retry store:
 
 Scheduling rules:
 
+- Every scheduler-initiated re-publish stamps `retryKind` and `attempt` into the Envelope metadata. The consumer echoes them in `SuccessAck` / `FailureAck`; `retryKind` identifies the retry row/context, not the semantic ack domain.
 - A scheduler-initiated `PROCESSING` re-publish that fails at the transport stage is recorded against the `PROCESSING` row with reason `PUBLISH_FAILED`, not as a new `DELIVERY` row. The retry's purpose remains processing; the delivery failure is the cause.
 - If both a `DELIVERY` and a `PROCESSING` row are due for the same event, group by `event_id` in a cycle and perform one re-publish. The same delivery can satisfy the delivery ack and provide the processing attempt.
 - Watchdogs avoid a row per healthy event:
@@ -712,6 +714,9 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 19. `SuccessAck` arriving before `AcceptedAck` moves the event to `HANDLED`; the late `AcceptedAck` is ignored for status and does not leave a delivery row.
 20. `FailureAck` arriving before `AcceptedAck` keeps the event `FAILED` with a `PROCESSING` row; the late `AcceptedAck` only clears the delivery row and does not change the status.
 21. A late publish result must not overwrite `HANDLED`, `ACCEPTED` or `DEAD`.
+22. A `SuccessAck` with `retryKind = DELIVERY` closes the delivery row and marks the event `HANDLED`; a stale success with an older attempt is ignored.
+23. A `FailureAck` with `retryKind = DELIVERY` closes the delivery row and creates a `PROCESSING` retry row.
+24. A first-publish ack without retry metadata defaults to `PROCESSING` / `attempt = 1` and does not require an existing retry row.
 
 ## Implementation phases
 
