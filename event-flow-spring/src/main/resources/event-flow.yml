@@ -45,8 +45,10 @@ event-flow:
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
       # Event types (simple class names) to exclude from logging
-      # Default: SuccessAck, FailureAck (lifecycle acknowledgment events)
+      # Default: AcceptedAck, NoHandlerAck, SuccessAck, FailureAck (lifecycle acknowledgment events)
       excluded-events:
+        - AcceptedAck
+        - NoHandlerAck
         - SuccessAck
         - FailureAck
       # Per-event minimum log level for suppressing low-severity entries
@@ -206,8 +208,10 @@ event-flow:
       # Maximum length of payload in log output (characters)
       max-payload-length: 500
       # Event types (simple class names) to exclude from logging
-      # Default: SuccessAck, FailureAck (lifecycle acknowledgment events)
+      # Default: AcceptedAck, NoHandlerAck, SuccessAck, FailureAck (lifecycle acknowledgment events)
       excluded-events:
+        - AcceptedAck
+        - NoHandlerAck
         - SuccessAck
         - FailureAck
       # Per-event minimum log level for suppressing low-severity entries

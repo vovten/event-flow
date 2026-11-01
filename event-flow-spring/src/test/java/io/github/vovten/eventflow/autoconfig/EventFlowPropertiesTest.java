@@ -48,6 +48,17 @@ class EventFlowPropertiesTest {
     }
 
     @Test
+    @DisplayName("Should exclude all lifecycle acks from logging by default")
+    void shouldExcludeLifecycleAcksFromLoggingByDefault() {
+        EventFlowProperties properties = new EventFlowProperties();
+
+        assertThat(properties.getPublisher().getLogging().getExcludedEvents())
+                .containsExactlyInAnyOrder("AcceptedAck", "NoHandlerAck", "SuccessAck", "FailureAck");
+        assertThat(properties.getDispatcher().getLogging().getExcludedEvents())
+                .containsExactlyInAnyOrder("AcceptedAck", "NoHandlerAck", "SuccessAck", "FailureAck");
+    }
+
+    @Test
     @DisplayName("Should bind custom publisher configuration")
     void shouldBindCustomPublisherConfiguration() {
         // given

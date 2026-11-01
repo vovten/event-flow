@@ -465,9 +465,11 @@ public class EventFlowProperties {
         private int maxPayloadLength = 500;
         /**
          * List of event simple class names to exclude from logging.
-         * Default: SuccessAck, FailureAck (lifecycle acknowledgment events).
+         * Default: AcceptedAck, NoHandlerAck, SuccessAck, FailureAck
+         * (lifecycle acknowledgment events).
          */
-        private List<String> excludedEvents = new ArrayList<>(List.of("SuccessAck", "FailureAck"));
+        private List<String> excludedEvents = new ArrayList<>(
+                List.of("AcceptedAck", "NoHandlerAck", "SuccessAck", "FailureAck"));
         /**
          * Per-event minimum log level for suppressing low-severity entries.
          * Key: payload simple class name or fully-qualified class name (e.g., "HeartbeatEvent"

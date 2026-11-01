@@ -426,7 +426,7 @@ PR 1 and PR 2 can overlap only after the ack contracts in section 2.1 are fixed.
   - temporarily include `ACCEPTED` in the legacy status list;
   - this preserves recovery of a lost final ack until the durable watchdog exists in PR 3b.
   - File: `lifecycle/EventRetryScheduler.java`.
-- [ ] **1.13a** Update logging exclusions:
+- [x] **1.13a** Update logging exclusions:
   - add `AcceptedAck` and `NoHandlerAck` to the default `excludedEvents`;
   - `EventFlowProperties.LoggingConfig`;
   - both `logging.excluded-events` sections in `event-flow.yml` (publisher and dispatcher);
@@ -883,7 +883,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
-| PR 1 — boundary | In progress | 16 commits | Tasks 1.1–1.13 done; next: 1.13a |
+| PR 1 — boundary | In progress | 17 commits | Tasks 1.1–1.13a done; next: 1.14 |
 | PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
@@ -911,7 +911,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.10 Lifecycle dispatcher | `19be94e` | dispatcher ack tests; full core suite passed | Yes |
 | 1.11 `AckHandler` | `97b7ac7` | `AckHandlerTest`; full core suite passed | Yes |
 | 1.12 Idempotency cache | `aed048b` | idempotency tests; full core suite passed | Yes |
-| 1.13 ACCEPTED retry scan | this commit | `EventRetrySchedulerTest`; full core suite passed | Yes |
+| 1.13 ACCEPTED retry scan | `6d0559b` | `EventRetrySchedulerTest`; full core suite passed | Yes |
+| 1.13a Logging exclusions | this commit | `EventFlowPropertiesTest`; full spring suite passed | Yes |
 
 Rules:
 
@@ -924,4 +925,4 @@ Rules:
 
 # 14. Next step
 
-Tasks **1.1–1.13** are committed. Start task **1.13a** (logging exclusions): implement, run the tests, report the result, and wait for confirmation before creating the commit.
+Tasks **1.1–1.13a** are committed. Start task **1.14** (README, CHANGELOG, Javadoc and full `mvn verify`): update the docs, run the full verification, report the result, and wait for confirmation before creating the commit.
