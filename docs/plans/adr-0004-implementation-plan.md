@@ -514,17 +514,27 @@ Tests for each task are written in the same commit as the task. This list is the
 
 ## 6.1 Policy API
 
-- [ ] **2.1** Create the `io.github.vovten.eventflow.retry` package with:
+- [x] **2.1** Create the `io.github.vovten.eventflow.retry` package with:
   - `@RetryPolicy`;
-  - `ResolvedRetryPolicy`;
+  - `ResolvedRetryPolicy` (including `localMaxRetries`, local/durable attempt helpers);
   - `RetryPolicyRegistry`;
-  - `RetryPolicyResolver`;
-  - `FailureKind`;
+  - `RetryPolicyResolver` (inline, named, effective/default resolution);
+  - `FailureKind` (`NONE`, `PERMANENT`, `TRANSIENT_EXHAUSTED`);
   - `RetryDelayScheduler`.
-- [ ] **2.2** `@RetryPolicy` attributes:
+- [x] **2.2** `@RetryPolicy` attributes:
   - `name`, `retryOn[]`, `noRetryOn[]`;
-  - `maxRetries`, `initialDelay`, `maxDelay` (String, parsed at startup);
-  - `multiplier`, `jitter`.
+  - `maxRetries` — total retries after the first attempt;
+  - `localMaxRetries` — local retries before durable hand-off;
+  - `initialDelay`, `maxDelay` (String, parsed at startup);
+  - `multiplier`, `jitter`;
+  - sentinel values inherit the default policy.
+- [x] **2.2a** Define the configured default policy:
+  - used for listeners without `@RetryPolicy` and for unset annotation attributes;
+  - shipped values preserve legacy behaviour:
+    - `maxRetries = 3`;
+    - `localMaxRetries = 0` (durable-only);
+    - `initialDelay = 30s`, `multiplier = 2.0`, `maxDelay = 10m`, `jitter = 0.5`;
+    - empty `retryOn` (any exception).
 - [ ] **2.3** `@EventListener`: add `retryPolicy()`.
 - [ ] **2.4** `EventHandler`: add `default ResolvedRetryPolicy retryPolicy() { return null; }` or introduce `RetryPolicyAware`. Choose one and document it.
 
@@ -540,51 +550,64 @@ Tests for each task are written in the same commit as the task. This list is the
 ## 6.3 Dispatcher
 
 - [ ] **2.8** `UnifiedEventDispatcher`:
-  - asynchronous local retry loop;
+  - read `attempt` from Envelope metadata (default `1`);
+  - asynchronous local retry loop while `attempt <= localMaxRetries` and the total budget remains;
   - each attempt is an executor task;
   - delay via `RetryDelayScheduler`;
   - semaphore acquired per attempt, not per loop;
   - backoff `min(initial × multiplier^(n-1), max)` plus full jitter;
   - cause-chain exception matching;
+  - when local budget is exhausted but total budget remains, return a result with
+    `retryAfterMs = policy.backoff(attempt)` and `policyName`;
+  - when `localMaxRetries = 0`, do not sleep; hand off to durable immediately;
   - global local-attempt safety cap.
 - [ ] **2.9** `HandlerResult`:
-  - `retryable`, `failureKind`, `attempts`, `policyName`.
+  - `retryable`, `failureKind`, `attempts`, `policyName`, `retryAfterMs`.
 - [ ] **2.10** `HandlerResults`:
   - `hasRetryableFailure()`;
   - `hasOnlyPermanentFailures()`;
   - aggregate failed handler names.
+- [ ] **2.11a** Extend `FailureAck`:
+  - add `retryAfterMs` and `policyName`;
+  - legacy constructor defaults: `retryAfterMs = 0`, `policyName = null`;
+  - keep the legacy constructor for backward compatibility.
 - [ ] **2.11** `EventLifecycleDispatcher`:
-  - compute `maxProcessingMs` from handler policies;
-  - populate `FailureAck.retryable`, `failedHandlers`, `errorType`.
+  - compute `maxProcessingMs` from the local portion of each handler policy;
+  - populate `FailureAck.retryable`, `failedHandlers`, `errorType`, `retryAfterMs`, `policyName`.
 
 ## 6.4 Spring wiring
 
-- [ ] **2.12** Add `RetryPolicyRegistry` bean.
-- [ ] **2.13** Add `event-flow.retry.processing.*` properties.
-- [ ] **2.14** Pass the registry to Spring registries and the delay scheduler to the dispatcher.
+- [ ] **2.12** Add `RetryPolicyRegistry` and default-policy beans.
+- [ ] **2.13** Add `event-flow.retry.processing.*` properties, including `default-policy.*` and named policy overrides.
+- [ ] **2.14** Pass the registry/default policy to Spring registries and the delay scheduler to the dispatcher.
 
 ## 6.5 Test coverage checklist (not a separate task)
 
 Tests for each task are written in the same commit as the task. This list is the minimum coverage checklist.
 
-- [ ] **2.15** `RetryPolicyRegistryTest`: inline, named, unknown, precedence.
-- [ ] **2.16** `RetryPolicyResolverTest`: `retryOn` / `noRetryOn` / empty.
+- [ ] **2.15** `RetryPolicyRegistryTest`: named, unknown, duplicate, precedence.
+- [ ] **2.16** `RetryPolicyResolverTest`: `retryOn` / `noRetryOn` / empty, `localMaxRetries`, default policy, duration parsing.
 - [ ] **2.17** `UnifiedEventDispatcherRetryTest`:
   - transient failure succeeds locally;
-  - exhausted budget returns failure;
+  - exhausted local budget returns `retryAfterMs`;
+  - `localMaxRetries = 0` performs no local retry;
+  - total budget splits into local + durable attempts;
   - permanent failure is not retried;
   - multiple handlers are isolated.
 - [ ] **2.18** `EventListenerRegistryRetryTest` and `SpringEventListenerRegistryTest`.
-- [ ] **2.19** `EventLifecycleDispatcherTest`: `maxProcessingMs`, `retryable`.
+- [ ] **2.19** `EventLifecycleDispatcherTest`: `maxProcessingMs`, `retryable`, `retryAfterMs`, `policyName`.
 - [ ] **2.20** Verify a platform-thread worker is not blocked during backoff.
+- [ ] **2.21** `FailureAckTest`: new `retryAfterMs`/`policyName` fields and legacy constructor defaults.
 
 ## 6.6 Definition of Done
 
-- [ ] Transient failures are absorbed locally without touching the store.
+- [ ] Transient failures are absorbed locally without touching the store when `localMaxRetries > 0`.
+- [ ] `localMaxRetries = 0` sends `FailureAck(retryable = true, retryAfterMs = ...)` without local delay.
+- [ ] The policy's total budget spans local and durable attempts.
 - [ ] Other handlers are not re-run for a local retry.
-- [ ] Exhausted budget produces `FailureAck(retryable = true)`.
+- [ ] Exhausted budget produces `FailureAck(retryable = true)` with `retryAfterMs` and `policyName`.
 - [ ] Permanent failure produces `FailureAck(retryable = false)`.
-- [ ] No policy means legacy behaviour.
+- [ ] Listeners without `@RetryPolicy` use the default policy; shipped default preserves legacy behaviour.
 - [ ] Named policies are overridable by config; inline policies are authoritative.
 - [ ] Unknown policy names fail startup.
 
@@ -709,8 +732,10 @@ Tests for each task are written in the same commit as the task. This list is the
   - cap → retry row `DEAD` + event status `DEAD`.
 - [ ] **3b.2** `ProcessingRetryScheduler`:
   - due `PROCESSING` → claim → re-publish with `retryKind = PROCESSING`;
+  - use the row's `next_attempt_at` computed from `FailureAck.retryAfterMs`;
+  - fall back to global processing backoff when the ack had no relative delay;
   - wait for final ack;
-  - retryable failure → `PENDING`;
+  - retryable failure → `PENDING` with the next policy-driven delay;
   - permanent/cap → `DEAD`.
 - [ ] **3b.3** Shared `RetrySchedulerSupport`:
   - claim, lease, batch, jitter, logging;
@@ -733,6 +758,8 @@ Tests for each task are written in the same commit as the task. This list is the
   - any processing ack (`SuccessAck`/`FailureAck`/`NoHandlerAck`) → delete `DELIVERY`, because it proves delivery;
   - `NoHandlerAck` → event `DEAD` + `PROCESSING` row `DEAD`;
   - `FailureAck(retryable = true)` → `FAILED` + `PROCESSING PENDING`;
+  - set `next_attempt_at = now + clamp(ack.retryAfterMs)`; if `retryAfterMs` is absent or `0`, use the global processing backoff;
+  - store `ack.policyName()` in `event_retry.policy_name` for diagnostics;
   - `FailureAck(retryable = false)` → event `DEAD` + `PROCESSING` row `DEAD`;
   - if processing is disabled: `FailureAck` sets `FAILED` with error details and does **not** create a `PROCESSING` row; log WARN and increment a metric;
   - stale-ack guard by `attempt` / `retryKind`.
@@ -783,6 +810,8 @@ Tests for each task are written in the same commit as the task. This list is the
 - [ ] **3b.31** Delivery-only mode does not retry `ACCEPTED`; the event remains `ACCEPTED`.
 - [ ] **3b.32** `DeliveryRetryScheduler` ignores `ACCEPTED` and creates no `DELIVERY` row for it.
 - [ ] **3b.33** Enabling the two-domain mode disables the legacy `ACCEPTED` scan.
+- [ ] **3b.34** `FailureAck.retryAfterMs` drives `event_retry.next_attempt_at`; missing/zero falls back to global backoff.
+- [ ] **3b.35** `policyName` is persisted in `event_retry` for diagnostics.
 
 ## 8.5 Definition of Done
 
@@ -866,8 +895,12 @@ Tests for each task are written in the same commit as the task. This list is the
 | Cap exhausted | `DEAD` |
 | Two scheduler instances | one row processed once |
 | Partial failure + idempotency | retry runs, not duplicate |
-| No `@RetryPolicy` | legacy behaviour |
+| No `@RetryPolicy` | default policy applies (`localMaxRetries = 0` by default) |
 | Old `FAILED` rows | legacy heuristic or backfill |
+| `localMaxRetries = 0` + handler failure | `FailureAck(retryable = true, retryAfterMs = policy.backoff)`; no local sleep |
+| `localMaxRetries = 2`, `maxRetries = 5` | attempts 1–3 local, attempts 4–6 durable, then `DEAD` |
+| `FailureAck.retryAfterMs` present | publisher sets `next_attempt_at = now + clamp(retryAfterMs)` |
+| `FailureAck.retryAfterMs` absent/0 | publisher uses global processing backoff |
 | `processing.enabled=true` + `delivery.enabled=false` | startup fails with `IllegalStateException` |
 | Delivery-only mode + handler failure | `FAILED`, no `PROCESSING` row, no processing retry |
 | Delivery-only mode + final ack lost | remains `ACCEPTED`; no processing retry |
@@ -894,7 +927,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | Not started | — | Depends on PR 1 contracts |
+| PR 2 — local retry | In progress | 1 commit | Tasks 2.1–2.2a done; next: 2.3 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -924,7 +957,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.13 ACCEPTED retry scan | `6d0559b` | `EventRetrySchedulerTest`; full core suite passed | Yes |
 | 1.13a Logging exclusions | `d7efb49` | `EventFlowPropertiesTest`; full spring suite passed | Yes |
 | 1.9a Publish result transitions | `f033efc` | `EventLifecyclePublisherTest`; full verify passed | Yes |
-| 1.20–1.26 Docs and verification | this commit | full `mvn verify` passed | Yes |
+| 1.20–1.26 Docs and verification | `8f3946f` | full `mvn verify` passed | Yes |
+| 2.1–2.2a Policy API | this commit | policy API tests; full core suite passed | Yes |
 
 Rules:
 
@@ -937,4 +971,4 @@ Rules:
 
 # 14. Next step
 
-PR 1 is complete. Start **PR 2 — local processing retry**: `@RetryPolicy`, policy registry, async local retry loop, failure classification, and `FailureAck.retryable`. Follow the one-task-one-commit rule and update this plan as work advances.
+Start task **2.3** (`@EventListener.retryPolicy`): add the named-policy reference attribute, keep inline precedence, and fail fast on unknown names. Follow the one-task-one-commit rule and update this plan as work advances.
