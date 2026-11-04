@@ -1,11 +1,23 @@
 package io.github.vovten.eventflow.autoconfig.config;
 
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
+import io.github.vovten.eventflow.lifecycle.AckHandler;
+import io.github.vovten.eventflow.lifecycle.DeliveryRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.EventCleanupScheduler;
+import io.github.vovten.eventflow.lifecycle.EventRetryScheduler;
+import io.github.vovten.eventflow.lifecycle.LifecycleRepository;
+import io.github.vovten.eventflow.lifecycle.ProcessingRetryScheduler;
+import io.github.vovten.eventflow.lifecycle.RetrySchedulerSupport;
+import io.github.vovten.eventflow.lifecycle.RetryWatchdog;
+import io.github.vovten.eventflow.lifecycle.retry.EventRetryStore;
+import io.github.vovten.eventflow.lifecycle.retry.InMemoryEventRetryStore;
+import io.github.vovten.eventflow.lifecycle.store.InMemoryLifecycleRepository;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.db.JdbcEventStore;
+import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -167,6 +180,85 @@ class LifecycleConfigurationTest {
             ctx.refresh();
 
             assertThatThrownBy(() -> ctx.getBean(EventCleanupScheduler.class));
+        }
+    }
+
+    @Test
+    @DisplayName("Should fail startup when durable processing is enabled without delivery")
+    void shouldFailWhenProcessingWithoutDelivery() {
+        AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
+        addInlinedPropertiesToEnvironment(ctx,
+                "event-flow.publisher.lifecycle.enabled=true",
+                "event-flow.retry.processing.durable-enabled=true",
+                "event-flow.retry.delivery.enabled=false");
+        ctx.registerBean("properties", EventFlowProperties.class, () -> {
+            EventFlowProperties props = inMemoryProps();
+            props.getRetry().getProcessing().setDurableEnabled(true);
+            return props;
+        });
+        ctx.register(LifecycleConfiguration.class);
+
+        assertThatThrownBy(ctx::refresh)
+                .isInstanceOf(BeanCreationException.class)
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("processing retries depend on the delivery boundary");
+    }
+
+    @Test
+    @DisplayName("Should create the two-domain retry beans")
+    void shouldCreateTwoDomainBeans() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            addInlinedPropertiesToEnvironment(ctx,
+                    "event-flow.publisher.lifecycle.enabled=true",
+                    "event-flow.publisher.lifecycle.retry.enabled=false",
+                    "event-flow.retry.delivery.enabled=true",
+                    "event-flow.retry.processing.durable-enabled=true");
+            ctx.registerBean("properties", EventFlowProperties.class, () -> {
+                EventFlowProperties props = inMemoryProps();
+                props.getPublisher().getLifecycle().getRetry().setEnabled(false);
+                props.getRetry().getDelivery().setEnabled(true);
+                props.getRetry().getProcessing().setDurableEnabled(true);
+                return props;
+            });
+            ctx.registerBean("eventPublisher", EventPublisher.class, () -> event ->
+                    CompletableFuture.completedFuture(SendResults.empty()));
+            ctx.register(LifecycleConfiguration.class);
+            ctx.refresh();
+
+            assertThat(ctx.getBean(EventRetryStore.class))
+                    .isInstanceOf(InMemoryEventRetryStore.class);
+            assertThat(ctx.getBean(LifecycleRepository.class))
+                    .isInstanceOf(InMemoryLifecycleRepository.class);
+            assertThat(ctx.getBean(RetrySchedulerSupport.class)).isNotNull();
+            assertThat(ctx.getBean(DeliveryRetryScheduler.class)).isNotNull();
+            assertThat(ctx.getBean(ProcessingRetryScheduler.class)).isNotNull();
+            assertThat(ctx.getBean(RetryWatchdog.class)).isNotNull();
+            assertThat(ctx.getBean(AckHandler.class)).isNotNull();
+        }
+    }
+
+    @Test
+    @DisplayName("Should disable the legacy scheduler when the new mode is enabled")
+    void shouldDisableLegacyScheduler() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            addInlinedPropertiesToEnvironment(ctx,
+                    "event-flow.publisher.lifecycle.enabled=true",
+                    "event-flow.publisher.lifecycle.retry.enabled=true",
+                    "event-flow.retry.delivery.enabled=true",
+                    "event-flow.retry.processing.durable-enabled=false");
+            ctx.registerBean("properties", EventFlowProperties.class, () -> {
+                EventFlowProperties props = inMemoryProps();
+                props.getPublisher().getLifecycle().getRetry().setEnabled(true);
+                props.getRetry().getDelivery().setEnabled(true);
+                return props;
+            });
+            ctx.registerBean("eventPublisher", EventPublisher.class, () -> event ->
+                    CompletableFuture.completedFuture(SendResults.empty()));
+            ctx.register(LifecycleConfiguration.class);
+            ctx.refresh();
+
+            assertThat(ctx.getBeanNamesForType(EventRetryScheduler.class)).isEmpty();
         }
     }
 

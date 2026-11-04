@@ -794,14 +794,14 @@ Tests for each task are written in the same commit as the task. This list is the
 
 ## 8.3 Spring wiring
 
-- [ ] **3b.9** Create `EventRetryStore`, `LifecycleRepository`, and both schedulers as beans.
-- [ ] **3b.10** Add `event-flow.retry.delivery.*` and `event-flow.retry.processing.*`.
-- [ ] **3b.10a** Add `RetryConfigurationValidator`:
+- [x] **3b.9** Create `EventRetryStore`, `LifecycleRepository`, and both schedulers as beans.
+- [x] **3b.10** Add `event-flow.retry.delivery.*` and `event-flow.retry.processing.*`.
+- [x] **3b.10a** Add `RetryConfigurationValidator`:
   - fail fast with `IllegalStateException` when `processing.enabled = true` and `delivery.enabled = false`;
   - run before any retry scheduler or `LifecycleRepository` is created;
   - unit-test the validator and the Spring startup failure.
-- [ ] **3b.11** Disable the legacy `EventRetryScheduler` when the new mode is enabled, including its transitional `ACCEPTED` scan.
-- [ ] **3b.12** Update `EventCleanupScheduler` for dead-letter retention.
+- [x] **3b.11** Disable the legacy `EventRetryScheduler` when the new mode is enabled, including its transitional `ACCEPTED` scan.
+- [x] **3b.12** Update `EventCleanupScheduler` for dead-letter retention.
 
 ## 8.4 Test coverage checklist (not a separate task)
 
@@ -949,7 +949,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
-| PR 3b — schedulers | In progress | 9 commits | 3b.1–3b.8 done; next: 3b.9 |
+| PR 3b — schedulers | Complete | 11 commits | 3b.1–3b.12 done; next: PR 4 |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
 Update this table after each merged PR.
@@ -1003,7 +1003,9 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 3b.4 `RetryWatchdog` | `052a4f2` | `RetryWatchdogTest` (14 tests) + full `mvn verify` passed | Yes |
 | 3b.5 Retry-aware `AckHandler` | `87ea818` | `AckHandlerRetryTest` (17 tests) + repository tests + full `mvn verify` passed | Yes |
 | 3b.6 Publisher delivery retries | `4e99254` | `EventLifecyclePublisherRetryTest` (7 tests) + full `mvn verify` passed | Yes |
-| 3b.7–3b.8 Metadata + manual retry | this commit | dead-event resurrection tests + full `mvn verify` passed | Yes |
+| 3b.7–3b.8 Metadata + manual retry | `af5a9cc` | dead-event resurrection tests + full `mvn verify` passed | Yes |
+| 3b.9–3b.11 Spring wiring | this commit | `RetryConfigurationValidatorTest`, `LifecycleConfigurationTest`; full `mvn verify` passed | Yes |
+| 3b.12 Retry-aware cleanup | `18160ed` | retry-aware cleanup tests; full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1016,4 +1018,4 @@ Rules:
 
 # 14. Next step
 
-Continue PR 3b with **3b.9–3b.12**: Spring wiring, delivery/processing properties, the configuration validator and legacy-scheduler cleanup.
+PR 3b is complete. Continue with **PR 4**: dead-letter retention, overview SQL, diagnostics, migration guide, README/CHANGELOG and the ADR status update.

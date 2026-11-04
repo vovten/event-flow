@@ -2,6 +2,8 @@ package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher;
+import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisherOptions;
+import io.github.vovten.eventflow.lifecycle.LifecycleRepository;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +64,8 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     private RetryConfig retryConfig;
     private EventStore persistentStore;
     private String persistentService;
+    private LifecycleRepository persistentRepository;
+    private EventLifecyclePublisherOptions persistentOptions;
     private final List<EventChannel> channels = new ArrayList<>();
     private final List<DecoratorFunction> decorators = new ArrayList<>();
 
@@ -173,6 +177,24 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
     }
 
     /**
+     * Enable lifecycle-aware publishing with durable delivery retries.
+     *
+     * @param eventStore          the event store for persistence
+     * @param lifecycleRepository transactional lifecycle facade for delivery retries
+     * @param options             publisher retry options
+     * @return this builder
+     */
+    @SuppressWarnings("unchecked")
+    public T lifecycleAware(EventStore eventStore,
+                            LifecycleRepository lifecycleRepository,
+                            EventLifecyclePublisherOptions options) {
+        this.persistentStore = eventStore;
+        this.persistentRepository = lifecycleRepository;
+        this.persistentOptions = options;
+        return (T) this;
+    }
+
+    /**
      * Sets the service name for ack filtering.
      * <p>
      * When set, events published through the persistent publisher will be stamped
@@ -235,8 +257,14 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
 
         // Apply lifecycle-aware publisher if configured (wraps retry, so save/status update happens once)
         if (persistentStore != null) {
-            publisher = new EventLifecyclePublisher(publisher, persistentStore, persistentService);
-            log.debug("Applied EventLifecyclePublisher decorator");
+            if (persistentRepository != null && persistentOptions != null) {
+                publisher = new EventLifecyclePublisher(publisher, persistentStore,
+                        persistentService, persistentRepository, persistentOptions);
+                log.debug("Applied retry-aware EventLifecyclePublisher decorator");
+            } else {
+                publisher = new EventLifecyclePublisher(publisher, persistentStore, persistentService);
+                log.debug("Applied EventLifecyclePublisher decorator");
+            }
         }
 
         // Allow subclasses to add additional decorations (e.g., transactional, logging) — always outermost

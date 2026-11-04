@@ -417,6 +417,11 @@ public class EventFlowProperties {
              */
             private Duration pauseBetweenBatches = Duration.ofMillis(100);
 
+            /**
+             * Retention for dead-lettered events. Must be longer than {@code maxAge}.
+             */
+            private Duration deadLetterMaxAge = Duration.ofDays(30);
+
             public boolean isEnabled() {
                 return enabled;
             }
@@ -451,6 +456,14 @@ public class EventFlowProperties {
 
             public Duration getPauseBetweenBatches() {
                 return pauseBetweenBatches;
+            }
+
+            public Duration getDeadLetterMaxAge() {
+                return deadLetterMaxAge;
+            }
+
+            public void setDeadLetterMaxAge(Duration deadLetterMaxAge) {
+                this.deadLetterMaxAge = deadLetterMaxAge;
             }
 
             public void setPauseBetweenBatches(Duration pauseBetweenBatches) {
@@ -916,11 +929,20 @@ public class EventFlowProperties {
     }
 
     /**
-     * Processing-retry configuration.
+     * Two-domain retry configuration.
      */
     public static class EventRetryConfig {
 
+        private DeliveryRetryConfig delivery = new DeliveryRetryConfig();
         private ProcessingRetryConfig processing = new ProcessingRetryConfig();
+
+        public DeliveryRetryConfig getDelivery() {
+            return delivery;
+        }
+
+        public void setDelivery(DeliveryRetryConfig delivery) {
+            this.delivery = delivery;
+        }
 
         public ProcessingRetryConfig getProcessing() {
             return processing;
@@ -928,6 +950,120 @@ public class EventFlowProperties {
 
         public void setProcessing(ProcessingRetryConfig processing) {
             this.processing = processing;
+        }
+    }
+
+    /**
+     * Durable delivery-retry configuration.
+     * <p>
+     * Delivery retries are publisher-side: they recover events that were not
+     * accepted by the consumer. The new durable mechanism is opt-in.
+     */
+    public static class DeliveryRetryConfig {
+
+        /**
+         * Enable durable delivery retries.
+         */
+        private boolean enabled = false;
+
+        /**
+         * Delay between delivery retry cycles.
+         */
+        private Duration interval = Duration.ofSeconds(30);
+
+        /**
+         * Maximum time to wait for an acceptance ack.
+         */
+        private Duration ackTimeout = Duration.ofSeconds(60);
+
+        /**
+         * Maximum number of retries after the first publish.
+         */
+        private int maxRetries = 3;
+
+        /**
+         * Maximum number of retry rows handled per cycle.
+         */
+        private int batchSize = 100;
+
+        /**
+         * Base delay before the first durable delivery retry.
+         */
+        private Duration retryDelay = Duration.ofSeconds(30);
+
+        /**
+         * Whether publish success requires an explicit {@code AcceptedAck}.
+         * Set to {@code false} during a mixed-fleet migration.
+         */
+        private boolean requireAcceptedAck = true;
+
+        /**
+         * Retry table name.
+         */
+        private String tableName = "event_retry";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Duration getInterval() {
+            return interval;
+        }
+
+        public void setInterval(Duration interval) {
+            this.interval = interval;
+        }
+
+        public Duration getAckTimeout() {
+            return ackTimeout;
+        }
+
+        public void setAckTimeout(Duration ackTimeout) {
+            this.ackTimeout = ackTimeout;
+        }
+
+        public int getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(int maxRetries) {
+            this.maxRetries = maxRetries;
+        }
+
+        public int getBatchSize() {
+            return batchSize;
+        }
+
+        public void setBatchSize(int batchSize) {
+            this.batchSize = batchSize;
+        }
+
+        public Duration getRetryDelay() {
+            return retryDelay;
+        }
+
+        public void setRetryDelay(Duration retryDelay) {
+            this.retryDelay = retryDelay;
+        }
+
+        public boolean isRequireAcceptedAck() {
+            return requireAcceptedAck;
+        }
+
+        public void setRequireAcceptedAck(boolean requireAcceptedAck) {
+            this.requireAcceptedAck = requireAcceptedAck;
+        }
+
+        public String getTableName() {
+            return tableName;
+        }
+
+        public void setTableName(String tableName) {
+            this.tableName = tableName;
         }
     }
 
@@ -945,6 +1081,31 @@ public class EventFlowProperties {
          * Absolute cap for local retry attempts, independent of listener policies.
          */
         private int localRetryCap = 10;
+
+        /**
+         * Enable durable processing retries. Requires delivery retries.
+         */
+        private boolean durableEnabled = false;
+
+        /**
+         * Delay between durable processing retry cycles.
+         */
+        private Duration durableInterval = Duration.ofSeconds(30);
+
+        /**
+         * Maximum time to wait for a final ack of a durable processing retry.
+         */
+        private Duration durableAckTimeout = Duration.ofMinutes(5);
+
+        /**
+         * Global hard cap for durable processing retries after the first attempt.
+         */
+        private int durableMaxRetries = 3;
+
+        /**
+         * Maximum number of durable processing retry rows handled per cycle.
+         */
+        private int durableBatchSize = 100;
 
         private DefaultRetryPolicyConfig defaultPolicy = new DefaultRetryPolicyConfig();
 
@@ -967,6 +1128,46 @@ public class EventFlowProperties {
 
         public void setLocalRetryCap(int localRetryCap) {
             this.localRetryCap = localRetryCap;
+        }
+
+        public boolean isDurableEnabled() {
+            return durableEnabled;
+        }
+
+        public void setDurableEnabled(boolean durableEnabled) {
+            this.durableEnabled = durableEnabled;
+        }
+
+        public Duration getDurableInterval() {
+            return durableInterval;
+        }
+
+        public void setDurableInterval(Duration durableInterval) {
+            this.durableInterval = durableInterval;
+        }
+
+        public Duration getDurableAckTimeout() {
+            return durableAckTimeout;
+        }
+
+        public void setDurableAckTimeout(Duration durableAckTimeout) {
+            this.durableAckTimeout = durableAckTimeout;
+        }
+
+        public int getDurableMaxRetries() {
+            return durableMaxRetries;
+        }
+
+        public void setDurableMaxRetries(int durableMaxRetries) {
+            this.durableMaxRetries = durableMaxRetries;
+        }
+
+        public int getDurableBatchSize() {
+            return durableBatchSize;
+        }
+
+        public void setDurableBatchSize(int durableBatchSize) {
+            this.durableBatchSize = durableBatchSize;
         }
 
         public DefaultRetryPolicyConfig getDefaultPolicy() {

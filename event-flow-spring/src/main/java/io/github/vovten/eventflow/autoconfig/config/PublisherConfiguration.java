@@ -5,6 +5,8 @@ import io.github.vovten.eventflow.autoconfig.transport.OutTransportFactory;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.publisher.SpringEventPublisherBuilder;
+import io.github.vovten.eventflow.lifecycle.EventLifecyclePublisherOptions;
+import io.github.vovten.eventflow.lifecycle.LifecycleRepository;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -50,6 +52,7 @@ public class PublisherConfiguration {
      *
      * @param eventChannels list of event channels to configure
      * @param eventStore    optional event store for persistent publishing (auto-injected)
+     * @param lifecycleRepository optional transactional lifecycle repository (auto-injected)
      * @return configured event publisher
      * @throws IllegalStateException if lifecycle is enabled but service-name is not configured
      */
@@ -57,7 +60,8 @@ public class PublisherConfiguration {
     @ConditionalOnMissingBean(name = "eventPublisher")
     @ConditionalOnProperty(prefix = "event-flow.publisher", name = "enabled", havingValue = "true")
     public EventPublisher eventPublisher(List<EventChannel> eventChannels,
-                                         @Autowired(required = false) EventStore eventStore) {
+                                         @Autowired(required = false) EventStore eventStore,
+                                         @Autowired(required = false) LifecycleRepository lifecycleRepository) {
         if (eventChannels.isEmpty()) {
             log.warn("""
 
@@ -111,8 +115,19 @@ public class PublisherConfiguration {
                 throw new IllegalStateException(
                         "event-flow.publisher.lifecycle.service-name must be configured when lifecycle tracking is enabled");
             }
-            builder.lifecycleAware(eventStore).service(service);
-            log.info("Configured EventPublisher with EventLifecyclePublisher (service: {})", service);
+            var delivery = properties.getRetry().getDelivery();
+            if (lifecycleRepository != null && delivery.isEnabled()) {
+                builder.lifecycleAware(eventStore, lifecycleRepository,
+                        new EventLifecyclePublisherOptions(
+                                delivery.isRequireAcceptedAck(), delivery.getRetryDelay()));
+                log.info("Configured EventPublisher with retry-aware EventLifecyclePublisher "
+                        + "(service: {}, requireAcceptedAck: {})",
+                        service, delivery.isRequireAcceptedAck());
+            } else {
+                builder.lifecycleAware(eventStore);
+                log.info("Configured EventPublisher with EventLifecyclePublisher (service: {})", service);
+            }
+            builder.service(service);
         }
 
         EventPublisher publisher = builder.build();
