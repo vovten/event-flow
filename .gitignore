@@ -12,3 +12,5 @@
 /event-flow-core/target/
 /event-flow-spring/target/
 .qwen/
+/.serena/
+/.opencode/
