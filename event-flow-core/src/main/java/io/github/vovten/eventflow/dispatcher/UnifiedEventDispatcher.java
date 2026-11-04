@@ -235,6 +235,17 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                         .toList()));
     }
 
+    @Override
+    public long maxProcessingMs(Event event) {
+        long maximum = 0L;
+        for (EventHandler handler : handlerRegistry.getHandlers(event)) {
+            ResolvedRetryPolicy policy = resolvePolicy(handler);
+            long localBudget = policy.maxLocalProcessingMs(localRetryCap - 1).toMillis();
+            maximum = Math.max(maximum, localBudget);
+        }
+        return maximum;
+    }
+
     private CompletableFuture<HandlerResult> executeHandlerWithRetry(EventHandler handler, Event event, int attempt) {
         ResolvedRetryPolicy policy = resolvePolicy(handler);
         return invokeOnce(handler, event)

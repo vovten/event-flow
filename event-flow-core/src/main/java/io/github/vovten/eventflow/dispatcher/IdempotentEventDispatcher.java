@@ -90,6 +90,11 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     }
 
     @Override
+    public long maxProcessingMs(Event event) {
+        return origin.maxProcessingMs(event);
+    }
+
+    @Override
     public void register(Object handler) {
         origin.register(handler);
     }

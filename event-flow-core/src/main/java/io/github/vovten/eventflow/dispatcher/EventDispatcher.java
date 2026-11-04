@@ -23,6 +23,21 @@ public interface EventDispatcher {
     CompletableFuture<HandlerResults> dispatch(Event event);
 
     /**
+     * Returns the estimated maximum local processing time for the event in
+     * milliseconds, including local retry backoff.
+     * <p>
+     * The lifecycle dispatcher uses this value to size the processing
+     * acknowledgment timeout. The default is {@code 0} (unknown).
+     *
+     * @param event the event being dispatched
+     * @return estimated local processing time in milliseconds, or 0 when unknown
+     * @since 1.4.0
+     */
+    default long maxProcessingMs(Event event) {
+        return 0L;
+    }
+
+    /**
      * Register a listener
      *
      * @param listener the listener

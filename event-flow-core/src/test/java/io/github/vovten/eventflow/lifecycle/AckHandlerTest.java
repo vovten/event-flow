@@ -189,6 +189,6 @@ class AckHandlerTest {
         return new FailureAck(
                 UUID.randomUUID(), eventId, "TestEvent", "test-service", "Handler error",
                 List.of(), null, Instant.now(),
-                RetryKind.PROCESSING, 1, retryable, List.of(), null);
+                RetryKind.PROCESSING, 1, retryable, List.of(), null, 0L, null);
     }
 }

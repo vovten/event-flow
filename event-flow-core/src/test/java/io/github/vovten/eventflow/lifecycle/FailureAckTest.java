@@ -36,7 +36,7 @@ class FailureAckTest {
                 CHANNELS, PROCESS_ID, OCCURRED_AT,
                 RetryKind.PROCESSING, 3, false,
                 List.of("PaymentHandler", "AuditHandler"),
-                "java.sql.SQLException");
+                "java.sql.SQLException", 1_500L, "payment-policy");
 
         assertThat(ack.eventId()).isEqualTo(EVENT_ID);
         assertThat(ack.originalEventId()).isEqualTo(ORIGINAL_EVENT_ID);
@@ -51,6 +51,8 @@ class FailureAckTest {
         assertThat(ack.retryable()).isFalse();
         assertThat(ack.failedHandlers()).containsExactly("PaymentHandler", "AuditHandler");
         assertThat(ack.errorType()).isEqualTo("java.sql.SQLException");
+        assertThat(ack.retryAfterMs()).isEqualTo(1_500L);
+        assertThat(ack.policyName()).isEqualTo("payment-policy");
     }
 
     @Test
@@ -65,6 +67,8 @@ class FailureAckTest {
         assertThat(ack.retryable()).isTrue();
         assertThat(ack.failedHandlers()).isEmpty();
         assertThat(ack.errorType()).isNull();
+        assertThat(ack.retryAfterMs()).isZero();
+        assertThat(ack.policyName()).isNull();
     }
 
     @Test
@@ -88,7 +92,7 @@ class FailureAckTest {
         FailureAck ack = new FailureAck(
                 EVENT_ID, ORIGINAL_EVENT_ID, EVENT_TYPE, SERVICE, ERROR,
                 CHANNELS, PROCESS_ID, OCCURRED_AT,
-                RetryKind.PROCESSING, 2, true, mutableHandlers, null);
+                RetryKind.PROCESSING, 2, true, mutableHandlers, null, 0L, null);
 
         mutableHandlers.add("SecondHandler");
 
@@ -101,7 +105,7 @@ class FailureAckTest {
         assertThatThrownBy(() -> new FailureAck(
                 EVENT_ID, ORIGINAL_EVENT_ID, EVENT_TYPE, SERVICE, ERROR,
                 CHANNELS, PROCESS_ID, OCCURRED_AT,
-                RetryKind.PROCESSING, 0, true, List.of(), null))
+                RetryKind.PROCESSING, 0, true, List.of(), null, 0L, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("attempt");
     }
@@ -112,7 +116,7 @@ class FailureAckTest {
         assertThatThrownBy(() -> new FailureAck(
                 EVENT_ID, ORIGINAL_EVENT_ID, EVENT_TYPE, SERVICE, ERROR,
                 CHANNELS, PROCESS_ID, OCCURRED_AT,
-                null, 1, true, List.of(), null))
+                null, 1, true, List.of(), null, 0L, null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("retryKind");
     }
@@ -123,8 +127,19 @@ class FailureAckTest {
         assertThatThrownBy(() -> new FailureAck(
                 EVENT_ID, ORIGINAL_EVENT_ID, EVENT_TYPE, SERVICE, ERROR,
                 CHANNELS, PROCESS_ID, OCCURRED_AT,
-                RetryKind.PROCESSING, 1, true, null, null))
+                RetryKind.PROCESSING, 1, true, null, null, 0L, null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("failedHandlers");
+    }
+
+    @Test
+    @DisplayName("Should reject a negative retry delay")
+    void shouldRejectNegativeRetryDelay() {
+        assertThatThrownBy(() -> new FailureAck(
+                EVENT_ID, ORIGINAL_EVENT_ID, EVENT_TYPE, SERVICE, ERROR,
+                CHANNELS, PROCESS_ID, OCCURRED_AT,
+                RetryKind.PROCESSING, 1, true, List.of(), null, -1L, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryAfterMs");
     }
 }

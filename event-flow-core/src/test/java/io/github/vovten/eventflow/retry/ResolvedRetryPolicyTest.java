@@ -143,6 +143,20 @@ class ResolvedRetryPolicyTest {
     }
 
     @Test
+    @DisplayName("Should estimate the maximum local processing time")
+    void shouldEstimateMaximumLocalProcessingTime() {
+        ResolvedRetryPolicy policy = new ResolvedRetryPolicy(
+                "test", Set.of(), Set.of(), 5, 2,
+                Duration.ofMillis(100), 2.0, Duration.ofMillis(1_000), 0.5);
+
+        assertThat(policy.maxBackoff(1)).isEqualTo(Duration.ofMillis(100));
+        assertThat(policy.maxBackoff(2)).isEqualTo(Duration.ofMillis(200));
+        assertThat(policy.maxLocalProcessingMs()).isEqualTo(Duration.ofMillis(300));
+        assertThat(policy.maxLocalProcessingMs(1)).isEqualTo(Duration.ofMillis(100));
+        assertThat(policy.maxLocalProcessingMs(10)).isEqualTo(Duration.ofMillis(300));
+    }
+
+    @Test
     @DisplayName("Should apply full jitter within the capped delay")
     void shouldApplyFullJitter() {
         ResolvedRetryPolicy policy = new ResolvedRetryPolicy(

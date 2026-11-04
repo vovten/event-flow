@@ -164,13 +164,50 @@ public record ResolvedRetryPolicy(
      * @throws IllegalArgumentException if {@code retryNumber < 1}
      */
     public Duration backoff(int retryNumber) {
+        long capped = maxBackoff(retryNumber).toMillis();
+        double factor = 1.0 - jitter + ThreadLocalRandom.current().nextDouble() * jitter;
+        return Duration.ofMillis(Math.max(0L, (long) (capped * factor)));
+    }
+
+    /**
+     * Computes the maximum (unjittered) backoff for the given retry number.
+     *
+     * @param retryNumber 1-based retry number (1 = first retry)
+     * @return the capped delay before the next attempt
+     * @throws IllegalArgumentException if {@code retryNumber < 1}
+     */
+    public Duration maxBackoff(int retryNumber) {
         if (retryNumber < 1) {
             throw new IllegalArgumentException("retryNumber must be >= 1");
         }
         double raw = initialDelay.toMillis() * Math.pow(multiplier, retryNumber - 1.0);
-        long capped = Math.min((long) raw, maxDelay.toMillis());
-        double factor = 1.0 - jitter + ThreadLocalRandom.current().nextDouble() * jitter;
-        return Duration.ofMillis(Math.max(0L, (long) (capped * factor)));
+        return Duration.ofMillis(Math.min((long) raw, maxDelay.toMillis()));
+    }
+
+    /**
+     * Estimates the maximum local processing time, including all local retry
+     * backoffs allowed by this policy.
+     *
+     * @return the maximum local backoff duration
+     */
+    public Duration maxLocalProcessingMs() {
+        return maxLocalProcessingMs(localMaxRetries);
+    }
+
+    /**
+     * Estimates the maximum local processing time for at most {@code localRetryLimit}
+     * local retries.
+     *
+     * @param localRetryLimit the absolute local retry cap
+     * @return the maximum local backoff duration
+     */
+    public Duration maxLocalProcessingMs(int localRetryLimit) {
+        int limit = Math.min(localMaxRetries, Math.max(0, localRetryLimit));
+        long total = 0L;
+        for (int retry = 1; retry <= limit; retry++) {
+            total += maxBackoff(retry).toMillis();
+        }
+        return Duration.ofMillis(total);
     }
 
     private static boolean matchesAny(Throwable error, Set<Class<? extends Throwable>> types) {

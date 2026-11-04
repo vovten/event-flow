@@ -7,6 +7,7 @@ import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.retry.FailureKind;
 import io.github.vovten.eventflow.retry.RetryKind;
 import io.github.vovten.eventflow.retry.RetryMetadata;
 import io.github.vovten.eventflow.transport.SendResult;
@@ -166,6 +167,60 @@ class EventLifecycleDispatcherTest {
         assertThat(failure.retryable()).isTrue();
         assertThat(failure.failedHandlers()).containsExactly("test-handler");
         assertThat(failure.errorType()).isEqualTo(RuntimeException.class.getName());
+        assertThat(failure.retryAfterMs()).isZero();
+        assertThat(failure.policyName()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should carry the local processing estimate into AcceptedAck")
+    void shouldCarryMaxProcessingMsIntoAcceptedAck() {
+        EventDispatcher origin = new TestDispatcher(
+                e -> CompletableFuture.completedFuture(
+                        HandlerResults.of(List.of(HandlerResult.success("test-handler")))),
+                1_234L);
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        AcceptedAck accepted = (AcceptedAck) publishedAcks.get(0);
+        assertThat(accepted.maxProcessingMs()).isEqualTo(1_234L);
+    }
+
+    @Test
+    @DisplayName("Should carry policy-driven retry delay into FailureAck")
+    void shouldCarryPolicyDrivenRetryDelayIntoFailureAck() {
+        HandlerResult classified = HandlerResult.failure(
+                "payment-handler", new RuntimeException("boom"), "boom",
+                FailureKind.TRANSIENT_EXHAUSTED, true, 3, "payment-policy", 1_500L);
+        EventDispatcher origin = new TestDispatcher(
+                e -> CompletableFuture.completedFuture(HandlerResults.of(List.of(classified))));
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        FailureAck failure = (FailureAck) lastAck();
+        assertThat(failure.retryable()).isTrue();
+        assertThat(failure.failedHandlers()).containsExactly("payment-handler");
+        assertThat(failure.retryAfterMs()).isEqualTo(1_500L);
+        assertThat(failure.policyName()).isEqualTo("payment-policy");
+    }
+
+    @Test
+    @DisplayName("Should mark a permanent failure as non-retryable")
+    void shouldMarkPermanentFailureAsNonRetryable() {
+        HandlerResult permanent = HandlerResult.failure(
+                "payment-handler", new IllegalArgumentException("bad"), "bad",
+                FailureKind.PERMANENT, false, 1, null, 0L);
+        EventDispatcher origin = new TestDispatcher(
+                e -> CompletableFuture.completedFuture(HandlerResults.of(List.of(permanent))));
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(event).join();
+
+        FailureAck failure = (FailureAck) lastAck();
+        assertThat(failure.retryable()).isFalse();
+        assertThat(failure.retryAfterMs()).isZero();
+        assertThat(failure.policyName()).isNull();
     }
 
     @Test
@@ -311,14 +366,25 @@ class EventLifecycleDispatcherTest {
 
     private static class TestDispatcher implements EventDispatcher {
         private final Function<Event, CompletableFuture<HandlerResults>> dispatchFn;
+        private final long maxProcessingMs;
 
         TestDispatcher(Function<Event, CompletableFuture<HandlerResults>> dispatchFn) {
+            this(dispatchFn, 0L);
+        }
+
+        TestDispatcher(Function<Event, CompletableFuture<HandlerResults>> dispatchFn, long maxProcessingMs) {
             this.dispatchFn = dispatchFn;
+            this.maxProcessingMs = maxProcessingMs;
         }
 
         @Override
         public CompletableFuture<HandlerResults> dispatch(Event event) {
             return dispatchFn.apply(event);
+        }
+
+        @Override
+        public long maxProcessingMs(Event event) {
+            return maxProcessingMs;
         }
 
         @Override

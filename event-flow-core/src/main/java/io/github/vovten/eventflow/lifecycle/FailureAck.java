@@ -35,6 +35,8 @@ import java.util.UUID;
  * @param retryable       whether another attempt is allowed
  * @param failedHandlers  names of handlers that failed
  * @param errorType       fully qualified class name of the outermost exception, or {@code null}
+ * @param retryAfterMs    relative delay before the next processing attempt, or 0 when not applicable
+ * @param policyName      effective processing-retry policy name, or {@code null} when unknown
  * @author Vladimir Aleshkov
  * @since 1.2.0
  */
@@ -51,7 +53,9 @@ public record FailureAck(
         int attempt,
         boolean retryable,
         List<String> failedHandlers,
-        String errorType
+        String errorType,
+        long retryAfterMs,
+        String policyName
 ) implements LifecycleAckEvent, TraceableEvent {
 
     public FailureAck {
@@ -66,6 +70,9 @@ public record FailureAck(
         if (attempt < 1) {
             throw new IllegalArgumentException("attempt must be >= 1");
         }
+        if (retryAfterMs < 0) {
+            throw new IllegalArgumentException("retryAfterMs must not be negative");
+        }
         failedHandlers = List.copyOf(failedHandlers);
     }
 
@@ -74,7 +81,7 @@ public record FailureAck(
      * <p>
      * Defaults: {@code retryKind = PROCESSING}, {@code attempt = 1},
      * {@code retryable = true}, {@code failedHandlers = List.of()},
-     * {@code errorType = null}.
+     * {@code errorType = null}, {@code retryAfterMs = 0}, {@code policyName = null}.
      *
      * @param eventId         unique identifier of this ack event
      * @param originalEventId the ID of the original event that failed
@@ -95,7 +102,7 @@ public record FailureAck(
                       Instant occurredAt) {
         this(eventId, originalEventId, eventType, originalService, error,
                 sourceChannels, processId, occurredAt,
-                RetryKind.PROCESSING, 1, true, List.of(), null);
+                RetryKind.PROCESSING, 1, true, List.of(), null, 0L, null);
     }
 
     @Override

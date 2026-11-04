@@ -151,6 +151,18 @@ class UnifiedEventDispatcherRetryTest {
     }
 
     @Test
+    @DisplayName("Should estimate the maximum local processing time")
+    void shouldEstimateMaxProcessingMs() {
+        RecordingDelayScheduler scheduler = new RecordingDelayScheduler();
+        PolicyHandler handler = new PolicyHandler(
+                "handler", policy(5, 2, Set.of(TimeoutException.class), Set.of()),
+                Integer.MAX_VALUE, new RuntimeException(new TimeoutException("slow")));
+        UnifiedEventDispatcher dispatcher = dispatcher(handler, scheduler);
+
+        assertThat(dispatcher.maxProcessingMs(new TestEvent())).isEqualTo(30L);
+    }
+
+    @Test
     @DisplayName("Should isolate retries per handler")
     void shouldIsolateRetriesPerHandler() {
         RecordingDelayScheduler scheduler = new RecordingDelayScheduler();

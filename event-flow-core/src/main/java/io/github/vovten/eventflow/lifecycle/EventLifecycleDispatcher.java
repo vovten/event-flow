@@ -1,7 +1,6 @@
 package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
-import io.github.vovten.eventflow.dispatcher.HandlerResult;
 import io.github.vovten.eventflow.dispatcher.HandlerResults;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
@@ -88,6 +87,11 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                         publishLifecycleAck(event, originalService, retryContext, results, error));
     }
 
+    @Override
+    public long maxProcessingMs(Event event) {
+        return origin.maxProcessingMs(event);
+    }
+
     private void publishAcceptedAck(Event event, String originalService, RetryContext retryContext) {
         if (shouldSkipLifecycleAck(event)) {
             return;
@@ -100,7 +104,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                     event.type().getName(),
                     originalService,
                     deliveryAttempt(retryContext),
-                    0L,
+                    origin.maxProcessingMs(event),
                     event.channels(),
                     Instant.now()
             );
@@ -118,7 +122,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
         }
         if (error != null) {
             publishFailedAck(event, originalService, retryContext, buildErrorChain(error),
-                    List.of(), error.getClass().getName());
+                    List.of(), error.getClass().getName(), true, 0L, null);
             return;
         }
         if (results != null && results.isEmpty() && !results.isDuplicate()) {
@@ -127,11 +131,12 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
         }
         if (hasHandlerFailures(results)) {
             Throwable cause = results.getFirstError().orElse(null);
-            List<String> failedHandlers = results.getFailures().stream()
-                    .map(HandlerResult::handlerName)
-                    .toList();
             publishFailedAck(event, originalService, retryContext, buildErrorChain(cause),
-                    failedHandlers, cause != null ? cause.getClass().getName() : null);
+                    results.getFailedHandlerNames(),
+                    cause != null ? cause.getClass().getName() : null,
+                    results.hasRetryableFailure(),
+                    results.getMaxRetryAfterMs(),
+                    results.getRetryPolicyName());
             return;
         }
         publishSuccessAck(event, originalService, retryContext);
@@ -195,7 +200,8 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
     }
 
     private void publishFailedAck(Event event, String originalService, RetryContext retryContext,
-                                  String errorMessage, List<String> failedHandlers, String errorType) {
+                                  String errorMessage, List<String> failedHandlers, String errorType,
+                                  boolean retryable, long retryAfterMs, String policyName) {
         UUID eventId = ((TraceableEvent) event).eventId();
         try {
             FailureAck failed = new FailureAck(
@@ -209,9 +215,11 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                     Instant.now(),
                     retryContext.retryKind(),
                     retryContext.attempt(),
-                    true,
+                    retryable,
                     failedHandlers,
-                    errorType
+                    errorType,
+                    retryAfterMs,
+                    policyName
             );
             ackPublisher.publish(failed);
             String eventName = event.type().getSimpleName();

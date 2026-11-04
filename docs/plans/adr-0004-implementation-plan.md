@@ -578,11 +578,11 @@ Tests for each task are written in the same commit as the task. This list is the
   - `hasRetryableFailure()`;
   - `hasOnlyPermanentFailures()`;
   - aggregate failed handler names.
-- [ ] **2.11a** Extend `FailureAck`:
+- [x] **2.11a** Extend `FailureAck`:
   - add `retryAfterMs` and `policyName`;
   - legacy constructor defaults: `retryAfterMs = 0`, `policyName = null`;
   - keep the legacy constructor for backward compatibility.
-- [ ] **2.11** `EventLifecycleDispatcher`:
+- [x] **2.11** `EventLifecycleDispatcher`:
   - compute `maxProcessingMs` from the local portion of each handler policy;
   - populate `FailureAck.retryable`, `failedHandlers`, `errorType`, `retryAfterMs`, `policyName`.
 
@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 10 commits | Tasks 2.1–2.10 done; next: 2.11 |
+| PR 2 — local retry | In progress | 11 commits | Tasks 2.1–2.11 done; next: 2.12 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -986,7 +986,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.7 Subscriber policy resolution | `4273ca6` | `EventSubscriberRegistryRetryTest`; full `mvn verify` passed | Yes |
 | 2.9 Handler result classification | `5adee1b` | `HandlerResultTest`/`HandlerResultsTest`; full core suite passed | Yes |
 | 2.10 `HandlerResults` aggregates | `5adee1b` | delivered with 2.9; tested | Yes |
-| 2.8 Dispatcher local retry loop | this commit | `UnifiedEventDispatcherRetryTest`; full `mvn verify` passed | Yes |
+| 2.8 Dispatcher local retry loop | `2a60456` | `UnifiedEventDispatcherRetryTest`; full `mvn verify` passed | Yes |
+| 2.11a–2.11 Policy-driven failure ack | this commit | ack/dispatcher tests + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -999,4 +1000,4 @@ Rules:
 
 # 14. Next step
 
-Start task **2.11a/2.11**: extend `FailureAck` with `retryAfterMs` and `policyName`, then populate them from `HandlerResults`/`EventLifecycleDispatcher` together with `maxProcessingMs`.
+Start task **2.12**: wire `RetryPolicyRegistry`, the default policy and `ListenerRetryPolicyResolver` into Spring auto-configuration, and expose `event-flow.retry.processing.*` properties.

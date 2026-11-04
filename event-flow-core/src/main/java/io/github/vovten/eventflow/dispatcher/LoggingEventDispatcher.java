@@ -239,6 +239,11 @@ public final class LoggingEventDispatcher implements EventDispatcher {
     }
 
     @Override
+    public long maxProcessingMs(Event event) {
+        return origin.maxProcessingMs(event);
+    }
+
+    @Override
     public void register(Object listener) {
         origin.register(listener);
     }
