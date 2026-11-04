@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.registry;
 import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
 
 import java.util.List;
 
@@ -87,6 +88,21 @@ public interface EventHandlerRegistry {
      * @see EventSubscriber#events()
      */
     List<EventHandler> getHandlers(Event event);
+
+    /**
+     * Returns the resolved processing-retry policy for the given handler.
+     * <p>
+     * The default implementation delegates to
+     * {@link EventHandler#resolvedRetryPolicy()}. Registries that resolve a
+     * named policy for a handler may override this method.
+     *
+     * @param handler the handler to inspect
+     * @return the resolved policy, or {@code null} when the default policy applies
+     * @since 1.4.0
+     */
+    default ResolvedRetryPolicy retryPolicyFor(EventHandler handler) {
+        return handler.resolvedRetryPolicy();
+    }
 
     /**
      * Register an event handler in the registry.

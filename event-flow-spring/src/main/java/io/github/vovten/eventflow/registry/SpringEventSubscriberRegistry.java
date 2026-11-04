@@ -1,6 +1,9 @@
 package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.EventSubscriber;
+import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicyRegistry;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -103,11 +106,38 @@ public class SpringEventSubscriberRegistry extends EventSubscriberRegistry
      * @throws IllegalArgumentException if applicationContext is null
      */
     public SpringEventSubscriberRegistry(ApplicationContext applicationContext) {
-        super();
+        this(applicationContext,
+                new ListenerRetryPolicyResolver(new RetryPolicyRegistry(), ResolvedRetryPolicy.defaults()));
+    }
+
+    /**
+     * Creates a Spring-aware interface-based registry with a shared retry-policy resolver.
+     *
+     * @param applicationContext Spring application context (required)
+     * @param retryPolicies      shared retry-policy resolver (must not be null)
+     */
+    public SpringEventSubscriberRegistry(ApplicationContext applicationContext,
+                                        ListenerRetryPolicyResolver retryPolicies) {
+        super(retryPolicies);
         if (applicationContext == null) {
             throw new IllegalArgumentException("ApplicationContext is required");
         }
         this.applicationContext = applicationContext;
+    }
+
+    /**
+     * Creates a Spring-aware interface-based registry with a shared policy registry
+     * and default policy.
+     *
+     * @param applicationContext  Spring application context (required)
+     * @param retryPolicyRegistry shared named policy registry (must not be null)
+     * @param defaultRetryPolicy  default policy (must not be null)
+     */
+    public SpringEventSubscriberRegistry(ApplicationContext applicationContext,
+                                        RetryPolicyRegistry retryPolicyRegistry,
+                                        ResolvedRetryPolicy defaultRetryPolicy) {
+        this(applicationContext,
+                new ListenerRetryPolicyResolver(retryPolicyRegistry, defaultRetryPolicy));
     }
 
     /**

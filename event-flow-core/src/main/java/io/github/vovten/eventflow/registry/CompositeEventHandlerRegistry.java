@@ -2,6 +2,7 @@ package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -116,6 +117,17 @@ public class CompositeEventHandlerRegistry implements EventHandlerRegistry {
      *
      * @return sum of handler counts from all registries
      */
+    @Override
+    public ResolvedRetryPolicy retryPolicyFor(EventHandler handler) {
+        for (EventHandlerRegistry registry : registries) {
+            ResolvedRetryPolicy policy = registry.retryPolicyFor(handler);
+            if (policy != null) {
+                return policy;
+            }
+        }
+        return handler.resolvedRetryPolicy();
+    }
+
     @Override
     public int handlerCount() {
         return registries.stream()

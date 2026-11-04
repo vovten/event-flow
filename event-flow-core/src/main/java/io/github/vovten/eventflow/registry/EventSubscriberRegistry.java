@@ -4,10 +4,14 @@ import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventSubscriber;
+import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicyRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -96,11 +100,44 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
     private final Map<Class<?>, List<EventSubscriber>> eventSubscribers;
 
     /**
-     * Creates a new interface-based event subscriber registry.
+     * Resolved retry policy per registered subscriber.
+     */
+    private final Map<EventSubscriber, ResolvedRetryPolicy> subscriberRetryPolicies;
+
+    /**
+     * Resolves named retry policies for subscribers.
+     */
+    private final ListenerRetryPolicyResolver retryPolicies;
+
+    /**
+     * Creates a new interface-based event subscriber registry with an isolated
+     * policy registry and the shipped default policy.
      * Thread-safe for concurrent register/unregister/dispatch operations.
      */
     public EventSubscriberRegistry() {
+        this(new ListenerRetryPolicyResolver(new RetryPolicyRegistry(), ResolvedRetryPolicy.defaults()));
+    }
+
+    /**
+     * Creates a new registry using the given retry-policy resolver.
+     *
+     * @param retryPolicies the shared resolver (must not be null)
+     */
+    public EventSubscriberRegistry(ListenerRetryPolicyResolver retryPolicies) {
         this.eventSubscribers = new ConcurrentHashMap<>();
+        this.subscriberRetryPolicies = new ConcurrentHashMap<>();
+        this.retryPolicies = Objects.requireNonNull(retryPolicies, "retryPolicies must not be null");
+    }
+
+    /**
+     * Creates a new registry using the given policy registry and default policy.
+     *
+     * @param retryPolicyRegistry the shared named policy registry (must not be null)
+     * @param defaultRetryPolicy  the default policy (must not be null)
+     */
+    public EventSubscriberRegistry(RetryPolicyRegistry retryPolicyRegistry,
+                                   ResolvedRetryPolicy defaultRetryPolicy) {
+        this(new ListenerRetryPolicyResolver(retryPolicyRegistry, defaultRetryPolicy));
     }
 
     /**
@@ -200,15 +237,19 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      */
     @Override
     public boolean unregister(Object eventSubscriber) {
-        if (!(eventSubscriber instanceof EventSubscriber)) {
+        if (!(eventSubscriber instanceof EventSubscriber subscriber)) {
             return false;
         }
+        boolean removed = false;
         for (List<EventSubscriber> subscribers : eventSubscribers.values()) {
-            if (subscribers.remove(eventSubscriber)) {
-                return true;
+            if (subscribers.remove(subscriber)) {
+                removed = true;
             }
         }
-        return false;
+        if (removed) {
+            subscriberRetryPolicies.remove(subscriber);
+        }
+        return removed;
     }
 
     /**
@@ -246,16 +287,27 @@ public class EventSubscriberRegistry implements EventHandlerRegistry {
      * @param subscriber the subscriber to register
      */
     protected void registerSubscriber(EventSubscriber subscriber) {
+        // Resolve first: an unknown reference must fail before the subscriber is stored.
+        ResolvedRetryPolicy retryPolicy = retryPolicies.resolveReference(subscriber.retryPolicy());
+        subscriberRetryPolicies.put(subscriber, retryPolicy);
+
         // Defensive copy to prevent external modification of subscriber.events()
         List<Class<?>> eventTypes = List.copyOf(subscriber.events());
 
         for (Class<?> event : eventTypes) {
-            @SuppressWarnings("unchecked")
             var subscribers = eventSubscribers.computeIfAbsent(event, k -> new CopyOnWriteArrayList<>());
             if (!subscribers.contains(subscriber)) {
                 subscribers.add(subscriber);
             }
         }
+    }
+
+    @Override
+    public ResolvedRetryPolicy retryPolicyFor(EventHandler handler) {
+        if (handler instanceof EventSubscriber subscriber) {
+            return subscriberRetryPolicies.getOrDefault(subscriber, retryPolicies.defaultPolicy());
+        }
+        return EventHandlerRegistry.super.retryPolicyFor(handler);
     }
 
     @Override

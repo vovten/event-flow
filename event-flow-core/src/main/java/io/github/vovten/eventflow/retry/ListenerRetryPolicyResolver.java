@@ -117,6 +117,22 @@ public final class ListenerRetryPolicyResolver {
     }
 
     /**
+     * Resolves a named policy reference.
+     * <p>
+     * A blank name resolves to the default policy. An unknown name fails fast.
+     *
+     * @param name the named policy reference, may be blank
+     * @return the resolved policy, never {@code null}
+     * @throws IllegalArgumentException if the referenced policy is unknown
+     */
+    public ResolvedRetryPolicy resolveReference(String name) {
+        if (name == null || name.isBlank()) {
+            return defaultRetryPolicy;
+        }
+        return retryPolicyRegistry.resolve(name);
+    }
+
+    /**
      * Returns the default policy used when a listener has no declaration or reference.
      *
      * @return the default policy
