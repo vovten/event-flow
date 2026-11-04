@@ -107,6 +107,15 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
     }
 
     @Override
+    public void onProcessingDisabled(UUID eventId, String errorType, String error) {
+        inTransaction(conn -> {
+            eventStore.transitionStatus(
+                    conn, eventId, PROCESSING_SOURCES, EventStatus.FAILED, error);
+            retryStore.complete(conn, eventId, RetryKind.DELIVERY);
+        });
+    }
+
+    @Override
     public void onHandled(UUID eventId, int attempt) {
         inTransaction(conn -> {
             boolean applied = eventStore.transitionStatus(

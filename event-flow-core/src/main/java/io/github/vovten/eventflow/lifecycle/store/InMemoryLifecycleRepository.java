@@ -86,6 +86,12 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
     }
 
     @Override
+    public synchronized void onProcessingDisabled(UUID eventId, String errorType, String error) {
+        eventStore.transitionStatus(eventId, PROCESSING_SOURCES, EventStatus.FAILED, error);
+        retryStore.complete(eventId, RetryKind.DELIVERY);
+    }
+
+    @Override
     public synchronized void onHandled(UUID eventId, int attempt) {
         boolean applied = eventStore.transitionStatus(
                 eventId, PROCESSING_SOURCES, EventStatus.HANDLED, null);

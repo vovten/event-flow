@@ -764,7 +764,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 ## 8.2 Ack routing
 
-- [ ] **3b.5** `AckHandler`:
+- [x] **3b.5** `AckHandler`:
   - use `LifecycleRepository`;
   - resolve the retry row by `(eventId, ack.retryKind)` and compare `ack.attempt` with the row attempt;
   - `AcceptedAck` → delete `DELIVERY`, set `ACCEPTED` only from `NEW`/`PUBLISHED`;
@@ -949,7 +949,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
-| PR 3b — schedulers | In progress | 6 commits | 3b.1–3b.4 done; next: 3b.5 |
+| PR 3b — schedulers | In progress | 7 commits | 3b.1–3b.5 done; next: 3b.6 |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
 Update this table after each merged PR.
@@ -1000,7 +1000,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 3b.1b Extract retry event reconstruction | `b9eec79` | `DeliveryRetrySchedulerTest` re-run; full `mvn verify` passed | Yes |
 | 3b.2 `ProcessingRetryScheduler` | `7a9aba5` | `ProcessingRetrySchedulerTest` (16 tests) + full `mvn verify` passed | Yes |
 | 3b.3 Shared scheduler support + grouping | `6d6fd19` | `RetrySchedulerSupportTest` + both scheduler suites; full `mvn verify` passed | Yes |
-| 3b.4 `RetryWatchdog` | this commit | `RetryWatchdogTest` (14 tests) + full `mvn verify` passed | Yes |
+| 3b.4 `RetryWatchdog` | `052a4f2` | `RetryWatchdogTest` (14 tests) + full `mvn verify` passed | Yes |
+| 3b.5 Retry-aware `AckHandler` | this commit | `AckHandlerRetryTest` (17 tests) + repository tests + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1013,4 +1014,4 @@ Rules:
 
 # 14. Next step
 
-Continue PR 3b with **3b.5 Ack routing**: route `AcceptedAck`, `NoHandlerAck`, `SuccessAck` and `FailureAck` through `LifecycleRepository` with stale-ack guards.
+Continue PR 3b with **3b.6 `EventLifecyclePublisher`**: create `DELIVERY` rows on publish failure, stamp retry context, never roll back terminal statuses, and support `require-accepted-ack = false`.

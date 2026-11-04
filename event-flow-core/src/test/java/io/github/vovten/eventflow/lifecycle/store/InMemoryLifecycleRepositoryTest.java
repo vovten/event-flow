@@ -121,6 +121,19 @@ class InMemoryLifecycleRepositoryTest {
     }
 
     @Test
+    @DisplayName("Should record a disabled-processing failure without creating a processing row")
+    void shouldRecordProcessingDisabled() {
+        retryStore.schedule(RetryTask.pending(eventId, SERVICE, RetryKind.DELIVERY, 1,
+                RetryReason.PUBLISH_FAILED, Instant.now(), null));
+
+        repository.onProcessingDisabled(eventId, "Type", "error");
+
+        assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.FAILED);
+        assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isEmpty();
+        assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should record no-handler as dead")
     void shouldRecordNoHandler() {
         repository.onNoHandler(eventId, SERVICE, 1, "Type", "no handler");

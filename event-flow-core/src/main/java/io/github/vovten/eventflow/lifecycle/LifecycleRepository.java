@@ -55,6 +55,18 @@ public interface LifecycleRepository {
                             Instant nextAttemptAt, String policyName, String errorType, String error);
 
     /**
+     * Records a processing failure when processing retries are disabled.
+     * <p>
+     * The event becomes {@code FAILED} with error details, the delivery retry
+     * is cleared, and no processing retry row is created.
+     *
+     * @param eventId   event identifier
+     * @param errorType error class name, may be null
+     * @param error     error message, may be null
+     */
+    void onProcessingDisabled(UUID eventId, String errorType, String error);
+
+    /**
      * Records successful handling and clears retry work.
      *
      * @param eventId event identifier
