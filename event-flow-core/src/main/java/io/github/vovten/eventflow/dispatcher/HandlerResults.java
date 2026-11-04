@@ -1,7 +1,10 @@
 package io.github.vovten.eventflow.dispatcher;
 
+import io.github.vovten.eventflow.retry.FailureKind;
+
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -183,6 +186,61 @@ public final class HandlerResults {
      */
     public Optional<Throwable> getFirstError() {
         return getFirstFailure().flatMap(r -> Optional.ofNullable(r.error()));
+    }
+
+    /**
+     * Returns whether at least one failed handler allows another processing attempt.
+     *
+     * @return true if any failure is retryable
+     */
+    public boolean hasRetryableFailure() {
+        return getFailures().stream().anyMatch(HandlerResult::retryable);
+    }
+
+    /**
+     * Returns whether there is at least one failure and every failure is permanent.
+     *
+     * @return true if all failures are permanent
+     */
+    public boolean hasOnlyPermanentFailures() {
+        List<HandlerResult> failures = getFailures();
+        return !failures.isEmpty()
+                && failures.stream().allMatch(r -> r.failureKind() == FailureKind.PERMANENT);
+    }
+
+    /**
+     * Returns the names of all failed handlers.
+     *
+     * @return failed handler names (never null)
+     */
+    public List<String> getFailedHandlerNames() {
+        return getFailures().stream().map(HandlerResult::handlerName).toList();
+    }
+
+    /**
+     * Returns the maximum relative retry delay among failed handlers.
+     *
+     * @return maximum delay in milliseconds, or 0 when none is set
+     */
+    public long getMaxRetryAfterMs() {
+        return getFailures().stream()
+                .mapToLong(HandlerResult::retryAfterMs)
+                .max()
+                .orElse(0L);
+    }
+
+    /**
+     * Returns the policy name of the first retryable failure.
+     *
+     * @return the policy name, or null when unknown
+     */
+    public String getRetryPolicyName() {
+        return getFailures().stream()
+                .filter(HandlerResult::retryable)
+                .map(HandlerResult::policyName)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     /**

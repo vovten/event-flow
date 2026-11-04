@@ -572,7 +572,7 @@ Tests for each task are written in the same commit as the task. This list is the
     `retryAfterMs = policy.backoff(attempt)` and `policyName`;
   - when `localMaxRetries = 0`, do not sleep; hand off to durable immediately;
   - global local-attempt safety cap.
-- [ ] **2.9** `HandlerResult`:
+- [x] **2.9** `HandlerResult`:
   - `retryable`, `failureKind`, `attempts`, `policyName`, `retryAfterMs`.
 - [ ] **2.10** `HandlerResults`:
   - `hasRetryableFailure()`;
@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 8 commits | Tasks 2.1–2.7 done; next: 2.9 (enables 2.8) |
+| PR 2 — local retry | In progress | 9 commits | Tasks 2.1–2.7 and 2.9 done; next: 2.8 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -983,7 +983,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.5 Listener registry policy resolution | `bfd91b6` | `EventListenerRegistryRetryTest`; full core suite passed | Yes |
 | 2.5a Extract listener retry policy resolver | `aac0d39` | registry tests + full `mvn verify` passed | Yes |
 | 2.6 Spring registry reuse | `a9d4c64` | `SpringEventListenerRegistryTest`; full `mvn verify` passed | Yes |
-| 2.7 Subscriber policy resolution | this commit | `EventSubscriberRegistryRetryTest`; full `mvn verify` passed | Yes |
+| 2.7 Subscriber policy resolution | `4273ca6` | `EventSubscriberRegistryRetryTest`; full `mvn verify` passed | Yes |
+| 2.9 Handler result classification | this commit | `HandlerResultTest`/`HandlerResultsTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -996,4 +997,4 @@ Rules:
 
 # 14. Next step
 
-Start task **2.9** first: `HandlerResult` must carry `retryable`, `failureKind`, `attempts`, `policyName` and `retryAfterMs` before the dispatcher retry loop (2.8) can emit them. Then implement 2.8.
+Start task **2.8** (`UnifiedEventDispatcher`): implement the asynchronous local retry loop, read `attempt` from metadata, honour `localMaxRetries`, and emit `retryAfterMs`/`policyName` when handing off to durable retry.

@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.registry.EventHandlerInvocationException;
+import io.github.vovten.eventflow.retry.FailureKind;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * @since 1.1.0
@@ -67,6 +69,11 @@ class HandlerResultTest {
         assertThat(result.handlerName()).isEqualTo("myHandler");
         assertThat(result.error()).isNull();
         assertThat(result.errorDetails()).isNull();
+        assertThat(result.failureKind()).isEqualTo(FailureKind.NONE);
+        assertThat(result.retryable()).isFalse();
+        assertThat(result.attempts()).isEqualTo(1);
+        assertThat(result.policyName()).isNull();
+        assertThat(result.retryAfterMs()).isZero();
     }
 
     @Test
@@ -78,6 +85,44 @@ class HandlerResultTest {
         assertThat(result.handlerName()).isEqualTo("myHandler");
         assertThat(result.error()).isNull();
         assertThat(result.errorDetails()).isEqualTo("custom error");
+        assertThat(result.failureKind()).isEqualTo(FailureKind.TRANSIENT_EXHAUSTED);
+        assertThat(result.retryable()).isTrue();
+        assertThat(result.attempts()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should create a classified failure")
+    void shouldCreateClassifiedFailure() {
+        RuntimeException error = new RuntimeException("boom");
+
+        HandlerResult result = HandlerResult.failure(
+                "payment", error, "boom", FailureKind.PERMANENT,
+                false, 4, "payment-policy", 1_500L);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.failureKind()).isEqualTo(FailureKind.PERMANENT);
+        assertThat(result.retryable()).isFalse();
+        assertThat(result.attempts()).isEqualTo(4);
+        assertThat(result.policyName()).isEqualTo("payment-policy");
+        assertThat(result.retryAfterMs()).isEqualTo(1_500L);
+    }
+
+    @Test
+    @DisplayName("Should reject an invalid attempt count")
+    void shouldRejectInvalidAttemptCount() {
+        assertThatThrownBy(() -> HandlerResult.success("handler", 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("attempts");
+    }
+
+    @Test
+    @DisplayName("Should reject a negative retry delay")
+    void shouldRejectNegativeRetryDelay() {
+        assertThatThrownBy(() -> HandlerResult.failure(
+                "handler", null, "error", FailureKind.TRANSIENT_EXHAUSTED,
+                true, 1, "policy", -1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryAfterMs");
     }
 
     private record TestEvent() implements TraceableEvent {
