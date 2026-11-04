@@ -647,8 +647,8 @@ You choose the level per event — `NONE` for high-throughput fire-and-forget, `
 1. `EventLifecyclePublisher` saves the event to `EventStore` with status `NEW`, then publishes it
 2. On successful publish, status updates to `PUBLISHED`; on failure, to `FAILED`
 3. `EventLifecycleDispatcher` (on the consumer side) publishes `AcceptedAck` before handler execution
-4. After execution it publishes `SuccessAck`, `FailureAck`, or `NoHandlerAck`
-5. `AckHandler` (on the publisher side) applies a conditional transition: `ACCEPTED`, `HANDLED`, `FAILED`, or `DEAD`. Late or out-of-order acks never roll back a terminal status
+4. Handlers may absorb transient failures with local processing retries; afterwards the dispatcher publishes `SuccessAck`, `FailureAck`, or `NoHandlerAck`
+5. `AckHandler` (on the publisher side) applies a conditional transition: `ACCEPTED`, `HANDLED`, `FAILED`, or `DEAD`. A retryable `FailureAck` carries `retryAfterMs` and `policyName`. Late or out-of-order acks never roll back a terminal status
 6. `EventRetryScheduler` periodically rescans `FAILED`, stuck `PUBLISHED`, `ACCEPTED`, and orphaned `NEW` events and retries them with exponential backoff
 
 ### Three lifecycle levels
@@ -706,6 +706,69 @@ The `service-name` is mandatory — it identifies this service instance so that 
 | `NEW` | Event was saved but the application crashed before publishing finished (orphaned) |
 
 Backoff is exponential: `delay = minAge × 2^retryCount`. First retry at 30s, second at 60s, third at 120s.
+
+### Processing retry policies
+
+A listener can declare a **named processing-retry policy**. `@RetryPolicy` always
+requires a name. On a listener method it declares and binds the policy; on a type
+it only declares it for reuse:
+
+```java
+@RetryPolicy(
+        name = "payment",
+        maxRetries = 5,
+        localMaxRetries = 2,
+        initialDelay = "100ms",
+        multiplier = 2.0,
+        maxDelay = "30s",
+        jitter = 0.5,
+        retryOn = PaymentUnavailableException.class,
+        noRetryOn = PaymentRejectedException.class
+)
+class RetryPolicies { }
+
+@EventListener(value = PaymentFailed.class, retryPolicy = "payment")
+void on(PaymentFailed event) { ... }
+```
+
+`maxRetries` is the total retry budget after the first attempt. The first
+`localMaxRetries` retries run in-process; the remaining ones are executed by
+durable re-publication:
+
+- `localMaxRetries = 0` — durable-only, no local retry loop;
+- `localMaxRetries = maxRetries` — local-only;
+- a method-level `@RetryPolicy` cannot be combined with `retryPolicy = "..."`.
+
+When the local budget is exhausted, `FailureAck` carries `retryAfterMs` and
+`policyName`, so the publisher can schedule the next re-publish using the
+listener's policy. `AcceptedAck.maxProcessingMs` tells the publisher how long
+the consumer may legitimately spend in local retries.
+
+Listeners without a declaration or reference use the configured default policy:
+
+```yaml
+event-flow:
+  retry:
+    processing:
+      enabled: true
+      local-retry-cap: 10
+      default-policy:
+        max-retries: 3
+        local-max-retries: 0
+        initial-delay: 30s
+        multiplier: 2.0
+        max-delay: 10m
+        jitter: 0.5
+        retry-on: []
+        no-retry-on: []
+      policies:
+        payment:
+          max-retries: 7
+          local-max-retries: 1
+```
+
+The shipped default preserves legacy behaviour: `localMaxRetries = 0` and
+three durable retries.
 
 ### Cleanup
 

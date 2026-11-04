@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NoHandlerAck`: published when a managed event is received but no listener is resolved. The event moves to the terminal `DEAD` status instead of being treated as successfully handled.
 - `EventStatus.ACCEPTED` and `EventStatus.DEAD`: explicit delivery-confirmed and terminal dead-letter states. No schema migration is required; only status comments change.
 - `EventStore.transitionStatus(...)`: conditional status updates that reject stale or out-of-order acknowledgments instead of overwriting a newer state.
+- Named `@RetryPolicy` processing policies. The `name` attribute is required; a method-level declaration declares and binds the policy, a type-level declaration makes it reusable through `@EventListener(retryPolicy = "...")`. `EventSubscriber.retryPolicy()` supports programmatic subscribers.
+- Local processing retry loop in `UnifiedEventDispatcher`: `maxRetries` is the total budget, `localMaxRetries` controls how many retries run in-process, and `localMaxRetries = 0` means durable-only. Retries are asynchronous, jittered and bounded by a global local-attempt cap.
+- Configurable default processing policy and named policy overrides via `event-flow.retry.processing.*`.
+- `FailureAck.retryAfterMs` and `FailureAck.policyName`, plus `AcceptedAck.maxProcessingMs`, carry the listener's retry decision to the publisher.
+- `HandlerResult` / `HandlerResults` now expose `failureKind`, `retryable`, `attempts`, `policyName` and `retryAfterMs`.
 
 ### Changed
 
@@ -22,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EventRetryScheduler` now also scans `ACCEPTED` events, recovering events whose final ack was lost after consumer acceptance.
 - Lifecycle ack events (`AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck`) are excluded from structured logs by default.
 - `SuccessAck` and `FailureAck` carry `retryKind` and `attempt`, identifying the retry context of the dispatch that produced the ack.
+- `UnifiedEventDispatcher` retries only the failing handler locally; other handlers of the same event are not re-run.
+- `ListenerRetryPolicyResolver` centralizes policy declaration, named-reference resolution, default-policy fallback and fail-fast validation. `SpringEventListenerRegistry` performs a two-phase policy scan so cross-bean references work.
+- `EventDispatcherBuilder` exposes `retryDelayScheduler(...)` and `localRetryCap(...)`.
 
 ### Fixed
 

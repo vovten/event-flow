@@ -230,3 +230,44 @@ event-flow:
     lifecycle:
       # Enable or disable ack-based lifecycle tracking
       enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Processing Retry Configuration
+  # ---------------------------------------------------------------------------
+  # Policies are named. Declare them in code with @RetryPolicy(name = "...")
+  # and reference them from @EventListener(retryPolicy = "...") or
+  # EventSubscriber.retryPolicy(). Listeners without a reference use the
+  # default policy below. Named policies can be overridden here by name.
+  retry:
+    processing:
+      # Enable local in-process retries. Durable re-publication still works
+      # when this is false; only the local layer is disabled.
+      enabled: true
+      # Absolute cap for local retry attempts, independent of listener policies.
+      local-retry-cap: 10
+      default-policy:
+        # Total retries after the first attempt (local + durable).
+        max-retries: 3
+        # Retries performed locally before durable re-publication.
+        # 0 = durable-only.
+        local-max-retries: 0
+        initial-delay: 30s
+        multiplier: 2.0
+        max-delay: 10m
+        jitter: 0.5
+        # Empty means retry any exception. Class names must be Throwable types.
+        retry-on: []
+        no-retry-on: []
+      # Named policy overrides. Only specified fields are overridden.
+      policies:
+        # payment:
+        #   max-retries: 7
+        #   local-max-retries: 1
+        #   initial-delay: 2s
+        #   multiplier: 2.0
+        #   max-delay: 30s
+        #   jitter: 0.25
+        #   retry-on:
+        #     - io.example.PaymentUnavailableException
+        #   no-retry-on:
+        #     - io.example.PaymentRejectedException

@@ -596,36 +596,36 @@ Tests for each task are written in the same commit as the task. This list is the
 
 Tests for each task are written in the same commit as the task. This list is the minimum coverage checklist.
 
-- [ ] **2.15** `RetryPolicyRegistryTest`: named, unknown, duplicate, reserved `default` name.
-- [ ] **2.16** `RetryPolicyResolverTest`: `retryOn` / `noRetryOn` / empty, `localMaxRetries`, default policy, duration parsing, declaration+reference ambiguity.
-- [ ] **2.17** `UnifiedEventDispatcherRetryTest`:
+- [x] **2.15** `RetryPolicyRegistryTest`: named, unknown, duplicate, reserved `default` name.
+- [x] **2.16** `RetryPolicyResolverTest`: `retryOn` / `noRetryOn` / empty, `localMaxRetries`, default policy, duration parsing, declaration+reference ambiguity.
+- [x] **2.17** `UnifiedEventDispatcherRetryTest`:
   - transient failure succeeds locally;
   - exhausted local budget returns `retryAfterMs`;
   - `localMaxRetries = 0` performs no local retry;
   - total budget splits into local + durable attempts;
   - permanent failure is not retried;
   - multiple handlers are isolated.
-- [ ] **2.18** `EventListenerRegistryRetryTest` and `SpringEventListenerRegistryTest`:
+- [x] **2.18** `EventListenerRegistryRetryTest` and `SpringEventListenerRegistryTest`:
   - method-level declaration is bound to its listener and reusable by another listener;
   - a type-level declaration alone does not bind implicitly;
   - duplicate names and declaration+reference ambiguity fail startup.
-- [ ] **2.19** `EventLifecycleDispatcherTest`: `maxProcessingMs`, `retryable`, `retryAfterMs`, `policyName`.
-- [ ] **2.20** Verify a platform-thread worker is not blocked during backoff.
-- [ ] **2.21** `FailureAckTest`: new `retryAfterMs`/`policyName` fields and legacy constructor defaults.
+- [x] **2.19** `EventLifecycleDispatcherTest`: `maxProcessingMs`, `retryable`, `retryAfterMs`, `policyName`.
+- [x] **2.20** Verify a platform-thread worker is not blocked during backoff.
+- [x] **2.21** `FailureAckTest`: new `retryAfterMs`/`policyName` fields and legacy constructor defaults.
 
 ## 6.6 Definition of Done
 
-- [ ] Transient failures are absorbed locally without touching the store when `localMaxRetries > 0`.
-- [ ] `localMaxRetries = 0` sends `FailureAck(retryable = true, retryAfterMs = ...)` without local delay.
-- [ ] The policy's total budget spans local and durable attempts.
-- [ ] Other handlers are not re-run for a local retry.
-- [ ] Exhausted budget produces `FailureAck(retryable = true)` with `retryAfterMs` and `policyName`.
-- [ ] Permanent failure produces `FailureAck(retryable = false)`.
-- [ ] Listeners without a declaration or reference use the default policy; shipped default preserves legacy behaviour.
-- [ ] Every declared policy is a named policy and is overridable by config.
-- [ ] Method-level declaration and `retryPolicy` reference together fail startup.
-- [ ] Duplicate names, unknown references and the reserved `default` name fail startup.
-- [ ] A method-level declaration is reusable by name; a type-level declaration does not bind implicitly.
+- [x] Transient failures are absorbed locally without touching the store when `localMaxRetries > 0`.
+- [x] `localMaxRetries = 0` sends `FailureAck(retryable = true, retryAfterMs = ...)` without local delay.
+- [x] The policy's total budget spans local and durable attempts.
+- [x] Other handlers are not re-run for a local retry.
+- [x] Exhausted budget produces `FailureAck(retryable = true)` with `retryAfterMs` and `policyName`.
+- [x] Permanent failure produces `FailureAck(retryable = false)`.
+- [x] Listeners without a declaration or reference use the default policy; shipped default preserves legacy behaviour.
+- [x] Every declared policy is a named policy and is overridable by config.
+- [x] Method-level declaration and `retryPolicy` reference together fail startup.
+- [x] Duplicate names, unknown references and the reserved `default` name fail startup.
+- [x] A method-level declaration is reusable by name; a type-level declaration does not bind implicitly.
 
 ## 6.7 Risks for PR 2
 
@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 12 commits | Tasks 2.1–2.14 done; next: final PR 2 verification/docs |
+| PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -988,7 +988,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.10 `HandlerResults` aggregates | `5adee1b` | delivered with 2.9; tested | Yes |
 | 2.8 Dispatcher local retry loop | `2a60456` | `UnifiedEventDispatcherRetryTest`; full `mvn verify` passed | Yes |
 | 2.11a–2.11 Policy-driven failure ack | `b856ed5` | ack/dispatcher tests + full `mvn verify` passed | Yes |
-| 2.12–2.14 Spring wiring | this commit | `RetryPolicyConfigurationTest`/`EventFlowPropertiesTest` + full `mvn verify` passed | Yes |
+| 2.12–2.14 Spring wiring | `8f85376` | `RetryPolicyConfigurationTest`/`EventFlowPropertiesTest` + full `mvn verify` passed | Yes |
+| PR 2 final tests/docs | this commit | non-blocking retry test + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1001,4 +1002,4 @@ Rules:
 
 # 14. Next step
 
-Finish PR 2: mark the 2.15–2.21 test checklist, update README/CHANGELOG with `@RetryPolicy`, default policy and `event-flow.retry.processing.*`, run the full `mvn verify`, and close PR 2.
+PR 2 is complete. Start **PR 3a — durable retry store**: `event_retry`, `EventRetryStore`, `LifecycleRepository` and transactional status transitions.
