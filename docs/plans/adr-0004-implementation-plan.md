@@ -748,7 +748,7 @@ Tests for each task are written in the same commit as the task. This list is the
   - wait for `AcceptedAck`;
   - timeout → `PENDING` + `attempt++`;
   - cap → retry row `DEAD` + event status `DEAD`.
-- [ ] **3b.2** `ProcessingRetryScheduler`:
+- [x] **3b.2** `ProcessingRetryScheduler`:
   - due `PROCESSING` → claim → re-publish with `retryKind = PROCESSING`;
   - use the row's `next_attempt_at` computed from `FailureAck.retryAfterMs`;
   - fall back to global processing backoff when the ack had no relative delay;
@@ -949,7 +949,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
-| PR 3b — schedulers | In progress | 1 commit | 3b.1 done; next: 3b.2 |
+| PR 3b — schedulers | In progress | 4 commits | 3b.1–3b.2 done; next: 3b.3 |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
 Update this table after each merged PR.
@@ -997,7 +997,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 3a.6–3a.9, 3a.12 Lifecycle repositories | `60dbce0` | repository atomicity/rollback tests + concurrency test + full `mvn verify` passed | Yes |
 | 3b.1 `DeliveryRetryScheduler` | `64f2979` | `DeliveryRetrySchedulerTest` (18 tests) + full `mvn verify` passed | Yes |
 | 3b.1a Attempt numbering alignment | `58d5b4a` | `DeliveryRetrySchedulerTest`/`RetryTaskTest`; full `mvn verify` passed | Yes |
-| 3b.1b Extract retry event reconstruction | this commit | `DeliveryRetrySchedulerTest` re-run; full `mvn verify` passed | Yes |
+| 3b.1b Extract retry event reconstruction | `b9eec79` | `DeliveryRetrySchedulerTest` re-run; full `mvn verify` passed | Yes |
+| 3b.2 `ProcessingRetryScheduler` | this commit | `ProcessingRetrySchedulerTest` (16 tests) + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1010,4 +1011,4 @@ Rules:
 
 # 14. Next step
 
-Continue PR 3b with **3b.2 `ProcessingRetryScheduler`**: due `PROCESSING` rows, policy-driven next attempt, final-ack handling and dead-lettering.
+Continue PR 3b with **3b.3 Shared `RetrySchedulerSupport`**: extract claim, lease, batch, jitter and logging shared by both schedulers; group by `eventId` to avoid double publish.
