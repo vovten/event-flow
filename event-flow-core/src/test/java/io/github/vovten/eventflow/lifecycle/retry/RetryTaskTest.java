@@ -59,6 +59,28 @@ class RetryTaskTest {
     }
 
     @Test
+    @DisplayName("Should reschedule the next attempt with a new reason")
+    void shouldScheduleNextAttempt() {
+        RetryTask task = RetryTask.pending(
+                EVENT_ID, "test-service", RetryKind.DELIVERY, 1,
+                RetryReason.PUBLISH_FAILED, NOW.minusSeconds(1), "delivery");
+
+        RetryTask next = task.withNextAttempt(2, RetryReason.ACK_TIMEOUT,
+                NOW.plusSeconds(5), "Type", "timeout");
+
+        assertThat(next.state()).isEqualTo(RetryState.PENDING);
+        assertThat(next.attempt()).isEqualTo(2);
+        assertThat(next.reason()).isEqualTo(RetryReason.ACK_TIMEOUT);
+        assertThat(next.nextAttemptAt()).isEqualTo(NOW.plusSeconds(5));
+        assertThat(next.lastErrorType()).isEqualTo("Type");
+        assertThat(next.lastError()).isEqualTo("timeout");
+        assertThat(next.policyName()).isEqualTo("delivery");
+        assertThat(next.createdAt()).isEqualTo(task.createdAt());
+        assertThat(next.claimedBy()).isNull();
+        assertThat(next.claimedUntil()).isNull();
+    }
+
+    @Test
     @DisplayName("Should mark a task as dead")
     void shouldMarkTaskAsDead() {
         RetryTask task = RetryTask.pending(

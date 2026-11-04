@@ -123,6 +123,25 @@ public record RetryTask(
     }
 
     /**
+     * Returns a pending copy for the next attempt, preserving the original
+     * creation time and policy name.
+     *
+     * @param newAttempt     new 1-based attempt number
+     * @param newReason      reason for the next attempt
+     * @param nextAttemptAt  next eligible time
+     * @param errorType      error class name, may be null
+     * @param error          error message, may be null
+     * @return the rescheduled pending copy
+     */
+    public RetryTask withNextAttempt(int newAttempt, RetryReason newReason,
+                                     Instant nextAttemptAt, String errorType, String error) {
+        return new RetryTask(eventId, service, retryKind, newAttempt,
+                RetryState.PENDING, newReason, nextAttemptAt,
+                errorType, error, policyName, null, null,
+                createdAt, Instant.now());
+    }
+
+    /**
      * Returns a terminal dead-letter copy.
      *
      * @param deadReason reason for the terminal state

@@ -742,7 +742,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 ## 8.1 Schedulers
 
-- [ ] **3b.1** `DeliveryRetryScheduler`:
+- [x] **3b.1** `DeliveryRetryScheduler`:
   - due `DELIVERY` → claim → re-publish;
   - never selects `ACCEPTED`; only `DELIVERY` rows;
   - wait for `AcceptedAck`;
@@ -949,7 +949,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
-| PR 3b — schedulers | Not started | — | Depends on PR 3a; next: 3b.1 |
+| PR 3b — schedulers | In progress | 1 commit | 3b.1 done; next: 3b.2 |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
 Update this table after each merged PR.
@@ -994,7 +994,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | PR 2 final tests/docs | `ee29e1e` | non-blocking retry test + full `mvn verify` passed | Yes |
 | 3a.1a Retry model + in-memory store | `a29c66f` | `RetryTaskTest`/`InMemoryEventRetryStoreTest`; full core suite passed | Yes |
 | 3a.1b JDBC retry store | `308b42c` | JDBC/schema/dialect tests + full `mvn verify` passed | Yes |
-| 3a.6–3a.9, 3a.12 Lifecycle repositories | this commit | repository atomicity/rollback tests + concurrency test + full `mvn verify` passed | Yes |
+| 3a.6–3a.9, 3a.12 Lifecycle repositories | `60dbce0` | repository atomicity/rollback tests + concurrency test + full `mvn verify` passed | Yes |
+| 3b.1 `DeliveryRetryScheduler` | this commit | `DeliveryRetrySchedulerTest` (18 tests) + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1007,4 +1008,4 @@ Rules:
 
 # 14. Next step
 
-PR 3a is complete. Continue with **PR 3b**: `DeliveryRetryScheduler`, `ProcessingRetryScheduler`, shared scheduler support, watchdogs, ack routing and Spring wiring (tasks 3b.1–3b.12).
+Continue PR 3b with **3b.2 `ProcessingRetryScheduler`**: due `PROCESSING` rows, policy-driven next attempt, final-ack handling and dead-lettering.
