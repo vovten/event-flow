@@ -1,15 +1,14 @@
 package io.github.vovten.eventflow.registry;
 
 import io.github.vovten.eventflow.EventHandler;
-import io.github.vovten.eventflow.EventListener;
-import io.github.vovten.eventflow.event.Envelope;
-import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicyRegistry;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.util.ClassUtils;
 
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -107,7 +106,20 @@ public class SpringEventListenerRegistry extends EventListenerRegistry
      * @throws IllegalArgumentException if applicationContext is null
      */
     public SpringEventListenerRegistry(ApplicationContext applicationContext, String scanPackage) {
-        super();
+        this(applicationContext, scanPackage,
+                new ListenerRetryPolicyResolver(new RetryPolicyRegistry(), ResolvedRetryPolicy.defaults()));
+    }
+
+    /**
+     * Creates a Spring-aware registry with a shared retry-policy resolver.
+     *
+     * @param applicationContext Spring application context (required)
+     * @param scanPackage        package prefix for filtering beans (required)
+     * @param retryPolicies      shared retry-policy resolver (must not be null)
+     */
+    public SpringEventListenerRegistry(ApplicationContext applicationContext, String scanPackage,
+                                       ListenerRetryPolicyResolver retryPolicies) {
+        super(retryPolicies);
         if (applicationContext == null) {
             throw new IllegalArgumentException("ApplicationContext is required");
         }
@@ -119,6 +131,21 @@ public class SpringEventListenerRegistry extends EventListenerRegistry
         }
         this.scanPackage = scanPackage;
         this.applicationContext = applicationContext;
+    }
+
+    /**
+     * Creates a Spring-aware registry with a shared policy registry and default policy.
+     *
+     * @param applicationContext Spring application context (required)
+     * @param scanPackage        package prefix for filtering beans (required)
+     * @param retryPolicyRegistry shared named policy registry (must not be null)
+     * @param defaultRetryPolicy  default policy (must not be null)
+     */
+    public SpringEventListenerRegistry(ApplicationContext applicationContext, String scanPackage,
+                                       RetryPolicyRegistry retryPolicyRegistry,
+                                       ResolvedRetryPolicy defaultRetryPolicy) {
+        this(applicationContext, scanPackage,
+                new ListenerRetryPolicyResolver(retryPolicyRegistry, defaultRetryPolicy));
     }
 
     /**
@@ -138,43 +165,9 @@ public class SpringEventListenerRegistry extends EventListenerRegistry
      */
     @Override
     protected void registerIfAnnotationPresent(Object bean) {
-        Method[] methods = ClassUtils.getUserClass(bean.getClass()).getMethods();
-        for (Method method : methods) {
-            if (method.isAnnotationPresent(EventListener.class)) {
-                checkMethodSignature(method);
-                EventListener annotation = method.getAnnotation(EventListener.class);
-                Class<?> eventType = resolveListenerEventType(method, annotation);
-                registerListener(bean, method, eventType);
-            }
-        }
-    }
-
-    /**
-     * Resolve the event type for listener registration.
-     * If method parameter is Envelope and annotation value is not specified,
-     * throws exception requiring explicit domain event type.
-     *
-     * @param method the annotated method
-     * @param annotation the annotation
-     * @return the event type to register
-     * @throws IllegalArgumentException if Envelope is used without annotation value
-     */
-    private Class<?> resolveListenerEventType(Method method, EventListener annotation) {
-        Class<?> annotationValue = annotation.value();
-        Class<?> paramType = method.getParameterTypes()[0];
-        if (Envelope.class.isAssignableFrom(paramType)) {
-            if (annotationValue == null || annotationValue.equals(Event.class)) {
-                throw new IllegalArgumentException(
-                        "Listener '" + method.getDeclaringClass().getSimpleName() + "." + method.getName() +
-                                "()': When method parameter is Envelope, annotation value must specify domain event type. " +
-                                "Use @EventListener(YourDomainEvent.class) instead of @EventListener");
-            }
-            return annotationValue;
-        }
-        if (annotationValue != null && !annotationValue.equals(Event.class)) {
-            return annotationValue;
-        }
-        return paramType;
+        Class<?> userClass = ClassUtils.getUserClass(bean.getClass());
+        preparePolicies(userClass);
+        registerAnnotatedMethods(bean, userClass);
     }
 
     /**
@@ -196,7 +189,11 @@ public class SpringEventListenerRegistry extends EventListenerRegistry
      */
     private void init() {
         if (applicationContext != null) {
-            allBeans().forEach(this::register);
+            List<Object> beans = allBeans();
+            // Phase 1: register every policy declaration before resolving references.
+            beans.forEach(bean -> preparePolicies(ClassUtils.getUserClass(bean.getClass())));
+            // Phase 2: register handlers and resolve their policies.
+            beans.forEach(this::register);
         }
     }
 

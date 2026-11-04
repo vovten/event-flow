@@ -228,6 +228,17 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     }
 
     /**
+     * Scans and registers the retry-policy declarations of the given class.
+     * <p>
+     * Exposed for subclasses that scan user classes behind proxies.
+     *
+     * @param beanClass the user class to scan
+     */
+    protected void preparePolicies(Class<?> beanClass) {
+        retryPolicies.prepare(beanClass);
+    }
+
+    /**
      * Registers all annotated listener methods of the given class.
      *
      * @param bean      the listener bean

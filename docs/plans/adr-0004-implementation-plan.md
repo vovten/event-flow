@@ -553,7 +553,7 @@ Tests for each task are written in the same commit as the task. This list is the
   - carry the resolved policy in `MethodInvokingEventHandler`;
   - fail-fast on duplicate names, unknown references and declaration+reference ambiguity;
   - document that shared policies belong on a dedicated type.
-- [ ] **2.6** `SpringEventListenerRegistry`: reuse base resolution, do not duplicate it.
+- [x] **2.6** `SpringEventListenerRegistry`: reuse base resolution, do not duplicate it.
 - [ ] **2.7** `EventSubscriberRegistry`: resolve the name returned by `EventSubscriber.retryPolicy()`;
   - empty name → default policy;
   - unknown name → fail startup.
@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 6 commits | Tasks 2.1–2.5 done; next: 2.6 |
+| PR 2 — local retry | In progress | 7 commits | Tasks 2.1–2.6 done; next: 2.7 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -981,7 +981,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.3 `@EventListener.retryPolicy` | `0151aaf` | `EventListenerAnnotationTest`; full core suite passed | Yes |
 | 2.4 `EventSubscriber.retryPolicy()` | `cdc1b72` | `EventSubscriberTest`; full core suite passed | Yes |
 | 2.5 Listener registry policy resolution | `bfd91b6` | `EventListenerRegistryRetryTest`; full core suite passed | Yes |
-| 2.5a Extract listener retry policy resolver | this commit | registry tests + full `mvn verify` passed | Yes |
+| 2.5a Extract listener retry policy resolver | `aac0d39` | registry tests + full `mvn verify` passed | Yes |
+| 2.6 Spring registry reuse | this commit | `SpringEventListenerRegistryTest`; full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -994,4 +995,4 @@ Rules:
 
 # 14. Next step
 
-Start task **2.6** (`SpringEventListenerRegistry`): reuse base policy resolution, scan policy declarations in two phases, and avoid duplicate logic. Follow the one-task-one-commit rule and update this plan as work advances.
+Start task **2.7** (`EventSubscriberRegistry`): resolve the named policy from `EventSubscriber.retryPolicy()` and expose it through `EventHandlerRegistry.retryPolicyFor(...)`. Follow the one-task-one-commit rule and update this plan as work advances.

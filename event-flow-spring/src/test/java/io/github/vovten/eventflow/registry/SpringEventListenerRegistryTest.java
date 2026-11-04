@@ -5,6 +5,11 @@ import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventListener;
+import io.github.vovten.eventflow.registry.EventListenerRegistry.MethodInvokingEventHandler;
+import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicyRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +17,7 @@ import org.springframework.context.ApplicationContext;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -156,6 +162,51 @@ class SpringEventListenerRegistryTest {
         assertTrue(exception.getMessage().contains("annotation value must specify domain event type"));
     }
 
+    @Test
+    @DisplayName("Should resolve a Spring method-level named policy")
+    void shouldResolveSpringMethodLevelPolicy() {
+        RetryPolicyRegistry policyRegistry = new RetryPolicyRegistry();
+        SpringEventListenerRegistry registry = new SpringEventListenerRegistry(
+                applicationContext, "com.example",
+                new ListenerRetryPolicyResolver(policyRegistry, ResolvedRetryPolicy.defaults()));
+
+        registry.register(new SpringMethodPolicyListener());
+
+        assertThat(policyRegistry.contains("spring-method")).isTrue();
+        assertThat(handlerFor(registry, new TestEvent()).resolvedRetryPolicy().name())
+                .isEqualTo("spring-method");
+    }
+
+    @Test
+    @DisplayName("Should resolve a policy reference across beans with a two-phase scan")
+    void shouldResolvePolicyReferenceAcrossBeans() {
+        SpringReferenceListener listener = new SpringReferenceListener();
+        SpringSharedPolicies policies = new SpringSharedPolicies();
+        when(applicationContext.getBeanDefinitionNames())
+                .thenReturn(new String[]{"listener", "policies"});
+        when(applicationContext.getBean("listener")).thenReturn(listener);
+        when(applicationContext.getBean("policies")).thenReturn(policies);
+
+        RetryPolicyRegistry policyRegistry = new RetryPolicyRegistry();
+        SpringEventListenerRegistry registry = new SpringEventListenerRegistry(
+                applicationContext, "io.github.vovten.eventflow.registry",
+                new ListenerRetryPolicyResolver(policyRegistry, ResolvedRetryPolicy.defaults()));
+
+        registry.postConstructInitialize();
+
+        assertThat(policyRegistry.contains("shared")).isTrue();
+        assertThat(handlerFor(registry, new TestEvent()).resolvedRetryPolicy().name())
+                .isEqualTo("shared");
+    }
+
+    private MethodInvokingEventHandler handlerFor(SpringEventListenerRegistry registry, Event event) {
+        return registry.getHandlers(event).stream()
+                .filter(MethodInvokingEventHandler.class::isInstance)
+                .map(MethodInvokingEventHandler.class::cast)
+                .findFirst()
+                .orElseThrow();
+    }
+
     static class TestEvent extends AbstractTraceableEvent {
         @Override
         public Class<? extends Event> type() {
@@ -221,6 +272,27 @@ class SpringEventListenerRegistryTest {
     static class EnvelopeWithoutAnnotationListener {
         @EventListener
         public void handleEnvelope(Envelope<DomainOrderEvent> event) {
+        }
+    }
+
+    static class SpringMethodPolicyListener {
+
+        @EventListener(TestEvent.class)
+        @RetryPolicy(name = "spring-method", maxRetries = 1, localMaxRetries = 0,
+                initialDelay = "10ms", jitter = 0.0)
+        public void handleTestEvent(TestEvent event) {
+        }
+    }
+
+    @RetryPolicy(name = "shared", maxRetries = 2, localMaxRetries = 0,
+            initialDelay = "10ms", jitter = 0.0)
+    static class SpringSharedPolicies {
+    }
+
+    static class SpringReferenceListener {
+
+        @EventListener(value = TestEvent.class, retryPolicy = "shared")
+        public void handleTestEvent(TestEvent event) {
         }
     }
 }
