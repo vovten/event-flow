@@ -3,16 +3,19 @@ package io.github.vovten.eventflow.lifecycle;
 import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
+import io.github.vovten.eventflow.lifecycle.retry.RetryReason;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.retry.RetryMetadata;
 import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.util.EventUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -72,6 +75,8 @@ public final class EventLifecyclePublisher implements EventPublisher {
     private final EventPublisher origin;
     private final EventStore eventStore;
     private final LifecycleResolver lifecycleResolver;
+    private final LifecycleRepository lifecycleRepository;
+    private final EventLifecyclePublisherOptions options;
 
     /**
      * Creates a new EventLifecyclePublisher with the standard lifecycle resolver.
@@ -81,7 +86,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
      * @param service    the service name for ack filtering, or null/empty to disable
      */
     public EventLifecyclePublisher(EventPublisher origin, EventStore eventStore, String service) {
-        this(origin, eventStore, service, LifecycleResolver.standard());
+        this(origin, eventStore, service, LifecycleResolver.standard(), null, null);
     }
 
     /**
@@ -94,10 +99,53 @@ public final class EventLifecyclePublisher implements EventPublisher {
      */
     public EventLifecyclePublisher(EventPublisher origin, EventStore eventStore, String service,
                                     LifecycleResolver lifecycleResolver) {
+        this(origin, eventStore, service, lifecycleResolver, null, null);
+    }
+
+    /**
+     * Creates a retry-aware publisher with the standard lifecycle resolver.
+     *
+     * @param origin              the underlying publisher to delegate to
+     * @param eventStore          the event store for persistence
+     * @param service             the service name for ack filtering and retry ownership
+     *                            (must not be blank)
+     * @param lifecycleRepository transactional lifecycle facade for durable delivery retries
+     * @param options             publisher retry options
+     */
+    public EventLifecyclePublisher(EventPublisher origin, EventStore eventStore, String service,
+                                   LifecycleRepository lifecycleRepository,
+                                   EventLifecyclePublisherOptions options) {
+        this(origin, eventStore, service, LifecycleResolver.standard(), lifecycleRepository, options);
+    }
+
+    /**
+     * Creates a retry-aware publisher with a custom lifecycle resolver.
+     *
+     * @param origin              the underlying publisher to delegate to
+     * @param eventStore          the event store for persistence
+     * @param service             the service name for ack filtering and retry ownership
+     *                            (must not be blank when retry routing is enabled)
+     * @param lifecycleResolver   the lifecycle resolver strategy (must not be null)
+     * @param lifecycleRepository transactional lifecycle facade, or null for legacy mode
+     * @param options             publisher retry options, or null for legacy mode
+     */
+    public EventLifecyclePublisher(EventPublisher origin, EventStore eventStore, String service,
+                                   LifecycleResolver lifecycleResolver,
+                                   LifecycleRepository lifecycleRepository,
+                                   EventLifecyclePublisherOptions options) {
         this.service = service;
         this.origin = Objects.requireNonNull(origin, "origin must not be null");
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.lifecycleResolver = Objects.requireNonNull(lifecycleResolver, "lifecycleResolver must not be null");
+        if ((lifecycleRepository == null) != (options == null)) {
+            throw new IllegalArgumentException(
+                    "lifecycleRepository and options must be either both set or both null");
+        }
+        if (lifecycleRepository != null && (service == null || service.isBlank())) {
+            throw new IllegalArgumentException("service must not be blank when retry routing is enabled");
+        }
+        this.lifecycleRepository = lifecycleRepository;
+        this.options = options;
     }
 
     @Override
@@ -110,6 +158,8 @@ public final class EventLifecyclePublisher implements EventPublisher {
         Event enriched = enrichWithService(ensureEnvelope(event));
         UUID eventId = resolveEventId(enriched);
         EventLifecycle lifecycle = lifecycleResolver.resolve(event);
+        int attempt = RetryMetadata.attempt(enriched);
+        boolean schedulerInitiated = RetryMetadata.hasContext(enriched);
 
         if (lifecycle == EventLifecycle.PERSISTED) {
             // Persist with UNDEFINED status, no further tracking
@@ -123,7 +173,8 @@ public final class EventLifecyclePublisher implements EventPublisher {
             return CompletableFuture.completedFuture(SendResults.empty());
         }
         return origin.publish(enriched)
-                .whenComplete((result, error) -> updatePublishResult(eventId, result, error));
+                .whenComplete((result, error) ->
+                        updatePublishResult(eventId, attempt, schedulerInitiated, result, error));
     }
 
     private boolean shouldSkipPersistence(Event event) {
@@ -201,15 +252,26 @@ public final class EventLifecyclePublisher implements EventPublisher {
         return true;
     }
 
-    private void updatePublishResult(UUID eventId, SendResults result, Throwable error) {
+    private void updatePublishResult(UUID eventId, int attempt, boolean schedulerInitiated,
+                                     SendResults result, Throwable error) {
         if (error != null) {
-            updatePublishFailed(eventId, error.getMessage());
+            updatePublishFailed(eventId, schedulerInitiated,
+                    error.getClass().getName(), error.getMessage());
             return;
         }
         if (result == null || result.isAllFailure()) {
-            updatePublishFailed(eventId, result != null ? result.getSummary() : "null result");
+            updatePublishFailed(eventId, schedulerInitiated, null,
+                    result != null ? result.getSummary() : "null result");
             return;
         }
+        if (options != null && !options.requireAcceptedAck()) {
+            acceptAfterPublish(eventId, attempt);
+        } else {
+            markPublished(eventId);
+        }
+    }
+
+    private void markPublished(UUID eventId) {
         boolean applied = eventStore.transitionStatus(
                 eventId, PUBLISH_RESULT_SOURCES, EventStatus.PUBLISHED, null);
         if (applied) {
@@ -219,7 +281,31 @@ public final class EventLifecyclePublisher implements EventPublisher {
         }
     }
 
-    private void updatePublishFailed(UUID eventId, String errorMessage) {
+    private void acceptAfterPublish(UUID eventId, int attempt) {
+        if (lifecycleRepository != null) {
+            lifecycleRepository.onAccepted(eventId, attempt);
+            log.debug("Event {} treated as ACCEPTED after successful publish", eventId);
+            return;
+        }
+        boolean applied = eventStore.transitionStatus(
+                eventId, PUBLISH_RESULT_SOURCES, EventStatus.ACCEPTED, null);
+        if (applied) {
+            log.debug("Event published and accepted: {}", eventId);
+        } else {
+            log.debug("Ignoring late publish success for event {}: status is already newer or terminal", eventId);
+        }
+    }
+
+    private void updatePublishFailed(UUID eventId, boolean schedulerInitiated,
+                                     String errorType, String errorMessage) {
+        if (lifecycleRepository != null && !schedulerInitiated) {
+            Instant nextAttemptAt = Instant.now().plus(options.deliveryRetryDelay());
+            lifecycleRepository.onPublishFailed(eventId, service, RetryReason.PUBLISH_FAILED,
+                    nextAttemptAt, errorType, errorMessage);
+            log.warn("Event publication failed: {} — {} (delivery retry scheduled)",
+                    eventId, errorMessage);
+            return;
+        }
         boolean applied = eventStore.transitionStatus(
                 eventId, PUBLISH_RESULT_SOURCES, EventStatus.FAILED, errorMessage);
         if (applied) {

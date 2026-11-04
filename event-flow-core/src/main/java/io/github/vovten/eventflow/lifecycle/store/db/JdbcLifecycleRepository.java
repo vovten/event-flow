@@ -70,7 +70,7 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
                     conn, eventId, PUBLISH_FAILURE_SOURCES, EventStatus.FAILED, error);
             if (applied) {
                 schedule(conn, eventId, service, RetryKind.DELIVERY, 1,
-                        reason, nextAttemptAt, null);
+                        reason, nextAttemptAt, null, errorType, error);
             }
         });
     }
@@ -98,7 +98,7 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
             retryStore.complete(conn, eventId, RetryKind.DELIVERY);
             if (retryable) {
                 schedule(conn, eventId, service, RetryKind.PROCESSING, attempt,
-                        RetryReason.HANDLER_FAILED, nextAttemptAt, policyName);
+                        RetryReason.HANDLER_FAILED, nextAttemptAt, policyName, errorType, error);
             } else {
                 deadOrSchedule(conn, eventId, service, RetryKind.PROCESSING,
                         RetryReason.HANDLER_FAILED, policyName, errorType, error);
@@ -165,15 +165,17 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
             Optional<RetryTask> existing = retryStore.find(conn, eventId, kind);
             String policyName = existing.map(RetryTask::policyName).orElse(null);
             schedule(conn, eventId, service, kind, 1,
-                    RetryReason.HANDLER_FAILED, Instant.now(), policyName);
+                    RetryReason.HANDLER_FAILED, Instant.now(), policyName, null, null);
         });
     }
 
     private void schedule(Connection conn, UUID eventId, String service, RetryKind kind,
                           int attempt, RetryReason reason, Instant nextAttemptAt,
-                          String policyName) throws SQLException {
-        retryStore.schedule(conn, RetryTask.pending(
-                eventId, service, kind, attempt, reason, nextAttemptAt, policyName));
+                          String policyName, String errorType, String error) throws SQLException {
+        RetryTask task = RetryTask.pending(
+                        eventId, service, kind, attempt, reason, nextAttemptAt, policyName)
+                .withNextAttempt(attempt, reason, nextAttemptAt, errorType, error);
+        retryStore.schedule(conn, task);
     }
 
     private void deadOrSchedule(Connection conn, UUID eventId, String service, RetryKind kind,

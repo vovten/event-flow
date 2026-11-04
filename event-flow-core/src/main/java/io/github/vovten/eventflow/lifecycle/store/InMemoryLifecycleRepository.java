@@ -55,7 +55,8 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
         boolean applied = eventStore.transitionStatus(
                 eventId, PUBLISH_FAILURE_SOURCES, EventStatus.FAILED, error);
         if (applied) {
-            schedule(eventId, service, RetryKind.DELIVERY, 1, reason, nextAttemptAt, null);
+            schedule(eventId, service, RetryKind.DELIVERY, 1, reason, nextAttemptAt, null,
+                    errorType, error);
         }
     }
 
@@ -78,7 +79,7 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
         retryStore.complete(eventId, RetryKind.DELIVERY);
         if (retryable) {
             schedule(eventId, service, RetryKind.PROCESSING, attempt,
-                    RetryReason.HANDLER_FAILED, nextAttemptAt, policyName);
+                    RetryReason.HANDLER_FAILED, nextAttemptAt, policyName, errorType, error);
         } else {
             deadOrSchedule(eventId, service, RetryKind.PROCESSING,
                     RetryReason.HANDLER_FAILED, policyName, errorType, error);
@@ -134,13 +135,16 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
         Optional<RetryTask> existing = retryStore.find(eventId, kind);
         String policyName = existing.map(RetryTask::policyName).orElse(null);
         schedule(eventId, service, kind, 1, RetryReason.HANDLER_FAILED,
-                Instant.now(), policyName);
+                Instant.now(), policyName, null, null);
     }
 
     private void schedule(UUID eventId, String service, RetryKind kind, int attempt,
-                          RetryReason reason, Instant nextAttemptAt, String policyName) {
-        retryStore.schedule(RetryTask.pending(
-                eventId, service, kind, attempt, reason, nextAttemptAt, policyName));
+                          RetryReason reason, Instant nextAttemptAt, String policyName,
+                          String errorType, String error) {
+        RetryTask task = RetryTask.pending(
+                        eventId, service, kind, attempt, reason, nextAttemptAt, policyName)
+                .withNextAttempt(attempt, reason, nextAttemptAt, errorType, error);
+        retryStore.schedule(task);
     }
 
     private void deadOrSchedule(UUID eventId, String service, RetryKind kind,

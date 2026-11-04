@@ -55,6 +55,21 @@ public final class RetryMetadata {
     }
 
     /**
+     * Checks whether an event already carries an explicit retry context.
+     * <p>
+     * Scheduler-initiated re-publishes set both keys; a first publish has no
+     * retry context.
+     *
+     * @param event the event to inspect
+     * @return true if both retry metadata keys are present
+     */
+    public static boolean hasContext(Event event) {
+        return event instanceof Envelope<?> envelope
+                && envelope.metadata().containsKey(RETRY_KIND)
+                && envelope.metadata().containsKey(ATTEMPT);
+    }
+
+    /**
      * Stamps the retry context into an event.
      * <p>
      * Envelopes receive two extra metadata entries. A raw event is wrapped in
