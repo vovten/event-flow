@@ -212,6 +212,141 @@ public interface SqlDialect {
     String deleteByStatusesStatement(int statusCount);
 
     /**
+     * INSERT statement for a durable retry row.
+     *
+     * @return INSERT SQL with {@code ?} placeholders and one {@code %s} table placeholder
+     */
+    default String insertRetryStatement() {
+        return """
+                INSERT INTO %s (
+                    event_id, service, retry_kind, attempt, state, reason, next_attempt_at,
+                    last_error_type, last_error, policy_name, claimed_by, claimed_until,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+    }
+
+    /**
+     * UPDATE statement for an existing durable retry row.
+     *
+     * @return UPDATE SQL with {@code ?} placeholders and one {@code %s} table placeholder
+     */
+    default String updateRetryStatement() {
+        return """
+                UPDATE %s
+                SET service = ?, attempt = ?, state = ?, reason = ?, next_attempt_at = ?,
+                    last_error_type = ?, last_error = ?, policy_name = ?,
+                    claimed_by = ?, claimed_until = ?, updated_at = ?
+                WHERE event_id = ? AND retry_kind = ?
+                """;
+    }
+
+    /**
+     * SELECT statement for due retry rows.
+     *
+     * @return SELECT SQL with placeholders for kind, service, now, now, and limit
+     */
+    default String selectDueRetriesStatement() {
+        String template = """
+                SELECT event_id, service, retry_kind, attempt, state, reason, next_attempt_at,
+                       last_error_type, last_error, policy_name, claimed_by, claimed_until,
+                       created_at, updated_at
+                FROM %%s
+                WHERE retry_kind = ? AND service = ?
+                  AND ((state = 'PENDING' AND next_attempt_at <= ?)
+                       OR (state = 'IN_PROGRESS' AND claimed_until <= ?))
+                ORDER BY next_attempt_at ASC
+                %s
+                """;
+        return String.format(template, limitClause());
+    }
+
+    /**
+     * Optimistic claim statement for a due retry row.
+     *
+     * @return UPDATE SQL with placeholders for owner, lease, now, event id, kind, now, now
+     */
+    default String claimRetryStatement() {
+        return """
+                UPDATE %s
+                SET state = 'IN_PROGRESS', claimed_by = ?, claimed_until = ?, updated_at = ?
+                WHERE event_id = ? AND retry_kind = ?
+                  AND ((state = 'PENDING' AND next_attempt_at <= ?)
+                       OR (state = 'IN_PROGRESS' AND claimed_until <= ?))
+                """;
+    }
+
+    /**
+     * UPDATE statement rescheduling a retry row.
+     *
+     * @return UPDATE SQL with placeholders for attempt, next attempt, errors, now, event id, kind
+     */
+    default String rescheduleRetryStatement() {
+        return """
+                UPDATE %s
+                SET state = 'PENDING', attempt = ?, next_attempt_at = ?,
+                    last_error_type = ?, last_error = ?,
+                    claimed_by = NULL, claimed_until = NULL, updated_at = ?
+                WHERE event_id = ? AND retry_kind = ?
+                """;
+    }
+
+    /**
+     * DELETE statement completing a retry row.
+     *
+     * @return DELETE SQL with placeholders for event id and kind
+     */
+    default String completeRetryStatement() {
+        return "DELETE FROM %s WHERE event_id = ? AND retry_kind = ?";
+    }
+
+    /**
+     * UPDATE statement marking a retry row as dead.
+     *
+     * @return UPDATE SQL with placeholders for reason, errors, now, event id, kind
+     */
+    default String deadRetryStatement() {
+        return """
+                UPDATE %s
+                SET state = 'DEAD', reason = ?, last_error_type = ?, last_error = ?,
+                    claimed_by = NULL, claimed_until = NULL, updated_at = ?
+                WHERE event_id = ? AND retry_kind = ?
+                """;
+    }
+
+    /**
+     * SELECT statement for a retry row by event id and kind.
+     *
+     * @return SELECT SQL with placeholders for event id and kind
+     */
+    default String selectRetryByIdStatement() {
+        return """
+                SELECT event_id, service, retry_kind, attempt, state, reason, next_attempt_at,
+                       last_error_type, last_error, policy_name, claimed_by, claimed_until,
+                       created_at, updated_at
+                FROM %s
+                WHERE event_id = ? AND retry_kind = ?
+                """;
+    }
+
+    /**
+     * DELETE statement for retry rows by event ids.
+     *
+     * @param eventCount number of event ids in the IN clause
+     * @return DELETE SQL with {@code eventCount} placeholders and one {@code %s} table placeholder
+     */
+    default String deleteRetriesByEventIdsStatement(int eventCount) {
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < eventCount; i++) {
+            if (i > 0) {
+                placeholders.append(", ");
+            }
+            placeholders.append("?");
+        }
+        return "DELETE FROM %s WHERE event_id IN (" + placeholders + ")";
+    }
+
+    /**
      * Returns the {@link SqlDialect} implementation for the given {@link DatabaseDialect}.
      *
      * @param dialect the database dialect enum value

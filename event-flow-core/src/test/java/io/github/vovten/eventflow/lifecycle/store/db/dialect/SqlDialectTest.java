@@ -319,4 +319,33 @@ class SqlDialectTest {
         assertThat(dialect.markForRetryStatement().formatted("events")).contains("retry = TRUE");
         assertThat(dialect.selectRetryableEventsStatement(2).formatted("events")).contains("retry = TRUE");
     }
+
+    @Test
+    @DisplayName("Should provide durable retry SQL for every dialect")
+    void shouldProvideRetrySqlForEveryDialect() {
+        for (DatabaseDialect databaseDialect : DatabaseDialect.values()) {
+            SqlDialect dialect = SqlDialect.forDialect(databaseDialect);
+
+            assertThat(dialect.insertRetryStatement().formatted("event_retry"))
+                    .contains("INSERT INTO event_retry");
+            assertThat(dialect.updateRetryStatement().formatted("event_retry"))
+                    .contains("UPDATE event_retry");
+            assertThat(dialect.selectDueRetriesStatement().formatted("event_retry"))
+                    .contains("FROM event_retry")
+                    .contains(dialect.limitClause());
+            assertThat(dialect.claimRetryStatement().formatted("event_retry"))
+                    .contains("UPDATE event_retry")
+                    .contains("IN_PROGRESS");
+            assertThat(dialect.rescheduleRetryStatement().formatted("event_retry"))
+                    .contains("PENDING");
+            assertThat(dialect.completeRetryStatement().formatted("event_retry"))
+                    .contains("DELETE FROM event_retry");
+            assertThat(dialect.deadRetryStatement().formatted("event_retry"))
+                    .contains("DEAD");
+            assertThat(dialect.selectRetryByIdStatement().formatted("event_retry"))
+                    .contains("FROM event_retry");
+            assertThat(dialect.deleteRetriesByEventIdsStatement(2).formatted("event_retry"))
+                    .contains("IN (?, ?)");
+        }
+    }
 }
