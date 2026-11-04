@@ -996,7 +996,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 3a.1b JDBC retry store | `308b42c` | JDBC/schema/dialect tests + full `mvn verify` passed | Yes |
 | 3a.6–3a.9, 3a.12 Lifecycle repositories | `60dbce0` | repository atomicity/rollback tests + concurrency test + full `mvn verify` passed | Yes |
 | 3b.1 `DeliveryRetryScheduler` | `64f2979` | `DeliveryRetrySchedulerTest` (18 tests) + full `mvn verify` passed | Yes |
-| 3b.1a Attempt numbering alignment | this commit | `DeliveryRetrySchedulerTest`/`RetryTaskTest`; full `mvn verify` passed | Yes |
+| 3b.1a Attempt numbering alignment | `58d5b4a` | `DeliveryRetrySchedulerTest`/`RetryTaskTest`; full `mvn verify` passed | Yes |
+| 3b.1b Extract retry event reconstruction | this commit | `DeliveryRetrySchedulerTest` re-run; full `mvn verify` passed | Yes |
 
 Rules:
 
