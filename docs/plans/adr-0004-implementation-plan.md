@@ -654,7 +654,9 @@ Tests for each task are written in the same commit as the task. This list is the
   - `InMemoryEventRetryStore`;
   - `RetryTaskMapper`;
   - `RetrySchemaInitializer`.
-- [ ] **3a.2** `EventRetryStore` methods:
+  - [x] **3a.1a** retry model, `EventRetryStore` SPI and `InMemoryEventRetryStore` + tests.
+  - [ ] **3a.1b** `JdbcEventRetryStore`, `RetryTaskMapper`, `RetrySchemaInitializer` and SQL resources.
+- [x] **3a.2** `EventRetryStore` methods:
   - `schedule`;
   - `findDue`;
   - `claim`;
@@ -946,7 +948,7 @@ Tests for each task are written in the same commit as the task. This list is the
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
-| PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
+| PR 3a — retry store | In progress | 1 commit | 3a.1a + 3a.2 done; next: 3a.1b |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
@@ -989,7 +991,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.8 Dispatcher local retry loop | `2a60456` | `UnifiedEventDispatcherRetryTest`; full `mvn verify` passed | Yes |
 | 2.11a–2.11 Policy-driven failure ack | `b856ed5` | ack/dispatcher tests + full `mvn verify` passed | Yes |
 | 2.12–2.14 Spring wiring | `8f85376` | `RetryPolicyConfigurationTest`/`EventFlowPropertiesTest` + full `mvn verify` passed | Yes |
-| PR 2 final tests/docs | this commit | non-blocking retry test + full `mvn verify` passed | Yes |
+| PR 2 final tests/docs | `ee29e1e` | non-blocking retry test + full `mvn verify` passed | Yes |
+| 3a.1a Retry model + in-memory store | this commit | `RetryTaskTest`/`InMemoryEventRetryStoreTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -1002,4 +1005,4 @@ Rules:
 
 # 14. Next step
 
-PR 2 is complete. Start **PR 3a — durable retry store**: `event_retry`, `EventRetryStore`, `LifecycleRepository` and transactional status transitions.
+Continue PR 3a with **3a.1b**: implement `JdbcEventRetryStore`, `RetryTaskMapper`, `RetrySchemaInitializer`, retry SQL in `SqlDialect`, and the five `event-retry-*.sql` resources.
