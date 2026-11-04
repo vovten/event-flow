@@ -538,14 +538,14 @@ Tests for each task are written in the same commit as the task. This list is the
     - empty `retryOn` (any exception).
 - [x] **2.3** `@EventListener`: add `retryPolicy()` named reference.
   - A method-level `@RetryPolicy` and a `retryPolicy` reference together fail startup.
-- [ ] **2.4** Policy reference for programmatic handlers:
+- [x] **2.4** Policy reference for programmatic handlers:
   - add `default String retryPolicy()` to `EventSubscriber`, returning a named policy reference;
   - `MethodInvokingEventHandler` carries the resolved policy from the method declaration/reference;
   - do not add a separate `RetryPolicyAware` abstraction.
 
 ## 6.2 Policy resolution
 
-- [ ] **2.5** `EventListenerRegistry`:
+- [x] **2.5** `EventListenerRegistry`:
   - register method-level `@RetryPolicy` declarations by their required name;
   - method-level declarations are declaration+binding and are reusable by other listeners through `retryPolicy`;
   - type-level declarations are declaration-only and never bind implicitly, even on a listener class;
@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 3 commits | Tasks 2.1–2.3 done; next: 2.4 |
+| PR 2 — local retry | In progress | 5 commits | Tasks 2.1–2.5 done; next: 2.6 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -978,7 +978,9 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.20–1.26 Docs and verification | `8f3946f` | full `mvn verify` passed | Yes |
 | 2.1–2.2a Policy API | `b93fdab` | policy API tests; full core suite passed | Yes |
 | 2.1b Named-only policy rework | `be5fdd4` | policy API tests; full `mvn verify` passed | Yes |
-| 2.3 `@EventListener.retryPolicy` | this commit | `EventListenerAnnotationTest`; full core suite passed | Yes |
+| 2.3 `@EventListener.retryPolicy` | `0151aaf` | `EventListenerAnnotationTest`; full core suite passed | Yes |
+| 2.4 `EventSubscriber.retryPolicy()` | `cdc1b72` | `EventSubscriberTest`; full core suite passed | Yes |
+| 2.5 Listener registry policy resolution | this commit | `EventListenerRegistryRetryTest`; full core suite passed | Yes |
 
 Rules:
 
@@ -991,4 +993,4 @@ Rules:
 
 # 14. Next step
 
-Start task **2.4** (`EventSubscriber.retryPolicy()`): add the named-policy reference for programmatic subscribers and test the default empty reference. Follow the one-task-one-commit rule and update this plan as work advances.
+Start task **2.6** (`SpringEventListenerRegistry`): reuse base policy resolution, scan policy declarations in two phases, and avoid duplicate logic. Follow the one-task-one-commit rule and update this plan as work advances.

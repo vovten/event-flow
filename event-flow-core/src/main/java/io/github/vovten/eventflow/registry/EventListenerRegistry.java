@@ -6,6 +6,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventListener;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicyRegistry;
+import io.github.vovten.eventflow.retry.RetryPolicyResolver;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -13,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -105,12 +112,53 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     private final Map<Class<?>, List<EventHandler>> combinedHandlersCache;
 
     /**
-     * Creates a new annotation-based event listener registry.
+     * Registry of named processing-retry policies.
+     */
+    private final RetryPolicyRegistry retryPolicyRegistry;
+
+    /**
+     * Default policy used when a listener has no declaration or reference.
+     */
+    private final ResolvedRetryPolicy defaultRetryPolicy;
+
+    /**
+     * Classes whose policy declarations have already been scanned.
+     */
+    private final Set<Class<?>> preparedPolicyTypes = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Creates a new annotation-based event listener registry with an isolated
+     * policy registry and the shipped default policy.
      * Thread-safe for concurrent register/unregister/dispatch operations.
      */
     public EventListenerRegistry() {
+        this(new RetryPolicyRegistry(), ResolvedRetryPolicy.defaults());
+    }
+
+    /**
+     * Creates a new registry using the given named policy registry and the
+     * shipped default policy.
+     *
+     * @param retryPolicyRegistry the shared named policy registry (must not be null)
+     */
+    public EventListenerRegistry(RetryPolicyRegistry retryPolicyRegistry) {
+        this(retryPolicyRegistry, ResolvedRetryPolicy.defaults());
+    }
+
+    /**
+     * Creates a new registry using the given named policy registry and default policy.
+     *
+     * @param retryPolicyRegistry the shared named policy registry (must not be null)
+     * @param defaultRetryPolicy  the default policy (must not be null)
+     */
+    public EventListenerRegistry(RetryPolicyRegistry retryPolicyRegistry,
+                                 ResolvedRetryPolicy defaultRetryPolicy) {
         this.eventListeners = new ConcurrentHashMap<>();
         this.combinedHandlersCache = new ConcurrentHashMap<>();
+        this.retryPolicyRegistry = Objects.requireNonNull(
+                retryPolicyRegistry, "retryPolicyRegistry must not be null");
+        this.defaultRetryPolicy = Objects.requireNonNull(
+                defaultRetryPolicy, "defaultRetryPolicy must not be null");
     }
 
     /**
@@ -165,8 +213,35 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * @throws InvalidEventListenerMethodSignatureException if method signature is invalid
      */
     protected void registerIfAnnotationPresent(Object bean) {
-        Method[] methods = bean.getClass().getMethods();
-        for (Method method : methods) {
+        Class<?> beanClass = bean.getClass();
+        preparePolicies(beanClass);
+        registerAnnotatedMethods(bean, beanClass);
+    }
+
+    /**
+     * Scans the given class for policy declarations and registers them by name.
+     * <p>
+     * A type-level {@code @RetryPolicy} is declaration-only and is not bound to
+     * any listener. Method-level declarations are registered here as well; they
+     * are bound when the annotated listener is registered.
+     * <p>
+     * Use this method to register a dedicated named-policy holder class that is
+     * not itself an event listener.
+     *
+     * @param policyType the class to scan
+     */
+    public void registerPolicyType(Class<?> policyType) {
+        preparePolicies(Objects.requireNonNull(policyType, "policyType must not be null"));
+    }
+
+    /**
+     * Registers all annotated listener methods of the given class.
+     *
+     * @param bean      the listener bean
+     * @param beanClass the user class to scan (may differ from {@code bean.getClass()} for proxies)
+     */
+    protected void registerAnnotatedMethods(Object bean, Class<?> beanClass) {
+        for (Method method : beanClass.getMethods()) {
             if (method.isAnnotationPresent(EventListener.class)) {
                 checkMethodSignature(method);
                 EventListener annotation = method.getAnnotation(EventListener.class);
@@ -175,6 +250,57 @@ public class EventListenerRegistry implements EventHandlerRegistry {
                 registerListener(bean, method, eventType);
             }
         }
+    }
+
+    private void preparePolicies(Class<?> beanClass) {
+        if (!preparedPolicyTypes.add(beanClass)) {
+            return;
+        }
+        RetryPolicy typePolicy = beanClass.getAnnotation(RetryPolicy.class);
+        if (typePolicy != null) {
+            registerDeclaredPolicy(RetryPolicyResolver.resolveDeclared(typePolicy, defaultRetryPolicy), beanClass);
+        }
+        for (Method method : beanClass.getMethods()) {
+            if (method.isAnnotationPresent(EventListener.class)
+                    && method.isAnnotationPresent(RetryPolicy.class)) {
+                RetryPolicy methodPolicy = method.getAnnotation(RetryPolicy.class);
+                registerDeclaredPolicy(
+                        RetryPolicyResolver.resolveDeclared(methodPolicy, defaultRetryPolicy), method);
+            }
+        }
+    }
+
+    private void registerDeclaredPolicy(ResolvedRetryPolicy policy, Object source) {
+        Optional<ResolvedRetryPolicy> existing = retryPolicyRegistry.find(policy.name());
+        if (existing.isPresent()) {
+            if (!existing.get().equals(policy)) {
+                throw new IllegalStateException(
+                        "Duplicate retry policy '" + policy.name() + "' declared at " + source);
+            }
+            return;
+        }
+        retryPolicyRegistry.register(policy);
+    }
+
+    private ResolvedRetryPolicy resolveRetryPolicy(Method method) {
+        RetryPolicy declared = method.getAnnotation(RetryPolicy.class);
+        EventListener annotation = method.getAnnotation(EventListener.class);
+        String reference = annotation != null ? annotation.retryPolicy() : "";
+        boolean hasReference = reference != null && !reference.isBlank();
+        if (declared != null && hasReference) {
+            throw new IllegalArgumentException(
+                    "Listener " + method.getDeclaringClass().getName() + "#" + method.getName()
+                            + " has both @RetryPolicy and @EventListener(retryPolicy=...); choose one");
+        }
+        if (declared != null) {
+            ResolvedRetryPolicy resolved = RetryPolicyResolver.resolveDeclared(declared, defaultRetryPolicy);
+            registerDeclaredPolicy(resolved, method);
+            return retryPolicyRegistry.resolve(resolved.name());
+        }
+        if (hasReference) {
+            return retryPolicyRegistry.resolve(reference);
+        }
+        return defaultRetryPolicy;
     }
 
     /**
@@ -216,18 +342,20 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * @param eventType the event type to register for
      */
     protected void registerListener(Object bean, Method method, Class<?> eventType) {
-        var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
-        var newHandler = new MethodInvokingEventHandler(bean, method);
-        boolean exists = handlers.stream()
+        List<EventHandler> existingHandlers = eventListeners.get(eventType);
+        boolean exists = existingHandlers != null && existingHandlers.stream()
                 .filter(h -> h instanceof MethodInvokingEventHandler mih)
                 .anyMatch(h -> {
                     MethodInvokingEventHandler mih = (MethodInvokingEventHandler) h;
                     return mih.object().equals(bean) && mih.method().equals(method);
                 });
-        if (!exists) {
-            handlers.add(newHandler);
-            combinedHandlersCache.clear();
+        if (exists) {
+            return;
         }
+        ResolvedRetryPolicy retryPolicy = resolveRetryPolicy(method);
+        var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
+        handlers.add(new MethodInvokingEventHandler(bean, method, retryPolicy));
+        combinedHandlersCache.clear();
     }
 
     private List<EventHandler> buildCombinedList(List<EventHandler> genericHandlers,
@@ -392,7 +520,21 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * @param object the listener object
      * @param method the method to invoke
      */
-    public record MethodInvokingEventHandler(Object object, Method method) implements EventHandler {
+    public record MethodInvokingEventHandler(
+            Object object,
+            Method method,
+            ResolvedRetryPolicy resolvedRetryPolicy
+    ) implements EventHandler {
+
+        /**
+         * Legacy constructor retained for backward compatibility.
+         *
+         * @param object the listener object
+         * @param method the listener method
+         */
+        public MethodInvokingEventHandler(Object object, Method method) {
+            this(object, method, null);
+        }
 
         @Override
         public void onEvent(Event event) {

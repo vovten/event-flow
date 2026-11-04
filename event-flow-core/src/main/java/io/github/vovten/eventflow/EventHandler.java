@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow;
 
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
 
 /**
  * Handler for events occurring in the application.
@@ -29,5 +30,19 @@ public interface EventHandler {
      */
     default String name() {
         return getClass().getSimpleName();
+    }
+
+    /**
+     * Returns the resolved processing-retry policy for this handler.
+     * <p>
+     * The registry resolves named policies at registration time. A {@code null}
+     * value means the handler has no explicitly resolved policy and the
+     * dispatcher's default policy applies.
+     *
+     * @return the resolved policy, or {@code null} when the default policy applies
+     * @since 1.4.0
+     */
+    default ResolvedRetryPolicy resolvedRetryPolicy() {
+        return null;
     }
 }
