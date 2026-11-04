@@ -20,8 +20,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -160,6 +162,41 @@ class UnifiedEventDispatcherRetryTest {
         UnifiedEventDispatcher dispatcher = dispatcher(handler, scheduler);
 
         assertThat(dispatcher.maxProcessingMs(new TestEvent())).isEqualTo(30L);
+    }
+
+    @Test
+    @DisplayName("Should not block the dispatcher worker during backoff")
+    void shouldNotBlockWorkerDuringBackoff() throws Exception {
+        ExecutorService singleThread = Executors.newSingleThreadExecutor();
+        try {
+            CountDownLatch delayRequested = new CountDownLatch(1);
+            CompletableFuture<Void> delayGate = new CompletableFuture<>();
+            RetryDelayScheduler blockingScheduler = delay -> {
+                delayRequested.countDown();
+                return delayGate;
+            };
+            PolicyHandler handler = new PolicyHandler(
+                    "handler", policy(3, 3, Set.of(TimeoutException.class), Set.of()),
+                    1, new RuntimeException(new TimeoutException("slow")));
+            Map<Class<?>, List<EventHandler>> handlerMap = Map.of(
+                    TestEvent.class, List.of(handler));
+            EventHandlerRegistry registry = new MapBasedHandlerRegistry(handlerMap);
+            UnifiedEventDispatcher dispatcher = new UnifiedEventDispatcher(
+                    singleThread, registry, List.of(), null, blockingScheduler, 10);
+
+            CompletableFuture<HandlerResults> dispatchFuture = dispatcher.dispatch(new TestEvent());
+            assertThat(delayRequested.await(1, TimeUnit.SECONDS)).isTrue();
+
+            CompletableFuture<String> probe = CompletableFuture.supplyAsync(() -> "ok", singleThread);
+            assertThat(probe.get(1, TimeUnit.SECONDS)).isEqualTo("ok");
+
+            delayGate.complete(null);
+            HandlerResults results = dispatchFuture.get(1, TimeUnit.SECONDS);
+            assertThat(results.isAllSuccess()).isTrue();
+            assertThat(handler.invocations()).isEqualTo(2);
+        } finally {
+            singleThread.shutdownNow();
+        }
     }
 
     @Test
