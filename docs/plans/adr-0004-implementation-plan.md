@@ -755,7 +755,7 @@ Tests for each task are written in the same commit as the task. This list is the
   - wait for final ack;
   - retryable failure → `PENDING` with the next policy-driven delay;
   - permanent/cap → `DEAD`.
-- [ ] **3b.3** Shared `RetrySchedulerSupport`:
+- [x] **3b.3** Shared `RetrySchedulerSupport`:
   - claim, lease, batch, jitter, logging;
   - group by `eventId` to avoid double publish.
 - [ ] **3b.4** Watchdogs:
@@ -949,7 +949,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
-| PR 3b — schedulers | In progress | 4 commits | 3b.1–3b.2 done; next: 3b.3 |
+| PR 3b — schedulers | In progress | 5 commits | 3b.1–3b.3 done; next: 3b.4 |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
 Update this table after each merged PR.
@@ -998,7 +998,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 3b.1 `DeliveryRetryScheduler` | `64f2979` | `DeliveryRetrySchedulerTest` (18 tests) + full `mvn verify` passed | Yes |
 | 3b.1a Attempt numbering alignment | `58d5b4a` | `DeliveryRetrySchedulerTest`/`RetryTaskTest`; full `mvn verify` passed | Yes |
 | 3b.1b Extract retry event reconstruction | `b9eec79` | `DeliveryRetrySchedulerTest` re-run; full `mvn verify` passed | Yes |
-| 3b.2 `ProcessingRetryScheduler` | this commit | `ProcessingRetrySchedulerTest` (16 tests) + full `mvn verify` passed | Yes |
+| 3b.2 `ProcessingRetryScheduler` | `7a9aba5` | `ProcessingRetrySchedulerTest` (16 tests) + full `mvn verify` passed | Yes |
+| 3b.3 Shared scheduler support + grouping | this commit | `RetrySchedulerSupportTest` + both scheduler suites; full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1011,4 +1012,4 @@ Rules:
 
 # 14. Next step
 
-Continue PR 3b with **3b.3 Shared `RetrySchedulerSupport`**: extract claim, lease, batch, jitter and logging shared by both schedulers; group by `eventId` to avoid double publish.
+Continue PR 3b with **3b.4 Watchdogs**: create or raise `DELIVERY` rows for stale `PUBLISHED` events and `PROCESSING` rows for stale `ACCEPTED` events (only when processing is enabled).

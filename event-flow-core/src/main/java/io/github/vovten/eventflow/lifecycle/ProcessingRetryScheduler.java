@@ -13,6 +13,7 @@ import io.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +34,7 @@ import java.util.concurrent.TimeUnit;
  * The row stays {@link RetryState#IN_PROGRESS} until a {@code SuccessAck} or
  * {@code FailureAck} is routed to the {@link LifecycleRepository}. If the lease
  * expires, the scheduler returns the row to {@link RetryState#PENDING} with the
- * next attempt and an exponential backoff. When
+ * next attempt and a jittered exponential backoff. When
  * {@link ProcessingRetryOptions#maxRetries()} is exhausted, the row and the
  * event are dead-lettered.
  * <p>
@@ -47,16 +48,14 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(ProcessingRetryScheduler.class);
 
-    private final EventRetryStore retryStore;
+    private final RetrySchedulerSupport support;
     private final EventStore eventStore;
-    private final LifecycleRepository lifecycleRepository;
     private final EventPublisher publisher;
     private final ProcessingRetryOptions options;
-    private final String owner;
     private final ScheduledExecutorService scheduler;
 
     /**
-     * Creates a processing retry scheduler.
+     * Creates a processing retry scheduler with its own support object.
      *
      * @param retryStore          durable retry store
      * @param eventStore          event store holding the payloads
@@ -69,13 +68,27 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
                                     LifecycleRepository lifecycleRepository,
                                     EventPublisher publisher,
                                     ProcessingRetryOptions options) {
-        this.retryStore = Objects.requireNonNull(retryStore, "retryStore must not be null");
+        this(new RetrySchedulerSupport(retryStore, lifecycleRepository,
+                        "processing-retry-" + UUID.randomUUID()),
+                eventStore, publisher, options);
+    }
+
+    /**
+     * Creates a processing retry scheduler with a shared support object.
+     *
+     * @param support    shared scheduler support
+     * @param eventStore event store holding the payloads
+     * @param publisher  publisher used to re-publish stored events
+     * @param options    scheduler options
+     */
+    public ProcessingRetryScheduler(RetrySchedulerSupport support,
+                                    EventStore eventStore,
+                                    EventPublisher publisher,
+                                    ProcessingRetryOptions options) {
+        this.support = Objects.requireNonNull(support, "support must not be null");
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
-        this.lifecycleRepository = Objects.requireNonNull(lifecycleRepository,
-                "lifecycleRepository must not be null");
         this.publisher = Objects.requireNonNull(publisher, "publisher must not be null");
         this.options = Objects.requireNonNull(options, "options must not be null");
-        this.owner = "processing-retry-" + UUID.randomUUID();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, "processing-retry-scheduler");
             thread.setDaemon(true);
@@ -121,7 +134,7 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
      */
     void retryCycle() {
         Instant now = Instant.now();
-        List<RetryTask> due = retryStore.findDue(
+        List<RetryTask> due = support.findDue(
                 RetryKind.PROCESSING, options.service(), now, options.batchSize());
         if (due.isEmpty()) {
             log.trace("No processing retries are due");
@@ -153,25 +166,19 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
     private void deliver(RetryTask task, Instant now) {
         int nextAttempt = task.attempt() + 1;
         if (isBudgetExhausted(nextAttempt)) {
-            deadLetter(task, RetryReason.CAP_EXCEEDED, "processing retry budget exhausted");
+            support.deadLetter(task, RetryReason.CAP_EXCEEDED, "processing retry budget exhausted");
             return;
         }
-        if (!claimNextAttempt(task, nextAttempt, now)) {
+        if (!support.claimNextAttempt(task, nextAttempt, now, options.ackTimeout())) {
             log.debug("Processing retry for event {} was already claimed", task.eventId());
             return;
         }
         Optional<StoredEvent> stored = eventStore.findById(task.eventId());
         if (stored.isEmpty()) {
-            markDeadWithoutEvent(task, "stored event not found");
+            support.markDeadWithoutEvent(task, "stored event not found");
             return;
         }
         publish(task, stored.get(), nextAttempt, now);
-    }
-
-    private boolean claimNextAttempt(RetryTask task, int nextAttempt, Instant now) {
-        retryStore.schedule(task.withNextAttempt(nextAttempt, task.reason(), now, null, null));
-        return retryStore.claim(task.eventId(), RetryKind.PROCESSING, owner,
-                now.plus(options.ackTimeout()));
     }
 
     private void publish(RetryTask task, StoredEvent stored, int attempt, Instant now) {
@@ -194,8 +201,7 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
     }
 
     private void handleExpiredClaim(RetryTask task, Instant now) {
-        if (!retryStore.claim(task.eventId(), RetryKind.PROCESSING, owner,
-                now.plus(options.ackTimeout()))) {
+        if (!support.claim(task, now, options.ackTimeout())) {
             log.debug("Expired processing retry for event {} was claimed by another instance",
                     task.eventId());
             return;
@@ -210,14 +216,14 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
                                      RetryReason reason, String errorType, String error) {
         int nextAttempt = performedAttempt + 1;
         if (isBudgetExhausted(nextAttempt)) {
-            deadLetter(task, RetryReason.CAP_EXCEEDED, error);
+            support.deadLetter(task, RetryReason.CAP_EXCEEDED, error);
             return;
         }
-        Instant nextAttemptAt = now.plus(options.backoff(performedAttempt));
-        retryStore.schedule(task.withNextAttempt(nextAttempt, reason, nextAttemptAt, errorType, error));
+        Duration delay = RetrySchedulerSupport.withJitter(
+                options.backoff(performedAttempt), options.jitter());
+        support.reschedule(task, nextAttempt, reason, now.plus(delay), errorType, error);
         log.debug("Scheduled processing retry for event {}: attempt {}/{}, reason={}, delay={}",
-                task.eventId(), nextAttempt, maxAttempts(), reason,
-                options.backoff(performedAttempt));
+                task.eventId(), nextAttempt, maxAttempts(), reason, delay);
     }
 
     private boolean isBudgetExhausted(int attempt) {
@@ -226,22 +232,6 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
 
     private int maxAttempts() {
         return options.maxRetries() + 1;
-    }
-
-    private void deadLetter(RetryTask task, RetryReason reason, String error) {
-        try {
-            lifecycleRepository.onDeadLetter(task.eventId(), task.service(),
-                    RetryKind.PROCESSING, reason, null, error);
-            log.error("Dead-lettered processing retry for event {}: {}", task.eventId(), error);
-        } catch (RuntimeException e) {
-            log.error("Failed to dead-letter processing retry for event {}", task.eventId(), e);
-        }
-    }
-
-    private void markDeadWithoutEvent(RetryTask task, String error) {
-        log.error("Cannot retry processing for event {}: {}", task.eventId(), error);
-        retryStore.dead(task.eventId(), RetryKind.PROCESSING,
-                RetryReason.PUBLISH_FAILED, null, error);
     }
 
     private static String errorDetails(Throwable error) {

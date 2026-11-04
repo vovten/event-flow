@@ -11,6 +11,7 @@ import java.util.Objects;
  * @param ackTimeout    maximum time to wait for a final ack (must be positive)
  * @param retryDelay    base backoff delay used when the scheduler reschedules (must not be negative)
  * @param multiplier    exponential backoff multiplier (must be &gt;= 1.0)
+ * @param jitter        symmetric jitter fraction in [0, 1]
  * @param maxRetryDelay upper bound for the backoff delay (must not be shorter than {@code retryDelay})
  * @param maxRetries    maximum number of retries after the first attempt (must be &gt;= 0)
  * @param batchSize     maximum number of retry rows handled per cycle (must be positive)
@@ -23,6 +24,7 @@ public record ProcessingRetryOptions(
         Duration ackTimeout,
         Duration retryDelay,
         double multiplier,
+        double jitter,
         Duration maxRetryDelay,
         int maxRetries,
         int batchSize
@@ -47,6 +49,9 @@ public record ProcessingRetryOptions(
         }
         if (multiplier < 1.0) {
             throw new IllegalArgumentException("multiplier must be >= 1.0");
+        }
+        if (jitter < 0.0 || jitter > 1.0) {
+            throw new IllegalArgumentException("jitter must be between 0 and 1");
         }
         if (maxRetryDelay.compareTo(retryDelay) < 0) {
             throw new IllegalArgumentException("maxRetryDelay must not be shorter than retryDelay");
