@@ -153,12 +153,12 @@ public final class DeliveryRetryScheduler implements AutoCloseable {
     }
 
     private void deliver(RetryTask task, Instant now) {
-        if (isBudgetExhausted(task.attempt())) {
+        int nextAttempt = task.attempt() + 1;
+        if (isBudgetExhausted(nextAttempt)) {
             deadLetter(task, RetryReason.CAP_EXCEEDED, "delivery retry budget exhausted");
             return;
         }
-        if (!retryStore.claim(task.eventId(), RetryKind.DELIVERY, owner,
-                now.plus(options.ackTimeout()))) {
+        if (!claimNextAttempt(task, nextAttempt, now)) {
             log.debug("Delivery retry for event {} was already claimed", task.eventId());
             return;
         }
@@ -167,24 +167,30 @@ public final class DeliveryRetryScheduler implements AutoCloseable {
             markDeadWithoutEvent(task, "stored event not found");
             return;
         }
-        publish(task, stored.get(), now);
+        publish(task, stored.get(), nextAttempt, now);
     }
 
-    private void publish(RetryTask task, StoredEvent stored, Instant now) {
+    private boolean claimNextAttempt(RetryTask task, int nextAttempt, Instant now) {
+        retryStore.schedule(task.withNextAttempt(nextAttempt, task.reason(), now, null, null));
+        return retryStore.claim(task.eventId(), RetryKind.DELIVERY, owner,
+                now.plus(options.ackTimeout()));
+    }
+
+    private void publish(RetryTask task, StoredEvent stored, int attempt, Instant now) {
         try {
-            Event event = toRetryEvent(stored, task.attempt());
+            Event event = toRetryEvent(stored, attempt);
             SendResults results = publisher.publish(event).join();
             if (results == null || results.isAllFailure()) {
                 String error = results == null ? "null publish result" : results.getSummary();
-                scheduleNextAttempt(task, now, RetryReason.PUBLISH_FAILED, null, error);
+                scheduleNextAttempt(task, attempt, now, RetryReason.PUBLISH_FAILED, null, error);
                 return;
             }
             log.info("Re-published delivery retry for event {} (attempt {}/{})",
-                    task.eventId(), task.attempt(), options.maxRetries());
+                    task.eventId(), attempt, maxAttempts());
         } catch (RuntimeException e) {
             log.warn("Delivery retry publish failed for event {} (attempt {}): {}",
-                    task.eventId(), task.attempt(), e.getMessage());
-            scheduleNextAttempt(task, now, RetryReason.PUBLISH_FAILED,
+                    task.eventId(), attempt, e.getMessage());
+            scheduleNextAttempt(task, attempt, now, RetryReason.PUBLISH_FAILED,
                     e.getClass().getName(), errorDetails(e));
         }
     }
@@ -197,25 +203,29 @@ public final class DeliveryRetryScheduler implements AutoCloseable {
             return;
         }
         log.warn("Delivery ack timeout for event {} (attempt {}/{})",
-                task.eventId(), task.attempt(), options.maxRetries());
-        scheduleNextAttempt(task, now, RetryReason.ACK_TIMEOUT, null,
+                task.eventId(), task.attempt(), maxAttempts());
+        scheduleNextAttempt(task, task.attempt(), now, RetryReason.ACK_TIMEOUT, null,
                 "no AcceptedAck within " + options.ackTimeout());
     }
 
-    private void scheduleNextAttempt(RetryTask task, Instant now, RetryReason reason,
-                                     String errorType, String error) {
-        int nextAttempt = task.attempt() + 1;
+    private void scheduleNextAttempt(RetryTask task, int performedAttempt, Instant now,
+                                     RetryReason reason, String errorType, String error) {
+        int nextAttempt = performedAttempt + 1;
         if (isBudgetExhausted(nextAttempt)) {
             deadLetter(task, RetryReason.CAP_EXCEEDED, error);
             return;
         }
         retryStore.schedule(task.withNextAttempt(nextAttempt, reason, now, errorType, error));
         log.debug("Scheduled delivery retry for event {}: attempt {}/{}, reason={}",
-                task.eventId(), nextAttempt, options.maxRetries(), reason);
+                task.eventId(), nextAttempt, maxAttempts(), reason);
     }
 
     private boolean isBudgetExhausted(int attempt) {
-        return attempt > options.maxRetries();
+        return attempt > maxAttempts();
+    }
+
+    private int maxAttempts() {
+        return options.maxRetries() + 1;
     }
 
     private void deadLetter(RetryTask task, RetryReason reason, String error) {

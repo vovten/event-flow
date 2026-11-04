@@ -116,7 +116,7 @@ class DeliveryRetrySchedulerTest {
             Envelope<?> envelope = (Envelope<?>) published;
             assertThat(envelope.metadata())
                     .containsEntry(RetryMetadata.RETRY_KIND, RetryKind.DELIVERY.name())
-                    .containsEntry(RetryMetadata.ATTEMPT, "1");
+                    .containsEntry(RetryMetadata.ATTEMPT, "2");
             assertThat(status(eventId)).isEqualTo(EventStatus.PUBLISHED);
             RetryTask row = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
             assertThat(row.state()).isEqualTo(RetryState.IN_PROGRESS);
@@ -143,7 +143,7 @@ class DeliveryRetrySchedulerTest {
             assertThat(envelope.eventId()).isEqualTo(eventId);
             assertThat(envelope.metadata())
                     .containsEntry(RetryMetadata.RETRY_KIND, RetryKind.DELIVERY.name())
-                    .containsEntry(RetryMetadata.ATTEMPT, "1");
+                    .containsEntry(RetryMetadata.ATTEMPT, "2");
         }
 
         @Test
@@ -184,7 +184,7 @@ class DeliveryRetrySchedulerTest {
             assertThat(status(eventId)).isEqualTo(EventStatus.FAILED);
             RetryTask row = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
             assertThat(row.state()).isEqualTo(RetryState.PENDING);
-            assertThat(row.attempt()).isEqualTo(2);
+            assertThat(row.attempt()).isEqualTo(3);
             assertThat(row.reason()).isEqualTo(RetryReason.PUBLISH_FAILED);
         }
 
@@ -221,7 +221,7 @@ class DeliveryRetrySchedulerTest {
         @DisplayName("should dead-letter an expired claim when the budget is exhausted")
         void deadLettersExpiredClaimAtCap() {
             UUID eventId = storeEvent(EventStatus.PUBLISHED);
-            scheduleExpiredDelivery(eventId, 2);
+            scheduleExpiredDelivery(eventId, 3);
 
             scheduler(2).retryCycle();
 
