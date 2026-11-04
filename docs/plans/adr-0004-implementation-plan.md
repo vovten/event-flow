@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 5 commits | Tasks 2.1–2.5 done; next: 2.6 |
+| PR 2 — local retry | In progress | 6 commits | Tasks 2.1–2.5 done; next: 2.6 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -980,7 +980,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.1b Named-only policy rework | `be5fdd4` | policy API tests; full `mvn verify` passed | Yes |
 | 2.3 `@EventListener.retryPolicy` | `0151aaf` | `EventListenerAnnotationTest`; full core suite passed | Yes |
 | 2.4 `EventSubscriber.retryPolicy()` | `cdc1b72` | `EventSubscriberTest`; full core suite passed | Yes |
-| 2.5 Listener registry policy resolution | this commit | `EventListenerRegistryRetryTest`; full core suite passed | Yes |
+| 2.5 Listener registry policy resolution | `bfd91b6` | `EventListenerRegistryRetryTest`; full core suite passed | Yes |
+| 2.5a Extract listener retry policy resolver | this commit | registry tests + full `mvn verify` passed | Yes |
 
 Rules:
 

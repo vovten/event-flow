@@ -6,10 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventListener;
+import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
 import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
-import io.github.vovten.eventflow.retry.RetryPolicy;
 import io.github.vovten.eventflow.retry.RetryPolicyRegistry;
-import io.github.vovten.eventflow.retry.RetryPolicyResolver;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -18,8 +17,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -112,19 +109,9 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     private final Map<Class<?>, List<EventHandler>> combinedHandlersCache;
 
     /**
-     * Registry of named processing-retry policies.
+     * Resolves and registers named processing-retry policies.
      */
-    private final RetryPolicyRegistry retryPolicyRegistry;
-
-    /**
-     * Default policy used when a listener has no declaration or reference.
-     */
-    private final ResolvedRetryPolicy defaultRetryPolicy;
-
-    /**
-     * Classes whose policy declarations have already been scanned.
-     */
-    private final Set<Class<?>> preparedPolicyTypes = ConcurrentHashMap.newKeySet();
+    private final ListenerRetryPolicyResolver retryPolicies;
 
     /**
      * Creates a new annotation-based event listener registry with an isolated
@@ -132,7 +119,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * Thread-safe for concurrent register/unregister/dispatch operations.
      */
     public EventListenerRegistry() {
-        this(new RetryPolicyRegistry(), ResolvedRetryPolicy.defaults());
+        this(new ListenerRetryPolicyResolver(new RetryPolicyRegistry(), ResolvedRetryPolicy.defaults()));
     }
 
     /**
@@ -146,6 +133,17 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     }
 
     /**
+     * Creates a new registry using a shared retry-policy resolver.
+     *
+     * @param retryPolicies the shared resolver (must not be null)
+     */
+    public EventListenerRegistry(ListenerRetryPolicyResolver retryPolicies) {
+        this.eventListeners = new ConcurrentHashMap<>();
+        this.combinedHandlersCache = new ConcurrentHashMap<>();
+        this.retryPolicies = Objects.requireNonNull(retryPolicies, "retryPolicies must not be null");
+    }
+
+    /**
      * Creates a new registry using the given named policy registry and default policy.
      *
      * @param retryPolicyRegistry the shared named policy registry (must not be null)
@@ -153,12 +151,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     public EventListenerRegistry(RetryPolicyRegistry retryPolicyRegistry,
                                  ResolvedRetryPolicy defaultRetryPolicy) {
-        this.eventListeners = new ConcurrentHashMap<>();
-        this.combinedHandlersCache = new ConcurrentHashMap<>();
-        this.retryPolicyRegistry = Objects.requireNonNull(
-                retryPolicyRegistry, "retryPolicyRegistry must not be null");
-        this.defaultRetryPolicy = Objects.requireNonNull(
-                defaultRetryPolicy, "defaultRetryPolicy must not be null");
+        this(new ListenerRetryPolicyResolver(retryPolicyRegistry, defaultRetryPolicy));
     }
 
     /**
@@ -214,7 +207,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      */
     protected void registerIfAnnotationPresent(Object bean) {
         Class<?> beanClass = bean.getClass();
-        preparePolicies(beanClass);
+        retryPolicies.prepare(beanClass);
         registerAnnotatedMethods(bean, beanClass);
     }
 
@@ -231,7 +224,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
      * @param policyType the class to scan
      */
     public void registerPolicyType(Class<?> policyType) {
-        preparePolicies(Objects.requireNonNull(policyType, "policyType must not be null"));
+        retryPolicies.registerPolicyType(Objects.requireNonNull(policyType, "policyType must not be null"));
     }
 
     /**
@@ -250,57 +243,6 @@ public class EventListenerRegistry implements EventHandlerRegistry {
                 registerListener(bean, method, eventType);
             }
         }
-    }
-
-    private void preparePolicies(Class<?> beanClass) {
-        if (!preparedPolicyTypes.add(beanClass)) {
-            return;
-        }
-        RetryPolicy typePolicy = beanClass.getAnnotation(RetryPolicy.class);
-        if (typePolicy != null) {
-            registerDeclaredPolicy(RetryPolicyResolver.resolveDeclared(typePolicy, defaultRetryPolicy), beanClass);
-        }
-        for (Method method : beanClass.getMethods()) {
-            if (method.isAnnotationPresent(EventListener.class)
-                    && method.isAnnotationPresent(RetryPolicy.class)) {
-                RetryPolicy methodPolicy = method.getAnnotation(RetryPolicy.class);
-                registerDeclaredPolicy(
-                        RetryPolicyResolver.resolveDeclared(methodPolicy, defaultRetryPolicy), method);
-            }
-        }
-    }
-
-    private void registerDeclaredPolicy(ResolvedRetryPolicy policy, Object source) {
-        Optional<ResolvedRetryPolicy> existing = retryPolicyRegistry.find(policy.name());
-        if (existing.isPresent()) {
-            if (!existing.get().equals(policy)) {
-                throw new IllegalStateException(
-                        "Duplicate retry policy '" + policy.name() + "' declared at " + source);
-            }
-            return;
-        }
-        retryPolicyRegistry.register(policy);
-    }
-
-    private ResolvedRetryPolicy resolveRetryPolicy(Method method) {
-        RetryPolicy declared = method.getAnnotation(RetryPolicy.class);
-        EventListener annotation = method.getAnnotation(EventListener.class);
-        String reference = annotation != null ? annotation.retryPolicy() : "";
-        boolean hasReference = reference != null && !reference.isBlank();
-        if (declared != null && hasReference) {
-            throw new IllegalArgumentException(
-                    "Listener " + method.getDeclaringClass().getName() + "#" + method.getName()
-                            + " has both @RetryPolicy and @EventListener(retryPolicy=...); choose one");
-        }
-        if (declared != null) {
-            ResolvedRetryPolicy resolved = RetryPolicyResolver.resolveDeclared(declared, defaultRetryPolicy);
-            registerDeclaredPolicy(resolved, method);
-            return retryPolicyRegistry.resolve(resolved.name());
-        }
-        if (hasReference) {
-            return retryPolicyRegistry.resolve(reference);
-        }
-        return defaultRetryPolicy;
     }
 
     /**
@@ -344,7 +286,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
     protected void registerListener(Object bean, Method method, Class<?> eventType) {
         List<EventHandler> existingHandlers = eventListeners.get(eventType);
         boolean exists = existingHandlers != null && existingHandlers.stream()
-                .filter(h -> h instanceof MethodInvokingEventHandler mih)
+                .filter(h -> h instanceof MethodInvokingEventHandler)
                 .anyMatch(h -> {
                     MethodInvokingEventHandler mih = (MethodInvokingEventHandler) h;
                     return mih.object().equals(bean) && mih.method().equals(method);
@@ -352,7 +294,7 @@ public class EventListenerRegistry implements EventHandlerRegistry {
         if (exists) {
             return;
         }
-        ResolvedRetryPolicy retryPolicy = resolveRetryPolicy(method);
+        ResolvedRetryPolicy retryPolicy = retryPolicies.resolve(method);
         var handlers = eventListeners.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>());
         handlers.add(new MethodInvokingEventHandler(bean, method, retryPolicy));
         combinedHandlersCache.clear();
