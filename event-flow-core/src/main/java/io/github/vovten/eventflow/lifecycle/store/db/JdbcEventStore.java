@@ -353,6 +353,35 @@ public class JdbcEventStore implements EventStore {
     }
 
     @Override
+    public int deleteByIds(java.util.Collection<UUID> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return 0;
+        }
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < eventIds.size(); i++) {
+            if (i > 0) {
+                placeholders.append(',');
+            }
+            placeholders.append('?');
+        }
+        String sql = "DELETE FROM " + tableName + " WHERE event_id IN (" + placeholders + ")";
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+            int index = 1;
+            for (UUID eventId : eventIds) {
+                mapper.setUuid(ps, index++, eventId);
+            }
+            int deleted = ps.executeUpdate();
+            if (deleted > 0) {
+                log.debug("Deleted {} events by ID", deleted);
+            }
+            return deleted;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete events by IDs", e);
+        }
+    }
+
+    @Override
     public Optional<StoredEvent> findById(UUID eventId) {
         try (Connection conn = dataSource.getConnection(); PreparedStatement ps = conn.prepareStatement(selectByIdSql)) {
             mapper.setUuid(ps, 1, eventId);

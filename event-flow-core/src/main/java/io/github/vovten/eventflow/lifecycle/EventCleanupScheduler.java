@@ -1,7 +1,11 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import io.github.vovten.eventflow.lifecycle.retry.EventRetryStore;
+import io.github.vovten.eventflow.lifecycle.retry.RetryState;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
+import io.github.vovten.eventflow.retry.RetryKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
@@ -58,6 +63,8 @@ public final class EventCleanupScheduler implements AutoCloseable {
     private final Duration maxAge;
     private final int batchSize;
     private final Duration pauseBetweenBatches;
+    private final EventRetryStore retryStore;
+    private final Duration deadLetterMaxAge;
     private final ScheduledExecutorService scheduler;
 
     /**
@@ -74,12 +81,44 @@ public final class EventCleanupScheduler implements AutoCloseable {
                                   Duration maxAge,
                                   int batchSize,
                                   Duration pauseBetweenBatches) {
+        this(eventStore, interval, maxAge, batchSize, pauseBetweenBatches, null, null);
+    }
+
+    /**
+     * Creates a cleanup scheduler that also respects durable retry rows and
+     * dead-letter retention.
+     *
+     * @param eventStore          the event store to clean up
+     * @param interval            delay between cleanup cycles
+     * @param maxAge              terminal events older than this are eligible for deletion
+     * @param batchSize           maximum number of events to delete per batch
+     * @param pauseBetweenBatches pause between consecutive delete batches
+     * @param retryStore          durable retry store, or null for legacy cleanup
+     * @param deadLetterMaxAge    retention of dead-lettered events, or null for legacy cleanup
+     */
+    public EventCleanupScheduler(EventStore eventStore,
+                                  Duration interval,
+                                  Duration maxAge,
+                                  int batchSize,
+                                  Duration pauseBetweenBatches,
+                                  EventRetryStore retryStore,
+                                  Duration deadLetterMaxAge) {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.interval = Objects.requireNonNull(interval, "interval must not be null");
         this.maxAge = Objects.requireNonNull(maxAge, "maxAge must not be null");
         this.batchSize = batchSize;
         this.pauseBetweenBatches = Objects.requireNonNull(pauseBetweenBatches,
                 "pauseBetweenBatches must not be null");
+        if ((retryStore == null) != (deadLetterMaxAge == null)) {
+            throw new IllegalArgumentException(
+                    "retryStore and deadLetterMaxAge must be either both set or both null");
+        }
+        if (deadLetterMaxAge != null
+                && (deadLetterMaxAge.isZero() || deadLetterMaxAge.isNegative())) {
+            throw new IllegalArgumentException("deadLetterMaxAge must be positive");
+        }
+        this.retryStore = retryStore;
+        this.deadLetterMaxAge = deadLetterMaxAge;
         if (!pauseBetweenBatches.isZero() && pauseBetweenBatches.compareTo(interval) >= 0) {
             log.warn("pauseBetweenBatches ({}) is >= cleanup interval ({}). "
                     + "The next cycle may be delayed while the previous batch pause is still active.",
@@ -137,6 +176,11 @@ public final class EventCleanupScheduler implements AutoCloseable {
      */
     public void cleanupCycle() {
         try {
+            if (retryStore != null) {
+                int totalDeleted = deleteTerminalSkippingRetries() + deleteDeadLetters();
+                logResult(totalDeleted);
+                return;
+            }
             Instant deadline = Instant.now().minus(maxAge);
             int totalDeleted = deleteInBatches(deadline);
             logResult(totalDeleted);
@@ -146,6 +190,78 @@ public final class EventCleanupScheduler implements AutoCloseable {
         } catch (Exception e) {
             log.error("Cleanup cycle failed", e);
         }
+    }
+
+    private int deleteTerminalSkippingRetries() throws InterruptedException {
+        Instant deadline = Instant.now().minus(maxAge);
+        int totalDeleted = 0;
+        while (totalDeleted < MAX_DELETE_PER_CYCLE) {
+            int batch = Math.min(batchSize, MAX_DELETE_PER_CYCLE - totalDeleted);
+            List<StoredEvent> candidates = eventStore.findByStatuses(TERMINAL_STATUSES, deadline, batch);
+            if (candidates.isEmpty()) {
+                break;
+            }
+            List<UUID> deletable = candidates.stream()
+                    .map(StoredEvent::eventId)
+                    .filter(eventId -> !hasRetryRow(eventId))
+                    .toList();
+            if (deletable.isEmpty()) {
+                break;
+            }
+            totalDeleted += deleteWithRetries(deletable);
+            pauseIfFullBatch(candidates.size(), batch);
+            if (candidates.size() < batch) {
+                break;
+            }
+        }
+        return totalDeleted;
+    }
+
+    private int deleteDeadLetters() throws InterruptedException {
+        Instant deadline = Instant.now().minus(deadLetterMaxAge);
+        int totalDeleted = 0;
+        while (totalDeleted < MAX_DELETE_PER_CYCLE) {
+            int batch = Math.min(batchSize, MAX_DELETE_PER_CYCLE - totalDeleted);
+            List<StoredEvent> candidates = eventStore.findByStatuses(
+                    List.of(EventStatus.DEAD), deadline, batch);
+            if (candidates.isEmpty()) {
+                break;
+            }
+            List<UUID> deletable = candidates.stream()
+                    .map(StoredEvent::eventId)
+                    .filter(this::retryIsTerminal)
+                    .toList();
+            if (deletable.isEmpty()) {
+                break;
+            }
+            totalDeleted += deleteWithRetries(deletable);
+            pauseIfFullBatch(candidates.size(), batch);
+            if (candidates.size() < batch) {
+                break;
+            }
+        }
+        return totalDeleted;
+    }
+
+    private int deleteWithRetries(List<UUID> eventIds) {
+        int deleted = eventStore.deleteByIds(eventIds);
+        retryStore.deleteByEventIds(eventIds);
+        return deleted;
+    }
+
+    private boolean hasRetryRow(UUID eventId) {
+        return retryStore.find(eventId, RetryKind.DELIVERY).isPresent()
+                || retryStore.find(eventId, RetryKind.PROCESSING)
+                .isPresent();
+    }
+
+    private boolean retryIsTerminal(UUID eventId) {
+        return retryStore.find(eventId, RetryKind.DELIVERY)
+                        .map(row -> row.state() == RetryState.DEAD)
+                        .orElse(true)
+                && retryStore.find(eventId, RetryKind.PROCESSING)
+                        .map(row -> row.state() == RetryState.DEAD)
+                        .orElse(true);
     }
 
     private int deleteInBatches(Instant deadline) throws InterruptedException {

@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.lifecycle.store;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -153,6 +154,23 @@ public interface EventStore {
      * @since 1.2.0
      */
     List<StoredEvent> findRetryableEvents(List<EventStatus> statuses, Instant before, int batchSize, String service);
+
+    /**
+     * Deletes events by their identifiers.
+     * <p>
+     * Used by the cleanup scheduler to skip events that still have pending
+     * retry rows. The default implementation rejects the call so that custom
+     * stores keep their previous cleanup behaviour.
+     *
+     * @param eventIds event identifiers
+     * @return number of deleted events
+     * @throws UnsupportedOperationException if the store does not support deletion by ID
+     * @since 1.4.0
+     */
+    default int deleteByIds(Collection<UUID> eventIds) {
+        throw new UnsupportedOperationException(
+                "deleteByIds is not supported by " + getClass().getName());
+    }
 
     /**
      * Finds an event by its unique identifier.

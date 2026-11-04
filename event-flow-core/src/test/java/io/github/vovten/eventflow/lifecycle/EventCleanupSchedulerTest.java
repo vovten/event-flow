@@ -1,8 +1,13 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import io.github.vovten.eventflow.lifecycle.retry.InMemoryEventRetryStore;
+import io.github.vovten.eventflow.lifecycle.retry.RetryReason;
+import io.github.vovten.eventflow.lifecycle.retry.RetryState;
+import io.github.vovten.eventflow.lifecycle.retry.RetryTask;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
+import io.github.vovten.eventflow.retry.RetryKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -50,6 +55,82 @@ class EventCleanupSchedulerTest {
         );
         eventStore.save(stored);
         return id;
+    }
+
+    private EventCleanupScheduler schedulerWithRetries(InMemoryEventRetryStore retryStore,
+                                                      Duration deadLetterMaxAge) {
+        return new EventCleanupScheduler(
+                eventStore,
+                Duration.ofMinutes(1),
+                Duration.ofMinutes(30),
+                100,
+                Duration.ZERO,
+                retryStore,
+                deadLetterMaxAge
+        );
+    }
+
+    @Nested
+    @DisplayName("retry-aware cleanup")
+    class RetryAwareCleanup {
+
+        @Test
+        @DisplayName("does not delete a terminal event with a pending retry row")
+        void keepsTerminalEventWithPendingRetry() {
+            InMemoryEventRetryStore retryStore = new InMemoryEventRetryStore();
+            UUID eventId = createEvent(EventStatus.HANDLED, oldTimestamp);
+            retryStore.schedule(RetryTask.pending(eventId, "test-service", RetryKind.DELIVERY,
+                    1, RetryReason.PUBLISH_FAILED, Instant.now(), null));
+
+            schedulerWithRetries(retryStore, Duration.ofDays(30)).cleanupCycle();
+
+            assertThat(eventStore.findById(eventId)).isPresent();
+            assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isPresent();
+        }
+
+        @Test
+        @DisplayName("deletes a dead-lettered event after dead-letter retention")
+        void deletesDeadLetterAfterRetention() {
+            InMemoryEventRetryStore retryStore = new InMemoryEventRetryStore();
+            UUID eventId = createEvent(EventStatus.DEAD, oldTimestamp);
+            retryStore.schedule(RetryTask.pending(eventId, "test-service", RetryKind.PROCESSING,
+                            1, RetryReason.HANDLER_FAILED, oldTimestamp, "payment")
+                    .withDead(RetryReason.CAP_EXCEEDED, "Type", "error"));
+
+            schedulerWithRetries(retryStore, Duration.ofMinutes(30)).cleanupCycle();
+
+            assertThat(eventStore.findById(eventId)).isEmpty();
+            assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("keeps a dead-lettered event inside dead-letter retention")
+        void keepsDeadLetterInsideRetention() {
+            InMemoryEventRetryStore retryStore = new InMemoryEventRetryStore();
+            UUID eventId = createEvent(EventStatus.DEAD, oldTimestamp);
+            retryStore.schedule(RetryTask.pending(eventId, "test-service", RetryKind.PROCESSING,
+                            1, RetryReason.HANDLER_FAILED, oldTimestamp, "payment")
+                    .withDead(RetryReason.CAP_EXCEEDED, "Type", "error"));
+
+            schedulerWithRetries(retryStore, Duration.ofHours(2)).cleanupCycle();
+
+            assertThat(eventStore.findById(eventId)).isPresent();
+        }
+
+        @Test
+        @DisplayName("keeps a dead-lettered event with a non-terminal retry row")
+        void keepsDeadLetterWithPendingRetry() {
+            InMemoryEventRetryStore retryStore = new InMemoryEventRetryStore();
+            UUID eventId = createEvent(EventStatus.DEAD, oldTimestamp);
+            retryStore.schedule(RetryTask.pending(eventId, "test-service", RetryKind.PROCESSING,
+                    2, RetryReason.HANDLER_FAILED, Instant.now(), "payment"));
+
+            schedulerWithRetries(retryStore, Duration.ofMinutes(30)).cleanupCycle();
+
+            assertThat(eventStore.findById(eventId)).isPresent();
+            assertThat(retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow().state())
+                    .isEqualTo(RetryState.PENDING);
+        }
     }
 
     @Nested

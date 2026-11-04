@@ -150,6 +150,17 @@ public class InMemoryEventStore implements EventStore {
         return deletedCount[0];
     }
 
+    @Override
+    public int deleteByIds(Collection<UUID> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return 0;
+        }
+        Set<UUID> ids = Set.copyOf(eventIds);
+        int before = store.size();
+        store.keySet().removeIf(ids::contains);
+        return before - store.size();
+    }
+
     /**
      * Returns the total number of stored events (for testing).
      *
