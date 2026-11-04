@@ -19,6 +19,15 @@ import java.lang.annotation.Target;
  * @EventListener(DomainOrderEvent.class)
  * public void onEvent(Envelope<DomainOrderEvent> event) {...}
  * }</pre>
+ * <p>
+ * A listener may reference a named processing-retry policy:
+ * <pre>{@code
+ * @EventListener(value = OrderCreated.class, retryPolicy = "order-retry")
+ * public void on(OrderCreated event) {...}
+ * }</pre>
+ * An empty value means "use the configured default policy". Setting both a
+ * method-level {@code @RetryPolicy} and this reference is ambiguous and fails
+ * at startup.
  *
  * @author Vladimir Aleshkov
  * @since 1.0.0
@@ -34,4 +43,16 @@ public @interface EventListener {
      * @return the domain event class
      */
     Class<?> value() default Event.class;
+
+    /**
+     * Named processing-retry policy reference.
+     * <p>
+     * Empty means the configured default policy. The referenced policy must be
+     * declared with {@code @RetryPolicy(name = "...")}; an unknown name fails
+     * at startup. Cannot be combined with a method-level {@code @RetryPolicy}.
+     *
+     * @return the named policy reference, or an empty string for the default policy
+     * @since 1.4.0
+     */
+    String retryPolicy() default "";
 }
