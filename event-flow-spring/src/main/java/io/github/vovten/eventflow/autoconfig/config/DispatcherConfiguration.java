@@ -7,6 +7,7 @@ import io.github.vovten.eventflow.dispatcher.EventDispatcherBuilder;
 import io.github.vovten.eventflow.lifecycle.EventLifecycleDispatcher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
+import io.github.vovten.eventflow.retry.RetryDelayScheduler;
 import io.github.vovten.eventflow.transport.InTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,7 @@ public class DispatcherConfiguration {
      * @param eventHandlerRegistry    event handler registry
      * @param inTransports            list of dispatcher transports
      * @param ackPublisher            optional publisher for lifecycle ack events
+     * @param retryDelayScheduler     non-blocking scheduler for local retry delays
      * @return event dispatcher instance
      */
     @Bean(destroyMethod = "stop")
@@ -66,11 +68,17 @@ public class DispatcherConfiguration {
     public EventDispatcher eventDispatcher(@Qualifier("dispatcherExecutor") ExecutorService dispatcherExecutor,
                                            @Qualifier("eventHandlerRegistry") EventHandlerRegistry eventHandlerRegistry,
                                            @Qualifier("dispatcherTransports") List<InTransport> inTransports,
-                                           @Autowired(required = false) EventPublisher ackPublisher) {
+                                           @Autowired(required = false) EventPublisher ackPublisher,
+                                           @Autowired(required = false) RetryDelayScheduler retryDelayScheduler) {
+        RetryDelayScheduler delayScheduler = retryDelayScheduler != null
+                ? retryDelayScheduler
+                : RetryDelayScheduler.defaultScheduler();
         EventDispatcherBuilder builder = EventDispatcherBuilder.create()
                 .executor(dispatcherExecutor)
                 .handlerRegistry(eventHandlerRegistry)
-                .transports(inTransports);
+                .transports(inTransports)
+                .retryDelayScheduler(delayScheduler)
+                .localRetryCap(properties.getRetry().getProcessing().getLocalRetryCap());
         int concurrencyLimit = properties.getDispatcher().getThreadPool().getConcurrencyLimit();
         if (concurrencyLimit > 0) {
             builder.concurrencyLimit(concurrencyLimit);

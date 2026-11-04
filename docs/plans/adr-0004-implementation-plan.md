@@ -588,9 +588,9 @@ Tests for each task are written in the same commit as the task. This list is the
 
 ## 6.4 Spring wiring
 
-- [ ] **2.12** Add `RetryPolicyRegistry` and default-policy beans.
-- [ ] **2.13** Add `event-flow.retry.processing.*` properties, including `default-policy.*` and named policy overrides.
-- [ ] **2.14** Pass the registry/default policy to Spring registries and the delay scheduler to the dispatcher.
+- [x] **2.12** Add `RetryPolicyRegistry` and default-policy beans.
+- [x] **2.13** Add `event-flow.retry.processing.*` properties, including `default-policy.*` and named policy overrides.
+- [x] **2.14** Pass the registry/default policy to Spring registries and the delay scheduler to the dispatcher.
 
 ## 6.5 Test coverage checklist (not a separate task)
 
@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 11 commits | Tasks 2.1–2.11 done; next: 2.12 |
+| PR 2 — local retry | In progress | 12 commits | Tasks 2.1–2.14 done; next: final PR 2 verification/docs |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -987,7 +987,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.9 Handler result classification | `5adee1b` | `HandlerResultTest`/`HandlerResultsTest`; full core suite passed | Yes |
 | 2.10 `HandlerResults` aggregates | `5adee1b` | delivered with 2.9; tested | Yes |
 | 2.8 Dispatcher local retry loop | `2a60456` | `UnifiedEventDispatcherRetryTest`; full `mvn verify` passed | Yes |
-| 2.11a–2.11 Policy-driven failure ack | this commit | ack/dispatcher tests + full `mvn verify` passed | Yes |
+| 2.11a–2.11 Policy-driven failure ack | `b856ed5` | ack/dispatcher tests + full `mvn verify` passed | Yes |
+| 2.12–2.14 Spring wiring | this commit | `RetryPolicyConfigurationTest`/`EventFlowPropertiesTest` + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1000,4 +1001,4 @@ Rules:
 
 # 14. Next step
 
-Start task **2.12**: wire `RetryPolicyRegistry`, the default policy and `ListenerRetryPolicyResolver` into Spring auto-configuration, and expose `event-flow.retry.processing.*` properties.
+Finish PR 2: mark the 2.15–2.21 test checklist, update README/CHANGELOG with `@RetryPolicy`, default policy and `event-flow.retry.processing.*`, run the full `mvn verify`, and close PR 2.

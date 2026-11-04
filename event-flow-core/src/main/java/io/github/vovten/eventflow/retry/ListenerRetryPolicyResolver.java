@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.retry;
 import io.github.vovten.eventflow.EventListener;
 
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -28,20 +29,35 @@ public final class ListenerRetryPolicyResolver {
 
     private final RetryPolicyRegistry retryPolicyRegistry;
     private final ResolvedRetryPolicy defaultRetryPolicy;
+    private final Map<String, RetryPolicyOverride> overrides;
     private final Set<Class<?>> preparedPolicyTypes = ConcurrentHashMap.newKeySet();
 
     /**
-     * Creates a resolver.
+     * Creates a resolver without configuration overrides.
      *
      * @param retryPolicyRegistry the shared named policy registry (must not be null)
      * @param defaultRetryPolicy  the default policy (must not be null)
      */
     public ListenerRetryPolicyResolver(RetryPolicyRegistry retryPolicyRegistry,
                                        ResolvedRetryPolicy defaultRetryPolicy) {
+        this(retryPolicyRegistry, defaultRetryPolicy, Map.of());
+    }
+
+    /**
+     * Creates a resolver with named-policy configuration overrides.
+     *
+     * @param retryPolicyRegistry the shared named policy registry (must not be null)
+     * @param defaultRetryPolicy  the default policy (must not be null)
+     * @param overrides           overrides by policy name (must not be null)
+     */
+    public ListenerRetryPolicyResolver(RetryPolicyRegistry retryPolicyRegistry,
+                                       ResolvedRetryPolicy defaultRetryPolicy,
+                                       Map<String, RetryPolicyOverride> overrides) {
         this.retryPolicyRegistry = Objects.requireNonNull(
                 retryPolicyRegistry, "retryPolicyRegistry must not be null");
         this.defaultRetryPolicy = Objects.requireNonNull(
                 defaultRetryPolicy, "defaultRetryPolicy must not be null");
+        this.overrides = Map.copyOf(Objects.requireNonNull(overrides, "overrides must not be null"));
     }
 
     /**
@@ -142,14 +158,20 @@ public final class ListenerRetryPolicyResolver {
     }
 
     private void registerDeclaredPolicy(ResolvedRetryPolicy policy, Object source) {
-        Optional<ResolvedRetryPolicy> existing = retryPolicyRegistry.find(policy.name());
+        ResolvedRetryPolicy effective = applyOverride(policy);
+        Optional<ResolvedRetryPolicy> existing = retryPolicyRegistry.find(effective.name());
         if (existing.isPresent()) {
-            if (!existing.get().equals(policy)) {
+            if (!existing.get().equals(effective)) {
                 throw new IllegalStateException(
-                        "Duplicate retry policy '" + policy.name() + "' declared at " + source);
+                        "Duplicate retry policy '" + effective.name() + "' declared at " + source);
             }
             return;
         }
-        retryPolicyRegistry.register(policy);
+        retryPolicyRegistry.register(effective);
+    }
+
+    private ResolvedRetryPolicy applyOverride(ResolvedRetryPolicy policy) {
+        RetryPolicyOverride override = overrides.get(policy.name());
+        return override != null ? override.applyTo(policy) : policy;
     }
 }

@@ -48,6 +48,44 @@ class EventFlowPropertiesTest {
     }
 
     @Test
+    @DisplayName("Should bind processing retry properties")
+    void shouldBindProcessingRetryProperties() {
+        Map<String, String> properties = Map.ofEntries(
+                Map.entry("event-flow.retry.processing.enabled", "false"),
+                Map.entry("event-flow.retry.processing.local-retry-cap", "7"),
+                Map.entry("event-flow.retry.processing.default-policy.max-retries", "5"),
+                Map.entry("event-flow.retry.processing.default-policy.local-max-retries", "2"),
+                Map.entry("event-flow.retry.processing.default-policy.initial-delay", "1s"),
+                Map.entry("event-flow.retry.processing.default-policy.multiplier", "3.0"),
+                Map.entry("event-flow.retry.processing.default-policy.max-delay", "10s"),
+                Map.entry("event-flow.retry.processing.default-policy.jitter", "0.25"),
+                Map.entry("event-flow.retry.processing.default-policy.retry-on[0]",
+                        "java.util.concurrent.TimeoutException"),
+                Map.entry("event-flow.retry.processing.policies.payment.max-retries", "7"),
+                Map.entry("event-flow.retry.processing.policies.payment.local-max-retries", "1")
+        );
+        ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
+        Binder binder = new Binder(source);
+
+        EventFlowProperties eventFlowProperties = binder.bind("event-flow", EventFlowProperties.class)
+                .orElseGet(EventFlowProperties::new);
+
+        var processing = eventFlowProperties.getRetry().getProcessing();
+        assertThat(processing.isEnabled()).isFalse();
+        assertThat(processing.getLocalRetryCap()).isEqualTo(7);
+        assertThat(processing.getDefaultPolicy().getMaxRetries()).isEqualTo(5);
+        assertThat(processing.getDefaultPolicy().getLocalMaxRetries()).isEqualTo(2);
+        assertThat(processing.getDefaultPolicy().getInitialDelay()).isEqualTo(Duration.ofSeconds(1));
+        assertThat(processing.getDefaultPolicy().getMultiplier()).isEqualTo(3.0);
+        assertThat(processing.getDefaultPolicy().getMaxDelay()).isEqualTo(Duration.ofSeconds(10));
+        assertThat(processing.getDefaultPolicy().getJitter()).isEqualTo(0.25);
+        assertThat(processing.getDefaultPolicy().getRetryOn())
+                .containsExactly("java.util.concurrent.TimeoutException");
+        assertThat(processing.getPolicies().get("payment").getMaxRetries()).isEqualTo(7);
+        assertThat(processing.getPolicies().get("payment").getLocalMaxRetries()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("Should exclude all lifecycle acks from logging by default")
     void shouldExcludeLifecycleAcksFromLoggingByDefault() {
         EventFlowProperties properties = new EventFlowProperties();

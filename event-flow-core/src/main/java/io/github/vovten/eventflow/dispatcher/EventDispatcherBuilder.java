@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.dispatcher;
 
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
+import io.github.vovten.eventflow.retry.RetryDelayScheduler;
 import io.github.vovten.eventflow.transport.InTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,11 +108,14 @@ import java.util.concurrent.Semaphore;
 public final class EventDispatcherBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(EventDispatcherBuilder.class);
+    private static final int DEFAULT_LOCAL_RETRY_CAP = 10;
 
     private ExecutorService executorService;
     private EventHandlerRegistry handlerRegistry;
     private final List<InTransport> transports = new ArrayList<>();
     private Integer concurrencyLimit = null;
+    private RetryDelayScheduler retryDelayScheduler = RetryDelayScheduler.defaultScheduler();
+    private int localRetryCap = DEFAULT_LOCAL_RETRY_CAP;
     private boolean idempotent = false;
     private Duration idempotentTtl = Duration.ofMinutes(10);
     private long idempotentMaxSize = 10_000;
@@ -228,6 +232,32 @@ public final class EventDispatcherBuilder {
     }
 
     /**
+     * Set the scheduler used between local retry attempts.
+     *
+     * @param retryDelayScheduler non-blocking delay scheduler
+     * @return this builder
+     */
+    public EventDispatcherBuilder retryDelayScheduler(RetryDelayScheduler retryDelayScheduler) {
+        this.retryDelayScheduler = retryDelayScheduler;
+        return this;
+    }
+
+    /**
+     * Set the absolute cap for local retry attempts.
+     *
+     * @param localRetryCap maximum local attempts (must be positive)
+     * @return this builder
+     * @throws IllegalArgumentException if {@code localRetryCap <= 0}
+     */
+    public EventDispatcherBuilder localRetryCap(int localRetryCap) {
+        if (localRetryCap <= 0) {
+            throw new IllegalArgumentException("localRetryCap must be positive");
+        }
+        this.localRetryCap = localRetryCap;
+        return this;
+    }
+
+    /**
      * Enable idempotent event processing with default settings:
      * <ul>
      *   <li>TTL: 10 minutes</li>
@@ -338,7 +368,8 @@ public final class EventDispatcherBuilder {
         }
         Semaphore semaphore = concurrencyLimit != null ? new Semaphore(concurrencyLimit) : null;
         EventDispatcher dispatcher = new UnifiedEventDispatcher(
-                executorService, handlerRegistry, transports, semaphore
+                executorService, handlerRegistry, transports, semaphore,
+                retryDelayScheduler, localRetryCap
         );
         // Apply idempotent decorator
         if (idempotent) {
@@ -421,6 +452,8 @@ public final class EventDispatcherBuilder {
         chain.handlerRegistry = this.handlerRegistry;
         chain.transports.addAll(this.transports);
         chain.concurrencyLimit = this.concurrencyLimit;
+        chain.retryDelayScheduler = this.retryDelayScheduler;
+        chain.localRetryCap = this.localRetryCap;
         return chain;
     }
 
@@ -443,6 +476,8 @@ public final class EventDispatcherBuilder {
         private EventHandlerRegistry handlerRegistry;
         private final List<InTransport> transports = new ArrayList<>();
         private Integer concurrencyLimit = null;
+        private RetryDelayScheduler retryDelayScheduler = RetryDelayScheduler.defaultScheduler();
+        private int localRetryCap = DEFAULT_LOCAL_RETRY_CAP;
         private final List<DecoratorFunction> decorators = new ArrayList<>();
 
         private Chain() {
@@ -476,7 +511,8 @@ public final class EventDispatcherBuilder {
             }
             Semaphore semaphore = concurrencyLimit != null ? new Semaphore(concurrencyLimit) : null;
             EventDispatcher dispatcher = new UnifiedEventDispatcher(
-                    executorService, handlerRegistry, transports, semaphore
+                    executorService, handlerRegistry, transports, semaphore,
+                    retryDelayScheduler, localRetryCap
             );
             for (DecoratorFunction decorator : decorators) {
                 dispatcher = decorator.apply(dispatcher);

@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.autoconfig.config.DispatcherConfiguration;
 import io.github.vovten.eventflow.autoconfig.config.LifecycleConfiguration;
 import io.github.vovten.eventflow.autoconfig.config.PublisherConfiguration;
 import io.github.vovten.eventflow.autoconfig.config.RegistryConfiguration;
+import io.github.vovten.eventflow.autoconfig.config.RetryPolicyConfiguration;
 import io.github.vovten.eventflow.autoconfig.config.SerializerConfiguration;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -20,6 +21,7 @@ import org.springframework.context.annotation.Import;
  * This is a facade that imports modular configuration classes:
  * <ul>
  *   <li>{@link SerializerConfiguration} - custom event serializers (registered in constructor for early initialization)</li>
+ *   <li>{@link RetryPolicyConfiguration} - processing-retry policy registry, resolver and delay scheduler</li>
  *   <li>{@link RegistryConfiguration} - event listener registries</li>
  *   <li>{@link CommonConfiguration} - executor service and local-queue transports</li>
  *   <li>{@link ChannelConfiguration} - event channels</li>
@@ -68,6 +70,7 @@ import org.springframework.context.annotation.Import;
 @ConditionalOnProperty(prefix = "event-flow", name = "enabled", havingValue = "true")
 @Import({
     SerializerConfiguration.class,
+    RetryPolicyConfiguration.class,
     RegistryConfiguration.class,
     CommonConfiguration.class,
     ChannelConfiguration.class,

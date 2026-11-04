@@ -92,6 +92,11 @@ public class EventFlowProperties {
      */
     private DispatcherConfig dispatcher = new DispatcherConfig();
 
+    /**
+     * Processing-retry configuration.
+     */
+    private EventRetryConfig retry = new EventRetryConfig();
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -114,6 +119,14 @@ public class EventFlowProperties {
 
     public void setDispatcher(DispatcherConfig dispatcher) {
         this.dispatcher = dispatcher;
+    }
+
+    public EventRetryConfig getRetry() {
+        return retry;
+    }
+
+    public void setRetry(EventRetryConfig retry) {
+        this.retry = retry;
     }
 
     /**
@@ -899,6 +912,235 @@ public class EventFlowProperties {
 
         public void setAllowedEventPackages(List<String> allowedEventPackages) {
             this.allowedEventPackages = allowedEventPackages;
+        }
+    }
+
+    /**
+     * Processing-retry configuration.
+     */
+    public static class EventRetryConfig {
+
+        private ProcessingRetryConfig processing = new ProcessingRetryConfig();
+
+        public ProcessingRetryConfig getProcessing() {
+            return processing;
+        }
+
+        public void setProcessing(ProcessingRetryConfig processing) {
+            this.processing = processing;
+        }
+    }
+
+    /**
+     * Processing-retry settings, including the default policy and named overrides.
+     */
+    public static class ProcessingRetryConfig {
+
+        /**
+         * Enable local processing retries.
+         */
+        private boolean enabled = true;
+
+        /**
+         * Absolute cap for local retry attempts, independent of listener policies.
+         */
+        private int localRetryCap = 10;
+
+        private DefaultRetryPolicyConfig defaultPolicy = new DefaultRetryPolicyConfig();
+
+        /**
+         * Named policy overrides by policy name.
+         */
+        private Map<String, RetryPolicyOverrideConfig> policies = new HashMap<>();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getLocalRetryCap() {
+            return localRetryCap;
+        }
+
+        public void setLocalRetryCap(int localRetryCap) {
+            this.localRetryCap = localRetryCap;
+        }
+
+        public DefaultRetryPolicyConfig getDefaultPolicy() {
+            return defaultPolicy;
+        }
+
+        public void setDefaultPolicy(DefaultRetryPolicyConfig defaultPolicy) {
+            this.defaultPolicy = defaultPolicy;
+        }
+
+        public Map<String, RetryPolicyOverrideConfig> getPolicies() {
+            return policies;
+        }
+
+        public void setPolicies(Map<String, RetryPolicyOverrideConfig> policies) {
+            this.policies = policies;
+        }
+    }
+
+    /**
+     * Default processing-retry policy.
+     */
+    public static class DefaultRetryPolicyConfig {
+
+        private int maxRetries = 3;
+        private int localMaxRetries = 0;
+        private Duration initialDelay = Duration.ofSeconds(30);
+        private double multiplier = 2.0;
+        private Duration maxDelay = Duration.ofMinutes(10);
+        private double jitter = 0.5;
+        private List<String> retryOn = new ArrayList<>();
+        private List<String> noRetryOn = new ArrayList<>();
+
+        public int getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(int maxRetries) {
+            this.maxRetries = maxRetries;
+        }
+
+        public int getLocalMaxRetries() {
+            return localMaxRetries;
+        }
+
+        public void setLocalMaxRetries(int localMaxRetries) {
+            this.localMaxRetries = localMaxRetries;
+        }
+
+        public Duration getInitialDelay() {
+            return initialDelay;
+        }
+
+        public void setInitialDelay(Duration initialDelay) {
+            this.initialDelay = initialDelay;
+        }
+
+        public double getMultiplier() {
+            return multiplier;
+        }
+
+        public void setMultiplier(double multiplier) {
+            this.multiplier = multiplier;
+        }
+
+        public Duration getMaxDelay() {
+            return maxDelay;
+        }
+
+        public void setMaxDelay(Duration maxDelay) {
+            this.maxDelay = maxDelay;
+        }
+
+        public double getJitter() {
+            return jitter;
+        }
+
+        public void setJitter(double jitter) {
+            this.jitter = jitter;
+        }
+
+        public List<String> getRetryOn() {
+            return retryOn;
+        }
+
+        public void setRetryOn(List<String> retryOn) {
+            this.retryOn = retryOn;
+        }
+
+        public List<String> getNoRetryOn() {
+            return noRetryOn;
+        }
+
+        public void setNoRetryOn(List<String> noRetryOn) {
+            this.noRetryOn = noRetryOn;
+        }
+    }
+
+    /**
+     * Partial override of a named processing-retry policy.
+     */
+    public static class RetryPolicyOverrideConfig {
+
+        private Integer maxRetries;
+        private Integer localMaxRetries;
+        private Duration initialDelay;
+        private Double multiplier;
+        private Duration maxDelay;
+        private Double jitter;
+        private List<String> retryOn;
+        private List<String> noRetryOn;
+
+        public Integer getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(Integer maxRetries) {
+            this.maxRetries = maxRetries;
+        }
+
+        public Integer getLocalMaxRetries() {
+            return localMaxRetries;
+        }
+
+        public void setLocalMaxRetries(Integer localMaxRetries) {
+            this.localMaxRetries = localMaxRetries;
+        }
+
+        public Duration getInitialDelay() {
+            return initialDelay;
+        }
+
+        public void setInitialDelay(Duration initialDelay) {
+            this.initialDelay = initialDelay;
+        }
+
+        public Double getMultiplier() {
+            return multiplier;
+        }
+
+        public void setMultiplier(Double multiplier) {
+            this.multiplier = multiplier;
+        }
+
+        public Duration getMaxDelay() {
+            return maxDelay;
+        }
+
+        public void setMaxDelay(Duration maxDelay) {
+            this.maxDelay = maxDelay;
+        }
+
+        public Double getJitter() {
+            return jitter;
+        }
+
+        public void setJitter(Double jitter) {
+            this.jitter = jitter;
+        }
+
+        public List<String> getRetryOn() {
+            return retryOn;
+        }
+
+        public void setRetryOn(List<String> retryOn) {
+            this.retryOn = retryOn;
+        }
+
+        public List<String> getNoRetryOn() {
+            return noRetryOn;
+        }
+
+        public void setNoRetryOn(List<String> noRetryOn) {
+            this.noRetryOn = noRetryOn;
         }
     }
 }

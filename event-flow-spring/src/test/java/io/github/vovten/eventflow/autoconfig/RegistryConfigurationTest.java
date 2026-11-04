@@ -3,6 +3,9 @@ package io.github.vovten.eventflow.autoconfig;
 import io.github.vovten.eventflow.autoconfig.config.RegistryConfiguration;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 import io.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
+import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
+import io.github.vovten.eventflow.retry.RetryPolicyRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -22,6 +25,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @since 1.0.0
  */
 class RegistryConfigurationTest {
+
+    private static ListenerRetryPolicyResolver defaultResolver() {
+        return new ListenerRetryPolicyResolver(new RetryPolicyRegistry(), ResolvedRetryPolicy.defaults());
+    }
 
     @Test
     @DisplayName("RegistryConfiguration should be instantiable with properties")
@@ -49,7 +56,7 @@ class RegistryConfigurationTest {
         context.refresh();
 
         // when & then
-        assertThatThrownBy(() -> config.springEventListenerRegistry(context))
+        assertThatThrownBy(() -> config.springEventListenerRegistry(context, defaultResolver()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("event-flow.dispatcher.listener-packages must be configured");
     }
@@ -66,7 +73,7 @@ class RegistryConfigurationTest {
         context.refresh();
 
         // when
-        EventHandlerRegistry registry = config.springEventSubscriberRegistry(context);
+        EventHandlerRegistry registry = config.springEventSubscriberRegistry(context, defaultResolver());
 
         // then
         assertThat(registry).isNotNull();

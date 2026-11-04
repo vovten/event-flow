@@ -5,6 +5,7 @@ import io.github.vovten.eventflow.registry.CompositeEventHandlerRegistry;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 import io.github.vovten.eventflow.registry.SpringEventListenerRegistry;
 import io.github.vovten.eventflow.registry.SpringEventSubscriberRegistry;
+import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -45,32 +46,36 @@ public class RegistryConfiguration {
     /**
      * Creates Spring-aware annotation-based listener registry.
      *
-     * @param appContext Spring application context
+     * @param appContext    Spring application context
+     * @param retryPolicies shared listener retry-policy resolver
      * @return annotation-based event listener registry
      * @throws IllegalStateException if listener-packages is not configured
      */
     @Bean
     @ConditionalOnMissingBean(name = "springEventListenerRegistry")
-    public EventHandlerRegistry springEventListenerRegistry(ApplicationContext appContext) {
+    public EventHandlerRegistry springEventListenerRegistry(ApplicationContext appContext,
+                                                            ListenerRetryPolicyResolver retryPolicies) {
         String listenerPackage = properties.getDispatcher().getListenerPackages();
         if (listenerPackage == null || listenerPackage.isEmpty()) {
             throw new IllegalStateException("event-flow.dispatcher.listener-packages must be configured");
         }
         log.info("Creating SpringEventListenerRegistry with listener package: {}", listenerPackage);
-        return new SpringEventListenerRegistry(appContext, listenerPackage);
+        return new SpringEventListenerRegistry(appContext, listenerPackage, retryPolicies);
     }
 
     /**
      * Creates Spring-aware interface-based subscriber registry.
      *
-     * @param appContext Spring application context
+     * @param appContext    Spring application context
+     * @param retryPolicies shared listener retry-policy resolver
      * @return interface-based event subscriber registry
      */
     @Bean
     @ConditionalOnMissingBean(name = "springEventSubscriberRegistry")
-    public EventHandlerRegistry springEventSubscriberRegistry(ApplicationContext appContext) {
+    public EventHandlerRegistry springEventSubscriberRegistry(ApplicationContext appContext,
+                                                              ListenerRetryPolicyResolver retryPolicies) {
         log.info("Creating SpringEventSubscriberRegistry");
-        return new SpringEventSubscriberRegistry(appContext);
+        return new SpringEventSubscriberRegistry(appContext, retryPolicies);
     }
 
     /**
