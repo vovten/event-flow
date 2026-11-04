@@ -130,6 +130,22 @@ class JdbcLifecycleRepositoryTest {
     }
 
     @Test
+    @DisplayName("Should resurrect a dead event for manual retry")
+    void shouldResurrectDeadEvent() {
+        repository.onProcessingFailed(eventId, SERVICE, 1, false,
+                Instant.now(), "payment", "Type", "error");
+        assertThat(status()).isEqualTo(EventStatus.DEAD);
+
+        repository.markForRetry(eventId, SERVICE);
+
+        assertThat(status()).isEqualTo(EventStatus.NEW);
+        RetryTask task = retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow();
+        assertThat(task.state()).isEqualTo(RetryState.PENDING);
+        assertThat(task.attempt()).isEqualTo(1);
+        assertThat(task.policyName()).isEqualTo("payment");
+    }
+
+    @Test
     @DisplayName("Should record a disabled-processing failure without creating a processing row")
     void shouldRecordProcessingDisabled() {
         retryStore.schedule(RetryTask.pending(eventId, SERVICE, RetryKind.DELIVERY, 1,

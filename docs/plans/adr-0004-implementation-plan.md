@@ -786,8 +786,8 @@ Tests for each task are written in the same commit as the task. This list is the
   - stamp `retryKind` and `attempt`;
   - never roll back statuses;
   - `require-accepted-ack = false` → publish success equals `ACCEPTED`.
-- [ ] **3b.7** Add `RetryMetadata` constants for Envelope keys.
-- [ ] **3b.8** `markForRetry`:
+- [x] **3b.7** Add `RetryMetadata` constants for Envelope keys.
+- [x] **3b.8** `markForRetry`:
   - reset the row to `PENDING`;
   - set the event to `FAILED` / `NEW`;
   - atomically.
@@ -949,7 +949,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
-| PR 3b — schedulers | In progress | 8 commits | 3b.1–3b.6 done; next: 3b.7–3b.8 |
+| PR 3b — schedulers | In progress | 9 commits | 3b.1–3b.8 done; next: 3b.9 |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
 Update this table after each merged PR.
@@ -1002,7 +1002,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 3b.3 Shared scheduler support + grouping | `6d6fd19` | `RetrySchedulerSupportTest` + both scheduler suites; full `mvn verify` passed | Yes |
 | 3b.4 `RetryWatchdog` | `052a4f2` | `RetryWatchdogTest` (14 tests) + full `mvn verify` passed | Yes |
 | 3b.5 Retry-aware `AckHandler` | `87ea818` | `AckHandlerRetryTest` (17 tests) + repository tests + full `mvn verify` passed | Yes |
-| 3b.6 Publisher delivery retries | this commit | `EventLifecyclePublisherRetryTest` (7 tests) + full `mvn verify` passed | Yes |
+| 3b.6 Publisher delivery retries | `4e99254` | `EventLifecyclePublisherRetryTest` (7 tests) + full `mvn verify` passed | Yes |
+| 3b.7–3b.8 Metadata + manual retry | this commit | dead-event resurrection tests + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1015,4 +1016,4 @@ Rules:
 
 # 14. Next step
 
-Continue PR 3b with **3b.7–3b.8**: finish retry metadata helpers and verify the atomic `markForRetry` reset.
+Continue PR 3b with **3b.9–3b.12**: Spring wiring, delivery/processing properties, the configuration validator and legacy-scheduler cleanup.
