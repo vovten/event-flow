@@ -683,7 +683,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 ## 7.2 Lifecycle repository
 
-- [ ] **3a.6** `LifecycleRepository`:
+- [x] **3a.6** `LifecycleRepository`:
   - `onPublishFailed`;
   - `onAccepted`;
   - `onProcessingFailed`;
@@ -691,13 +691,13 @@ Tests for each task are written in the same commit as the task. This list is the
   - `onNoHandler`;
   - `onDeadLetter`;
   - `markForRetry`.
-- [ ] **3a.7** `JdbcLifecycleRepository`:
+- [x] **3a.7** `JdbcLifecycleRepository`:
   - one `Connection` per transition;
   - `event_store` + `event_retry` in one transaction;
   - rollback both on failure.
-- [ ] **3a.8** `InMemoryLifecycleRepository`:
+- [x] **3a.8** `InMemoryLifecycleRepository`:
   - synchronized/lock-based atomicity.
-- [ ] **3a.9** `EventStore`: package-private connection-aware helpers so the JDBC repository does not duplicate SQL.
+- [x] **3a.9** `EventStore`: package-private connection-aware helpers so the JDBC repository does not duplicate SQL.
 
 ## 7.3 Test coverage checklist (not a separate task)
 
@@ -712,17 +712,17 @@ Tests for each task are written in the same commit as the task. This list is the
   - complete;
   - dead.
 - [x] **3a.11** `InMemoryEventRetryStoreTest`: behavioural parity.
-- [ ] **3a.12** `JdbcLifecycleRepositoryTest`: atomicity and rollback.
+- [x] **3a.12** `JdbcLifecycleRepositoryTest`: atomicity and rollback.
 - [x] **3a.13** `RetrySchemaInitializerTest`.
 - [x] **3a.14** `SqlDialectTest`: retry SQL for all dialects.
 
 ## 7.4 Definition of Done
 
-- [ ] Table is created on H2 and all five dialects.
-- [ ] Two instances cannot claim the same row.
-- [ ] `onHandled` deletes the retry row and sets `HANDLED` atomically.
-- [ ] A failure on one write rolls back both.
-- [ ] No retry row is created for healthy events.
+- [x] Table is created on H2 and all five dialects.
+- [x] Two instances cannot claim the same row.
+- [x] `onHandled` deletes the retry row and sets `HANDLED` atomically.
+- [x] A failure on one write rolls back both.
+- [x] No retry row is created for healthy events.
 
 ## 7.5 Risks for PR 3a
 
@@ -948,8 +948,8 @@ Tests for each task are written in the same commit as the task. This list is the
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
-| PR 3a — retry store | In progress | 2 commits | 3a.1 done; next: 3a.6–3a.9 |
-| PR 3b — schedulers | Not started | — | Depends on PR 3a |
+| PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
+| PR 3b — schedulers | Not started | — | Depends on PR 3a; next: 3b.1 |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
 
 Update this table after each merged PR.
@@ -993,7 +993,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.12–2.14 Spring wiring | `8f85376` | `RetryPolicyConfigurationTest`/`EventFlowPropertiesTest` + full `mvn verify` passed | Yes |
 | PR 2 final tests/docs | `ee29e1e` | non-blocking retry test + full `mvn verify` passed | Yes |
 | 3a.1a Retry model + in-memory store | `a29c66f` | `RetryTaskTest`/`InMemoryEventRetryStoreTest`; full core suite passed | Yes |
-| 3a.1b JDBC retry store | this commit | JDBC/schema/dialect tests + full `mvn verify` passed | Yes |
+| 3a.1b JDBC retry store | `308b42c` | JDBC/schema/dialect tests + full `mvn verify` passed | Yes |
+| 3a.6–3a.9, 3a.12 Lifecycle repositories | this commit | repository atomicity/rollback tests + concurrency test + full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -1006,4 +1007,4 @@ Rules:
 
 # 14. Next step
 
-Continue PR 3a with **3a.6–3a.9**: implement `LifecycleRepository`, `JdbcLifecycleRepository`, `InMemoryLifecycleRepository` and connection-aware `EventStore` transition helpers.
+PR 3a is complete. Continue with **PR 3b**: `DeliveryRetryScheduler`, `ProcessingRetryScheduler`, shared scheduler support, watchdogs, ack routing and Spring wiring (tasks 3b.1–3b.12).

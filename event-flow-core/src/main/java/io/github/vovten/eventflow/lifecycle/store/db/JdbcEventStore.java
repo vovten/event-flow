@@ -209,6 +209,28 @@ public class JdbcEventStore implements EventStore {
     @Override
     public boolean transitionStatus(UUID eventId, Set<EventStatus> allowedSources,
                                     EventStatus target, String errorDetails) {
+        try (Connection conn = dataSource.getConnection()) {
+            return transitionStatus(conn, eventId, allowedSources, target, errorDetails);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to transition status for event: " + eventId, e);
+        }
+    }
+
+    /**
+     * Conditional status transition using an existing connection.
+     * <p>
+     * Package-private helper for the transactional lifecycle repository.
+     *
+     * @param conn           existing JDBC connection
+     * @param eventId        the event to update
+     * @param allowedSources current statuses from which the transition is allowed
+     * @param target         the new status
+     * @param errorDetails   optional error details
+     * @return true if the row was updated
+     * @throws SQLException on JDBC error
+     */
+    boolean transitionStatus(Connection conn, UUID eventId, Set<EventStatus> allowedSources,
+                             EventStatus target, String errorDetails) throws SQLException {
         Objects.requireNonNull(eventId, "eventId must not be null");
         Objects.requireNonNull(allowedSources, "allowedSources must not be null");
         Objects.requireNonNull(target, "target must not be null");
@@ -218,8 +240,7 @@ public class JdbcEventStore implements EventStore {
         }
         Set<EventStatus> sources = EnumSet.copyOf(allowedSources);
         String sql = transitionSql(target, sources);
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             mapper.setUpdateParameters(ps, eventId, target, errorDetails);
             int index = 5;
             for (EventStatus source : sources) {
@@ -232,8 +253,6 @@ public class JdbcEventStore implements EventStore {
                 return false;
             }
             return true;
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to transition status for event: " + eventId, e);
         }
     }
 

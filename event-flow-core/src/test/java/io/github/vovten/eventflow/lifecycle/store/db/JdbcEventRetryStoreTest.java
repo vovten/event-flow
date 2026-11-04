@@ -21,6 +21,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -155,6 +160,38 @@ class JdbcEventRetryStoreTest {
         assertThat(claimed).isTrue();
         assertThat(store.find(task.eventId(), RetryKind.PROCESSING).orElseThrow().claimedBy())
                 .isEqualTo("scheduler-2");
+    }
+
+    @Test
+    @DisplayName("Should allow only one concurrent claim")
+    void shouldAllowOnlyOneConcurrentClaim() throws Exception {
+        JdbcEventRetryStore store = new JdbcEventRetryStore(dataSource);
+        RetryTask task = task(RetryKind.PROCESSING, 1, Instant.now().minusSeconds(1));
+        store.schedule(task);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Boolean> first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return store.claim(task.eventId(), RetryKind.PROCESSING,
+                        "scheduler-1", Instant.now().plusSeconds(30));
+            });
+            Future<Boolean> second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return store.claim(task.eventId(), RetryKind.PROCESSING,
+                        "scheduler-2", Instant.now().plusSeconds(30));
+            });
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            long claims = (first.get(5, TimeUnit.SECONDS) ? 1 : 0)
+                    + (second.get(5, TimeUnit.SECONDS) ? 1 : 0);
+            assertThat(claims).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

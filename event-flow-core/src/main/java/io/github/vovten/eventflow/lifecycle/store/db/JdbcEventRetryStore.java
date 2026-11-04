@@ -147,19 +147,30 @@ public final class JdbcEventRetryStore implements EventRetryStore {
     public void schedule(RetryTask task) {
         Objects.requireNonNull(task, "task must not be null");
         try (Connection conn = dataSource.getConnection()) {
-            int updated;
-            try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
-                mapper.setUpdateParameters(ps, task);
-                updated = ps.executeUpdate();
-            }
-            if (updated == 0) {
-                try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
-                    mapper.setInsertParameters(ps, task);
-                    ps.executeUpdate();
-                }
-            }
+            schedule(conn, task);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to schedule retry for event: " + task.eventId(), e);
+        }
+    }
+
+    /**
+     * Inserts or replaces a retry row using an existing connection.
+     *
+     * @param conn existing connection
+     * @param task retry task
+     * @throws SQLException on JDBC error
+     */
+    void schedule(Connection conn, RetryTask task) throws SQLException {
+        int updated;
+        try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
+            mapper.setUpdateParameters(ps, task);
+            updated = ps.executeUpdate();
+        }
+        if (updated == 0) {
+            try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                mapper.setInsertParameters(ps, task);
+                ps.executeUpdate();
+            }
         }
     }
 
@@ -221,20 +232,53 @@ public final class JdbcEventRetryStore implements EventRetryStore {
 
     @Override
     public void complete(UUID eventId, RetryKind retryKind) {
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(completeSql)) {
-            mapper.setUuid(ps, 1, eventId);
-            ps.setString(2, retryKind.name());
-            ps.executeUpdate();
+        try (Connection conn = dataSource.getConnection()) {
+            complete(conn, eventId, retryKind);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to complete retry for event: " + eventId, e);
         }
     }
 
+    /**
+     * Deletes a retry row using an existing connection.
+     *
+     * @param conn      existing connection
+     * @param eventId   event identifier
+     * @param retryKind retry domain
+     * @throws SQLException on JDBC error
+     */
+    void complete(Connection conn, UUID eventId, RetryKind retryKind) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(completeSql)) {
+            mapper.setUuid(ps, 1, eventId);
+            ps.setString(2, retryKind.name());
+            ps.executeUpdate();
+        }
+    }
+
     @Override
     public void dead(UUID eventId, RetryKind retryKind, RetryReason reason, String errorType, String error) {
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(deadSql)) {
+        try (Connection conn = dataSource.getConnection()) {
+            dead(conn, eventId, retryKind, reason, errorType, error);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to dead-letter retry for event: " + eventId, e);
+        }
+    }
+
+    /**
+     * Marks a retry row as dead using an existing connection.
+     *
+     * @param conn      existing connection
+     * @param eventId   event identifier
+     * @param retryKind retry domain
+     * @param reason    terminal reason
+     * @param errorType error class name, may be null
+     * @param error     error message, may be null
+     * @throws SQLException          on JDBC error
+     * @throws NoSuchElementException if the retry row does not exist
+     */
+    void dead(Connection conn, UUID eventId, RetryKind retryKind, RetryReason reason,
+              String errorType, String error) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(deadSql)) {
             ps.setString(1, reason.name());
             mapper.setOptionalString(ps, 2, errorType);
             mapper.setOptionalString(ps, 3, error);
@@ -244,22 +288,34 @@ public final class JdbcEventRetryStore implements EventRetryStore {
             if (ps.executeUpdate() == 0) {
                 throw new NoSuchElementException("Retry task not found: " + eventId + "/" + retryKind);
             }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to dead-letter retry for event: " + eventId, e);
         }
     }
 
     @Override
     public Optional<RetryTask> find(UUID eventId, RetryKind retryKind) {
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(selectByIdSql)) {
+        try (Connection conn = dataSource.getConnection()) {
+            return find(conn, eventId, retryKind);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find retry for event: " + eventId, e);
+        }
+    }
+
+    /**
+     * Finds a retry row using an existing connection.
+     *
+     * @param conn      existing connection
+     * @param eventId   event identifier
+     * @param retryKind retry domain
+     * @return the row, or empty when absent
+     * @throws SQLException on JDBC error
+     */
+    Optional<RetryTask> find(Connection conn, UUID eventId, RetryKind retryKind) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(selectByIdSql)) {
             mapper.setUuid(ps, 1, eventId);
             ps.setString(2, retryKind.name());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(mapper.mapRow(rs)) : Optional.empty();
             }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to find retry for event: " + eventId, e);
         }
     }
 
