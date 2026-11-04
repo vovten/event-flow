@@ -16,7 +16,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * Resolution from {@link RetryPolicy} annotations, named policies and the
  * configured default policy is performed by {@link RetryPolicyResolver}.
  *
- * @param name             reusable policy name, or {@code null} for an inline policy
+ * @param name             unique policy name
  * @param retryOn          retryable exception types; empty means "any exception"
  * @param noRetryOn        non-retryable exception types; wins over {@code retryOn}
  * @param maxRetries       total retries after the first attempt (local + durable)
@@ -40,6 +40,11 @@ public record ResolvedRetryPolicy(
         double jitter
 ) {
 
+    /**
+     * Reserved name of the configured default policy.
+     */
+    public static final String DEFAULT_POLICY_NAME = "default";
+
     private static final int DEFAULT_MAX_RETRIES = 3;
     private static final int DEFAULT_LOCAL_MAX_RETRIES = 0;
     private static final Duration DEFAULT_INITIAL_DELAY = Duration.ofSeconds(30);
@@ -48,6 +53,10 @@ public record ResolvedRetryPolicy(
     private static final double DEFAULT_JITTER = 0.5;
 
     public ResolvedRetryPolicy {
+        Objects.requireNonNull(name, "name must not be null");
+        if (name.isBlank()) {
+            throw new IllegalArgumentException("name must not be blank");
+        }
         Objects.requireNonNull(retryOn, "retryOn must not be null");
         Objects.requireNonNull(noRetryOn, "noRetryOn must not be null");
         Objects.requireNonNull(initialDelay, "initialDelay must not be null");
@@ -88,7 +97,7 @@ public record ResolvedRetryPolicy(
      */
     public static ResolvedRetryPolicy defaults() {
         return new ResolvedRetryPolicy(
-                null,
+                DEFAULT_POLICY_NAME,
                 Set.of(),
                 Set.of(),
                 DEFAULT_MAX_RETRIES,

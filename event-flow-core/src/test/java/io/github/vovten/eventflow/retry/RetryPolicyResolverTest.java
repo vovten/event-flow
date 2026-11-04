@@ -16,12 +16,12 @@ class RetryPolicyResolverTest {
     private static final ResolvedRetryPolicy DEFAULTS = ResolvedRetryPolicy.defaults();
 
     @Test
-    @DisplayName("Should inherit defaults for unset inline attributes")
+    @DisplayName("Should inherit defaults for unset declared attributes")
     void shouldInheritDefaults() {
-        ResolvedRetryPolicy policy = RetryPolicyResolver.resolveInline(retryPolicy("empty"), DEFAULTS);
+        ResolvedRetryPolicy policy = RetryPolicyResolver.resolveDeclared(retryPolicy("empty"), DEFAULTS);
 
         assertThat(policy).isNotNull();
-        assertThat(policy.name()).isNull();
+        assertThat(policy.name()).isEqualTo("empty");
         assertThat(policy.maxRetries()).isEqualTo(DEFAULTS.maxRetries());
         assertThat(policy.localMaxRetries()).isEqualTo(DEFAULTS.localMaxRetries());
         assertThat(policy.initialDelay()).isEqualTo(DEFAULTS.initialDelay());
@@ -33,10 +33,11 @@ class RetryPolicyResolverTest {
     }
 
     @Test
-    @DisplayName("Should apply explicit inline attributes")
+    @DisplayName("Should apply explicit declared attributes")
     void shouldApplyExplicitAttributes() {
-        ResolvedRetryPolicy policy = RetryPolicyResolver.resolveInline(retryPolicy("explicit"), DEFAULTS);
+        ResolvedRetryPolicy policy = RetryPolicyResolver.resolveDeclared(retryPolicy("explicit"), DEFAULTS);
 
+        assertThat(policy.name()).isEqualTo("explicit");
         assertThat(policy.maxRetries()).isEqualTo(2);
         assertThat(policy.localMaxRetries()).isEqualTo(1);
         assertThat(policy.initialDelay()).isEqualTo(Duration.ofMillis(250));
@@ -53,6 +54,14 @@ class RetryPolicyResolverTest {
     }
 
     @Test
+    @DisplayName("Should reject a blank policy name")
+    void shouldRejectBlankName() {
+        assertThatThrownBy(() -> RetryPolicyResolver.resolveDeclared(retryPolicy("blank"), DEFAULTS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name");
+    }
+
+    @Test
     @DisplayName("Should resolve a named policy from the registry")
     void shouldResolveNamedPolicy() {
         RetryPolicyRegistry registry = new RetryPolicyRegistry();
@@ -66,25 +75,8 @@ class RetryPolicyResolverTest {
     }
 
     @Test
-    @DisplayName("Should prefer an inline policy over named and default policies")
-    void shouldPreferInlinePolicy() {
-        RetryPolicyRegistry registry = new RetryPolicyRegistry();
-        ResolvedRetryPolicy named = new ResolvedRetryPolicy(
-                "payment", Set.of(), Set.of(), 5, 0,
-                Duration.ofSeconds(1), 2.0, Duration.ofSeconds(10), 0.0);
-        registry.register(named);
-
-        ResolvedRetryPolicy effective = RetryPolicyResolver.resolveEffective(
-                retryPolicy("empty"), "payment", registry, DEFAULTS);
-
-        assertThat(effective.name()).isNull();
-        assertThat(effective.maxRetries()).isEqualTo(DEFAULTS.maxRetries());
-        assertThat(effective).isNotSameAs(named);
-    }
-
-    @Test
-    @DisplayName("Should use the named policy when no inline policy exists")
-    void shouldUseNamedPolicyWhenNoInlinePolicy() {
+    @DisplayName("Should use the named policy when no method declaration exists")
+    void shouldUseNamedPolicyWhenNoDeclaration() {
         RetryPolicyRegistry registry = new RetryPolicyRegistry();
         ResolvedRetryPolicy named = new ResolvedRetryPolicy(
                 "payment", Set.of(), Set.of(), 5, 0,
@@ -96,12 +88,24 @@ class RetryPolicyResolverTest {
     }
 
     @Test
-    @DisplayName("Should use the default policy when no policy is configured")
+    @DisplayName("Should use the default policy when nothing is configured")
     void shouldUseDefaultPolicyWhenNothingIsConfigured() {
         RetryPolicyRegistry registry = new RetryPolicyRegistry();
 
         assertThat(RetryPolicyResolver.resolveEffective(null, null, registry, DEFAULTS))
                 .isSameAs(DEFAULTS);
+        assertThat(DEFAULTS.name()).isEqualTo(ResolvedRetryPolicy.DEFAULT_POLICY_NAME);
+    }
+
+    @Test
+    @DisplayName("Should reject a method declaration combined with a policy reference")
+    void shouldRejectDeclarationAndReferenceTogether() {
+        RetryPolicyRegistry registry = new RetryPolicyRegistry();
+
+        assertThatThrownBy(() -> RetryPolicyResolver.resolveEffective(
+                retryPolicy("empty"), "payment", registry, DEFAULTS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Both");
     }
 
     @Test
@@ -115,9 +119,9 @@ class RetryPolicyResolverTest {
     }
 
     @Test
-    @DisplayName("Should return null when there is no policy")
-    void shouldReturnNullWhenNoPolicy() {
-        assertThat(RetryPolicyResolver.resolveInline(null, DEFAULTS)).isNull();
+    @DisplayName("Should return null when there is no declaration")
+    void shouldReturnNullWhenNoDeclaration() {
+        assertThat(RetryPolicyResolver.resolveDeclared(null, DEFAULTS)).isNull();
     }
 
     @Test
@@ -171,11 +175,12 @@ class RetryPolicyResolverTest {
     @SuppressWarnings("unused")
     private static final class Annotated {
 
-        @RetryPolicy
+        @RetryPolicy(name = "empty")
         private void empty() {
         }
 
         @RetryPolicy(
+                name = "explicit",
                 maxRetries = 2,
                 localMaxRetries = 1,
                 initialDelay = "250ms",
@@ -186,6 +191,10 @@ class RetryPolicyResolverTest {
                 noRetryOn = IllegalStateException.class
         )
         private void explicit() {
+        }
+
+        @RetryPolicy(name = "  ")
+        private void blank() {
         }
     }
 }

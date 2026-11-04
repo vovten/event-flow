@@ -31,6 +31,9 @@ public final class RetryPolicyRegistry {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Named retry policy must have a non-blank name");
         }
+        if (ResolvedRetryPolicy.DEFAULT_POLICY_NAME.equals(name)) {
+            throw new IllegalArgumentException("Retry policy name 'default' is reserved");
+        }
         ResolvedRetryPolicy previous = policies.putIfAbsent(name, policy);
         if (previous != null) {
             throw new IllegalStateException("Duplicate retry policy: " + name);

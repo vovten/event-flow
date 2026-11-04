@@ -18,7 +18,7 @@ class ResolvedRetryPolicyTest {
     void shouldExposeGlobalDefaults() {
         ResolvedRetryPolicy policy = ResolvedRetryPolicy.defaults();
 
-        assertThat(policy.name()).isNull();
+        assertThat(policy.name()).isEqualTo(ResolvedRetryPolicy.DEFAULT_POLICY_NAME);
         assertThat(policy.retryOn()).isEmpty();
         assertThat(policy.noRetryOn()).isEmpty();
         assertThat(policy.maxRetries()).isEqualTo(3);
@@ -28,6 +28,16 @@ class ResolvedRetryPolicyTest {
         assertThat(policy.maxDelay()).isEqualTo(Duration.ofMinutes(10));
         assertThat(policy.jitter()).isEqualTo(0.5);
         assertThat(policy.hasRetries()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should reject a blank policy name")
+    void shouldRejectBlankName() {
+        assertThatThrownBy(() -> new ResolvedRetryPolicy(
+                " ", Set.of(), Set.of(), 1, 0,
+                Duration.ofMillis(1), 2.0, Duration.ofSeconds(1), 0.0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name");
     }
 
     @Test
@@ -98,7 +108,7 @@ class ResolvedRetryPolicyTest {
     @DisplayName("Should match retryOn types and inspect the cause chain")
     void shouldMatchRetryOnAndCauseChain() {
         ResolvedRetryPolicy policy = new ResolvedRetryPolicy(
-                null, Set.of(TimeoutException.class), Set.of(), 3, 0,
+                "test", Set.of(TimeoutException.class), Set.of(), 3, 0,
                 Duration.ofMillis(1), 2.0, Duration.ofSeconds(1), 0.0);
 
         assertThat(policy.matches(new TimeoutException("slow"))).isTrue();
@@ -111,7 +121,7 @@ class ResolvedRetryPolicyTest {
     @DisplayName("Should let noRetryOn win over retryOn")
     void shouldLetNoRetryOnWin() {
         ResolvedRetryPolicy policy = new ResolvedRetryPolicy(
-                null, Set.of(RuntimeException.class), Set.of(IllegalArgumentException.class), 3, 0,
+                "test", Set.of(RuntimeException.class), Set.of(IllegalArgumentException.class), 3, 0,
                 Duration.ofMillis(1), 2.0, Duration.ofSeconds(1), 0.0);
 
         assertThat(policy.matches(new IllegalStateException("boom"))).isTrue();
@@ -122,7 +132,7 @@ class ResolvedRetryPolicyTest {
     @DisplayName("Should compute capped exponential backoff when jitter is disabled")
     void shouldComputeCappedExponentialBackoff() {
         ResolvedRetryPolicy policy = new ResolvedRetryPolicy(
-                null, Set.of(), Set.of(), 5, 2,
+                "test", Set.of(), Set.of(), 5, 2,
                 Duration.ofMillis(100), 2.0, Duration.ofMillis(1_000), 0.0);
 
         assertThat(policy.backoff(1)).isEqualTo(Duration.ofMillis(100));
@@ -136,7 +146,7 @@ class ResolvedRetryPolicyTest {
     @DisplayName("Should apply full jitter within the capped delay")
     void shouldApplyFullJitter() {
         ResolvedRetryPolicy policy = new ResolvedRetryPolicy(
-                null, Set.of(), Set.of(), 1, 0,
+                "test", Set.of(), Set.of(), 1, 0,
                 Duration.ofMillis(100), 2.0, Duration.ofMillis(1_000), 1.0);
 
         assertThat(policy.backoff(1))
@@ -156,7 +166,7 @@ class ResolvedRetryPolicyTest {
     private static ResolvedRetryPolicy policy(int maxRetries, int localMaxRetries,
                                               Duration initialDelay, double multiplier,
                                               Duration maxDelay, double jitter) {
-        return new ResolvedRetryPolicy(null, Set.of(), Set.of(), maxRetries, localMaxRetries,
+        return new ResolvedRetryPolicy("test", Set.of(), Set.of(), maxRetries, localMaxRetries,
                 initialDelay, multiplier, maxDelay, jitter);
     }
 }

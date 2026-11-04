@@ -38,15 +38,11 @@ class RetryPolicyRegistryTest {
     }
 
     @Test
-    @DisplayName("Should reject a policy without a name")
-    void shouldRejectUnnamedPolicy() {
-        assertThatThrownBy(() -> registry.register(policy(null)))
+    @DisplayName("Should reject the reserved default policy name")
+    void shouldRejectReservedDefaultName() {
+        assertThatThrownBy(() -> registry.register(policy(ResolvedRetryPolicy.DEFAULT_POLICY_NAME)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-blank name");
-
-        assertThatThrownBy(() -> registry.register(policy("  ")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-blank name");
+                .hasMessageContaining("reserved");
     }
 
     @Test

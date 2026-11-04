@@ -7,25 +7,31 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Declares a local processing-retry policy for an event listener.
+ * Declares a named processing-retry policy.
  * <p>
- * The annotation can be placed on a listener method (inline policy) or on a
- * type together with a {@link #name()} to define a reusable named policy.
- * Inline policies are authoritative. Named policies may be overridden by
- * configuration.
+ * There is one policy concept: a named policy. The annotation can be placed
+ * in two locations:
+ * <ul>
+ *   <li>on a listener method — declares the named policy and binds it to that
+ *       listener;</li>
+ *   <li>on a type — declares the named policy for reuse; listeners reference
+ *       it with {@code @EventListener(retryPolicy = "...")}.</li>
+ * </ul>
+ * A listener with neither a method-level declaration nor a reference uses the
+ * configured default policy. Setting both a method-level annotation and a
+ * {@code retryPolicy} reference is ambiguous and fails fast.
  * <p>
- * Attributes left at their sentinel values inherit the global processing
- * defaults:
+ * Attributes left at their sentinel values inherit the default policy:
  * <ul>
  *   <li>{@link #maxRetries()} {@code < 0} — inherit;</li>
+ *   <li>{@link #localMaxRetries()} {@code < 0} — inherit;</li>
  *   <li>{@link #initialDelay()} blank — inherit;</li>
  *   <li>{@link #maxDelay()} blank — inherit;</li>
  *   <li>{@link #multiplier()} {@code < 1.0} — inherit;</li>
  *   <li>{@link #jitter()} {@code < 0} — inherit.</li>
  * </ul>
  * An empty {@link #retryOn()} means "retry any exception". {@link #noRetryOn()}
- * always wins over {@link #retryOn()}. A listener without a policy has no local
- * retries and keeps the legacy durable event-level retry behaviour.
+ * always wins over {@link #retryOn()}.
  *
  * @author Vladimir Aleshkov
  * @since 1.4.0
@@ -36,11 +42,11 @@ import java.lang.annotation.Target;
 public @interface RetryPolicy {
 
     /**
-     * Reusable policy name. Only legal on a type.
+     * Unique policy name. Required.
      *
-     * @return the policy name, or an empty string for an inline policy
+     * @return the policy name
      */
-    String name() default "";
+    String name();
 
     /**
      * Exception types that are retried. Empty means "any exception".

@@ -24,23 +24,27 @@ public final class RetryPolicyResolver {
     }
 
     /**
-     * Resolves an inline policy.
+     * Resolves a declared named policy.
      *
-     * @param annotation the inline annotation, or {@code null} when the listener has no policy
+     * @param annotation the policy declaration, or {@code null} when the listener has no declaration
      * @param defaults   default policy used for unset attributes (must not be null)
      * @return the resolved policy, or {@code null} when the annotation is absent
+     * @throws IllegalArgumentException if the declared name is blank
      */
-    public static ResolvedRetryPolicy resolveInline(RetryPolicy annotation, ResolvedRetryPolicy defaults) {
+    public static ResolvedRetryPolicy resolveDeclared(RetryPolicy annotation, ResolvedRetryPolicy defaults) {
         Objects.requireNonNull(defaults, "defaults must not be null");
         if (annotation == null) {
             return null;
+        }
+        if (annotation.name() == null || annotation.name().isBlank()) {
+            throw new IllegalArgumentException("Retry policy name must not be blank");
         }
         int maxRetries = annotation.maxRetries() >= 0 ? annotation.maxRetries() : defaults.maxRetries();
         int localMaxRetries = annotation.localMaxRetries() >= 0
                 ? annotation.localMaxRetries()
                 : defaults.localMaxRetries();
         return new ResolvedRetryPolicy(
-                null,
+                annotation.name(),
                 toTypeSet(annotation.retryOn()),
                 toTypeSet(annotation.noRetryOn()),
                 maxRetries,
@@ -68,15 +72,22 @@ public final class RetryPolicyResolver {
     }
 
     /**
-     * Resolves the effective policy using the documented precedence:
-     * method-level annotation, then the named policy reference, then the
-     * configured default policy.
+     * Resolves the effective policy:
+     * <ul>
+     *   <li>a method-level declaration declares and binds its own named policy;</li>
+     *   <li>otherwise a non-blank {@code namedPolicy} reference is resolved from the registry;</li>
+     *   <li>otherwise the configured default policy applies.</li>
+     * </ul>
+     * Combining a method-level declaration with a {@code retryPolicy} reference is
+     * ambiguous and fails fast.
      *
-     * @param annotation    method-level policy, may be {@code null}
+     * @param annotation    method-level declaration, may be {@code null}
      * @param namedPolicy   name referenced by {@code @EventListener.retryPolicy}, may be blank
      * @param registry      named policy registry (must not be null)
      * @param defaultPolicy configured default policy (must not be null)
      * @return the effective policy, never {@code null}
+     * @throws IllegalArgumentException if both a declaration and a reference are present,
+     *                                  or the referenced policy is unknown
      */
     public static ResolvedRetryPolicy resolveEffective(RetryPolicy annotation,
                                                        String namedPolicy,
@@ -84,12 +95,18 @@ public final class RetryPolicyResolver {
                                                        ResolvedRetryPolicy defaultPolicy) {
         Objects.requireNonNull(registry, "registry must not be null");
         Objects.requireNonNull(defaultPolicy, "defaultPolicy must not be null");
-        ResolvedRetryPolicy inline = resolveInline(annotation, defaultPolicy);
-        if (inline != null) {
-            return inline;
+        boolean hasReference = namedPolicy != null && !namedPolicy.isBlank();
+        if (annotation != null && hasReference) {
+            throw new IllegalArgumentException(
+                    "Both method-level @RetryPolicy and @EventListener(retryPolicy=...) are set");
         }
-        ResolvedRetryPolicy named = resolveNamed(namedPolicy, registry);
-        return named != null ? named : defaultPolicy;
+        if (annotation != null) {
+            return resolveDeclared(annotation, defaultPolicy);
+        }
+        if (hasReference) {
+            return registry.resolve(namedPolicy);
+        }
+        return defaultPolicy;
     }
 
     /**

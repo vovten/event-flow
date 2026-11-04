@@ -163,6 +163,7 @@ A processing retry policy describes **one attempt sequence**, not two unrelated 
 ```java
 @EventListener(OrderCreated.class)
 @RetryPolicy(
+        name = "order-retry",
         maxRetries = 5,        // total retries after the first attempt
         localMaxRetries = 2,   // first 2 retries are local; the rest are durable
         initialDelay = "100ms",
@@ -185,13 +186,30 @@ public class PaymentRetryPolicies { }
 public void on(PaymentFailedEvent event) { ... }
 ```
 
-Resolution order:
+There is exactly one policy concept: a **named policy**. `@RetryPolicy` always requires a name and can be placed in two locations:
 
-1. method-level `@RetryPolicy`;
-2. named policy referenced by `@EventListener.retryPolicy`;
-3. configured default policy from settings.
+- on a listener method — declares the named policy and binds it to that listener;
+- on a type — declares the named policy for reuse; listeners reference it with `@EventListener(retryPolicy = "...")`.
 
-An unknown policy name is a fail-fast startup error. The `name` attribute is only legal on `TYPE`; method-level declarations must not set it. `@RetryPolicy` targets `METHOD, TYPE`.
+Resolution:
+
+1. a method-level declaration declares and binds its own named policy;
+2. otherwise a non-blank `@EventListener.retryPolicy` reference resolves the named policy;
+3. otherwise the configured default policy applies.
+
+Fail-fast rules:
+
+- a method-level declaration and a `retryPolicy` reference on the same listener are ambiguous and fail startup;
+- duplicate policy names fail startup;
+- an unknown referenced name fails startup;
+- the name `default` is reserved for the configured default policy.
+
+Reuse rules:
+
+- every declared name is global and registered at startup;
+- a method-level declaration is bound to its method **and** is reusable by other listeners through `retryPolicy = "..."`;
+- a type-level declaration is declaration-only: it never binds implicitly, even when the type is a listener class. Listener methods must reference it explicitly;
+- shared policies should be declared on a dedicated type. Reusing a method-level declaration is supported, but it couples other listeners to the declaring listener's lifecycle: if that listener bean is not registered, the policy is missing and references fail fast.
 
 The default policy is used both for listeners **without** an annotation and as the source of unset annotation attributes. The shipped defaults preserve legacy behaviour:
 
@@ -214,7 +232,7 @@ Policy semantics:
   - `PERMANENT` — the exception does not match `retryOn`, or matches `noRetryOn`;
   - `TRANSIENT_EXHAUSTED` — the exception is retryable but the total attempt budget is exhausted;
   - `NONE` — the handler succeeded.
-- Inline policy is authoritative. A named policy may be overridden by configuration:
+- Every declared policy — whether declared on a listener method or on a type — is a named policy and may be overridden by configuration using its name:
 
 ```properties
 event-flow.retry.processing.policies.payment.max-retries=10
@@ -317,10 +335,10 @@ Notes:
 
 Processing and delivery policies are deliberately different types:
 
-- **Processing:** `@RetryPolicy` on the listener, named policies, configuration overrides. The consumer owns the decision.
+- **Processing:** named `@RetryPolicy` declarations, `@EventListener.retryPolicy` references, the configured default policy and configuration overrides. The consumer owns the decision.
 - **Delivery:** publisher configuration only (`event-flow.retry.delivery.*`). The listener must not know how the publisher transports events.
 
-The publisher never introspects consumer annotations. The consumer never transports a schedule in an ack. The publisher computes `next_attempt_at` from `now + backoff(attempt)` using its own clock, so clock skew between services cannot corrupt the schedule.
+The publisher never introspects consumer annotations. The consumer transports only a **relative** delay (`retryAfterMs`), never an absolute timestamp. The publisher computes `next_attempt_at` from `now + clamp(retryAfterMs)` using its own clock, so clock skew between services cannot corrupt the schedule.
 
 `RetryEventPublisher` remains the **immediate in-memory transport retry** (fast network/broker glitches). The durable `DELIVERY` queue is the recovery path after immediate retries are exhausted or after `AcceptedAck` is missing. These are two levels of the same domain, not duplicate mechanisms.
 
@@ -529,14 +547,14 @@ Publisher                                      Dispatcher
 | **new** `NoHandlerAck` | permanent configuration failure |
 | `FailureAck` | + `retryKind`, `attempt`, `retryable`, `failedHandlers`, `errorType`, `retryAfterMs`, `policyName`; legacy constructor retained |
 | `SuccessAck` | + `retryKind`, `attempt`; legacy constructor retained |
-| **new** `@RetryPolicy` | `retryOn[]`, `noRetryOn[]`, `maxRetries`, `localMaxRetries`, `initialDelay`, `unit`, `multiplier`, `maxDelay`, `jitter`, `name`; targets `METHOD, TYPE` |
-| `@EventListener` | + `retryPolicy()` (policy name) |
-| **new** `RetryPolicyRegistry` | startup scan of method/type annotations; fail-fast on unknown names |
-| `EventHandler` | + `default RetryPolicy retryPolicy()` (backward-compatible) |
-| `MethodInvokingEventHandler` / `EventListenerRegistry` | resolve and carry the policy |
+| **new** `@RetryPolicy` | `name` (required), `retryOn[]`, `noRetryOn[]`, `maxRetries`, `localMaxRetries`, `initialDelay`, `unit`, `multiplier`, `maxDelay`, `jitter`; `METHOD` declares+binds, `TYPE` declares only |
+| `@EventListener` | + `retryPolicy()` (named policy reference) |
+| **new** `RetryPolicyRegistry` | registers named declarations; fail-fast on duplicates, unknown references and the reserved `default` name |
+| `EventSubscriber` | + `default String retryPolicy()` (named policy reference) |
+| `MethodInvokingEventHandler` / `EventListenerRegistry` | resolve and carry the effective named policy |
 | `UnifiedEventDispatcher` | async local retry loop, per-attempt semaphore, classification |
-| `HandlerResult` / `HandlerResults` | + `retryable`, `failureKind`, `attempts`, `policyName`; aggregate predicates |
-| `EventLifecycleDispatcher` | emit `AcceptedAck` before handlers; emit `NoHandlerAck` when empty |
+| `HandlerResult` / `HandlerResults` | + `retryable`, `failureKind`, `attempts`, `policyName`, `retryAfterMs`; aggregate predicates |
+| `EventLifecycleDispatcher` | emit `AcceptedAck` before handlers; emit `NoHandlerAck` when empty; populate `retryAfterMs`/`policyName` |
 | `AckHandler` | route `AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck` to `LifecycleRepository`; stale-ack guard |
 | `EventLifecyclePublisher` | create `DELIVERY` retry on publish failure; stamp `retryKind` / `attempt`; monotonic status updates |
 | **new** `EventRetryStore` | retry-row persistence: schedule, claim, reschedule, complete, dead-letter |

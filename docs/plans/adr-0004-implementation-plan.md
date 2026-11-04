@@ -518,11 +518,12 @@ Tests for each task are written in the same commit as the task. This list is the
   - `@RetryPolicy`;
   - `ResolvedRetryPolicy` (including `localMaxRetries`, local/durable attempt helpers);
   - `RetryPolicyRegistry`;
-  - `RetryPolicyResolver` (inline, named, effective/default resolution);
+  - `RetryPolicyResolver` (declared named, referenced named, effective/default resolution);
   - `FailureKind` (`NONE`, `PERMANENT`, `TRANSIENT_EXHAUSTED`);
   - `RetryDelayScheduler`.
 - [x] **2.2** `@RetryPolicy` attributes:
-  - `name`, `retryOn[]`, `noRetryOn[]`;
+  - `name` — required; `METHOD` declares+binds, `TYPE` declares only;
+  - `retryOn[]`, `noRetryOn[]`;
   - `maxRetries` — total retries after the first attempt;
   - `localMaxRetries` — local retries before durable hand-off;
   - `initialDelay`, `maxDelay` (String, parsed at startup);
@@ -535,17 +536,27 @@ Tests for each task are written in the same commit as the task. This list is the
     - `localMaxRetries = 0` (durable-only);
     - `initialDelay = 30s`, `multiplier = 2.0`, `maxDelay = 10m`, `jitter = 0.5`;
     - empty `retryOn` (any exception).
-- [ ] **2.3** `@EventListener`: add `retryPolicy()`.
-- [ ] **2.4** `EventHandler`: add `default ResolvedRetryPolicy retryPolicy() { return null; }` or introduce `RetryPolicyAware`. Choose one and document it.
+- [ ] **2.3** `@EventListener`: add `retryPolicy()` named reference.
+  - A method-level `@RetryPolicy` and a `retryPolicy` reference together fail startup.
+- [ ] **2.4** Policy reference for programmatic handlers:
+  - add `default String retryPolicy()` to `EventSubscriber`, returning a named policy reference;
+  - `MethodInvokingEventHandler` carries the resolved policy from the method declaration/reference;
+  - do not add a separate `RetryPolicyAware` abstraction.
 
 ## 6.2 Policy resolution
 
 - [ ] **2.5** `EventListenerRegistry`:
-  - resolve method-level policy and `@EventListener.retryPolicy`;
+  - register method-level `@RetryPolicy` declarations by their required name;
+  - method-level declarations are declaration+binding and are reusable by other listeners through `retryPolicy`;
+  - type-level declarations are declaration-only and never bind implicitly, even on a listener class;
+  - resolve `@EventListener.retryPolicy` by name;
   - carry the resolved policy in `MethodInvokingEventHandler`;
-  - unknown policy name fails startup.
+  - fail-fast on duplicate names, unknown references and declaration+reference ambiguity;
+  - document that shared policies belong on a dedicated type.
 - [ ] **2.6** `SpringEventListenerRegistry`: reuse base resolution, do not duplicate it.
-- [ ] **2.7** `EventSubscriberRegistry`: support type-level `@RetryPolicy` on subscriber classes.
+- [ ] **2.7** `EventSubscriberRegistry`: resolve the name returned by `EventSubscriber.retryPolicy()`;
+  - empty name → default policy;
+  - unknown name → fail startup.
 
 ## 6.3 Dispatcher
 
@@ -585,8 +596,8 @@ Tests for each task are written in the same commit as the task. This list is the
 
 Tests for each task are written in the same commit as the task. This list is the minimum coverage checklist.
 
-- [ ] **2.15** `RetryPolicyRegistryTest`: named, unknown, duplicate, precedence.
-- [ ] **2.16** `RetryPolicyResolverTest`: `retryOn` / `noRetryOn` / empty, `localMaxRetries`, default policy, duration parsing.
+- [ ] **2.15** `RetryPolicyRegistryTest`: named, unknown, duplicate, reserved `default` name.
+- [ ] **2.16** `RetryPolicyResolverTest`: `retryOn` / `noRetryOn` / empty, `localMaxRetries`, default policy, duration parsing, declaration+reference ambiguity.
 - [ ] **2.17** `UnifiedEventDispatcherRetryTest`:
   - transient failure succeeds locally;
   - exhausted local budget returns `retryAfterMs`;
@@ -594,7 +605,10 @@ Tests for each task are written in the same commit as the task. This list is the
   - total budget splits into local + durable attempts;
   - permanent failure is not retried;
   - multiple handlers are isolated.
-- [ ] **2.18** `EventListenerRegistryRetryTest` and `SpringEventListenerRegistryTest`.
+- [ ] **2.18** `EventListenerRegistryRetryTest` and `SpringEventListenerRegistryTest`:
+  - method-level declaration is bound to its listener and reusable by another listener;
+  - a type-level declaration alone does not bind implicitly;
+  - duplicate names and declaration+reference ambiguity fail startup.
 - [ ] **2.19** `EventLifecycleDispatcherTest`: `maxProcessingMs`, `retryable`, `retryAfterMs`, `policyName`.
 - [ ] **2.20** Verify a platform-thread worker is not blocked during backoff.
 - [ ] **2.21** `FailureAckTest`: new `retryAfterMs`/`policyName` fields and legacy constructor defaults.
@@ -607,9 +621,11 @@ Tests for each task are written in the same commit as the task. This list is the
 - [ ] Other handlers are not re-run for a local retry.
 - [ ] Exhausted budget produces `FailureAck(retryable = true)` with `retryAfterMs` and `policyName`.
 - [ ] Permanent failure produces `FailureAck(retryable = false)`.
-- [ ] Listeners without `@RetryPolicy` use the default policy; shipped default preserves legacy behaviour.
-- [ ] Named policies are overridable by config; inline policies are authoritative.
-- [ ] Unknown policy names fail startup.
+- [ ] Listeners without a declaration or reference use the default policy; shipped default preserves legacy behaviour.
+- [ ] Every declared policy is a named policy and is overridable by config.
+- [ ] Method-level declaration and `retryPolicy` reference together fail startup.
+- [ ] Duplicate names, unknown references and the reserved `default` name fail startup.
+- [ ] A method-level declaration is reusable by name; a type-level declaration does not bind implicitly.
 
 ## 6.7 Risks for PR 2
 
@@ -896,6 +912,8 @@ Tests for each task are written in the same commit as the task. This list is the
 | Two scheduler instances | one row processed once |
 | Partial failure + idempotency | retry runs, not duplicate |
 | No `@RetryPolicy` | default policy applies (`localMaxRetries = 0` by default) |
+| Method-level policy reused by another listener | resolves through the global registry by name |
+| Type-level `@RetryPolicy` on a listener class without a reference | does not bind implicitly; default policy applies |
 | Old `FAILED` rows | legacy heuristic or backfill |
 | `localMaxRetries = 0` + handler failure | `FailureAck(retryable = true, retryAfterMs = policy.backoff)`; no local sleep |
 | `localMaxRetries = 2`, `maxRetries = 5` | attempts 1–3 local, attempts 4–6 durable, then `DEAD` |
@@ -927,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 1 commit | Tasks 2.1–2.2a done; next: 2.3 |
+| PR 2 — local retry | In progress | 2 commits | Tasks 2.1–2.2a done; next: 2.3 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -958,7 +976,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 1.13a Logging exclusions | `d7efb49` | `EventFlowPropertiesTest`; full spring suite passed | Yes |
 | 1.9a Publish result transitions | `f033efc` | `EventLifecyclePublisherTest`; full verify passed | Yes |
 | 1.20–1.26 Docs and verification | `8f3946f` | full `mvn verify` passed | Yes |
-| 2.1–2.2a Policy API | this commit | policy API tests; full core suite passed | Yes |
+| 2.1–2.2a Policy API | `b93fdab` | policy API tests; full core suite passed | Yes |
+| 2.1b Named-only policy rework | this commit | policy API tests; full `mvn verify` passed | Yes |
 
 Rules:
 
