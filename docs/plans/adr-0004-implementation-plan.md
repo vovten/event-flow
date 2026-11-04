@@ -560,7 +560,7 @@ Tests for each task are written in the same commit as the task. This list is the
 
 ## 6.3 Dispatcher
 
-- [ ] **2.8** `UnifiedEventDispatcher`:
+- [x] **2.8** `UnifiedEventDispatcher`:
   - read `attempt` from Envelope metadata (default `1`);
   - asynchronous local retry loop while `attempt <= localMaxRetries` and the total budget remains;
   - each attempt is an executor task;
@@ -574,7 +574,7 @@ Tests for each task are written in the same commit as the task. This list is the
   - global local-attempt safety cap.
 - [x] **2.9** `HandlerResult`:
   - `retryable`, `failureKind`, `attempts`, `policyName`, `retryAfterMs`.
-- [ ] **2.10** `HandlerResults`:
+- [x] **2.10** `HandlerResults`:
   - `hasRetryableFailure()`;
   - `hasOnlyPermanentFailures()`;
   - aggregate failed handler names.
@@ -945,7 +945,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Phase | Status | Commits | Notes |
 |---|---|---|---|
 | PR 1 — boundary | Complete | 19 commits | PR 1 done; next: PR 2 |
-| PR 2 — local retry | In progress | 9 commits | Tasks 2.1–2.7 and 2.9 done; next: 2.8 |
+| PR 2 — local retry | In progress | 10 commits | Tasks 2.1–2.10 done; next: 2.11 |
 | PR 3a — retry store | Not started | — | Depends on PR 1 statuses |
 | PR 3b — schedulers | Not started | — | Depends on PR 3a |
 | PR 4 — operations | Not started | — | Depends on PR 3b |
@@ -984,7 +984,9 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 2.5a Extract listener retry policy resolver | `aac0d39` | registry tests + full `mvn verify` passed | Yes |
 | 2.6 Spring registry reuse | `a9d4c64` | `SpringEventListenerRegistryTest`; full `mvn verify` passed | Yes |
 | 2.7 Subscriber policy resolution | `4273ca6` | `EventSubscriberRegistryRetryTest`; full `mvn verify` passed | Yes |
-| 2.9 Handler result classification | this commit | `HandlerResultTest`/`HandlerResultsTest`; full core suite passed | Yes |
+| 2.9 Handler result classification | `5adee1b` | `HandlerResultTest`/`HandlerResultsTest`; full core suite passed | Yes |
+| 2.10 `HandlerResults` aggregates | `5adee1b` | delivered with 2.9; tested | Yes |
+| 2.8 Dispatcher local retry loop | this commit | `UnifiedEventDispatcherRetryTest`; full `mvn verify` passed | Yes |
 
 Rules:
 
@@ -997,4 +999,4 @@ Rules:
 
 # 14. Next step
 
-Start task **2.8** (`UnifiedEventDispatcher`): implement the asynchronous local retry loop, read `attempt` from metadata, honour `localMaxRetries`, and emit `retryAfterMs`/`policyName` when handing off to durable retry.
+Start task **2.11a/2.11**: extend `FailureAck` with `retryAfterMs` and `policyName`, then populate them from `HandlerResults`/`EventLifecycleDispatcher` together with `maxProcessingMs`.

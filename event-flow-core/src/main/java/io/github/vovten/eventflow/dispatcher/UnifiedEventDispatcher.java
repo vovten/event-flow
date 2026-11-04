@@ -1,12 +1,18 @@
 package io.github.vovten.eventflow.dispatcher;
 
-import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.EventHandler;
+import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
+import io.github.vovten.eventflow.retry.FailureKind;
+import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
+import io.github.vovten.eventflow.retry.RetryDelayScheduler;
+import io.github.vovten.eventflow.retry.RetryMetadata;
 import io.github.vovten.eventflow.transport.InTransport;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -34,6 +40,7 @@ import static java.util.stream.Collectors.joining;
  *   <li>Support for decorator pattern via external dispatch consumer injection</li>
  *   <li>Backpressure support via concurrency semaphore (for virtual threads)
  *       or CallerRunsPolicy (for platform thread pools)</li>
+ *   <li>Asynchronous local processing retry per handler</li>
  * </ul>
  * <p>
  * <b>Backpressure behavior:</b>
@@ -62,6 +69,11 @@ public class UnifiedEventDispatcher implements EventDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(UnifiedEventDispatcher.class);
 
+    /**
+     * Default absolute cap for local attempts, regardless of the policy value.
+     */
+    private static final int DEFAULT_LOCAL_RETRY_CAP = 10;
+
     private final List<InTransport> transports;
     private final ExecutorService executorService;
     private final EventHandlerRegistry handlerRegistry;
@@ -73,6 +85,21 @@ public class UnifiedEventDispatcher implements EventDispatcher {
      */
     private final Semaphore concurrencySemaphore;
 
+    /**
+     * Non-blocking scheduler used between local retry attempts.
+     */
+    private final RetryDelayScheduler retryDelayScheduler;
+
+    /**
+     * Absolute cap for local attempts, independent of listener policy.
+     */
+    private final int localRetryCap;
+
+    /**
+     * Fallback policy for handlers that do not expose one.
+     */
+    private final ResolvedRetryPolicy defaultRetryPolicy = ResolvedRetryPolicy.defaults();
+
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     /**
@@ -82,59 +109,77 @@ public class UnifiedEventDispatcher implements EventDispatcher {
      * {@code executorService}. The caller is responsible for shutting down the executor
      * when it is no longer needed. This follows the standard dependency injection principle
      * where the component that creates a resource is responsible for its lifecycle.
-     * <p>
-     * <b>Usage example:</b>
-     * <pre>{@code
-     * ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-     * EventDispatcher dispatcher = new UnifiedEventDispatcher(executor, registry, transports);
      *
-     * try {
-     *     dispatcher.start(consumer);
-     *     // ... application work ...
-     * } finally {
-     *     dispatcher.stop();
-     *     executor.shutdownNow(); // Caller must close executor
-     * }
-     * }</pre>
-     *
-     * @param executorService  executor service for async handler execution (NOT closed by dispatcher)
-     * @param handlerRegistry  custom handler registry
-     * @param transports       list of transports to listen to
+     * @param executorService executor service for async handler execution (NOT closed by dispatcher)
+     * @param handlerRegistry custom handler registry
+     * @param transports      list of transports to listen to
      */
     public UnifiedEventDispatcher(ExecutorService executorService,
                                   EventHandlerRegistry handlerRegistry,
                                   List<InTransport> transports) {
-        this(executorService, handlerRegistry, transports, null);
+        this(executorService, handlerRegistry, transports, null,
+                RetryDelayScheduler.defaultScheduler(), DEFAULT_LOCAL_RETRY_CAP);
     }
 
     /**
      * Create unified dispatcher with concurrency limiting for backpressure support.
-     * <p>
-     * When using virtual threads ({@code Executors.newVirtualThreadPerTaskExecutor()}),
-     * the executor never rejects tasks. Without a concurrency limit, a burst of events
-     * can spawn thousands of concurrent handler executions, potentially overwhelming
-     * downstream systems (databases, HTTP services).
-     * <p>
-     * The {@code concurrencySemaphore} limits the number of handler executions running
-     * simultaneously. When the semaphore is exhausted, handler submissions block until
-     * a slot becomes available, providing backpressure without rejecting events.
-     * <p>
-     * <b>Resource ownership:</b> This dispatcher does NOT close the provided
-     * {@code executorService}. The caller is responsible for shutting down the executor.
      *
-     * @param executorService       executor service for async handler execution (NOT closed by dispatcher)
-     * @param handlerRegistry       custom handler registry
-     * @param transports            list of transports to listen to
-     * @param concurrencySemaphore  semaphore for limiting concurrent handler executions (null = unlimited)
+     * @param executorService      executor service for async handler execution (NOT closed by dispatcher)
+     * @param handlerRegistry      custom handler registry
+     * @param transports           list of transports to listen to
+     * @param concurrencySemaphore semaphore for limiting concurrent handler executions (null = unlimited)
      */
     public UnifiedEventDispatcher(ExecutorService executorService,
                                   EventHandlerRegistry handlerRegistry,
                                   List<InTransport> transports,
                                   Semaphore concurrencySemaphore) {
+        this(executorService, handlerRegistry, transports, concurrencySemaphore,
+                RetryDelayScheduler.defaultScheduler(), DEFAULT_LOCAL_RETRY_CAP);
+    }
+
+    /**
+     * Create unified dispatcher with a custom retry delay scheduler.
+     *
+     * @param executorService      executor service for async handler execution (NOT closed by dispatcher)
+     * @param handlerRegistry      custom handler registry
+     * @param transports           list of transports to listen to
+     * @param concurrencySemaphore semaphore for limiting concurrent handler executions (null = unlimited)
+     * @param retryDelayScheduler  non-blocking delay scheduler for local retries
+     */
+    public UnifiedEventDispatcher(ExecutorService executorService,
+                                  EventHandlerRegistry handlerRegistry,
+                                  List<InTransport> transports,
+                                  Semaphore concurrencySemaphore,
+                                  RetryDelayScheduler retryDelayScheduler) {
+        this(executorService, handlerRegistry, transports, concurrencySemaphore,
+                retryDelayScheduler, DEFAULT_LOCAL_RETRY_CAP);
+    }
+
+    /**
+     * Create unified dispatcher with full local retry configuration.
+     *
+     * @param executorService      executor service for async handler execution (NOT closed by dispatcher)
+     * @param handlerRegistry      custom handler registry
+     * @param transports           list of transports to listen to
+     * @param concurrencySemaphore semaphore for limiting concurrent handler executions (null = unlimited)
+     * @param retryDelayScheduler  non-blocking delay scheduler for local retries
+     * @param localRetryCap        absolute cap for local attempts (must be positive)
+     */
+    public UnifiedEventDispatcher(ExecutorService executorService,
+                                  EventHandlerRegistry handlerRegistry,
+                                  List<InTransport> transports,
+                                  Semaphore concurrencySemaphore,
+                                  RetryDelayScheduler retryDelayScheduler,
+                                  int localRetryCap) {
+        if (localRetryCap <= 0) {
+            throw new IllegalArgumentException("localRetryCap must be positive");
+        }
         this.transports = List.copyOf(transports);
         this.executorService = executorService;
         this.handlerRegistry = handlerRegistry;
         this.concurrencySemaphore = concurrencySemaphore;
+        this.retryDelayScheduler = retryDelayScheduler;
+        this.localRetryCap = localRetryCap;
     }
 
     @Override
@@ -168,15 +213,14 @@ public class UnifiedEventDispatcher implements EventDispatcher {
             return CompletableFuture.completedFuture(HandlerResults.empty());
         }
 
+        int attempt = RetryMetadata.attempt(event);
         List<CompletableFuture<HandlerResult>> futures = new ArrayList<>();
 
         for (EventHandler handler : handlers) {
             try {
-                CompletableFuture<HandlerResult> future = CompletableFuture
-                        .supplyAsync(() -> executeHandler(handler, event), executorService);
-                futures.add(future);
-            } catch (RejectedExecutionException e) {
-                log.warn("Failed to submit handler {}: executor rejected task", handler.name(), e);
+                futures.add(executeHandlerWithRetry(handler, event, attempt));
+            } catch (Exception e) {
+                log.warn("Failed to submit handler {}: {}", handler.name(), e.getMessage());
                 futures.add(CompletableFuture.completedFuture(
                         HandlerResult.failure(handler.name(), e)));
             }
@@ -191,7 +235,28 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                         .toList()));
     }
 
-    private HandlerResult executeHandler(EventHandler handler, Event event) {
+    private CompletableFuture<HandlerResult> executeHandlerWithRetry(EventHandler handler, Event event, int attempt) {
+        ResolvedRetryPolicy policy = resolvePolicy(handler);
+        return invokeOnce(handler, event)
+                .thenCompose(outcome -> {
+                    if (outcome.success()) {
+                        return CompletableFuture.completedFuture(
+                                HandlerResult.success(handler.name(), attempt));
+                    }
+                    return handleFailure(handler, event, attempt, policy, outcome.error());
+                });
+    }
+
+    private CompletableFuture<AttemptOutcome> invokeOnce(EventHandler handler, Event event) {
+        try {
+            return CompletableFuture.supplyAsync(() -> invokeHandler(handler, event), executorService);
+        } catch (RejectedExecutionException e) {
+            log.warn("Failed to submit handler {}: executor rejected task", handler.name(), e);
+            return CompletableFuture.completedFuture(AttemptOutcome.failed(e));
+        }
+    }
+
+    private AttemptOutcome invokeHandler(EventHandler handler, Event event) {
         boolean acquired = false;
         if (concurrencySemaphore != null) {
             try {
@@ -199,20 +264,68 @@ public class UnifiedEventDispatcher implements EventDispatcher {
                 acquired = true;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return HandlerResult.failure(handler.name(), e);
+                return AttemptOutcome.failed(e);
             }
         }
         try {
             handler.onEvent(event);
-            return HandlerResult.success(handler.name());
+            return AttemptOutcome.succeeded();
         } catch (Exception e) {
-            log.error("Handler {} failed for event {}", handler.name(), event.type().getSimpleName(), e);
-            return HandlerResult.failure(handler.name(), e);
+            return AttemptOutcome.failed(e);
         } finally {
             if (acquired) {
                 concurrencySemaphore.release();
             }
         }
+    }
+
+    private CompletableFuture<HandlerResult> handleFailure(EventHandler handler, Event event, int attempt,
+                                                           ResolvedRetryPolicy policy, Throwable error) {
+        if (error instanceof InterruptedException) {
+            return CompletableFuture.completedFuture(failure(
+                    handler, error, attempt, policy, FailureKind.TRANSIENT_EXHAUSTED, true, 0L));
+        }
+        if (!policy.matches(error)) {
+            log.error("Handler {} failed permanently for event {} on attempt {}: {}",
+                    handler.name(), event.type().getSimpleName(), attempt, errorDetails(error));
+            return CompletableFuture.completedFuture(failure(
+                    handler, error, attempt, policy, FailureKind.PERMANENT, false, 0L));
+        }
+        if (!policy.hasMoreAttempts(attempt)) {
+            log.error("Handler {} exhausted the retry budget for event {} on attempt {}",
+                    handler.name(), event.type().getSimpleName(), attempt);
+            return CompletableFuture.completedFuture(failure(
+                    handler, error, attempt, policy, FailureKind.TRANSIENT_EXHAUSTED, false, 0L));
+        }
+        if (policy.isLocalRetryAllowed(attempt) && attempt < localRetryCap) {
+            Duration delay = policy.backoff(attempt);
+            log.warn("Handler {} failed on attempt {}/{} for event {}; retrying in {}ms",
+                    handler.name(), attempt, policy.maxRetries(), event.type().getSimpleName(),
+                    delay.toMillis());
+            return retryDelayScheduler.delay(delay)
+                    .thenCompose(ignored -> executeHandlerWithRetry(handler, event, attempt + 1));
+        }
+        long retryAfterMs = policy.backoff(attempt).toMillis();
+        log.warn("Handler {} failed on attempt {} for event {}; handing off to durable retry after {}ms",
+                handler.name(), attempt, event.type().getSimpleName(), retryAfterMs);
+        return CompletableFuture.completedFuture(failure(
+                handler, error, attempt, policy, FailureKind.TRANSIENT_EXHAUSTED, true, retryAfterMs));
+    }
+
+    private HandlerResult failure(EventHandler handler, Throwable error, int attempt,
+                                  ResolvedRetryPolicy policy, FailureKind kind,
+                                  boolean retryable, long retryAfterMs) {
+        return HandlerResult.failure(handler.name(), error, errorDetails(error),
+                kind, retryable, attempt, policy.name(), retryAfterMs);
+    }
+
+    private ResolvedRetryPolicy resolvePolicy(EventHandler handler) {
+        ResolvedRetryPolicy policy = handlerRegistry.retryPolicyFor(handler);
+        return policy != null ? policy : defaultRetryPolicy;
+    }
+
+    private static String errorDetails(Throwable error) {
+        return error != null ? ExceptionUtils.getRootCauseMessage(error) : null;
     }
 
     @Override
@@ -241,4 +354,14 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         return String.format(msg, transports.size(), names);
     }
 
+    private record AttemptOutcome(boolean success, Throwable error) {
+
+        private static AttemptOutcome succeeded() {
+            return new AttemptOutcome(true, null);
+        }
+
+        private static AttemptOutcome failed(Throwable error) {
+            return new AttemptOutcome(false, error);
+        }
+    }
 }
