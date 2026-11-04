@@ -856,26 +856,26 @@ Tests for each task are written in the same commit as the task. This list is the
 
 **Task/commit rule:** each functional task below is a separate commit and includes its own tests; documentation-only tasks require a passing full suite.
 
-- [ ] **4.1** Dead-letter retention:
+- [x] **4.1** Dead-letter retention:
   - separate `maxAge`;
   - cleanup never deletes a pending retry;
   - dead-letter rows are deleted together with the event.
-- [ ] **4.2** Overview SQL view for `event_store + event_retry` in README/release notes.
-- [ ] **4.3** Diagnostics without a hard Micrometer dependency:
+- [x] **4.2** Overview SQL view for `event_store + event_retry` in README/release notes.
+- [x] **4.3** Diagnostics without a hard Micrometer dependency:
   - structured logs;
   - optional `RetryMetricsListener` / events for integration.
-- [ ] **4.4** Migration:
+- [x] **4.4** Migration:
   - old `FAILED` rows → legacy heuristic or backfill;
   - mixed fleet: `require-accepted-ack = false` during transition;
   - old-to-new property mapping.
-- [ ] **4.5** README:
+- [x] **4.5** README:
   - new properties;
   - ack flow;
   - state machine;
   - `@RetryPolicy` examples;
   - migration guide.
-- [ ] **4.6** CHANGELOG: version `1.4.0`, no breaking changes, legacy scheduler deprecated.
-- [ ] **4.7** Update ADR-0004 status from `Proposed` to `Accepted` after PR 3b.
+- [x] **4.6** CHANGELOG: version `1.4.0`, no breaking changes, legacy scheduler deprecated.
+- [x] **4.7** Update ADR-0004 status from `Proposed` to `Accepted` after PR 3b.
 - [ ] **4.8** Optional deferred features:
   - per-handler targeting and `PARTIALLY_HANDLED`;
   - per-destination delivery;
@@ -950,7 +950,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | PR 2 — local retry | Complete | 13 commits | PR 2 done; next: PR 3a |
 | PR 3a — retry store | Complete | 3 commits | 3a.1 and 3a.6–3a.12 done; next: PR 3b |
 | PR 3b — schedulers | Complete | 11 commits | 3b.1–3b.12 done; next: PR 4 |
-| PR 4 — operations | Not started | — | Depends on PR 3b |
+| PR 4 — operations | Complete (MVP) | 2 commits | 4.1–4.7 done; 4.8 (optional) deferred |
 
 Update this table after each merged PR.
 
@@ -1004,7 +1004,8 @@ Record one row per task. A row is completed only after the task's commit is conf
 | 3b.5 Retry-aware `AckHandler` | `87ea818` | `AckHandlerRetryTest` (17 tests) + repository tests + full `mvn verify` passed | Yes |
 | 3b.6 Publisher delivery retries | `4e99254` | `EventLifecyclePublisherRetryTest` (7 tests) + full `mvn verify` passed | Yes |
 | 3b.7–3b.8 Metadata + manual retry | `af5a9cc` | dead-event resurrection tests + full `mvn verify` passed | Yes |
-| 3b.9–3b.11 Spring wiring | this commit | `RetryConfigurationValidatorTest`, `LifecycleConfigurationTest`; full `mvn verify` passed | Yes |
+| 3b.9–3b.11 Spring wiring | `714f459` | `RetryConfigurationValidatorTest`, `LifecycleConfigurationTest`; full `mvn verify` passed | Yes |
+| 4.1–4.7 Operations and docs | this commit | documentation-only; full `mvn verify` passed | Yes |
 | 3b.12 Retry-aware cleanup | `18160ed` | retry-aware cleanup tests; full `mvn verify` passed | Yes |
 
 Rules:
@@ -1018,4 +1019,4 @@ Rules:
 
 # 14. Next step
 
-PR 3b is complete. Continue with **PR 4**: dead-letter retention, overview SQL, diagnostics, migration guide, README/CHANGELOG and the ADR status update.
+The ADR-0004 MVP is complete. Optional deferred scope (4.8) remains: per-handler targeting/`PARTIALLY_HANDLED`, per-destination delivery, a DB policy table and a DLQ event with payload.

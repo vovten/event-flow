@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] (target 1.4.0)
 
 ### Added
 
@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configurable default processing policy and named policy overrides via `event-flow.retry.processing.*`.
 - `FailureAck.retryAfterMs` and `FailureAck.policyName`, plus `AcceptedAck.maxProcessingMs`, carry the listener's retry decision to the publisher.
 - `HandlerResult` / `HandlerResults` now expose `failureKind`, `retryable`, `attempts`, `policyName` and `retryAfterMs`.
+- Durable retry storage: the `event_retry` table (keyed by `event_id`, `retry_kind`) and the `EventRetryStore` SPI with JDBC and in-memory implementations. The table is created automatically when schema initialization is enabled.
+- Transactional `LifecycleRepository`: coordinated `event_store` + `event_retry` writes with rollback on either side (`JdbcLifecycleRepository`, `InMemoryLifecycleRepository`).
+- `DeliveryRetryScheduler` and `ProcessingRetryScheduler`: durable retries with lease-based claims, attempt counters, exponential backoff, jitter and hard caps. A shared `RetrySchedulerSupport` groups both retry kinds by `eventId` so an event is re-published once per cycle.
+- `RetryWatchdog`: raises `DELIVERY` rows for stale `PUBLISHED` events and `PROCESSING` rows for stale `ACCEPTED` events.
+- Retry-aware `AckHandler`: routes all four acks through `LifecycleRepository`, applies stale-ack guards by `retryKind` and `attempt`, persists `retryAfterMs`/`policyName`, and supports delivery-only mode.
+- Retry-aware `EventLifecyclePublisher`: creates a `DELIVERY` retry row on publish failure, supports `require-accepted-ack = false` (publish success equals `ACCEPTED`), and never rolls back terminal statuses.
+- Spring properties `event-flow.retry.delivery.*` and `event-flow.retry.processing.durable-*`, plus `RetryConfigurationValidator`. Startup fails fast when durable processing retries are enabled without delivery retries.
+- Manual resurrection of `DEAD` events via `markForRetry(eventId)`, which resets the retry row to `PENDING` and the event to `NEW` atomically.
+- Retry-aware cleanup: events with `PENDING`/`IN_PROGRESS` retry rows are never deleted, and dead-lettered events use a separate `dead-letter-max-age` retention.
 
 ### Changed
 
@@ -30,11 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UnifiedEventDispatcher` retries only the failing handler locally; other handlers of the same event are not re-run.
 - `ListenerRetryPolicyResolver` centralizes policy declaration, named-reference resolution, default-policy fallback and fail-fast validation. `SpringEventListenerRegistry` performs a two-phase policy scan so cross-bean references work.
 - `EventDispatcherBuilder` exposes `retryDelayScheduler(...)` and `localRetryCap(...)`.
+- `AckHandler` now defaults to the legacy status-only constructor when no `LifecycleRepository` bean is present, preserving backward compatibility.
+- The legacy `EventRetryScheduler` is disabled automatically when either durable retry domain is enabled, including its transitional `ACCEPTED` scan.
+- `EventCleanupScheduler` accepts an optional `EventRetryStore` and honours dead-letter retention; the legacy constructor is retained.
 
 ### Fixed
 
 - `IdempotentEventDispatcher` now invalidates its cache on any handler failure, not only when all handlers fail. A partial failure is therefore eligible for a processing retry instead of being dropped as a duplicate.
 - `EventStatus` status comments in all SQL dialects and `SchemaInitializer` now document the new `A` and `D` codes.
+- Retry rows now persist the publish error type and message instead of dropping them.
+- Delivery attempt numbers now count from the first publish, so stale acks from the original attempt cannot clear a newer delivery retry.
 
 ## [1.3.1] - 2026-10-19
 

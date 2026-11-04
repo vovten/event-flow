@@ -1,6 +1,6 @@
 # ADR-0004: Two-Domain Event Retry — Delivery and Processing
 
-- **Status:** Proposed
+- **Status:** Accepted (implemented in 1.4.0)
 - **Date:** 2026-11-01
 - **Author:** project maintainer (design review)
 - **Relates to:**

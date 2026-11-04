@@ -531,6 +531,18 @@ Periodically scans the `EventStore` for failed (`FAILED`), stuck (`PUBLISHED`), 
 
 An `EventSubscriber` that processes incoming lifecycle acknowledgment events (`AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck`) and applies conditional status transitions in the `EventStore`. Late or out-of-order acks cannot roll back a terminal status. Filters by service name to allow multiple publisher instances to share the same channel. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
 
+### Two-Domain Retry Components
+
+The durable two-domain model adds the following components:
+
+- **`DeliveryRetryScheduler`** — retries events that were not accepted by the consumer (`DELIVERY` rows).
+- **`ProcessingRetryScheduler`** — retries handler processing after the consumer accepted the event (`PROCESSING` rows).
+- **`RetryWatchdog`** — creates or raises retry rows for stale `PUBLISHED` / `ACCEPTED` events whose acks were lost.
+- **`LifecycleRepository`** — transactional facade coordinating `event_store` and `event_retry` writes (`JdbcLifecycleRepository`, `InMemoryLifecycleRepository`).
+- **`EventRetryStore`** — durable retry-row persistence (`JdbcEventRetryStore`, `InMemoryEventRetryStore`).
+
+See [Two-domain durable retry](#two-domain-durable-retry-delivery-vs-processing).
+
 ### EventTransport
 
 Transports for event delivery.
@@ -707,6 +719,132 @@ The `service-name` is mandatory — it identifies this service instance so that 
 
 Backoff is exponential: `delay = minAge × 2^retryCount`. First retry at 30s, second at 60s, third at 120s.
 
+`EventRetryScheduler` is the **legacy** retry path. It is disabled automatically when
+the two-domain durable retry is enabled.
+
+### Two-domain durable retry (delivery vs processing)
+
+The two-domain model answers two separate questions instead of overloading `FAILED`:
+
+| Domain | Question | Success evidence | Failure handling |
+|--------|----------|------------------|------------------|
+| `DELIVERY` | Did the consumer receive the event? | `AcceptedAck` | durable delivery retry |
+| `PROCESSING` | Did the handlers process it? | `SuccessAck` | local retry, then durable processing retry |
+| `NO_HANDLER` | Was a listener resolved? | — | terminal `DEAD`, no automatic retry |
+
+State machine:
+
+```text
+NEW ──publish ok──► PUBLISHED ──AcceptedAck──► ACCEPTED ──SuccessAck──► HANDLED
+ │                     │                          │
+ │                     │ no ack / timeout         │ FailureAck (retryable)
+ │                     ▼                          ▼
+ └──publish failed──► FAILED ◄────────────────────┘
+                       │
+                       ├── FailureAck (permanent) / cap ──► DEAD
+                       └── NoHandlerAck ──────────────────► DEAD
+```
+
+Acks are idempotent and may arrive out of order. A processing ack
+(`SuccessAck`, `FailureAck`, `NoHandlerAck`) also proves delivery and clears the
+`DELIVERY` row. A stale ack whose `attempt` is older than the retry row is
+ignored. `HANDLED` and `DEAD` are terminal for acks; only an explicit
+`markForRetry(eventId)` can resurrect a dead event.
+
+#### Durable retry table
+
+The single `event_retry` table is keyed by `(event_id, retry_kind)` and is
+created automatically when `auto-init-schema=true`:
+
+```sql
+CREATE TABLE IF NOT EXISTS event_retry (
+    event_id         UUID         NOT NULL,
+    service          VARCHAR(255) NOT NULL,
+    retry_kind       VARCHAR(16)  NOT NULL,   -- DELIVERY | PROCESSING
+    attempt          INT          NOT NULL DEFAULT 1,
+    next_attempt_at  TIMESTAMP    NOT NULL,
+    state            VARCHAR(16)  NOT NULL,   -- PENDING | IN_PROGRESS | DEAD
+    reason           VARCHAR(64)  NOT NULL,
+    last_error_type  VARCHAR(512),
+    last_error       TEXT,
+    policy_name      VARCHAR(255),
+    claimed_by       VARCHAR(255),
+    claimed_until    TIMESTAMP,
+    created_at       TIMESTAMP    NOT NULL,
+    updated_at       TIMESTAMP    NOT NULL,
+    PRIMARY KEY (event_id, retry_kind)
+);
+```
+
+#### Configuration
+
+The new mode is opt-in. Enable delivery retries first, then durable processing
+retries (processing requires the delivery boundary):
+
+```yaml
+event-flow:
+  retry:
+    delivery:
+      enabled: true               # durable delivery retries
+      interval: 30s
+      ack-timeout: 60s
+      max-retries: 3
+      batch-size: 100
+      retry-delay: 30s            # base delay before the first delivery retry
+      require-accepted-ack: true  # set false during a mixed-fleet migration
+      table-name: event_retry
+    processing:
+      enabled: true               # local processing retries (see policy section)
+      durable-enabled: true       # durable processing retries
+      durable-interval: 30s
+      durable-ack-timeout: 5m
+      durable-max-retries: 3
+      durable-batch-size: 100
+```
+
+Startup fails fast with `IllegalStateException` when
+`retry.processing.durable-enabled=true` and `retry.delivery.enabled=false`.
+The legacy `event-flow.publisher.lifecycle.retry.*` scheduler is disabled
+automatically while either new flag is enabled.
+
+#### Operational overview
+
+Join the two tables for a complete retry picture:
+
+```sql
+SELECT e.event_id,
+       e.event_type,
+       e.service,
+       e.status,
+       r.retry_kind,
+       r.state       AS retry_state,
+       r.attempt,
+       r.reason,
+       r.next_attempt_at,
+       r.policy_name
+FROM event_store e
+LEFT JOIN event_retry r ON r.event_id = e.event_id
+WHERE e.status IN ('P', 'A', 'F', 'D')
+ORDER BY r.next_attempt_at NULLS LAST;
+```
+
+Retry logs include `eventId`, `retryKind`, `attempt`, `reason`, `policyName` and
+the destination where applicable. Dead-letter transitions are logged at ERROR.
+
+#### Migration from the legacy retry scheduler
+
+1. Deploy the new code with both new flags disabled. The legacy scheduler keeps
+   working as before.
+2. Enable `retry.delivery.enabled=true`. The legacy scheduler and its
+   transitional `ACCEPTED` scan are disabled automatically.
+3. During a mixed-version fleet, keep `require-accepted-ack=false` so old
+   consumers without `AcceptedAck` do not trigger delivery retries. Switch to
+   `true` once all consumers are upgraded.
+4. Enable `retry.processing.durable-enabled=true`.
+5. Old `FAILED` rows can be recovered by the legacy heuristic during the
+   transition or backfilled as `PROCESSING` rows; the recovery action is a
+   re-publish either way.
+
 ### Processing retry policies
 
 A listener can declare a **named processing-retry policy**. `@RetryPolicy` always
@@ -780,14 +918,17 @@ event-flow:
     lifecycle:
       cleanup:
         enabled: true
-        max-age: 7d           # Events older than this are deleted
-        batch-size: 500       # Rows per DELETE
-        interval: 60m         # How often the scheduler runs
+        max-age: 7d               # HANDLED / UNDEFINED retention
+        dead-letter-max-age: 30d  # DEAD retention (kept longer for triage)
+        batch-size: 500           # Rows per DELETE
+        interval: 60m             # How often the scheduler runs
         pause-between-batches: 100ms  # Throttle between batches
 ```
 
 **Safety:**
-- Only terminal statuses (`HANDLED`, `UNDEFINED`) are cleaned up — `FAILED` and `DEAD` events are preserved for manual inspection
+- Only terminal statuses (`HANDLED`, `UNDEFINED`, `DEAD`) are cleaned up — `FAILED` events are preserved for manual inspection
+- An event is never deleted while a `PENDING` or `IN_PROGRESS` retry row exists for it
+- `DEAD` events use a separate, longer retention and their retry rows are deleted with the event
 - A single cycle deletes at most 100 000 events; leftover events are picked up by the next cycle
 - A random jitter (up to `interval`) is added to the first run to avoid thundering herd when multiple instances start
 
