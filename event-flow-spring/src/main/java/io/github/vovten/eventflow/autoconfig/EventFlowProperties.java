@@ -30,10 +30,20 @@ import java.util.Map;
  *         table-name: event_store
  *         auto-init-schema: true
  *       retry:
- *         enabled: true
- *         max-retries: 3
- *         retry-interval: 30s
- *         min-age: 30s
+ *         interval: 30s
+ *         ack-timeout: 5m
+ *         batch-size: 100
+ *         table-name: event_retry
+ *         delivery:
+ *           enabled: true
+ *           max-retries: 3
+ *           retry-delay: 30s
+ *           require-accepted-ack: true
+ *         processing:
+ *           enabled: true
+ *           max-attempts: 100
+ *           default-delay: 30s
+ *           max-delay: 10m
  *     retry:
  *       enabled: true
  *       max-attempts: 3
@@ -51,6 +61,17 @@ import java.util.Map;
  *             servers: localhost:9092
  *   dispatcher:
  *     enabled: true
+ *     lifecycle:
+ *       enabled: false
+ *       retry:
+ *         enabled: true
+ *         local-retry-cap: 10
+ *         total-retries: 15
+ *         local-max-retries: 3
+ *         initial-delay: 3s
+ *         multiplier: 2.0
+ *         max-delay: 10m
+ *         jitter: 0.5
  *     idempotent:
  *       enabled: true
  *       ttl: 10m
@@ -92,11 +113,6 @@ public class EventFlowProperties {
      */
     private DispatcherConfig dispatcher = new DispatcherConfig();
 
-    /**
-     * Processing-retry configuration.
-     */
-    private EventRetryConfig retry = new EventRetryConfig();
-
     public boolean isEnabled() {
         return enabled;
     }
@@ -119,14 +135,6 @@ public class EventFlowProperties {
 
     public void setDispatcher(DispatcherConfig dispatcher) {
         this.dispatcher = dispatcher;
-    }
-
-    public EventRetryConfig getRetry() {
-        return retry;
-    }
-
-    public void setRetry(EventRetryConfig retry) {
-        this.retry = retry;
     }
 
     /**
@@ -206,7 +214,7 @@ public class EventFlowProperties {
         private boolean enabled = false;
         private String serviceName = "";
         private StoreConfig store = new StoreConfig();
-        private RetryTrackingConfig retry = new RetryTrackingConfig();
+        private PublisherRetryConfig retry = new PublisherRetryConfig();
         private CleanupConfig cleanup = new CleanupConfig();
 
         public boolean isEnabled() {
@@ -233,11 +241,11 @@ public class EventFlowProperties {
             this.store = store;
         }
 
-        public RetryTrackingConfig getRetry() {
+        public PublisherRetryConfig getRetry() {
             return retry;
         }
 
-        public void setRetry(RetryTrackingConfig retry) {
+        public void setRetry(PublisherRetryConfig retry) {
             this.retry = retry;
         }
 
@@ -312,70 +320,6 @@ public class EventFlowProperties {
                         "type='" + type + '\'' +
                         ", tableName='" + tableName + '\'' +
                         ", autoInitSchema=" + autoInitSchema +
-                        '}';
-            }
-        }
-
-        /**
-         * Retry configuration for lifecycle event tracking.
-         * <p>
-         * Controls automatic retry of failed and stuck (PUBLISHED) events.
-         */
-        public static class RetryTrackingConfig {
-            private boolean enabled = true;
-            private int maxRetries = 3;
-            private Duration retryInterval = Duration.ofSeconds(30);
-            private Duration minAge = Duration.ofSeconds(30);
-            private int batchSize = 1000;
-
-            public boolean isEnabled() {
-                return enabled;
-            }
-
-            public void setEnabled(boolean enabled) {
-                this.enabled = enabled;
-            }
-
-            public int getMaxRetries() {
-                return maxRetries;
-            }
-
-            public void setMaxRetries(int maxRetries) {
-                this.maxRetries = maxRetries;
-            }
-
-            public Duration getRetryInterval() {
-                return retryInterval;
-            }
-
-            public void setRetryInterval(Duration retryInterval) {
-                this.retryInterval = retryInterval;
-            }
-
-            public Duration getMinAge() {
-                return minAge;
-            }
-
-            public void setMinAge(Duration minAge) {
-                this.minAge = minAge;
-            }
-
-            public int getBatchSize() {
-                return batchSize;
-            }
-
-            public void setBatchSize(int batchSize) {
-                this.batchSize = batchSize;
-            }
-
-            @Override
-            public String toString() {
-                return "RetryTrackingConfig{" +
-                        "enabled=" + enabled +
-                        ", maxRetries=" + maxRetries +
-                        ", retryInterval=" + retryInterval +
-                        ", minAge=" + minAge +
-                        ", batchSize=" + batchSize +
                         '}';
             }
         }
@@ -703,6 +647,7 @@ public class EventFlowProperties {
      */
     public static class LifecycleConfig {
         private boolean enabled = false;
+        private ProcessingRetryConfig retry = new ProcessingRetryConfig();
 
         public boolean isEnabled() {
             return enabled;
@@ -712,9 +657,20 @@ public class EventFlowProperties {
             this.enabled = enabled;
         }
 
+        public ProcessingRetryConfig getRetry() {
+            return retry;
+        }
+
+        public void setRetry(ProcessingRetryConfig retry) {
+            this.retry = retry;
+        }
+
         @Override
         public String toString() {
-            return "LifecycleConfig{enabled=" + enabled + '}';
+            return "LifecycleConfig{" +
+                    "enabled=" + enabled +
+                    ", retry=" + retry +
+                    '}';
         }
     }
 
@@ -929,57 +885,27 @@ public class EventFlowProperties {
     }
 
     /**
-     * Two-domain retry configuration.
-     */
-    public static class EventRetryConfig {
-
-        private DeliveryRetryConfig delivery = new DeliveryRetryConfig();
-        private ProcessingRetryConfig processing = new ProcessingRetryConfig();
-
-        public DeliveryRetryConfig getDelivery() {
-            return delivery;
-        }
-
-        public void setDelivery(DeliveryRetryConfig delivery) {
-            this.delivery = delivery;
-        }
-
-        public ProcessingRetryConfig getProcessing() {
-            return processing;
-        }
-
-        public void setProcessing(ProcessingRetryConfig processing) {
-            this.processing = processing;
-        }
-    }
-
-    /**
-     * Durable delivery-retry configuration.
+     * Durable retry configuration owned by the publisher.
      * <p>
-     * Delivery retries are publisher-side: they recover events that were not
-     * accepted by the consumer. The new durable mechanism is opt-in.
+     * The shared settings ({@code interval}, {@code ackTimeout}, {@code batchSize},
+     * {@code tableName}) are used by both the delivery and the durable processing
+     * schedulers. The {@code delivery} and {@code processing} blocks configure
+     * each domain independently.
      */
-    public static class DeliveryRetryConfig {
+    public static class PublisherRetryConfig {
 
         /**
-         * Enable durable delivery retries.
-         */
-        private boolean enabled = false;
-
-        /**
-         * Delay between delivery retry cycles.
+         * Delay between delivery/processing retry cycles.
          */
         private Duration interval = Duration.ofSeconds(30);
 
         /**
-         * Maximum time to wait for an acceptance ack.
+         * Maximum time to wait for an acknowledgment.
+         * <p>
+         * Used for the {@code AcceptedAck} of a delivery retry and for the final
+         * ack of a durable processing retry.
          */
-        private Duration ackTimeout = Duration.ofSeconds(60);
-
-        /**
-         * Maximum number of retries after the first publish.
-         */
-        private int maxRetries = 3;
+        private Duration ackTimeout = Duration.ofMinutes(5);
 
         /**
          * Maximum number of retry rows handled per cycle.
@@ -987,28 +913,12 @@ public class EventFlowProperties {
         private int batchSize = 100;
 
         /**
-         * Base delay before the first durable delivery retry.
-         */
-        private Duration retryDelay = Duration.ofSeconds(30);
-
-        /**
-         * Whether publish success requires an explicit {@code AcceptedAck}.
-         * Set to {@code false} during a mixed-fleet migration.
-         */
-        private boolean requireAcceptedAck = true;
-
-        /**
-         * Retry table name.
+         * Durable retry table name shared by both retry domains.
          */
         private String tableName = "event_retry";
 
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
+        private DeliveryConfig delivery = new DeliveryConfig();
+        private ProcessingConfig processing = new ProcessingConfig();
 
         public Duration getInterval() {
             return interval;
@@ -1026,20 +936,79 @@ public class EventFlowProperties {
             this.ackTimeout = ackTimeout;
         }
 
-        public int getMaxRetries() {
-            return maxRetries;
-        }
-
-        public void setMaxRetries(int maxRetries) {
-            this.maxRetries = maxRetries;
-        }
-
         public int getBatchSize() {
             return batchSize;
         }
 
         public void setBatchSize(int batchSize) {
             this.batchSize = batchSize;
+        }
+
+        public String getTableName() {
+            return tableName;
+        }
+
+        public void setTableName(String tableName) {
+            this.tableName = tableName;
+        }
+
+        public DeliveryConfig getDelivery() {
+            return delivery;
+        }
+
+        public void setDelivery(DeliveryConfig delivery) {
+            this.delivery = delivery;
+        }
+
+        public ProcessingConfig getProcessing() {
+            return processing;
+        }
+
+        public void setProcessing(ProcessingConfig processing) {
+            this.processing = processing;
+        }
+    }
+
+    /**
+     * Delivery retry configuration (publisher-side).
+     */
+    public static class DeliveryConfig {
+
+        /**
+         * Enable durable delivery retries.
+         */
+        private boolean enabled = false;
+
+        /**
+         * Maximum number of delivery retries after the first publish.
+         */
+        private int maxRetries = 3;
+
+        /**
+         * Base delay before the first durable delivery retry.
+         */
+        private Duration retryDelay = Duration.ofSeconds(30);
+
+        /**
+         * Whether publish success requires an explicit {@code AcceptedAck}.
+         * Set to {@code false} during a mixed-fleet migration.
+         */
+        private boolean requireAcceptedAck = true;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(int maxRetries) {
+            this.maxRetries = maxRetries;
         }
 
         public Duration getRetryDelay() {
@@ -1057,25 +1026,85 @@ public class EventFlowProperties {
         public void setRequireAcceptedAck(boolean requireAcceptedAck) {
             this.requireAcceptedAck = requireAcceptedAck;
         }
+    }
 
-        public String getTableName() {
-            return tableName;
+    /**
+     * Durable processing retry configuration (publisher-side).
+     * <p>
+     * The publisher does not own the listener policy. It executes the retry
+     * decision carried by {@code FailureAck} and enforces only its own global
+     * safety cap.
+     */
+    public static class ProcessingConfig {
+
+        /**
+         * Enable durable processing retries on the publisher side.
+         */
+        private boolean enabled = false;
+
+        /**
+         * Global hard cap for processing attempts, independent of listener policies.
+         */
+        private int maxAttempts = 100;
+
+        /**
+         * Fallback delay when a {@code FailureAck} does not carry a relative delay.
+         */
+        private Duration defaultDelay = Duration.ofSeconds(30);
+
+        /**
+         * Upper clamp for a consumer-provided retry delay.
+         */
+        private Duration maxDelay = Duration.ofMinutes(10);
+
+        public boolean isEnabled() {
+            return enabled;
         }
 
-        public void setTableName(String tableName) {
-            this.tableName = tableName;
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getMaxAttempts() {
+            return maxAttempts;
+        }
+
+        public void setMaxAttempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+        }
+
+        public Duration getDefaultDelay() {
+            return defaultDelay;
+        }
+
+        public void setDefaultDelay(Duration defaultDelay) {
+            this.defaultDelay = defaultDelay;
+        }
+
+        public Duration getMaxDelay() {
+            return maxDelay;
+        }
+
+        public void setMaxDelay(Duration maxDelay) {
+            this.maxDelay = maxDelay;
         }
     }
 
     /**
-     * Processing-retry settings, including the default policy and named overrides.
+     * Processing-retry policy for the dispatcher.
+     * <p>
+     * The top-level settings form the default policy. A policy splits its retry
+     * budget between the local and durable layers: the first
+     * {@code localMaxRetries} retries run in-process, the remaining
+     * {@code totalRetries - localMaxRetries} retries are executed by the durable
+     * processing scheduler.
      */
     public static class ProcessingRetryConfig {
 
         /**
-         * Enable local processing retries.
+         * Enable processing retries (local and durable).
          */
-        private boolean enabled = true;
+        private boolean enabled = false;
 
         /**
          * Absolute cap for local retry attempts, independent of listener policies.
@@ -1083,31 +1112,45 @@ public class EventFlowProperties {
         private int localRetryCap = 10;
 
         /**
-         * Enable durable processing retries. Requires delivery retries.
+         * Total retries after the first attempt (local + durable).
          */
-        private boolean durableEnabled = false;
+        private int totalRetries = 15;
 
         /**
-         * Delay between durable processing retry cycles.
+         * Retries performed locally before durable re-publication.
+         * {@code 0} means durable-only, {@code totalRetries} means local-only.
          */
-        private Duration durableInterval = Duration.ofSeconds(30);
+        private int localMaxRetries = 3;
 
         /**
-         * Maximum time to wait for a final ack of a durable processing retry.
+         * Delay before the first retry.
          */
-        private Duration durableAckTimeout = Duration.ofMinutes(5);
+        private Duration initialDelay = Duration.ofSeconds(3);
 
         /**
-         * Global hard cap for durable processing retries after the first attempt.
+         * Exponential backoff multiplier applied to each subsequent retry.
          */
-        private int durableMaxRetries = 3;
+        private double multiplier = 2.0;
 
         /**
-         * Maximum number of durable processing retry rows handled per cycle.
+         * Upper bound for the computed backoff delay.
          */
-        private int durableBatchSize = 100;
+        private Duration maxDelay = Duration.ofMinutes(10);
 
-        private DefaultRetryPolicyConfig defaultPolicy = new DefaultRetryPolicyConfig();
+        /**
+         * Jitter fraction in {@code [0, 1]}; {@code 1.0} means full jitter.
+         */
+        private double jitter = 0.5;
+
+        /**
+         * Exception types that are retryable. Empty means any exception.
+         */
+        private List<String> retryOn = new ArrayList<>();
+
+        /**
+         * Exception types that are never retryable. Wins over {@link #retryOn}.
+         */
+        private List<String> noRetryOn = new ArrayList<>();
 
         /**
          * Named policy overrides by policy name.
@@ -1130,83 +1173,12 @@ public class EventFlowProperties {
             this.localRetryCap = localRetryCap;
         }
 
-        public boolean isDurableEnabled() {
-            return durableEnabled;
+        public int getTotalRetries() {
+            return totalRetries;
         }
 
-        public void setDurableEnabled(boolean durableEnabled) {
-            this.durableEnabled = durableEnabled;
-        }
-
-        public Duration getDurableInterval() {
-            return durableInterval;
-        }
-
-        public void setDurableInterval(Duration durableInterval) {
-            this.durableInterval = durableInterval;
-        }
-
-        public Duration getDurableAckTimeout() {
-            return durableAckTimeout;
-        }
-
-        public void setDurableAckTimeout(Duration durableAckTimeout) {
-            this.durableAckTimeout = durableAckTimeout;
-        }
-
-        public int getDurableMaxRetries() {
-            return durableMaxRetries;
-        }
-
-        public void setDurableMaxRetries(int durableMaxRetries) {
-            this.durableMaxRetries = durableMaxRetries;
-        }
-
-        public int getDurableBatchSize() {
-            return durableBatchSize;
-        }
-
-        public void setDurableBatchSize(int durableBatchSize) {
-            this.durableBatchSize = durableBatchSize;
-        }
-
-        public DefaultRetryPolicyConfig getDefaultPolicy() {
-            return defaultPolicy;
-        }
-
-        public void setDefaultPolicy(DefaultRetryPolicyConfig defaultPolicy) {
-            this.defaultPolicy = defaultPolicy;
-        }
-
-        public Map<String, RetryPolicyOverrideConfig> getPolicies() {
-            return policies;
-        }
-
-        public void setPolicies(Map<String, RetryPolicyOverrideConfig> policies) {
-            this.policies = policies;
-        }
-    }
-
-    /**
-     * Default processing-retry policy.
-     */
-    public static class DefaultRetryPolicyConfig {
-
-        private int maxRetries = 3;
-        private int localMaxRetries = 0;
-        private Duration initialDelay = Duration.ofSeconds(30);
-        private double multiplier = 2.0;
-        private Duration maxDelay = Duration.ofMinutes(10);
-        private double jitter = 0.5;
-        private List<String> retryOn = new ArrayList<>();
-        private List<String> noRetryOn = new ArrayList<>();
-
-        public int getMaxRetries() {
-            return maxRetries;
-        }
-
-        public void setMaxRetries(int maxRetries) {
-            this.maxRetries = maxRetries;
+        public void setTotalRetries(int totalRetries) {
+            this.totalRetries = totalRetries;
         }
 
         public int getLocalMaxRetries() {
@@ -1264,6 +1236,41 @@ public class EventFlowProperties {
         public void setNoRetryOn(List<String> noRetryOn) {
             this.noRetryOn = noRetryOn;
         }
+
+        public Map<String, RetryPolicyOverrideConfig> getPolicies() {
+            return policies;
+        }
+
+        public void setPolicies(Map<String, RetryPolicyOverrideConfig> policies) {
+            this.policies = policies;
+        }
+
+        /**
+         * Whether any configured policy needs the durable processing layer.
+         * <p>
+         * The durable layer is used when the local retry budget is smaller than
+         * the total retry budget. Code-declared policies may also request durable
+         * retries; the delivery boundary is required for those as well.
+         *
+         * @return {@code true} when durable processing retries are needed
+         */
+        public boolean requiresDurable() {
+            if (!enabled) {
+                return false;
+            }
+            if (localMaxRetries < totalRetries) {
+                return true;
+            }
+            return policies.values().stream().anyMatch(this::overrideRequiresDurable);
+        }
+
+        private boolean overrideRequiresDurable(RetryPolicyOverrideConfig override) {
+            int effectiveMax = override.getTotalRetries() != null
+                    ? override.getTotalRetries() : totalRetries;
+            int effectiveLocal = override.getLocalMaxRetries() != null
+                    ? override.getLocalMaxRetries() : localMaxRetries;
+            return effectiveLocal < effectiveMax;
+        }
     }
 
     /**
@@ -1271,7 +1278,7 @@ public class EventFlowProperties {
      */
     public static class RetryPolicyOverrideConfig {
 
-        private Integer maxRetries;
+        private Integer totalRetries;
         private Integer localMaxRetries;
         private Duration initialDelay;
         private Double multiplier;
@@ -1280,12 +1287,12 @@ public class EventFlowProperties {
         private List<String> retryOn;
         private List<String> noRetryOn;
 
-        public Integer getMaxRetries() {
-            return maxRetries;
+        public Integer getTotalRetries() {
+            return totalRetries;
         }
 
-        public void setMaxRetries(Integer maxRetries) {
-            this.maxRetries = maxRetries;
+        public void setTotalRetries(Integer totalRetries) {
+            this.totalRetries = totalRetries;
         }
 
         public Integer getLocalMaxRetries() {

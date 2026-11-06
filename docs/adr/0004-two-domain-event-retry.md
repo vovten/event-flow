@@ -10,6 +10,14 @@
 - **Implementation plan:** [ADR-0004 Implementation Plan](../plans/adr-0004-implementation-plan.md)
 - **Tags:** retry, delivery, processing, lifecycle, dead-letter, event-store, ack, api
 
+> **Configuration placement amendment (2026-11-06).** Retry configuration follows the
+> component that owns the domain. The publisher owns durable execution:
+> `event-flow.publisher.lifecycle.retry.delivery.*` and
+> `event-flow.publisher.lifecycle.retry.processing.*`; the dispatcher owns the
+> processing policy: `event-flow.dispatcher.lifecycle.retry.*`. The former root
+> `event-flow.retry.*` block, the legacy `EventRetryScheduler` auto-configuration
+> and the cross-domain `RetryConfigurationValidator` were removed.
+
 ## Context
 
 ### The current ambiguity
@@ -211,17 +219,20 @@ Reuse rules:
 - a type-level declaration is declaration-only: it never binds implicitly, even when the type is a listener class. Listener methods must reference it explicitly;
 - shared policies should be declared on a dedicated type. Reusing a method-level declaration is supported, but it couples other listeners to the declaring listener's lifecycle: if that listener bean is not registered, the policy is missing and references fail fast.
 
-The default policy is used both for listeners **without** an annotation and as the source of unset annotation attributes. The shipped defaults preserve legacy behaviour:
+The default policy is used both for listeners **without** an annotation and as the source of unset annotation attributes. Processing retries are opt-in; when enabled, the shipped defaults are:
 
 ```text
-maxRetries       = 3
-localMaxRetries  = 0        # durable-only
-initialDelay     = 30s
+maxRetries       = 15       # 3 local + 12 durable
+localMaxRetries  = 3
+initialDelay     = 3s
 multiplier       = 2.0
 maxDelay         = 10m
 jitter           = 0.5
 retryOn          = []       # any exception
 ```
+
+With this sequence the retry campaign spans at least 40 minutes even at the
+minimum jitter (15 retries × exponential backoff capped at 10 minutes).
 
 There is therefore no "unclassified" or "no policy" state: every listener has a resolved policy, and the default policy is identified by `policyName = "default"` in diagnostics.
 
@@ -235,13 +246,13 @@ Policy semantics:
 - Every declared policy — whether declared on a listener method or on a type — is a named policy and may be overridden by configuration using its name:
 
 ```properties
-event-flow.retry.processing.policies.payment.max-retries=10
-event-flow.retry.processing.policies.payment.local-max-retries=2
-event-flow.retry.processing.policies.payment.initial-delay=2s
-event-flow.retry.processing.policies.payment.multiplier=2.0
-event-flow.retry.processing.policies.payment.max-delay=30s
-event-flow.retry.processing.policies.payment.retry-on[0]=io.example.PaymentUnavailableException
-event-flow.retry.processing.policies.payment.no-retry-on[0]=io.example.PaymentRejectedException
+event-flow.dispatcher.lifecycle.retry.policies.payment.total-retries=10
+event-flow.dispatcher.lifecycle.retry.policies.payment.local-max-retries=2
+event-flow.dispatcher.lifecycle.retry.policies.payment.initial-delay=2s
+event-flow.dispatcher.lifecycle.retry.policies.payment.multiplier=2.0
+event-flow.dispatcher.lifecycle.retry.policies.payment.max-delay=30s
+event-flow.dispatcher.lifecycle.retry.policies.payment.retry-on[0]=io.example.PaymentUnavailableException
+event-flow.dispatcher.lifecycle.retry.policies.payment.no-retry-on[0]=io.example.PaymentRejectedException
 ```
 
 Implementation notes:
@@ -336,28 +347,39 @@ Notes:
 Processing and delivery policies are deliberately different types:
 
 - **Processing:** named `@RetryPolicy` declarations, `@EventListener.retryPolicy` references, the configured default policy and configuration overrides. The consumer owns the decision.
-- **Delivery:** publisher configuration only (`event-flow.retry.delivery.*`). The listener must not know how the publisher transports events.
+- **Delivery:** publisher configuration only (`event-flow.publisher.lifecycle.retry.*`). The listener must not know how the publisher transports events.
 
 The publisher never introspects consumer annotations. The consumer transports only a **relative** delay (`retryAfterMs`), never an absolute timestamp. The publisher computes `next_attempt_at` from `now + clamp(retryAfterMs)` using its own clock, so clock skew between services cannot corrupt the schedule.
 
 `RetryEventPublisher` remains the **immediate in-memory transport retry** (fast network/broker glitches). The durable `DELIVERY` queue is the recovery path after immediate retries are exhausted or after `AcceptedAck` is missing. These are two levels of the same domain, not duplicate mechanisms.
 
-#### D6.1 — Configuration invariant: `PROCESSING` requires `DELIVERY`
+#### D6.1 — Configuration ownership: consumer policy vs publisher execution
 
-The two domains are independent in state, scheduling and metrics, but not in configuration. A processing retry depends on the delivery boundary: without delivery tracking, a processing retry would silently become a delivery retry and the clear separation would be lost.
+The two domains are configured independently and may run in different applications:
 
-| `delivery.enabled` | `processing.enabled` | Mode |
+- the **dispatcher** owns the processing policy (`total-retries`,
+  `local-max-retries`, delays, exception filters) and carries its decision in
+  `FailureAck` (`retryable`, `attempt`, `retryAfterMs`, `policyName`);
+- the **publisher** owns durable execution (`...retry.delivery.*` and
+  `...retry.processing.*`) and enforces its own global safety cap
+  (`processing.max-attempts`).
+
+There is no start-up invariant that couples processing retries to delivery
+retries. The publisher may enable durable processing without delivery retries,
+and the consumer may request a retry even if the publisher has no processing
+scheduler configured; in that case the event simply remains `FAILED`.
+
+| Publisher `delivery.enabled` | Publisher `processing.enabled` | Mode |
 |---|---|---|
-| `false` | `false` | New retry mechanism off; the legacy scheduler may run |
-| `true` | `false` | Delivery-only mode; processing outcomes are recorded but not automatically retried |
+| `false` | `false` | No durable retries |
+| `true` | `false` | Delivery retries only |
+| `false` | `true` | Durable processing retries only |
 | `true` | `true` | Full two-domain mode |
-| `false` | `true` | **Invalid; fail fast at startup** |
 
-Startup validation rules:
-
-- If `event-flow.retry.processing.enabled = true` and `event-flow.retry.delivery.enabled = false`, application startup fails with an `IllegalStateException` whose message explains that processing retries require the delivery boundary.
-- The check runs before any retry scheduler or `LifecycleRepository` is created. It is a configuration error, not a runtime condition.
-- The validation is implemented in a small, unit-testable `RetryConfigurationValidator` and invoked from the Spring lifecycle configuration.
+The dispatcher policy is not visible to the publisher. The publisher trusts
+`FailureAck.retryable` and continues the attempt counter from
+`FailureAck.attempt`; `max-attempts` is an independent safety net against a
+buggy consumer.
 
 Delivery-only mode semantics:
 
@@ -404,7 +426,7 @@ Scheduling rules:
 - `DeliveryRetryScheduler` selects only `DELIVERY` rows. It never selects an `ACCEPTED` event and never creates a delivery row for one: `ACCEPTED` belongs to the processing domain.
 - Watchdogs avoid a row per healthy event:
   - scan `event_store` for `PUBLISHED` older than `deliveryAckTimeout` → create or raise a `DELIVERY` row;
-  - scan `event_store` for `ACCEPTED` older than `processingAckTimeout` → create or raise a `PROCESSING` row; this watchdog runs only when `processing.enabled = true`.
+  - scan `event_store` for `ACCEPTED` older than `processingAckTimeout` → create or raise a `PROCESSING` row; this watchdog runs only when publisher `processing.enabled = true`.
 - `claimed_until` must exceed the maximum expected publish + ack window. An expired lease returns the row to `PENDING`; this is at-least-once, not exactly-once.
 - Manual `markForRetry(eventId)` resets the relevant row to `PENDING` and the event to `FAILED`/`NEW` atomically. It bypasses the current backoff but not the hard safety cap unless an explicit operator override is configured.
 
@@ -457,7 +479,7 @@ Implementation notes:
 
 ### D10 — Backward compatibility
 
-- Listeners without `@RetryPolicy` use the configured default policy. The shipped default is `localMaxRetries = 0` and legacy-compatible durable settings, so today's behaviour is preserved. Operators may enable local retries globally by increasing the default `localMaxRetries`.
+- Listeners without `@RetryPolicy` use the configured default policy. Processing retries are disabled by default; when enabled, the shipped default is `localMaxRetries = 3` and `maxRetries = 15`, so the campaign spans at least 40 minutes.
 - Legacy `FailureAck` constructors: `retryKind = PROCESSING`, `retryable = true`, `attempt = 1`, `retryAfterMs = 0`, `policyName = null`.
 - A `FailureAck` without `retryAfterMs` (old consumer) uses the publisher's global processing backoff.
 - A publisher receiving `AcceptedAck` from a new consumer: it processes the ack; a publisher that does not understand it treats it as an unknown technical event and ignores it.
@@ -566,10 +588,10 @@ Publisher                                      Dispatcher
 | `EventStore` | no interface change; built-in stores implement `EventRetryStore` (or a combined repository) |
 | `JdbcEventStore` / `InMemoryEventStore` | retry table support / in-memory retry map |
 | 5 SQL dialects + DDL scripts + `SchemaInitializer` | `event_retry` table, indexes, status comments |
-| `EventRetryScheduler` | deprecated in favour of the two schedulers; legacy mode retained for old rows |
+| `EventRetryScheduler` | no longer auto-configured; the two durable schedulers replace it |
 | `EventCleanupScheduler` | exclude events with pending `event_retry`; separate `DEAD` retention |
 | `IdempotentEventDispatcher` | invalidate cache on any handler failure |
-| `EventFlowProperties` | new `event-flow.retry.delivery.*`, `event-flow.retry.processing.*`, including the default processing policy; startup validation (`RetryConfigurationValidator`); legacy properties aliased/deprecated |
+| `EventFlowProperties` | publisher-owned `...retry.delivery.*` / `...retry.processing.*`; dispatcher-owned processing policy under `...dispatcher.lifecycle.retry.*`; legacy scheduler properties removed |
 | `RetryEventPublisher` | unchanged: immediate in-memory transport retry |
 | `TransactionalEventPublisher` | unchanged |
 
@@ -755,8 +777,8 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 13. `IdempotentEventDispatcher` invalidates the cache on partial failure, so the processing retry runs.
 14. Cleanup does not delete an event with a pending retry row or a dead letter within retention.
 15. `LifecycleRepository` rolls back both writes when one side fails.
-16. Backward compatibility: a listener without `@RetryPolicy` uses the default policy (`localMaxRetries = 0`), legacy `FailureAck` constructor, old `FAILED` rows, mixed-fleet `require-accepted-ack = false`.
-17. `processing.enabled = true` with `delivery.enabled = false` fails startup with a clear configuration error.
+16. Backward compatibility: a listener without `@RetryPolicy` uses the default policy, legacy `FailureAck` constructor, old `FAILED` rows, mixed-fleet `require-accepted-ack = false`.
+17. Publisher durable processing works independently of delivery retries; the two flags are configured separately.
 18. Delivery-only mode records a handler failure as `FAILED` without creating a `PROCESSING` row and without running a processing retry.
 19. `SuccessAck` arriving before `AcceptedAck` moves the event to `HANDLED`; the late `AcceptedAck` is ignored for status and does not leave a delivery row.
 20. `FailureAck` arriving before `AcceptedAck` keeps the event `FAILED` with a `PROCESSING` row; the late `AcceptedAck` only clears the delivery row and does not change the status.
@@ -781,7 +803,7 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 `@RetryPolicy`, `RetryPolicyRegistry`, named policies, configuration overrides, async local retry loop, backoff + jitter, global local cap, `FailureAck.retryable`.
 
 **Phase 3 — durable retry queue.**
-`event_retry` table, `EventRetryStore`, `LifecycleRepository`, `ACCEPTED` / `DEAD` statuses, `DeliveryRetryScheduler`, `ProcessingRetryScheduler`, watchdogs, claim/lease, caps, `AckHandler` routing, `EventLifecyclePublisher` delivery-row creation and attempt stamping, `RetryConfigurationValidator` startup validation, schema initialization and migration.
+`event_retry` table, `EventRetryStore`, `LifecycleRepository`, `ACCEPTED` / `DEAD` statuses, `DeliveryRetryScheduler`, `ProcessingRetryScheduler`, watchdogs, claim/lease, caps, `AckHandler` routing, `EventLifecyclePublisher` delivery-row creation and attempt stamping, schema initialization and migration.
 
 **Phase 4 — operations and deferred features.**
 Dead-letter retention, manual retry, overview view, optional backfill, per-handler durable isolation / `PARTIALLY_HANDLED`, per-destination delivery, DB policy table and seeding, DLQ event with payload.

@@ -51,6 +51,13 @@ A missing handler is a permanent `NO_HANDLER` failure and goes to `DEAD` without
 
 These are locked before coding starts.
 
+> **Configuration placement amendment (2026-11-06).** Configuration is split by ownership:
+> the publisher owns durable execution (`...publisher.lifecycle.retry.delivery.*` and
+> `...publisher.lifecycle.retry.processing.*`); the dispatcher owns the processing policy
+> (`...dispatcher.lifecycle.retry.*`). The root `event-flow.retry.*` block, the legacy
+> `EventRetryScheduler` auto-configuration and the cross-domain
+> `RetryConfigurationValidator` were removed.
+
 ### 2.1 Ack contracts (final)
 
 All acks implement `LifecycleAckEvent` and `TraceableEvent`. They are technical events: not persisted and they receive no lifecycle acks.
@@ -589,7 +596,7 @@ Tests for each task are written in the same commit as the task. This list is the
 ## 6.4 Spring wiring
 
 - [x] **2.12** Add `RetryPolicyRegistry` and default-policy beans.
-- [x] **2.13** Add `event-flow.retry.processing.*` properties, including `default-policy.*` and named policy overrides.
+- [x] **2.13** Add `event-flow.dispatcher.lifecycle.retry.*` properties: the top-level settings form the default policy, plus named policy overrides.
 - [x] **2.14** Pass the registry/default policy to Spring registries and the delay scheduler to the dispatcher.
 
 ## 6.5 Test coverage checklist (not a separate task)
@@ -795,7 +802,7 @@ Tests for each task are written in the same commit as the task. This list is the
 ## 8.3 Spring wiring
 
 - [x] **3b.9** Create `EventRetryStore`, `LifecycleRepository`, and both schedulers as beans.
-- [x] **3b.10** Add `event-flow.retry.delivery.*` and `event-flow.retry.processing.*`.
+- [x] **3b.10** Add `event-flow.publisher.lifecycle.retry.*` and `event-flow.dispatcher.lifecycle.retry.*`.
 - [x] **3b.10a** Add `RetryConfigurationValidator`:
   - fail fast with `IllegalStateException` when `processing.enabled = true` and `delivery.enabled = false`;
   - run before any retry scheduler or `LifecycleRepository` is created;

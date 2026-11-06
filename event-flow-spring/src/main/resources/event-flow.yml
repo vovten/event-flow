@@ -82,19 +82,44 @@ event-flow:
         #   io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql
         auto-init-schema: false
 
-      # Retry configuration for lifecycle event tracking
+      # Durable retry configuration (publisher-side).
+      # The shared settings are used by both the delivery and processing
+      # schedulers; the delivery and processing blocks configure each domain.
       retry:
-        # Enable or disable automatic retry of failed and stuck events
-        enabled: true
-        # Maximum number of retry attempts
-        max-retries: 3
-        # Interval between retry cycles
-        retry-interval: 30s
-        # Base backoff interval for retries (delay = min-age × 2^retryCount)
-        # Examples with 30s: 1st retry=30s, 2nd=60s, 3rd=120s
-        min-age: 30s
-        # Maximum number of events to fetch per retry cycle
-        batch-size: 1000
+        # Delay between delivery/processing retry cycles.
+        interval: 30s
+        # Maximum time to wait for an AcceptedAck (delivery) or a final ack
+        # (durable processing). Must exceed the longest local retry campaign.
+        ack-timeout: 5m
+        # Maximum number of retry rows handled per cycle.
+        batch-size: 100
+        # Name of the durable retry table shared by both retry domains.
+        table-name: event_retry
+
+        # Delivery retry configuration.
+        delivery:
+          # Enable durable delivery retries.
+          enabled: false
+          # Maximum number of delivery retries after the first publish.
+          max-retries: 3
+          # Base delay before the first durable delivery retry.
+          retry-delay: 30s
+          # When true, a successful publish must be confirmed by AcceptedAck.
+          # Set to false during a mixed-version fleet migration.
+          require-accepted-ack: true
+
+        # Durable processing retry configuration (publisher-side).
+        # The publisher executes the retry decision carried by FailureAck and
+        # does not read the dispatcher policy.
+        processing:
+          # Enable durable processing retries on the publisher side.
+          enabled: false
+          # Global hard cap for processing attempts, independent of listener policies.
+          max-attempts: 100
+          # Fallback delay when a FailureAck does not carry a relative delay.
+          default-delay: 30s
+          # Upper clamp for a consumer-provided retry delay.
+          max-delay: 10m
 
       # Cleanup configuration for lifecycle event tracking
       # Removes old terminal events (HANDLED, UNDEFINED) to prevent unbounded growth
@@ -231,43 +256,44 @@ event-flow:
       # Enable or disable ack-based lifecycle tracking
       enabled: false
 
-  # ---------------------------------------------------------------------------
-  # Processing Retry Configuration
-  # ---------------------------------------------------------------------------
-  # Policies are named. Declare them in code with @RetryPolicy(name = "...")
-  # and reference them from @EventListener(retryPolicy = "...") or
-  # EventSubscriber.retryPolicy(). Listeners without a reference use the
-  # default policy below. Named policies can be overridden here by name.
-  retry:
-    processing:
-      # Enable local in-process retries. Durable re-publication still works
-      # when this is false; only the local layer is disabled.
-      enabled: true
-      # Absolute cap for local retry attempts, independent of listener policies.
-      local-retry-cap: 10
-      default-policy:
-        # Total retries after the first attempt (local + durable).
-        max-retries: 3
+      # Processing retry policy (listener-side).
+      # The top-level settings are the default policy; named policies override
+      # only the fields they specify. A policy splits its budget between the
+      # local and durable layers: local-max-retries run in-process, the rest
+      # are executed by the publisher when
+      # event-flow.publisher.lifecycle.retry.processing.enabled=true.
+      retry:
+        # Enable processing retries (local and durable).
+        enabled: false
+        # Absolute cap for local retry attempts, independent of listener policies.
+        local-retry-cap: 10
         # Retries performed locally before durable re-publication.
-        # 0 = durable-only.
-        local-max-retries: 0
-        initial-delay: 30s
+        # 0 = durable-only; total-retries = local-only.
+        # A value below total-retries makes the remaining attempts durable.
+        local-max-retries: 3
+        # Total retries after the first attempt (local + durable).
+        total-retries: 15
+        # Delay before the first retry.
+        initial-delay: 3s
+        # Exponential backoff multiplier applied to each subsequent retry.
         multiplier: 2.0
+        # Upper bound for the computed backoff delay.
         max-delay: 10m
+        # Jitter fraction in [0, 1]; 1.0 means full jitter.
         jitter: 0.5
         # Empty means retry any exception. Class names must be Throwable types.
         retry-on: []
         no-retry-on: []
-      # Named policy overrides. Only specified fields are overridden.
-      policies:
-        # payment:
-        #   max-retries: 7
-        #   local-max-retries: 1
-        #   initial-delay: 2s
-        #   multiplier: 2.0
-        #   max-delay: 30s
-        #   jitter: 0.25
-        #   retry-on:
-        #     - io.example.PaymentUnavailableException
-        #   no-retry-on:
-        #     - io.example.PaymentRejectedException
+        # Named policy overrides. Only specified fields are overridden.
+        policies:
+          # payment:
+          #   total-retries: 7
+          #   local-max-retries: 1
+          #   initial-delay: 2s
+          #   multiplier: 2.0
+          #   max-delay: 30s
+          #   jitter: 0.25
+          #   retry-on:
+          #     - io.example.PaymentUnavailableException
+          #   no-retry-on:
+          #     - io.example.PaymentRejectedException

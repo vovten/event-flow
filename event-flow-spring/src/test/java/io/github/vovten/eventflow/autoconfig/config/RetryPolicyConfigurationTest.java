@@ -1,7 +1,6 @@
 package io.github.vovten.eventflow.autoconfig.config;
 
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import io.github.vovten.eventflow.autoconfig.EventFlowProperties.DefaultRetryPolicyConfig;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties.ProcessingRetryConfig;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties.RetryPolicyOverrideConfig;
 import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
@@ -27,8 +26,8 @@ class RetryPolicyConfigurationTest {
     @DisplayName("Should build the default policy from properties")
     void shouldBuildDefaultPolicyFromProperties() {
         EventFlowProperties properties = properties();
-        DefaultRetryPolicyConfig config = properties.getRetry().getProcessing().getDefaultPolicy();
-        config.setMaxRetries(5);
+        ProcessingRetryConfig config = properties.getDispatcher().getLifecycle().getRetry();
+        config.setTotalRetries(5);
         config.setLocalMaxRetries(2);
         config.setInitialDelay(Duration.ofSeconds(1));
         config.setMultiplier(3.0);
@@ -53,9 +52,9 @@ class RetryPolicyConfigurationTest {
     void shouldApplyNamedPolicyOverrides() {
         EventFlowProperties properties = properties();
         RetryPolicyOverrideConfig override = new RetryPolicyOverrideConfig();
-        override.setMaxRetries(7);
+        override.setTotalRetries(7);
         override.setLocalMaxRetries(1);
-        properties.getRetry().getProcessing().getPolicies().put("payment", override);
+        properties.getDispatcher().getLifecycle().getRetry().getPolicies().put("payment", override);
 
         RetryPolicyRegistry registry = configuration.retryPolicyRegistry();
         ResolvedRetryPolicy defaultPolicy = configuration.defaultRetryPolicy(properties);
@@ -71,15 +70,16 @@ class RetryPolicyConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should disable local retries when processing is disabled")
+    @DisplayName("Should disable processing retries when processing is disabled")
     void shouldDisableLocalRetriesWhenProcessingDisabled() {
         EventFlowProperties properties = properties();
-        ProcessingRetryConfig processing = properties.getRetry().getProcessing();
+        ProcessingRetryConfig processing = properties.getDispatcher().getLifecycle().getRetry();
         processing.setEnabled(false);
-        processing.getDefaultPolicy().setLocalMaxRetries(5);
+        processing.setLocalMaxRetries(5);
 
         ResolvedRetryPolicy policy = configuration.defaultRetryPolicy(properties);
 
+        assertThat(policy.maxRetries()).isZero();
         assertThat(policy.localMaxRetries()).isZero();
     }
 
@@ -87,7 +87,7 @@ class RetryPolicyConfigurationTest {
     @DisplayName("Should reject an unknown exception class")
     void shouldRejectUnknownExceptionClass() {
         EventFlowProperties properties = properties();
-        properties.getRetry().getProcessing().getDefaultPolicy()
+        properties.getDispatcher().getLifecycle().getRetry()
                 .setRetryOn(List.of("com.example.MissingException"));
 
         assertThatThrownBy(() -> configuration.defaultRetryPolicy(properties))
@@ -102,7 +102,9 @@ class RetryPolicyConfigurationTest {
     }
 
     private static EventFlowProperties properties() {
-        return new EventFlowProperties();
+        EventFlowProperties properties = new EventFlowProperties();
+        properties.getDispatcher().getLifecycle().getRetry().setEnabled(true);
+        return properties;
     }
 
     @RetryPolicy(name = "payment", maxRetries = 2, localMaxRetries = 0,

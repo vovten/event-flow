@@ -1,7 +1,6 @@
 package io.github.vovten.eventflow.autoconfig.config;
 
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties;
-import io.github.vovten.eventflow.autoconfig.EventFlowProperties.DefaultRetryPolicyConfig;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties.ProcessingRetryConfig;
 import io.github.vovten.eventflow.autoconfig.EventFlowProperties.RetryPolicyOverrideConfig;
 import io.github.vovten.eventflow.retry.ListenerRetryPolicyResolver;
@@ -55,8 +54,8 @@ public class RetryPolicyConfiguration {
     @Bean("defaultRetryPolicy")
     @ConditionalOnMissingBean(name = "defaultRetryPolicy")
     public ResolvedRetryPolicy defaultRetryPolicy(EventFlowProperties properties) {
-        ProcessingRetryConfig processing = properties.getRetry().getProcessing();
-        return toResolvedPolicy(processing.getDefaultPolicy(), processing.isEnabled());
+        ProcessingRetryConfig processing = properties.getDispatcher().getLifecycle().getRetry();
+        return toResolvedPolicy(processing, processing.isEnabled());
     }
 
     /**
@@ -73,7 +72,7 @@ public class RetryPolicyConfiguration {
             RetryPolicyRegistry registry,
             @Qualifier("defaultRetryPolicy") ResolvedRetryPolicy defaultPolicy,
             EventFlowProperties properties) {
-        ProcessingRetryConfig processing = properties.getRetry().getProcessing();
+        ProcessingRetryConfig processing = properties.getDispatcher().getLifecycle().getRetry();
         Map<String, RetryPolicyOverride> overrides =
                 toOverrides(processing.getPolicies(), processing.isEnabled());
         return new ListenerRetryPolicyResolver(registry, defaultPolicy, overrides);
@@ -90,13 +89,13 @@ public class RetryPolicyConfiguration {
         return RetryDelayScheduler.defaultScheduler();
     }
 
-    private static ResolvedRetryPolicy toResolvedPolicy(DefaultRetryPolicyConfig config, boolean localEnabled) {
+    private static ResolvedRetryPolicy toResolvedPolicy(ProcessingRetryConfig config, boolean enabled) {
         return new ResolvedRetryPolicy(
                 ResolvedRetryPolicy.DEFAULT_POLICY_NAME,
                 resolveTypes(config.getRetryOn()),
                 resolveTypes(config.getNoRetryOn()),
-                config.getMaxRetries(),
-                localEnabled ? config.getLocalMaxRetries() : 0,
+                enabled ? config.getTotalRetries() : 0,
+                enabled ? config.getLocalMaxRetries() : 0,
                 config.getInitialDelay(),
                 config.getMultiplier(),
                 config.getMaxDelay(),
@@ -104,20 +103,18 @@ public class RetryPolicyConfiguration {
     }
 
     private static Map<String, RetryPolicyOverride> toOverrides(
-            Map<String, RetryPolicyOverrideConfig> configs, boolean localEnabled) {
+            Map<String, RetryPolicyOverrideConfig> configs, boolean enabled) {
         return configs.entrySet().stream()
                 .collect(Collectors.toUnmodifiableMap(
                         Map.Entry::getKey,
-                        entry -> toOverride(entry.getValue(), localEnabled)));
+                        entry -> toOverride(entry.getValue(), enabled)));
     }
 
-    private static RetryPolicyOverride toOverride(RetryPolicyOverrideConfig config, boolean localEnabled) {
-        Integer localMaxRetries = config.getLocalMaxRetries();
-        if (!localEnabled) {
-            localMaxRetries = 0;
-        }
+    private static RetryPolicyOverride toOverride(RetryPolicyOverrideConfig config, boolean enabled) {
+        Integer maxRetries = enabled ? config.getTotalRetries() : 0;
+        Integer localMaxRetries = enabled ? config.getLocalMaxRetries() : 0;
         return new RetryPolicyOverride(
-                config.getMaxRetries(),
+                maxRetries,
                 localMaxRetries,
                 config.getInitialDelay(),
                 config.getMultiplier(),

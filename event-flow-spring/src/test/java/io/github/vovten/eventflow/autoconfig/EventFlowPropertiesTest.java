@@ -51,18 +51,18 @@ class EventFlowPropertiesTest {
     @DisplayName("Should bind processing retry properties")
     void shouldBindProcessingRetryProperties() {
         Map<String, String> properties = Map.ofEntries(
-                Map.entry("event-flow.retry.processing.enabled", "false"),
-                Map.entry("event-flow.retry.processing.local-retry-cap", "7"),
-                Map.entry("event-flow.retry.processing.default-policy.max-retries", "5"),
-                Map.entry("event-flow.retry.processing.default-policy.local-max-retries", "2"),
-                Map.entry("event-flow.retry.processing.default-policy.initial-delay", "1s"),
-                Map.entry("event-flow.retry.processing.default-policy.multiplier", "3.0"),
-                Map.entry("event-flow.retry.processing.default-policy.max-delay", "10s"),
-                Map.entry("event-flow.retry.processing.default-policy.jitter", "0.25"),
-                Map.entry("event-flow.retry.processing.default-policy.retry-on[0]",
+                Map.entry("event-flow.dispatcher.lifecycle.retry.enabled", "false"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.local-retry-cap", "7"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.total-retries", "5"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.local-max-retries", "2"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.initial-delay", "1s"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.multiplier", "3.0"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.max-delay", "10s"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.jitter", "0.25"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.retry-on[0]",
                         "java.util.concurrent.TimeoutException"),
-                Map.entry("event-flow.retry.processing.policies.payment.max-retries", "7"),
-                Map.entry("event-flow.retry.processing.policies.payment.local-max-retries", "1")
+                Map.entry("event-flow.dispatcher.lifecycle.retry.policies.payment.total-retries", "7"),
+                Map.entry("event-flow.dispatcher.lifecycle.retry.policies.payment.local-max-retries", "1")
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
         Binder binder = new Binder(source);
@@ -70,19 +70,61 @@ class EventFlowPropertiesTest {
         EventFlowProperties eventFlowProperties = binder.bind("event-flow", EventFlowProperties.class)
                 .orElseGet(EventFlowProperties::new);
 
-        var processing = eventFlowProperties.getRetry().getProcessing();
+        var processing = eventFlowProperties.getDispatcher().getLifecycle().getRetry();
         assertThat(processing.isEnabled()).isFalse();
         assertThat(processing.getLocalRetryCap()).isEqualTo(7);
-        assertThat(processing.getDefaultPolicy().getMaxRetries()).isEqualTo(5);
-        assertThat(processing.getDefaultPolicy().getLocalMaxRetries()).isEqualTo(2);
-        assertThat(processing.getDefaultPolicy().getInitialDelay()).isEqualTo(Duration.ofSeconds(1));
-        assertThat(processing.getDefaultPolicy().getMultiplier()).isEqualTo(3.0);
-        assertThat(processing.getDefaultPolicy().getMaxDelay()).isEqualTo(Duration.ofSeconds(10));
-        assertThat(processing.getDefaultPolicy().getJitter()).isEqualTo(0.25);
-        assertThat(processing.getDefaultPolicy().getRetryOn())
+        assertThat(processing.getTotalRetries()).isEqualTo(5);
+        assertThat(processing.getLocalMaxRetries()).isEqualTo(2);
+        assertThat(processing.getInitialDelay()).isEqualTo(Duration.ofSeconds(1));
+        assertThat(processing.getMultiplier()).isEqualTo(3.0);
+        assertThat(processing.getMaxDelay()).isEqualTo(Duration.ofSeconds(10));
+        assertThat(processing.getJitter()).isEqualTo(0.25);
+        assertThat(processing.getRetryOn())
                 .containsExactly("java.util.concurrent.TimeoutException");
-        assertThat(processing.getPolicies().get("payment").getMaxRetries()).isEqualTo(7);
+        assertThat(processing.getPolicies().get("payment").getTotalRetries()).isEqualTo(7);
         assertThat(processing.getPolicies().get("payment").getLocalMaxRetries()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should bind delivery retry properties under publisher lifecycle")
+    void shouldBindDeliveryRetryProperties() {
+        Map<String, String> properties = Map.ofEntries(
+                Map.entry("event-flow.publisher.lifecycle.retry.interval", "10s"),
+                Map.entry("event-flow.publisher.lifecycle.retry.ack-timeout", "2m"),
+                Map.entry("event-flow.publisher.lifecycle.retry.batch-size", "25"),
+                Map.entry("event-flow.publisher.lifecycle.retry.table-name", "custom_retry"),
+                Map.entry("event-flow.publisher.lifecycle.retry.delivery.enabled", "true"),
+                Map.entry("event-flow.publisher.lifecycle.retry.delivery.max-retries", "8"),
+                Map.entry("event-flow.publisher.lifecycle.retry.delivery.retry-delay", "5s"),
+                Map.entry("event-flow.publisher.lifecycle.retry.delivery.require-accepted-ack", "false"),
+                Map.entry("event-flow.publisher.lifecycle.retry.processing.enabled", "true"),
+                Map.entry("event-flow.publisher.lifecycle.retry.processing.max-attempts", "42"),
+                Map.entry("event-flow.publisher.lifecycle.retry.processing.default-delay", "3s"),
+                Map.entry("event-flow.publisher.lifecycle.retry.processing.max-delay", "1m")
+        );
+        ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
+        Binder binder = new Binder(source);
+
+        EventFlowProperties eventFlowProperties = binder.bind("event-flow", EventFlowProperties.class)
+                .orElseGet(EventFlowProperties::new);
+
+        var retry = eventFlowProperties.getPublisher().getLifecycle().getRetry();
+        assertThat(retry.getInterval()).isEqualTo(Duration.ofSeconds(10));
+        assertThat(retry.getAckTimeout()).isEqualTo(Duration.ofMinutes(2));
+        assertThat(retry.getBatchSize()).isEqualTo(25);
+        assertThat(retry.getTableName()).isEqualTo("custom_retry");
+
+        var delivery = retry.getDelivery();
+        assertThat(delivery.isEnabled()).isTrue();
+        assertThat(delivery.getMaxRetries()).isEqualTo(8);
+        assertThat(delivery.getRetryDelay()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(delivery.isRequireAcceptedAck()).isFalse();
+
+        var processing = retry.getProcessing();
+        assertThat(processing.isEnabled()).isTrue();
+        assertThat(processing.getMaxAttempts()).isEqualTo(42);
+        assertThat(processing.getDefaultDelay()).isEqualTo(Duration.ofSeconds(3));
+        assertThat(processing.getMaxDelay()).isEqualTo(Duration.ofMinutes(1));
     }
 
     @Test

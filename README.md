@@ -525,7 +525,7 @@ Decorator for `EventDispatcher` that publishes a delivery confirmation (`Accepte
 
 ### EventRetryScheduler
 
-Periodically scans the `EventStore` for failed (`FAILED`), stuck (`PUBLISHED`), accepted-but-unconfirmed (`ACCEPTED`), and orphaned (`NEW`) events and re-publishes them with exponential backoff. See the [Lifecycle Tracking](#-lifecycle-tracking) section.
+The legacy store-scanning retry scheduler. It is **no longer auto-configured**; use the two-domain durable schedulers instead. The class remains available for manual use only.
 
 ### AckHandler
 
@@ -636,7 +636,7 @@ You choose the level per event — `NONE` for high-throughput fire-and-forget, `
 │                    │  saves & tracks status  │                   │
 │                    │  (NEW→PUBLISHED/FAILED) │                   │
 │                    │                         │                   │
-│  ◄── EventRetryScheduler scans FAILED, PUBLISHED, ACCEPTED, NEW  │
+│  ◄── DeliveryRetryScheduler / ProcessingRetryScheduler            │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
          │                                  ▲
@@ -661,7 +661,7 @@ You choose the level per event — `NONE` for high-throughput fire-and-forget, `
 3. `EventLifecycleDispatcher` (on the consumer side) publishes `AcceptedAck` before handler execution
 4. Handlers may absorb transient failures with local processing retries; afterwards the dispatcher publishes `SuccessAck`, `FailureAck`, or `NoHandlerAck`
 5. `AckHandler` (on the publisher side) applies a conditional transition: `ACCEPTED`, `HANDLED`, `FAILED`, or `DEAD`. A retryable `FailureAck` carries `retryAfterMs` and `policyName`. Late or out-of-order acks never roll back a terminal status
-6. `EventRetryScheduler` periodically rescans `FAILED`, stuck `PUBLISHED`, `ACCEPTED`, and orphaned `NEW` events and retries them with exponential backoff
+6. `DeliveryRetryScheduler` and `ProcessingRetryScheduler` retry the corresponding `DELIVERY` / `PROCESSING` rows with exponential backoff; `RetryWatchdog` creates rows for lost acks
 
 ### Three lifecycle levels
 
@@ -694,33 +694,46 @@ event-flow:
         type: db                 # "db" (PostgreSQL/H2/MySQL) or "in-memory" (testing)
         table-name: event_store
         auto-init-schema: true    # Disable in production, manage DDL via Flyway
-      retry:
-        enabled: true
-        max-retries: 3
-        retry-interval: 30s
-        min-age: 30s              # Backoff: 30s, then 60s, then 120s
+      retry:                       # shared durable infrastructure
+        interval: 30s
+        ack-timeout: 5m
+        batch-size: 100
+        table-name: event_retry
+        delivery:                  # DELIVERY domain
+          enabled: true
+          max-retries: 3
+          retry-delay: 30s         # base delay before the first delivery retry
+          require-accepted-ack: true
+        processing:                # durable PROCESSING execution
+          enabled: true
+          max-attempts: 100        # publisher-side safety cap
+          default-delay: 30s
+          max-delay: 10m
   dispatcher:
     lifecycle:
-      enabled: true               # Enable ack generation on the dispatcher side
+      enabled: true                # Enable ack generation on the dispatcher side
+      retry:                       # PROCESSING policy
+        enabled: true
+        local-retry-cap: 10
+        total-retries: 15         # total retries after the first attempt
+        local-max-retries: 3      # 3 local, then 12 durable
+        initial-delay: 3s
+        multiplier: 2.0
+        max-delay: 10m
+        jitter: 0.5
 ```
 
 The `service-name` is mandatory — it identifies this service instance so that `AckHandler` only processes acknowledgments meant for it (multiple services can share the same ack channel without interference).
 
 ### Retry mechanism
 
-`EventRetryScheduler` scans for four categories of events that need retry:
+The legacy `EventRetryScheduler` is no longer auto-configured. Retries are handled by
+the two-domain durable model below: `event_retry` rows are the source of truth, and
+`DeliveryRetryScheduler` / `ProcessingRetryScheduler` process due rows with exponential
+backoff. `RetryWatchdog` raises retry rows for lost `AcceptedAck` / final acks.
 
-| Status | Why it happens |
-|--------|---------------|
-| `FAILED` | Publication or handler threw an error |
-| `PUBLISHED` | Event was sent but the delivery ack was lost in transit (stuck) |
-| `ACCEPTED` | Consumer received the event but the final ack was lost or the consumer crashed before completion |
-| `NEW` | Event was saved but the application crashed before publishing finished (orphaned) |
-
-Backoff is exponential: `delay = minAge × 2^retryCount`. First retry at 30s, second at 60s, third at 120s.
-
-`EventRetryScheduler` is the **legacy** retry path. It is disabled automatically when
-the two-domain durable retry is enabled.
+The `EventRetryScheduler` class remains available for manual wiring, but it is not part
+of the Spring auto-configuration.
 
 ### Two-domain durable retry (delivery vs processing)
 
@@ -783,29 +796,40 @@ retries (processing requires the delivery boundary):
 
 ```yaml
 event-flow:
-  retry:
-    delivery:
-      enabled: true               # durable delivery retries
-      interval: 30s
-      ack-timeout: 60s
-      max-retries: 3
-      batch-size: 100
-      retry-delay: 30s            # base delay before the first delivery retry
-      require-accepted-ack: true  # set false during a mixed-fleet migration
-      table-name: event_retry
-    processing:
-      enabled: true               # local processing retries (see policy section)
-      durable-enabled: true       # durable processing retries
-      durable-interval: 30s
-      durable-ack-timeout: 5m
-      durable-max-retries: 3
-      durable-batch-size: 100
+  publisher:
+    lifecycle:
+      retry:                      # shared durable infrastructure
+        interval: 30s
+        ack-timeout: 5m
+        batch-size: 100
+        table-name: event_retry
+        delivery:                 # DELIVERY domain
+          enabled: true
+          max-retries: 3
+          retry-delay: 30s        # base delay before the first delivery retry
+          require-accepted-ack: true # set false during a mixed-fleet migration
+        processing:               # durable PROCESSING execution
+          enabled: true
+          max-attempts: 100       # publisher-side safety cap
+          default-delay: 30s
+          max-delay: 10m
+  dispatcher:
+    lifecycle:
+      retry:                      # PROCESSING policy
+        enabled: true
+        local-retry-cap: 10
+        total-retries: 15
+        local-max-retries: 3      # 3 local, then 12 durable
+        initial-delay: 3s
+        multiplier: 2.0
+        max-delay: 10m
+        jitter: 0.5
 ```
 
-Startup fails fast with `IllegalStateException` when
-`retry.processing.durable-enabled=true` and `retry.delivery.enabled=false`.
-The legacy `event-flow.publisher.lifecycle.retry.*` scheduler is disabled
-automatically while either new flag is enabled.
+The dispatcher and the publisher are configured independently. The dispatcher
+decides whether another attempt is allowed and carries that decision in
+`FailureAck`; the publisher executes durable processing retries only when
+`event-flow.publisher.lifecycle.retry.processing.enabled=true`.
 
 #### Operational overview
 
@@ -833,17 +857,16 @@ the destination where applicable. Dead-letter transitions are logged at ERROR.
 
 #### Migration from the legacy retry scheduler
 
-1. Deploy the new code with both new flags disabled. The legacy scheduler keeps
-   working as before.
-2. Enable `retry.delivery.enabled=true`. The legacy scheduler and its
-   transitional `ACCEPTED` scan are disabled automatically.
+The legacy `EventRetryScheduler` is no longer auto-configured.
+
+1. Deploy the new code with both new retry domains disabled.
+2. Enable `event-flow.publisher.lifecycle.retry.delivery.enabled=true`.
 3. During a mixed-version fleet, keep `require-accepted-ack=false` so old
    consumers without `AcceptedAck` do not trigger delivery retries. Switch to
    `true` once all consumers are upgraded.
-4. Enable `retry.processing.durable-enabled=true`.
-5. Old `FAILED` rows can be recovered by the legacy heuristic during the
-   transition or backfilled as `PROCESSING` rows; the recovery action is a
-   re-publish either way.
+4. Enable `event-flow.publisher.lifecycle.retry.processing.enabled=true` and `event-flow.dispatcher.lifecycle.retry.enabled=true` with `local-max-retries` below `total-retries`.
+5. Old `FAILED` rows without `event_retry` rows can be backfilled as
+   `PROCESSING` rows or recovered with `markForRetry(eventId)`.
 
 ### Processing retry policies
 
@@ -886,27 +909,29 @@ Listeners without a declaration or reference use the configured default policy:
 
 ```yaml
 event-flow:
-  retry:
-    processing:
-      enabled: true
-      local-retry-cap: 10
-      default-policy:
-        max-retries: 3
-        local-max-retries: 0
-        initial-delay: 30s
+  dispatcher:
+    lifecycle:
+      retry:
+        enabled: true
+        local-retry-cap: 10
+        total-retries: 15
+        local-max-retries: 3      # 3 local, then 12 durable
+        initial-delay: 3s
         multiplier: 2.0
         max-delay: 10m
         jitter: 0.5
         retry-on: []
         no-retry-on: []
-      policies:
-        payment:
-          max-retries: 7
-          local-max-retries: 1
+        policies:
+          payment:
+            total-retries: 7
+            local-max-retries: 1
 ```
 
-The shipped default preserves legacy behaviour: `localMaxRetries = 0` and
-three durable retries.
+Processing retries are opt-in (`enabled: false` by default). When enabled, the
+shipped policy performs 3 local retries and then 12 durable retries; with
+`initial-delay: 3s`, `multiplier: 2.0` and `max-delay: 10m` the campaign spans at
+least 40 minutes even at the minimum jitter.
 
 ### Cleanup
 
@@ -1229,11 +1254,27 @@ For detailed configuration examples, see:
 | `event-flow.publisher.lifecycle.store.type` | `db` | Store type: `db`, `in-memory`, or custom |
 | `event-flow.publisher.lifecycle.store.table-name` | `event_store` | Custom table name (for `db` type) |
 | `event-flow.publisher.lifecycle.store.auto-init-schema` | `true` | Auto-create table on startup |
-| `event-flow.publisher.lifecycle.retry.enabled` | `true` | Enable automatic retry of failed events |
-| `event-flow.publisher.lifecycle.retry.max-retries` | `3` | Maximum retry attempts |
-| `event-flow.publisher.lifecycle.retry.retry-interval` | `30s` | Interval between retry cycles |
-| `event-flow.publisher.lifecycle.retry.min-age` | `30s` | Base backoff for exponential retry |
+| `event-flow.publisher.lifecycle.retry.interval` | `30s` | Interval between delivery/processing retry cycles |
+| `event-flow.publisher.lifecycle.retry.ack-timeout` | `5m` | Wait time for `AcceptedAck` / final ack |
+| `event-flow.publisher.lifecycle.retry.batch-size` | `100` | Retry rows per delivery/processing cycle |
+| `event-flow.publisher.lifecycle.retry.table-name` | `event_retry` | Shared durable retry table |
+| `event-flow.publisher.lifecycle.retry.delivery.enabled` | `false` | Enable durable delivery retries |
+| `event-flow.publisher.lifecycle.retry.delivery.max-retries` | `3` | Maximum delivery retries after the first publish |
+| `event-flow.publisher.lifecycle.retry.delivery.retry-delay` | `30s` | Base delay before the first delivery retry |
+| `event-flow.publisher.lifecycle.retry.delivery.require-accepted-ack` | `true` | Require explicit `AcceptedAck` |
+| `event-flow.publisher.lifecycle.retry.processing.enabled` | `false` | Enable durable processing retries on the publisher |
+| `event-flow.publisher.lifecycle.retry.processing.max-attempts` | `100` | Global hard cap for processing attempts |
+| `event-flow.publisher.lifecycle.retry.processing.default-delay` | `30s` | Fallback delay when `retryAfterMs` is absent |
+| `event-flow.publisher.lifecycle.retry.processing.max-delay` | `10m` | Upper clamp for `retryAfterMs` |
 | `event-flow.dispatcher.lifecycle.enabled` | `false` | Enable ack-based lifecycle tracking on dispatcher |
+| `event-flow.dispatcher.lifecycle.retry.enabled` | `false` | Enable processing retries |
+| `event-flow.dispatcher.lifecycle.retry.local-retry-cap` | `10` | Absolute local retry cap |
+| `event-flow.dispatcher.lifecycle.retry.total-retries` | `15` | Total retries after the first attempt |
+| `event-flow.dispatcher.lifecycle.retry.local-max-retries` | `3` | Local retries before durable hand-off |
+| `event-flow.dispatcher.lifecycle.retry.initial-delay` | `3s` | Delay before the first retry |
+| `event-flow.dispatcher.lifecycle.retry.multiplier` | `2.0` | Exponential backoff multiplier |
+| `event-flow.dispatcher.lifecycle.retry.max-delay` | `10m` | Backoff upper bound |
+| `event-flow.dispatcher.lifecycle.retry.jitter` | `0.5` | Jitter fraction |
 
 ### LocalQueue
 

@@ -100,7 +100,7 @@ class LifecycleConfigurationTest {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
             addInlinedPropertiesToEnvironment(ctx,
                     "event-flow.publisher.lifecycle.enabled=true",
-                    "event-flow.publisher.lifecycle.retry.enabled=false",
+                    "event-flow.publisher.lifecycle.retry.delivery.enabled=false",
                     "event-flow.publisher.lifecycle.store.type=custom");
             ctx.registerBean("properties", EventFlowProperties.class, () -> {
                 EventFlowProperties props = new EventFlowProperties();
@@ -130,16 +130,18 @@ class LifecycleConfigurationTest {
         AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
         addInlinedPropertiesToEnvironment(ctx,
                 "event-flow.publisher.lifecycle.enabled=true",
-                "event-flow.publisher.lifecycle.retry.enabled=true");
+                "event-flow.publisher.lifecycle.retry.delivery.enabled=true");
         ctx.registerBean("properties", EventFlowProperties.class, () -> {
             EventFlowProperties props = new EventFlowProperties();
             props.getPublisher().setEnabled(true);
             props.getPublisher().getLifecycle().setEnabled(true);
             props.getPublisher().getLifecycle().getStore().setType("in-memory");
-            props.getPublisher().getLifecycle().getRetry().setEnabled(true);
+            props.getPublisher().getLifecycle().getRetry().getDelivery().setEnabled(true);
             // service-name is not configured
             return props;
         });
+        ctx.registerBean("eventPublisher", EventPublisher.class, () -> event ->
+                CompletableFuture.completedFuture(SendResults.empty()));
         ctx.register(LifecycleConfiguration.class);
 
         assertThatThrownBy(ctx::refresh)
@@ -155,7 +157,6 @@ class LifecycleConfigurationTest {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
             addInlinedPropertiesToEnvironment(ctx,
                     "event-flow.publisher.lifecycle.enabled=true",
-                    "event-flow.publisher.lifecycle.retry.enabled=false",
                     "event-flow.publisher.lifecycle.cleanup.enabled=true");
             ctx.registerBean("properties", EventFlowProperties.class,
                     () -> inMemoryCleanupProps(false, true));
@@ -172,7 +173,6 @@ class LifecycleConfigurationTest {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
             addInlinedPropertiesToEnvironment(ctx,
                     "event-flow.publisher.lifecycle.enabled=true",
-                    "event-flow.publisher.lifecycle.retry.enabled=false",
                     "event-flow.publisher.lifecycle.cleanup.enabled=false");
             ctx.registerBean("properties", EventFlowProperties.class,
                     () -> inMemoryCleanupProps(false, false));
@@ -184,25 +184,26 @@ class LifecycleConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should fail startup when durable processing is enabled without delivery")
-    void shouldFailWhenProcessingWithoutDelivery() {
-        AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
-        addInlinedPropertiesToEnvironment(ctx,
-                "event-flow.publisher.lifecycle.enabled=true",
-                "event-flow.retry.processing.durable-enabled=true",
-                "event-flow.retry.delivery.enabled=false");
-        ctx.registerBean("properties", EventFlowProperties.class, () -> {
-            EventFlowProperties props = inMemoryProps();
-            props.getRetry().getProcessing().setDurableEnabled(true);
-            return props;
-        });
-        ctx.register(LifecycleConfiguration.class);
+    @DisplayName("Should create the processing scheduler without enabling delivery retries")
+    void shouldCreateProcessingSchedulerWithoutDelivery() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            addInlinedPropertiesToEnvironment(ctx,
+                    "event-flow.publisher.lifecycle.enabled=true",
+                    "event-flow.publisher.lifecycle.retry.delivery.enabled=false",
+                    "event-flow.publisher.lifecycle.retry.processing.enabled=true");
+            ctx.registerBean("properties", EventFlowProperties.class, () -> {
+                EventFlowProperties props = inMemoryProps();
+                props.getPublisher().getLifecycle().getRetry().getProcessing().setEnabled(true);
+                return props;
+            });
+            ctx.registerBean("eventPublisher", EventPublisher.class, () -> event ->
+                    CompletableFuture.completedFuture(SendResults.empty()));
+            ctx.register(LifecycleConfiguration.class);
+            ctx.refresh();
 
-        assertThatThrownBy(ctx::refresh)
-                .isInstanceOf(BeanCreationException.class)
-                .rootCause()
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("processing retries depend on the delivery boundary");
+            assertThat(ctx.getBean(ProcessingRetryScheduler.class)).isNotNull();
+            assertThat(ctx.getBeanNamesForType(DeliveryRetryScheduler.class)).isEmpty();
+        }
     }
 
     @Test
@@ -211,14 +212,12 @@ class LifecycleConfigurationTest {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
             addInlinedPropertiesToEnvironment(ctx,
                     "event-flow.publisher.lifecycle.enabled=true",
-                    "event-flow.publisher.lifecycle.retry.enabled=false",
-                    "event-flow.retry.delivery.enabled=true",
-                    "event-flow.retry.processing.durable-enabled=true");
+                    "event-flow.publisher.lifecycle.retry.delivery.enabled=true",
+                    "event-flow.publisher.lifecycle.retry.processing.enabled=true");
             ctx.registerBean("properties", EventFlowProperties.class, () -> {
                 EventFlowProperties props = inMemoryProps();
-                props.getPublisher().getLifecycle().getRetry().setEnabled(false);
-                props.getRetry().getDelivery().setEnabled(true);
-                props.getRetry().getProcessing().setDurableEnabled(true);
+                props.getPublisher().getLifecycle().getRetry().getDelivery().setEnabled(true);
+                props.getPublisher().getLifecycle().getRetry().getProcessing().setEnabled(true);
                 return props;
             });
             ctx.registerBean("eventPublisher", EventPublisher.class, () -> event ->
@@ -239,22 +238,12 @@ class LifecycleConfigurationTest {
     }
 
     @Test
-    @DisplayName("Should disable the legacy scheduler when the new mode is enabled")
-    void shouldDisableLegacyScheduler() {
+    @DisplayName("Should not create the legacy EventRetryScheduler bean")
+    void shouldNotCreateLegacyScheduler() {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
             addInlinedPropertiesToEnvironment(ctx,
-                    "event-flow.publisher.lifecycle.enabled=true",
-                    "event-flow.publisher.lifecycle.retry.enabled=true",
-                    "event-flow.retry.delivery.enabled=true",
-                    "event-flow.retry.processing.durable-enabled=false");
-            ctx.registerBean("properties", EventFlowProperties.class, () -> {
-                EventFlowProperties props = inMemoryProps();
-                props.getPublisher().getLifecycle().getRetry().setEnabled(true);
-                props.getRetry().getDelivery().setEnabled(true);
-                return props;
-            });
-            ctx.registerBean("eventPublisher", EventPublisher.class, () -> event ->
-                    CompletableFuture.completedFuture(SendResults.empty()));
+                    "event-flow.publisher.lifecycle.enabled=true");
+            ctx.registerBean("properties", EventFlowProperties.class, LifecycleConfigurationTest::inMemoryProps);
             ctx.register(LifecycleConfiguration.class);
             ctx.refresh();
 
@@ -268,8 +257,7 @@ class LifecycleConfigurationTest {
                                                                      boolean withDataSource) {
         AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
         addInlinedPropertiesToEnvironment(ctx,
-                "event-flow.publisher.lifecycle.enabled=true",
-                "event-flow.publisher.lifecycle.retry.enabled=false");
+                "event-flow.publisher.lifecycle.enabled=true");
         if (withDataSource) {
             ctx.registerBean("dataSource", DataSource.class, LifecycleConfigurationTest::mockDataSource);
         }
@@ -303,7 +291,7 @@ class LifecycleConfigurationTest {
         props.getPublisher().getLifecycle().setEnabled(true);
         props.getPublisher().getLifecycle().setServiceName("test-service");
         props.getPublisher().getLifecycle().getStore().setType("in-memory");
-        props.getPublisher().getLifecycle().getRetry().setEnabled(retryEnabled);
+        props.getPublisher().getLifecycle().getRetry().getDelivery().setEnabled(retryEnabled);
         props.getPublisher().getLifecycle().getCleanup().setEnabled(cleanupEnabled);
         return props;
     }

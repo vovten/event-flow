@@ -78,7 +78,7 @@ public class DispatcherConfiguration {
                 .handlerRegistry(eventHandlerRegistry)
                 .transports(inTransports)
                 .retryDelayScheduler(delayScheduler)
-                .localRetryCap(properties.getRetry().getProcessing().getLocalRetryCap());
+                .localRetryCap(properties.getDispatcher().getLifecycle().getRetry().getLocalRetryCap());
         int concurrencyLimit = properties.getDispatcher().getThreadPool().getConcurrencyLimit();
         if (concurrencyLimit > 0) {
             builder.concurrencyLimit(concurrencyLimit);

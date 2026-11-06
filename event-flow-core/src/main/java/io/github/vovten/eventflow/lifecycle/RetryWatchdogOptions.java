@@ -11,6 +11,7 @@ import java.util.Objects;
  * @param deliveryAckTimeout    age after which a {@code PUBLISHED} event is considered stale
  * @param processingAckTimeout  age after which an {@code ACCEPTED} event is considered stale
  * @param batchSize             maximum number of stale events handled per cycle (must be positive)
+ * @param deliveryEnabled       whether the delivery watchdog is active
  * @param processingEnabled     whether the processing watchdog is active
  * @author Vladimir Aleshkov
  * @since 1.4.0
@@ -21,6 +22,7 @@ public record RetryWatchdogOptions(
         Duration deliveryAckTimeout,
         Duration processingAckTimeout,
         int batchSize,
+        boolean deliveryEnabled,
         boolean processingEnabled
 ) {
 

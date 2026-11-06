@@ -115,7 +115,7 @@ public class PublisherConfiguration {
                 throw new IllegalStateException(
                         "event-flow.publisher.lifecycle.service-name must be configured when lifecycle tracking is enabled");
             }
-            var delivery = properties.getRetry().getDelivery();
+            var delivery = publisherConfig.getLifecycle().getRetry().getDelivery();
             if (lifecycleRepository != null && delivery.isEnabled()) {
                 builder.lifecycleAware(eventStore, lifecycleRepository,
                         new EventLifecyclePublisherOptions(

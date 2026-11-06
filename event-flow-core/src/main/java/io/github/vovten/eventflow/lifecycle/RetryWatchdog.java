@@ -76,9 +76,10 @@ public final class RetryWatchdog implements AutoCloseable {
                 TimeUnit.MILLISECONDS
         );
         log.info("Retry watchdog started: interval={}, deliveryAckTimeout={}, processingAckTimeout={}, "
-                        + "processingEnabled={}",
+                        + "deliveryEnabled={}, processingEnabled={}",
                 options.interval(), options.deliveryAckTimeout(),
-                options.processingAckTimeout(), options.processingEnabled());
+                options.processingAckTimeout(), options.deliveryEnabled(),
+                options.processingEnabled());
     }
 
     /**
@@ -102,8 +103,10 @@ public final class RetryWatchdog implements AutoCloseable {
      */
     void watchdogCycle() {
         Instant now = Instant.now();
-        scan(EventStatus.PUBLISHED, RetryKind.DELIVERY, RetryReason.ACK_TIMEOUT,
-                now.minus(options.deliveryAckTimeout()), now);
+        if (options.deliveryEnabled()) {
+            scan(EventStatus.PUBLISHED, RetryKind.DELIVERY, RetryReason.ACK_TIMEOUT,
+                    now.minus(options.deliveryAckTimeout()), now);
+        }
         if (options.processingEnabled()) {
             scan(EventStatus.ACCEPTED, RetryKind.PROCESSING, RetryReason.PROCESSING_TIMEOUT,
                     now.minus(options.processingAckTimeout()), now);

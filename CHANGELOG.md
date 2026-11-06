@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EventStatus.ACCEPTED` and `EventStatus.DEAD`: explicit delivery-confirmed and terminal dead-letter states. No schema migration is required; only status comments change.
 - `EventStore.transitionStatus(...)`: conditional status updates that reject stale or out-of-order acknowledgments instead of overwriting a newer state.
 - Named `@RetryPolicy` processing policies. The `name` attribute is required; a method-level declaration declares and binds the policy, a type-level declaration makes it reusable through `@EventListener(retryPolicy = "...")`. `EventSubscriber.retryPolicy()` supports programmatic subscribers.
-- Local processing retry loop in `UnifiedEventDispatcher`: `maxRetries` is the total budget, `localMaxRetries` controls how many retries run in-process, and `localMaxRetries = 0` means durable-only. Retries are asynchronous, jittered and bounded by a global local-attempt cap.
-- Configurable default processing policy and named policy overrides via `event-flow.retry.processing.*`.
+- Local processing retry loop in `UnifiedEventDispatcher`: `maxRetries` is the total budget, `localMaxRetries` controls how many retries run in-process, `localMaxRetries = 0` means durable-only, and `localMaxRetries = maxRetries` means local-only. Processing retries are opt-in; the shipped policy uses 3 local retries followed by 12 durable retries, spanning at least 40 minutes. Retries are asynchronous, jittered and bounded by a global local-attempt cap.
+- Configurable processing policy via `event-flow.dispatcher.lifecycle.retry.*`: the top-level settings are the default policy, named overrides are supported, and `total-retries` / `local-max-retries` split the budget between the local and durable layers. The publisher-side durable execution is configured independently via `event-flow.publisher.lifecycle.retry.processing.*`.
 - `FailureAck.retryAfterMs` and `FailureAck.policyName`, plus `AcceptedAck.maxProcessingMs`, carry the listener's retry decision to the publisher.
 - `HandlerResult` / `HandlerResults` now expose `failureKind`, `retryable`, `attempts`, `policyName` and `retryAfterMs`.
 - Durable retry storage: the `event_retry` table (keyed by `event_id`, `retry_kind`) and the `EventRetryStore` SPI with JDBC and in-memory implementations. The table is created automatically when schema initialization is enabled.
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RetryWatchdog`: raises `DELIVERY` rows for stale `PUBLISHED` events and `PROCESSING` rows for stale `ACCEPTED` events.
 - Retry-aware `AckHandler`: routes all four acks through `LifecycleRepository`, applies stale-ack guards by `retryKind` and `attempt`, persists `retryAfterMs`/`policyName`, and supports delivery-only mode.
 - Retry-aware `EventLifecyclePublisher`: creates a `DELIVERY` retry row on publish failure, supports `require-accepted-ack = false` (publish success equals `ACCEPTED`), and never rolls back terminal statuses.
-- Spring properties `event-flow.retry.delivery.*` and `event-flow.retry.processing.durable-*`, plus `RetryConfigurationValidator`. Startup fails fast when durable processing retries are enabled without delivery retries.
+- Spring properties split by ownership: publisher-side `event-flow.publisher.lifecycle.retry.delivery.*` / `.processing.*` (shared interval, ack-timeout, batch-size, table) and dispatcher-side `event-flow.dispatcher.lifecycle.retry.*` (processing policy). The publisher no longer reads the dispatcher policy; it enforces its own `processing.max-attempts` safety cap.
 - Manual resurrection of `DEAD` events via `markForRetry(eventId)`, which resets the retry row to `PENDING` and the event to `NEW` atomically.
 - Retry-aware cleanup: events with `PENDING`/`IN_PROGRESS` retry rows are never deleted, and dead-lettered events use a separate `dead-letter-max-age` retention.
 
@@ -33,14 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `EventLifecycleDispatcher` now publishes `AcceptedAck` before handler execution and `SuccessAck` / `FailureAck` / `NoHandlerAck` afterwards.
 - `AckHandler` handles all four lifecycle acks through conditional transitions. Late acks cannot roll back `HANDLED` or `DEAD`, and a late `AcceptedAck` after a processing failure keeps `FAILED`.
-- `EventRetryScheduler` now also scans `ACCEPTED` events, recovering events whose final ack was lost after consumer acceptance.
 - Lifecycle ack events (`AcceptedAck`, `NoHandlerAck`, `SuccessAck`, `FailureAck`) are excluded from structured logs by default.
 - `SuccessAck` and `FailureAck` carry `retryKind` and `attempt`, identifying the retry context of the dispatch that produced the ack.
 - `UnifiedEventDispatcher` retries only the failing handler locally; other handlers of the same event are not re-run.
 - `ListenerRetryPolicyResolver` centralizes policy declaration, named-reference resolution, default-policy fallback and fail-fast validation. `SpringEventListenerRegistry` performs a two-phase policy scan so cross-bean references work.
 - `EventDispatcherBuilder` exposes `retryDelayScheduler(...)` and `localRetryCap(...)`.
 - `AckHandler` now defaults to the legacy status-only constructor when no `LifecycleRepository` bean is present, preserving backward compatibility.
-- The legacy `EventRetryScheduler` is disabled automatically when either durable retry domain is enabled, including its transitional `ACCEPTED` scan.
+- The legacy `EventRetryScheduler` is no longer auto-configured; the two-domain durable schedulers replace it.
 - `EventCleanupScheduler` accepts an optional `EventRetryStore` and honours dead-letter retention; the legacy constructor is retained.
 
 ### Fixed

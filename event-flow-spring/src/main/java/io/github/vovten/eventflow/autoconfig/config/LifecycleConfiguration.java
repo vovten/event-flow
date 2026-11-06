@@ -19,7 +19,6 @@ import io.github.vovten.eventflow.lifecycle.store.db.JdbcEventRetryStore;
 import io.github.vovten.eventflow.lifecycle.store.db.JdbcLifecycleRepository;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.lifecycle.EventCleanupScheduler;
-import io.github.vovten.eventflow.lifecycle.EventRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.db.JdbcEventStore;
@@ -46,7 +45,6 @@ import java.util.UUID;
  *   <li>{@link EventStore} — resolves user-defined custom {@link EventStore} beans
  *       by the configured {@code store.type}, or creates a built-in implementation</li>
  *   <li>{@link AckHandler} — processes lifecycle ack events (SuccessAck/FailureAck)</li>
- *   <li>{@link EventRetryScheduler} — periodically retries failed events</li>
  * </ul>
  * <p>
  * Built-in store types:
@@ -76,7 +74,6 @@ public class LifecycleConfiguration {
 
     public LifecycleConfiguration(EventFlowProperties properties) {
         this.properties = properties;
-        new RetryConfigurationValidator().validate(properties);
     }
 
     /**
@@ -92,7 +89,7 @@ public class LifecycleConfiguration {
      * </ol>
      * <p>
      * Marked as {@link Primary @Primary} so this bean is used for injection into
-     * {@link AckHandler}, {@link EventRetryScheduler}, and other consumers.
+     * {@link AckHandler} and other consumers.
      *
      * @param customStores       provider for user-defined EventStore beans
      * @param dataSourceProvider provider for optional DataSource
@@ -141,8 +138,8 @@ public class LifecycleConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnExpression("${event-flow.retry.delivery.enabled:false} "
-            + "or ${event-flow.retry.processing.durable-enabled:false}")
+    @ConditionalOnExpression("${event-flow.publisher.lifecycle.retry.delivery.enabled:false} "
+            + "or ${event-flow.publisher.lifecycle.retry.processing.enabled:false}")
     public EventRetryStore eventRetryStore(EventStore eventStore,
                                            ObjectProvider<DataSource> dataSourceProvider) {
         if (eventStore instanceof JdbcEventStore) {
@@ -151,7 +148,7 @@ public class LifecycleConfiguration {
                 throw new IllegalStateException(
                         "Durable retry requires a DataSource when the event store is JDBC");
             }
-            String tableName = properties.getRetry().getDelivery().getTableName();
+            String tableName = properties.getPublisher().getLifecycle().getRetry().getTableName();
             boolean autoInit = properties.getPublisher().getLifecycle().getStore().isAutoInitSchema();
             log.info("Creating JdbcEventRetryStore: table={}, autoInit={}", tableName, autoInit);
             return new JdbcEventRetryStore(dataSource, tableName, autoInit);
@@ -176,8 +173,8 @@ public class LifecycleConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnExpression("${event-flow.retry.delivery.enabled:false} "
-            + "or ${event-flow.retry.processing.durable-enabled:false}")
+    @ConditionalOnExpression("${event-flow.publisher.lifecycle.retry.delivery.enabled:false} "
+            + "or ${event-flow.publisher.lifecycle.retry.processing.enabled:false}")
     public LifecycleRepository lifecycleRepository(EventStore eventStore,
                                                    EventRetryStore retryStore,
                                                    ObjectProvider<DataSource> dataSourceProvider) {
@@ -207,8 +204,8 @@ public class LifecycleConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnExpression("${event-flow.retry.delivery.enabled:false} "
-            + "or ${event-flow.retry.processing.durable-enabled:false}")
+    @ConditionalOnExpression("${event-flow.publisher.lifecycle.retry.delivery.enabled:false} "
+            + "or ${event-flow.publisher.lifecycle.retry.processing.enabled:false}")
     public RetrySchedulerSupport retrySchedulerSupport(EventRetryStore retryStore,
                                                        LifecycleRepository lifecycleRepository) {
         return new RetrySchedulerSupport(retryStore, lifecycleRepository,
@@ -225,23 +222,28 @@ public class LifecycleConfiguration {
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "event-flow.retry.delivery", name = "enabled",
+    @ConditionalOnProperty(prefix = "event-flow.publisher.lifecycle.retry.delivery", name = "enabled",
             havingValue = "true")
     public DeliveryRetryScheduler deliveryRetryScheduler(
             RetrySchedulerSupport support,
             EventStore eventStore,
             ObjectProvider<EventPublisher> publisherProvider) {
-        EventFlowProperties.DeliveryRetryConfig delivery = properties.getRetry().getDelivery();
+        EventFlowProperties.PublisherRetryConfig retry =
+                properties.getPublisher().getLifecycle().getRetry();
+        EventFlowProperties.DeliveryConfig delivery = retry.getDelivery();
         log.info("Creating DeliveryRetryScheduler: interval={}, ackTimeout={}, maxRetries={}, batchSize={}",
-                delivery.getInterval(), delivery.getAckTimeout(),
-                delivery.getMaxRetries(), delivery.getBatchSize());
+                retry.getInterval(), retry.getAckTimeout(),
+                delivery.getMaxRetries(), retry.getBatchSize());
         return new DeliveryRetryScheduler(support, eventStore, requirePublisher(publisherProvider),
-                new DeliveryRetryOptions(requireService(), delivery.getInterval(),
-                        delivery.getAckTimeout(), delivery.getMaxRetries(), delivery.getBatchSize()));
+                new DeliveryRetryOptions(requireService(), retry.getInterval(),
+                        retry.getAckTimeout(), delivery.getMaxRetries(), retry.getBatchSize()));
     }
 
     /**
      * Creates the durable processing retry scheduler.
+     * <p>
+     * The publisher executes the retry decision carried by {@code FailureAck};
+     * it does not read the dispatcher policy.
      *
      * @param support           shared scheduler support
      * @param eventStore        the event store holding payloads
@@ -250,22 +252,23 @@ public class LifecycleConfiguration {
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "event-flow.retry.processing", name = "durable-enabled",
+    @ConditionalOnProperty(prefix = "event-flow.publisher.lifecycle.retry.processing", name = "enabled",
             havingValue = "true")
     public ProcessingRetryScheduler processingRetryScheduler(
             RetrySchedulerSupport support,
             EventStore eventStore,
             ObjectProvider<EventPublisher> publisherProvider) {
-        EventFlowProperties.ProcessingRetryConfig processing = properties.getRetry().getProcessing();
-        EventFlowProperties.DefaultRetryPolicyConfig policy = processing.getDefaultPolicy();
-        log.info("Creating ProcessingRetryScheduler: interval={}, ackTimeout={}, maxRetries={}, batchSize={}",
-                processing.getDurableInterval(), processing.getDurableAckTimeout(),
-                processing.getDurableMaxRetries(), processing.getDurableBatchSize());
+        EventFlowProperties.PublisherRetryConfig retry =
+                properties.getPublisher().getLifecycle().getRetry();
+        EventFlowProperties.ProcessingConfig processing = retry.getProcessing();
+        log.info("Creating ProcessingRetryScheduler: interval={}, ackTimeout={}, maxAttempts={}, batchSize={}",
+                retry.getInterval(), retry.getAckTimeout(),
+                processing.getMaxAttempts(), retry.getBatchSize());
         return new ProcessingRetryScheduler(support, eventStore, requirePublisher(publisherProvider),
-                new ProcessingRetryOptions(requireService(), processing.getDurableInterval(),
-                        processing.getDurableAckTimeout(), policy.getInitialDelay(),
-                        policy.getMultiplier(), policy.getJitter(), policy.getMaxDelay(),
-                        processing.getDurableMaxRetries(), processing.getDurableBatchSize()));
+                new ProcessingRetryOptions(requireService(), retry.getInterval(),
+                        retry.getAckTimeout(), processing.getDefaultDelay(),
+                        1.0, 0.0, processing.getMaxDelay(),
+                        processing.getMaxAttempts(), retry.getBatchSize()));
     }
 
     /**
@@ -277,15 +280,16 @@ public class LifecycleConfiguration {
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "event-flow.retry.delivery", name = "enabled",
-            havingValue = "true")
+    @ConditionalOnExpression("${event-flow.publisher.lifecycle.retry.delivery.enabled:false} "
+            + "or ${event-flow.publisher.lifecycle.retry.processing.enabled:false}")
     public RetryWatchdog retryWatchdog(EventStore eventStore, EventRetryStore retryStore) {
-        EventFlowProperties.DeliveryRetryConfig delivery = properties.getRetry().getDelivery();
-        EventFlowProperties.ProcessingRetryConfig processing = properties.getRetry().getProcessing();
+        EventFlowProperties.PublisherRetryConfig retry =
+                properties.getPublisher().getLifecycle().getRetry();
         return new RetryWatchdog(eventStore, retryStore,
-                new RetryWatchdogOptions(requireService(), delivery.getInterval(),
-                        delivery.getAckTimeout(), processing.getDurableAckTimeout(),
-                        delivery.getBatchSize(), processing.isDurableEnabled()));
+                new RetryWatchdogOptions(requireService(), retry.getInterval(),
+                        retry.getAckTimeout(), retry.getAckTimeout(),
+                        retry.getBatchSize(), retry.getDelivery().isEnabled(),
+                        retry.getProcessing().isEnabled()));
     }
 
     /**
@@ -311,52 +315,14 @@ public class LifecycleConfiguration {
         EventRetryStore retryStore = retryStoreProvider.getIfAvailable();
         log.info("Creating AckHandler with service: {}", service);
         if (repository != null && retryStore != null) {
-            EventFlowProperties.ProcessingRetryConfig processing = properties.getRetry().getProcessing();
-            EventFlowProperties.DefaultRetryPolicyConfig policy = processing.getDefaultPolicy();
+            EventFlowProperties.ProcessingConfig processing =
+                    properties.getPublisher().getLifecycle().getRetry().getProcessing();
             return new AckHandler(repository, retryStore, service,
-                    new AckHandlerOptions(processing.isDurableEnabled(),
-                            policy.getInitialDelay(), policy.getMaxDelay(),
-                            processing.getDurableMaxRetries()));
+                    new AckHandlerOptions(processing.isEnabled(),
+                            processing.getDefaultDelay(), processing.getMaxDelay(),
+                            processing.getMaxAttempts()));
         }
         return new AckHandler(eventStore, service);
-    }
-
-    /**
-     * Creates the event retry scheduler.
-     * <p>
-     * Periodically scans for failed events (FAILED status) and stuck events
-     * (PUBLISHED status) belonging to this service and re-publishes them.
-     *
-     * @param eventStore     the event store to scan
-     * @param eventPublisher the publisher for re-publishing events
-     * @return the retry scheduler
-     * @throws IllegalStateException if service-name is not configured
-     */
-    @Bean(initMethod = "start", destroyMethod = "close")
-    @ConditionalOnMissingBean
-    @ConditionalOnProperty(prefix = "event-flow.publisher.lifecycle.retry", name = "enabled",
-            havingValue = "true", matchIfMissing = true)
-    @ConditionalOnExpression("!${event-flow.retry.delivery.enabled:false} "
-            + "and !${event-flow.retry.processing.durable-enabled:false}")
-    public EventRetryScheduler eventRetryScheduler(EventStore eventStore, EventPublisher eventPublisher) {
-        LifecyclePublisherConfig.RetryTrackingConfig retry = properties.getPublisher().getLifecycle().getRetry();
-        String service = properties.getPublisher().getLifecycle().getServiceName();
-        if (StringUtils.isEmpty(service)) {
-            throw new IllegalStateException(
-                    "event-flow.publisher.lifecycle.service-name must be configured when lifecycle retry is enabled"
-            );
-        }
-        log.info("Creating EventRetryScheduler: interval={}, minAge={}, maxRetries={}, batchSize={}, service={}",
-                retry.getRetryInterval(), retry.getMinAge(), retry.getMaxRetries(), retry.getBatchSize(), service);
-        return new EventRetryScheduler(
-                eventStore,
-                eventPublisher,
-                retry.getRetryInterval(),
-                retry.getMinAge(),
-                retry.getMaxRetries(),
-                retry.getBatchSize(),
-                service
-        );
     }
 
     /**

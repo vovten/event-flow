@@ -41,7 +41,7 @@ class RetryWatchdogTest {
 
     private RetryWatchdogOptions options(boolean processingEnabled) {
         return new RetryWatchdogOptions(
-                SERVICE, Duration.ofMinutes(1), ACK_TIMEOUT, ACK_TIMEOUT, 100, processingEnabled);
+                SERVICE, Duration.ofMinutes(1), ACK_TIMEOUT, ACK_TIMEOUT, 100, true, processingEnabled);
     }
 
     private UUID storeEvent(EventStatus status, Duration age) {
@@ -183,7 +183,7 @@ class RetryWatchdogTest {
         @DisplayName("should reject a blank service")
         void rejectsBlankService() {
             assertThatThrownBy(() -> new RetryWatchdogOptions(
-                    "  ", Duration.ofMinutes(1), ACK_TIMEOUT, ACK_TIMEOUT, 100, true))
+                    "  ", Duration.ofMinutes(1), ACK_TIMEOUT, ACK_TIMEOUT, 100, true, true))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("service must not be null or blank");
         }
@@ -192,7 +192,7 @@ class RetryWatchdogTest {
         @DisplayName("should reject a non-positive interval")
         void rejectsNonPositiveInterval() {
             assertThatThrownBy(() -> new RetryWatchdogOptions(
-                    SERVICE, Duration.ZERO, ACK_TIMEOUT, ACK_TIMEOUT, 100, true))
+                    SERVICE, Duration.ZERO, ACK_TIMEOUT, ACK_TIMEOUT, 100, true, true))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("interval must be positive");
         }
@@ -201,7 +201,7 @@ class RetryWatchdogTest {
         @DisplayName("should reject a non-positive batch size")
         void rejectsNonPositiveBatchSize() {
             assertThatThrownBy(() -> new RetryWatchdogOptions(
-                    SERVICE, Duration.ofMinutes(1), ACK_TIMEOUT, ACK_TIMEOUT, 0, true))
+                    SERVICE, Duration.ofMinutes(1), ACK_TIMEOUT, ACK_TIMEOUT, 0, true, true))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("batchSize must be positive");
         }
