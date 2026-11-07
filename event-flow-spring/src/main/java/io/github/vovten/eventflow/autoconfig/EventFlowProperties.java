@@ -488,7 +488,17 @@ public class EventFlowProperties {
     }
 
     /**
-     * Retry configuration for event publishing.
+     * Immediate in-memory retry configuration for event publishing.
+     * <p>
+     * Retries transport failures within the current process with exponential
+     * backoff. This is a best-effort layer: it does not persist retry state and
+     * does not wait for acknowledgments. If the process restarts, pending
+     * retries are lost.
+     * <p>
+     * Use it when lifecycle tracking is disabled and only short transport
+     * glitches need to be smoothed over. For durable delivery retries that
+     * survive restarts and cover lost acknowledgments, use
+     * {@code event-flow.publisher.lifecycle.retry.delivery}.
      */
     public static class RetryConfig {
         private boolean enabled = false;

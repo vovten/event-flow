@@ -26,10 +26,27 @@ event-flow:
     # When true, events are published only after the current transaction commits
     transactional: true
 
-    # Retry configuration for event publishing
+    # Immediate in-memory retry for event publishing.
+    #
+    # Purpose:
+    #   retries failed transport sends in the same process with exponential
+    #   backoff. It smooths over short glitches such as a network blip or a
+    #   temporarily unavailable broker.
+    #
+    # When to use:
+    #   - you only need a lightweight, best-effort transport retry;
+    #   - lifecycle tracking is disabled and you do not need ack-based or
+    #     persistent delivery guarantees.
+    #
+    # When NOT to use:
+    #   - retries must survive a restart or cover lost acknowledgments;
+    #     use event-flow.publisher.lifecycle.retry.delivery instead.
+    #
+    # This layer does not persist retry state. If the process stops, pending
+    # retries are lost. It is applied before the lifecycle-aware wrapper.
     retry:
-      # Enable or disable retry mechanism
-      enabled: true
+      # Enable or disable the in-memory transport retry
+      enabled: false
       # Maximum number of retry attempts
       max-attempts: 3
       # Initial delay between retries (use ms, s, m suffixes)

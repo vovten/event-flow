@@ -1,5 +1,9 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.github.vovten.eventflow.lifecycle.retry.InMemoryEventRetryStore;
 import io.github.vovten.eventflow.lifecycle.retry.RetryReason;
 import io.github.vovten.eventflow.lifecycle.retry.RetryState;
@@ -13,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -296,6 +301,31 @@ class AckHandlerRetryTest {
             assertThat(status(eventId)).isEqualTo(EventStatus.FAILED);
             assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isEmpty();
             assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should warn when a retry request arrives while processing is disabled")
+        void warnsWhenRetryRequestedButProcessingDisabled() {
+            UUID eventId = storeEvent(EventStatus.ACCEPTED);
+            Logger logger = (Logger) LoggerFactory.getLogger(AckHandler.class);
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            logger.addAppender(appender);
+            try {
+                handler(false, 3).onEvent(failureAck(eventId, RetryKind.PROCESSING, 1,
+                        true, 0L, "payment"));
+
+                assertThat(status(eventId)).isEqualTo(EventStatus.FAILED);
+                assertThat(appender.list).anySatisfy(event -> {
+                    assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                    assertThat(event.getFormattedMessage())
+                            .contains("Processing retries are disabled")
+                            .contains(eventId.toString())
+                            .contains("policy=payment");
+                });
+            } finally {
+                logger.detachAppender(appender);
+            }
         }
 
         @Test

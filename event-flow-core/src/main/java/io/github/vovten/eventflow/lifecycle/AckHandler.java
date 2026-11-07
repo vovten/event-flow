@@ -191,8 +191,14 @@ public final class AckHandler implements EventSubscriber {
         if (!options.processingEnabled()) {
             lifecycleRepository.onProcessingDisabled(
                     ack.originalEventId(), ack.errorType(), ack.error());
-            log.warn("Processing retries are disabled; event {} recorded as FAILED without a "
-                    + "processing retry ({})", ack.originalEventId(), ack.eventType());
+            if (ack.retryable()) {
+                log.warn("Processing retries are disabled; retry request for event {} ignored "
+                                + "({} attempt {}, policy={})",
+                        ack.originalEventId(), ack.retryKind(), ack.attempt(), ack.policyName());
+            } else {
+                log.debug("Processing retries are disabled; event {} recorded as FAILED",
+                        ack.originalEventId());
+            }
             return;
         }
         boolean retryable = ack.retryable()
