@@ -39,7 +39,7 @@ public final class RetryPolicyResolver {
         if (annotation.name() == null || annotation.name().isBlank()) {
             throw new IllegalArgumentException("Retry policy name must not be blank");
         }
-        int maxRetries = annotation.maxRetries() >= 0 ? annotation.maxRetries() : defaults.maxRetries();
+        int totalRetries = annotation.totalRetries() >= 0 ? annotation.totalRetries() : defaults.totalRetries();
         int localMaxRetries = annotation.localMaxRetries() >= 0
                 ? annotation.localMaxRetries()
                 : defaults.localMaxRetries();
@@ -47,7 +47,7 @@ public final class RetryPolicyResolver {
                 annotation.name(),
                 toTypeSet(annotation.retryOn()),
                 toTypeSet(annotation.noRetryOn()),
-                maxRetries,
+                totalRetries,
                 localMaxRetries,
                 parseDuration(annotation.initialDelay(), defaults.initialDelay()),
                 annotation.multiplier() >= 1.0 ? annotation.multiplier() : defaults.multiplier(),

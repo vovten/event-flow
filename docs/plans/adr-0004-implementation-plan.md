@@ -531,7 +531,7 @@ Tests for each task are written in the same commit as the task. This list is the
 - [x] **2.2** `@RetryPolicy` attributes:
   - `name` — required; `METHOD` declares+binds, `TYPE` declares only;
   - `retryOn[]`, `noRetryOn[]`;
-  - `maxRetries` — total retries after the first attempt;
+  - `totalRetries` — total retries after the first attempt;
   - `localMaxRetries` — local retries before durable hand-off;
   - `initialDelay`, `maxDelay` (String, parsed at startup);
   - `multiplier`, `jitter`;
@@ -539,7 +539,7 @@ Tests for each task are written in the same commit as the task. This list is the
 - [x] **2.2a** Define the configured default policy:
   - used for listeners without `@RetryPolicy` and for unset annotation attributes;
   - shipped values preserve legacy behaviour:
-    - `maxRetries = 3`;
+    - `totalRetries = 3`;
     - `localMaxRetries = 0` (durable-only);
     - `initialDelay = 30s`, `multiplier = 2.0`, `maxDelay = 10m`, `jitter = 0.5`;
     - empty `retryOn` (any exception).
@@ -925,7 +925,7 @@ Tests for each task are written in the same commit as the task. This list is the
 | Type-level `@RetryPolicy` on a listener class without a reference | does not bind implicitly; default policy applies |
 | Old `FAILED` rows | legacy heuristic or backfill |
 | `localMaxRetries = 0` + handler failure | `FailureAck(retryable = true, retryAfterMs = policy.backoff)`; no local sleep |
-| `localMaxRetries = 2`, `maxRetries = 5` | attempts 1–3 local, attempts 4–6 durable, then `DEAD` |
+| `localMaxRetries = 2`, `totalRetries = 5` | attempts 1–3 local, attempts 4–6 durable, then `DEAD` |
 | `FailureAck.retryAfterMs` present | publisher sets `next_attempt_at = now + clamp(retryAfterMs)` |
 | `FailureAck.retryAfterMs` absent/0 | publisher uses global processing backoff |
 | `processing.enabled=true` + `delivery.enabled=false` | startup fails with `IllegalStateException` |

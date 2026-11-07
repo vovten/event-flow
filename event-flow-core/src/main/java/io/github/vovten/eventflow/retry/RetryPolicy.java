@@ -23,7 +23,7 @@ import java.lang.annotation.Target;
  * <p>
  * Attributes left at their sentinel values inherit the default policy:
  * <ul>
- *   <li>{@link #maxRetries()} {@code < 0} — inherit;</li>
+ *   <li>{@link #totalRetries()} {@code < 0} — inherit;</li>
  *   <li>{@link #localMaxRetries()} {@code < 0} — inherit;</li>
  *   <li>{@link #initialDelay()} blank — inherit;</li>
  *   <li>{@link #maxDelay()} blank — inherit;</li>
@@ -68,14 +68,14 @@ public @interface RetryPolicy {
      *
      * @return the total retry budget, or {@code -1} to inherit the default policy
      */
-    int maxRetries() default -1;
+    int totalRetries() default -1;
 
     /**
      * Number of retries performed locally in the dispatcher before handing the
      * event over to durable re-publication.
      * <p>
      * {@code 0} means "durable-only": no local retries. The value must not
-     * exceed {@link #maxRetries()}. A negative value inherits the default policy.
+     * exceed {@link #totalRetries()}. A negative value inherits the default policy.
      *
      * @return the local retry budget, or {@code -1} to inherit the default policy
      */

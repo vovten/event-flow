@@ -111,10 +111,10 @@ public class RetryPolicyConfiguration {
     }
 
     private static RetryPolicyOverride toOverride(RetryPolicyOverrideConfig config, boolean enabled) {
-        Integer maxRetries = enabled ? config.getTotalRetries() : 0;
+        Integer totalRetries = enabled ? config.getTotalRetries() : 0;
         Integer localMaxRetries = enabled ? config.getLocalMaxRetries() : 0;
         return new RetryPolicyOverride(
-                maxRetries,
+                totalRetries,
                 localMaxRetries,
                 config.getInitialDelay(),
                 config.getMultiplier(),

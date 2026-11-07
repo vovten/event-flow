@@ -164,15 +164,15 @@ A processing retry policy describes **one attempt sequence**, not two unrelated 
 
 - the first `localMaxRetries` retries are performed locally in the dispatcher;
 - the remaining retries are performed through durable re-publication;
-- `maxRetries` is the total retry budget after the first attempt;
+- `totalRetries` is the total retry budget after the first attempt;
 - `localMaxRetries = 0` means **durable-only**: no local retry loop;
-- `localMaxRetries = maxRetries` means **local-only**: no durable re-publication.
+- `localMaxRetries = totalRetries` means **local-only**: no durable re-publication.
 
 ```java
 @EventListener(OrderCreated.class)
 @RetryPolicy(
         name = "order-retry",
-        maxRetries = 5,        // total retries after the first attempt
+        totalRetries = 5,      // total retries after the first attempt
         localMaxRetries = 2,   // first 2 retries are local; the rest are durable
         initialDelay = "100ms",
         multiplier = 2.0,
@@ -187,7 +187,7 @@ public void on(OrderCreated event) { ... }
 Named, reusable policy:
 
 ```java
-@RetryPolicy(name = "payment", maxRetries = 5, localMaxRetries = 0, initialDelay = "1s", ...)
+@RetryPolicy(name = "payment", totalRetries = 5, localMaxRetries = 0, initialDelay = "1s", ...)
 public class PaymentRetryPolicies { }
 
 @EventListener(value = PaymentFailedEvent.class, retryPolicy = "payment")
@@ -222,7 +222,7 @@ Reuse rules:
 The default policy is used both for listeners **without** an annotation and as the source of unset annotation attributes. Processing retries are opt-in; when enabled, the shipped defaults are:
 
 ```text
-maxRetries       = 15       # 3 local + 12 durable
+totalRetries     = 15       # 3 local + 12 durable
 localMaxRetries  = 3
 initialDelay     = 3s
 multiplier       = 2.0
@@ -318,7 +318,7 @@ CREATE INDEX IF NOT EXISTS idx_event_retry_service_due
 
 Invariant: **if a retry is pending, `event_retry` has a row; if no retry is pending, it does not** (a `DEAD` row is kept for diagnostics and manual resurrection).
 
-`attempt` is 1-based and counts all attempts for that kind. `maxRetries` in configuration means retries **after** the first attempt, so the budget is `attempt <= maxRetries + 1`.
+`attempt` is 1-based and counts all attempts for that kind. `totalRetries` in configuration means retries **after** the first attempt, so the budget is `attempt <= totalRetries + 1`.
 
 ### D5 — Event status remains coarse: add `ACCEPTED` and `DEAD`
 
@@ -432,7 +432,7 @@ Scheduling rules:
 
 ### D8 — Reliability invariants
 
-1. **Hard caps per kind.** `maxDeliveryRetries` and the global `maxProcessingRetries` are absolute ceilings. The listener policy's `maxRetries` is enforced by the consumer, but the publisher independently enforces the global cap. Even a consumer that always reports `retryable = true` cannot cause an infinite loop.
+1. **Hard caps per kind.** `maxDeliveryRetries` and the global `maxProcessingRetries` are absolute ceilings. The listener policy's `totalRetries` is enforced by the consumer, but the publisher independently enforces the global cap. Even a consumer that always reports `retryable = true` cannot cause an infinite loop.
 2. **Jitter.** Every durable backoff uses jitter (full jitter or ±15%) to avoid re-publish herds.
 3. **Conditional, out-of-order-safe status transitions.** `AcceptedAck` may arrive before or after `EventLifecyclePublisher` records `PUBLISHED`, and `SuccessAck` may arrive before `AcceptedAck`. Status updates must be conditional:
    - `NEW → PUBLISHED → ACCEPTED → HANDLED` is the normal forward path;
@@ -479,7 +479,7 @@ Implementation notes:
 
 ### D10 — Backward compatibility
 
-- Listeners without `@RetryPolicy` use the configured default policy. Processing retries are disabled by default; when enabled, the shipped default is `localMaxRetries = 3` and `maxRetries = 15`, so the campaign spans at least 40 minutes.
+- Listeners without `@RetryPolicy` use the configured default policy. Processing retries are disabled by default; when enabled, the shipped default is `localMaxRetries = 3` and `totalRetries = 15`, so the campaign spans at least 40 minutes.
 - Legacy `FailureAck` constructors: `retryKind = PROCESSING`, `retryable = true`, `attempt = 1`, `retryAfterMs = 0`, `policyName = null`.
 - A `FailureAck` without `retryAfterMs` (old consumer) uses the publisher's global processing backoff.
 - A publisher receiving `AcceptedAck` from a new consumer: it processes the ack; a publisher that does not understand it treats it as an unknown technical event and ignores it.
@@ -569,7 +569,7 @@ Publisher                                      Dispatcher
 | **new** `NoHandlerAck` | permanent configuration failure |
 | `FailureAck` | + `retryKind`, `attempt`, `retryable`, `failedHandlers`, `errorType`, `retryAfterMs`, `policyName`; legacy constructor retained |
 | `SuccessAck` | + `retryKind`, `attempt`; legacy constructor retained |
-| **new** `@RetryPolicy` | `name` (required), `retryOn[]`, `noRetryOn[]`, `maxRetries`, `localMaxRetries`, `initialDelay`, `unit`, `multiplier`, `maxDelay`, `jitter`; `METHOD` declares+binds, `TYPE` declares only |
+| **new** `@RetryPolicy` | `name` (required), `retryOn[]`, `noRetryOn[]`, `totalRetries`, `localMaxRetries`, `initialDelay`, `unit`, `multiplier`, `maxDelay`, `jitter`; `METHOD` declares+binds, `TYPE` declares only |
 | `@EventListener` | + `retryPolicy()` (named policy reference) |
 | **new** `RetryPolicyRegistry` | registers named declarations; fail-fast on duplicates, unknown references and the reserved `default` name |
 | `EventSubscriber` | + `default String retryPolicy()` (named policy reference) |
@@ -634,7 +634,7 @@ Scenario: payment service, `InternalEventChannel`, `MANAGED` lifecycle, Kafka tr
 public record OrderCreated(String orderId, String customerId, long amount) {}
 
 @EventListener(OrderCreated.class)
-@RetryPolicy(retryOn = TimeoutException.class, maxRetries = 3,
+@RetryPolicy(retryOn = TimeoutException.class, totalRetries = 3,
         initialDelay = "100ms", multiplier = 2.0, maxDelay = "5s")
 public void charge(OrderCreated e) { gateway.charge(e); }
 
@@ -790,7 +790,7 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 26. `DeliveryRetryScheduler` ignores `ACCEPTED` events and creates no `DELIVERY` row for them.
 27. Enabling the two-domain mode disables the legacy `EventRetryScheduler`, including its transitional `ACCEPTED` scan.
 28. `localMaxRetries = 0` performs no local retries and sends `FailureAck(retryable = true, retryAfterMs = policy.backoff(attempt))` immediately.
-29. `localMaxRetries = 2` with `maxRetries = 5` performs local attempts 1–3, then three durable attempts 4–6, and terminates after attempt 6.
+29. `localMaxRetries = 2` with `totalRetries = 5` performs local attempts 1–3, then three durable attempts 4–6, and terminates after attempt 6.
 30. A listener without `@RetryPolicy` uses the configured default policy and reports `policyName = "default"`.
 31. The publisher clamps `retryAfterMs` to its global limits, uses global backoff when the field is absent, and enforces the global processing cap.
 

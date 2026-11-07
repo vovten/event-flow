@@ -22,7 +22,7 @@ class RetryPolicyResolverTest {
 
         assertThat(policy).isNotNull();
         assertThat(policy.name()).isEqualTo("empty");
-        assertThat(policy.maxRetries()).isEqualTo(DEFAULTS.maxRetries());
+        assertThat(policy.totalRetries()).isEqualTo(DEFAULTS.totalRetries());
         assertThat(policy.localMaxRetries()).isEqualTo(DEFAULTS.localMaxRetries());
         assertThat(policy.initialDelay()).isEqualTo(DEFAULTS.initialDelay());
         assertThat(policy.multiplier()).isEqualTo(DEFAULTS.multiplier());
@@ -38,7 +38,7 @@ class RetryPolicyResolverTest {
         ResolvedRetryPolicy policy = RetryPolicyResolver.resolveDeclared(retryPolicy("explicit"), DEFAULTS);
 
         assertThat(policy.name()).isEqualTo("explicit");
-        assertThat(policy.maxRetries()).isEqualTo(2);
+        assertThat(policy.totalRetries()).isEqualTo(2);
         assertThat(policy.localMaxRetries()).isEqualTo(1);
         assertThat(policy.initialDelay()).isEqualTo(Duration.ofMillis(250));
         assertThat(policy.maxDelay()).isEqualTo(Duration.ofSeconds(2));
@@ -181,7 +181,7 @@ class RetryPolicyResolverTest {
 
         @RetryPolicy(
                 name = "explicit",
-                maxRetries = 2,
+                totalRetries = 2,
                 localMaxRetries = 1,
                 initialDelay = "250ms",
                 maxDelay = "2s",

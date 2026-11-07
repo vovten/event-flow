@@ -38,7 +38,7 @@ class RetryPolicyConfigurationTest {
         ResolvedRetryPolicy policy = configuration.defaultRetryPolicy(properties);
 
         assertThat(policy.name()).isEqualTo(ResolvedRetryPolicy.DEFAULT_POLICY_NAME);
-        assertThat(policy.maxRetries()).isEqualTo(5);
+        assertThat(policy.totalRetries()).isEqualTo(5);
         assertThat(policy.localMaxRetries()).isEqualTo(2);
         assertThat(policy.initialDelay()).isEqualTo(Duration.ofSeconds(1));
         assertThat(policy.multiplier()).isEqualTo(3.0);
@@ -64,7 +64,7 @@ class RetryPolicyConfigurationTest {
         resolver.prepare(PaymentPolicies.class);
 
         ResolvedRetryPolicy policy = registry.resolve("payment");
-        assertThat(policy.maxRetries()).isEqualTo(7);
+        assertThat(policy.totalRetries()).isEqualTo(7);
         assertThat(policy.localMaxRetries()).isEqualTo(1);
         assertThat(policy.initialDelay()).isEqualTo(Duration.ofMillis(10));
     }
@@ -79,7 +79,7 @@ class RetryPolicyConfigurationTest {
 
         ResolvedRetryPolicy policy = configuration.defaultRetryPolicy(properties);
 
-        assertThat(policy.maxRetries()).isZero();
+        assertThat(policy.totalRetries()).isZero();
         assertThat(policy.localMaxRetries()).isZero();
     }
 
@@ -107,7 +107,7 @@ class RetryPolicyConfigurationTest {
         return properties;
     }
 
-    @RetryPolicy(name = "payment", maxRetries = 2, localMaxRetries = 0,
+    @RetryPolicy(name = "payment", totalRetries = 2, localMaxRetries = 0,
             initialDelay = "10ms", jitter = 0.0)
     private static final class PaymentPolicies {
     }

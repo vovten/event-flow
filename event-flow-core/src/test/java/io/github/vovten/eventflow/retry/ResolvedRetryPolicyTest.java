@@ -21,7 +21,7 @@ class ResolvedRetryPolicyTest {
         assertThat(policy.name()).isEqualTo(ResolvedRetryPolicy.DEFAULT_POLICY_NAME);
         assertThat(policy.retryOn()).isEmpty();
         assertThat(policy.noRetryOn()).isEmpty();
-        assertThat(policy.maxRetries()).isEqualTo(3);
+        assertThat(policy.totalRetries()).isEqualTo(3);
         assertThat(policy.localMaxRetries()).isZero();
         assertThat(policy.initialDelay()).isEqualTo(Duration.ofSeconds(30));
         assertThat(policy.multiplier()).isEqualTo(2.0);
@@ -45,7 +45,7 @@ class ResolvedRetryPolicyTest {
     void shouldRejectInvalidConfiguration() {
         assertThatThrownBy(() -> policy(-1, 0, Duration.ofMillis(1), 2.0, Duration.ofSeconds(1), 0.0))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("maxRetries");
+                .hasMessageContaining("totalRetries");
 
         assertThatThrownBy(() -> policy(3, -1, Duration.ofMillis(1), 2.0, Duration.ofSeconds(1), 0.0))
                 .isInstanceOf(IllegalArgumentException.class)

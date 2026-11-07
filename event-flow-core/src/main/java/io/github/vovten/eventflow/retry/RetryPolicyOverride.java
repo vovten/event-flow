@@ -10,7 +10,7 @@ import java.util.Set;
  * {@code null} fields leave the corresponding value unchanged. The override is
  * applied to a policy declaration before it is registered.
  *
- * @param maxRetries       total retry budget, or {@code null}
+ * @param totalRetries     total retry budget, or {@code null}
  * @param localMaxRetries  local retry budget, or {@code null}
  * @param initialDelay     initial backoff delay, or {@code null}
  * @param multiplier       backoff multiplier, or {@code null}
@@ -22,7 +22,7 @@ import java.util.Set;
  * @since 1.4.0
  */
 public record RetryPolicyOverride(
-        Integer maxRetries,
+        Integer totalRetries,
         Integer localMaxRetries,
         Duration initialDelay,
         Double multiplier,
@@ -53,7 +53,7 @@ public record RetryPolicyOverride(
                 base.name(),
                 retryOn != null ? retryOn : base.retryOn(),
                 noRetryOn != null ? noRetryOn : base.noRetryOn(),
-                maxRetries != null ? maxRetries : base.maxRetries(),
+                totalRetries != null ? totalRetries : base.totalRetries(),
                 localMaxRetries != null ? localMaxRetries : base.localMaxRetries(),
                 initialDelay != null ? initialDelay : base.initialDelay(),
                 multiplier != null ? multiplier : base.multiplier(),

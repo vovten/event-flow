@@ -125,7 +125,7 @@ class EventListenerRegistryRetryTest {
     private static final class MethodDeclaredListener {
 
         @EventListener(OrderEvent.class)
-        @RetryPolicy(name = "order-retry", maxRetries = 4, localMaxRetries = 1,
+        @RetryPolicy(name = "order-retry", totalRetries = 4, localMaxRetries = 1,
                 initialDelay = "50ms", jitter = 0.0)
         public void on(OrderEvent event) {
         }
@@ -138,7 +138,7 @@ class EventListenerRegistryRetryTest {
         }
     }
 
-    @RetryPolicy(name = "shared", maxRetries = 2, localMaxRetries = 0,
+    @RetryPolicy(name = "shared", totalRetries = 2, localMaxRetries = 0,
             initialDelay = "10ms", jitter = 0.0)
     private static final class SharedPolicies {
     }
@@ -150,7 +150,7 @@ class EventListenerRegistryRetryTest {
         }
     }
 
-    @RetryPolicy(name = "listener-class-policy", maxRetries = 1, localMaxRetries = 0,
+    @RetryPolicy(name = "listener-class-policy", totalRetries = 1, localMaxRetries = 0,
             initialDelay = "10ms", jitter = 0.0)
     private static final class TypeAnnotatedListener {
 
@@ -169,7 +169,7 @@ class EventListenerRegistryRetryTest {
     private static final class AmbiguousListener {
 
         @EventListener(value = OrderEvent.class, retryPolicy = "shared")
-        @RetryPolicy(name = "ambiguous", maxRetries = 1,
+        @RetryPolicy(name = "ambiguous", totalRetries = 1,
                 initialDelay = "10ms", jitter = 0.0)
         public void on(OrderEvent event) {
         }
@@ -185,13 +185,13 @@ class EventListenerRegistryRetryTest {
     private static final class DuplicateNameListener {
 
         @EventListener(OrderEvent.class)
-        @RetryPolicy(name = "duplicate", maxRetries = 1,
+        @RetryPolicy(name = "duplicate", totalRetries = 1,
                 initialDelay = "10ms", jitter = 0.0)
         public void onOrder(OrderEvent event) {
         }
 
         @EventListener(PaymentEvent.class)
-        @RetryPolicy(name = "duplicate", maxRetries = 2,
+        @RetryPolicy(name = "duplicate", totalRetries = 2,
                 initialDelay = "10ms", jitter = 0.0)
         public void onPayment(PaymentEvent event) {
         }

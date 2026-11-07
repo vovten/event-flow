@@ -278,13 +278,13 @@ class SpringEventListenerRegistryTest {
     static class SpringMethodPolicyListener {
 
         @EventListener(TestEvent.class)
-        @RetryPolicy(name = "spring-method", maxRetries = 1, localMaxRetries = 0,
+        @RetryPolicy(name = "spring-method", totalRetries = 1, localMaxRetries = 0,
                 initialDelay = "10ms", jitter = 0.0)
         public void handleTestEvent(TestEvent event) {
         }
     }
 
-    @RetryPolicy(name = "shared", maxRetries = 2, localMaxRetries = 0,
+    @RetryPolicy(name = "shared", totalRetries = 2, localMaxRetries = 0,
             initialDelay = "10ms", jitter = 0.0)
     static class SpringSharedPolicies {
     }

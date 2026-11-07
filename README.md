@@ -877,7 +877,7 @@ it only declares it for reuse:
 ```java
 @RetryPolicy(
         name = "payment",
-        maxRetries = 5,
+        totalRetries = 5,
         localMaxRetries = 2,
         initialDelay = "100ms",
         multiplier = 2.0,
@@ -892,12 +892,12 @@ class RetryPolicies { }
 void on(PaymentFailed event) { ... }
 ```
 
-`maxRetries` is the total retry budget after the first attempt. The first
+`totalRetries` is the total retry budget after the first attempt. The first
 `localMaxRetries` retries run in-process; the remaining ones are executed by
 durable re-publication:
 
 - `localMaxRetries = 0` — durable-only, no local retry loop;
-- `localMaxRetries = maxRetries` — local-only;
+- `localMaxRetries = totalRetries` — local-only;
 - a method-level `@RetryPolicy` cannot be combined with `retryPolicy = "..."`.
 
 When the local budget is exhausted, `FailureAck` carries `retryAfterMs` and

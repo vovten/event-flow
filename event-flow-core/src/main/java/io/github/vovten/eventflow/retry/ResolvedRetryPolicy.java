@@ -11,7 +11,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * The policy describes one attempt sequence. The first {@link #localMaxRetries()}
  * retries are performed locally in the dispatcher; the remaining retries are
  * performed through durable re-publication. A value of {@code 0} means
- * "durable-only"; a value equal to {@link #maxRetries()} means "local-only".
+ * "durable-only"; a value equal to {@link #totalRetries()} means "local-only".
  * <p>
  * Resolution from {@link RetryPolicy} annotations, named policies and the
  * configured default policy is performed by {@link RetryPolicyResolver}.
@@ -19,7 +19,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * @param name             unique policy name
  * @param retryOn          retryable exception types; empty means "any exception"
  * @param noRetryOn        non-retryable exception types; wins over {@code retryOn}
- * @param maxRetries       total retries after the first attempt (local + durable)
+ * @param totalRetries     total retries after the first attempt (local + durable)
  * @param localMaxRetries  retries performed locally before durable re-publication
  * @param initialDelay     delay before the first retry
  * @param multiplier       exponential backoff multiplier
@@ -32,7 +32,7 @@ public record ResolvedRetryPolicy(
         String name,
         Set<Class<? extends Throwable>> retryOn,
         Set<Class<? extends Throwable>> noRetryOn,
-        int maxRetries,
+        int totalRetries,
         int localMaxRetries,
         Duration initialDelay,
         double multiplier,
@@ -45,7 +45,7 @@ public record ResolvedRetryPolicy(
      */
     public static final String DEFAULT_POLICY_NAME = "default";
 
-    private static final int DEFAULT_MAX_RETRIES = 3;
+    private static final int DEFAULT_TOTAL_RETRIES = 3;
     private static final int DEFAULT_LOCAL_MAX_RETRIES = 0;
     private static final Duration DEFAULT_INITIAL_DELAY = Duration.ofSeconds(30);
     private static final double DEFAULT_MULTIPLIER = 2.0;
@@ -61,14 +61,14 @@ public record ResolvedRetryPolicy(
         Objects.requireNonNull(noRetryOn, "noRetryOn must not be null");
         Objects.requireNonNull(initialDelay, "initialDelay must not be null");
         Objects.requireNonNull(maxDelay, "maxDelay must not be null");
-        if (maxRetries < 0) {
-            throw new IllegalArgumentException("maxRetries must be >= 0");
+        if (totalRetries < 0) {
+            throw new IllegalArgumentException("totalRetries must be >= 0");
         }
         if (localMaxRetries < 0) {
             throw new IllegalArgumentException("localMaxRetries must be >= 0");
         }
-        if (localMaxRetries > maxRetries) {
-            throw new IllegalArgumentException("localMaxRetries must not exceed maxRetries");
+        if (localMaxRetries > totalRetries) {
+            throw new IllegalArgumentException("localMaxRetries must not exceed totalRetries");
         }
         if (initialDelay.isNegative()) {
             throw new IllegalArgumentException("initialDelay must not be negative");
@@ -100,7 +100,7 @@ public record ResolvedRetryPolicy(
                 DEFAULT_POLICY_NAME,
                 Set.of(),
                 Set.of(),
-                DEFAULT_MAX_RETRIES,
+                DEFAULT_TOTAL_RETRIES,
                 DEFAULT_LOCAL_MAX_RETRIES,
                 DEFAULT_INITIAL_DELAY,
                 DEFAULT_MULTIPLIER,
@@ -131,10 +131,10 @@ public record ResolvedRetryPolicy(
      * Returns whether another attempt is allowed by the total retry budget.
      *
      * @param currentAttempt the 1-based attempt number that just failed
-     * @return {@code true} if {@code currentAttempt <= maxRetries}
+     * @return {@code true} if {@code currentAttempt <= totalRetries}
      */
     public boolean hasMoreAttempts(int currentAttempt) {
-        return currentAttempt >= 1 && currentAttempt <= maxRetries;
+        return currentAttempt >= 1 && currentAttempt <= totalRetries;
     }
 
     /**
@@ -150,10 +150,10 @@ public record ResolvedRetryPolicy(
     /**
      * Returns whether this policy allows at least one retry.
      *
-     * @return {@code true} if {@code maxRetries > 0}
+     * @return {@code true} if {@code totalRetries > 0}
      */
     public boolean hasRetries() {
-        return maxRetries > 0;
+        return totalRetries > 0;
     }
 
     /**
