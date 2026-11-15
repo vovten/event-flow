@@ -95,7 +95,14 @@ public class TransactionalEventPublisher implements EventPublisher {
             log.debug("Transaction active, deferred publishing for event {}", event.type().getSimpleName());
             return resultFuture;
         } else {
-            return origin.publish(event);
+            try {
+                return origin.publish(event);
+            } catch (RuntimeException e) {
+                // Keep the "always a CompletableFuture" contract even when the
+                // delegate throws before it can return a future.
+                return CompletableFuture.failedFuture(
+                        new EventPublisherException("Event publication failed synchronously", e));
+            }
         }
     }
 
@@ -123,7 +130,16 @@ public class TransactionalEventPublisher implements EventPublisher {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                publishAction.run();
+                try {
+                    publishAction.run();
+                } catch (Throwable t) {
+                    // Spring swallows exceptions thrown from afterCommit (it only
+                    // logs them), so the future would otherwise never complete and
+                    // the caller would block forever.
+                    log.error("Deferred event publication failed after transaction commit", t);
+                    resultFuture.completeExceptionally(
+                            new EventPublisherException("Deferred event publication failed", t));
+                }
             }
 
             @Override
