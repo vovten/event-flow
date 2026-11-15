@@ -84,8 +84,7 @@ public final class JdbcEventRetryStore implements EventRetryStore {
      * @param autoInitSchema whether to create the schema automatically
      */
     public JdbcEventRetryStore(DataSource dataSource, String tableName, boolean autoInitSchema) {
-        this(dataSource, tableName, SqlDialect.forDialect(detectDialect(dataSource)),
-                SqlDialect.forDialect(detectDialect(dataSource)).uuidType(), autoInitSchema);
+        this(dataSource, tableName, detectDialect(dataSource), autoInitSchema);
     }
 
     /**
@@ -138,8 +137,8 @@ public final class JdbcEventRetryStore implements EventRetryStore {
         try (Connection conn = dataSource.getConnection()) {
             return DatabaseDialect.detect(conn);
         } catch (SQLException e) {
-            log.warn("Failed to detect database dialect, defaulting to PostgreSQL", e);
-            return DatabaseDialect.POSTGRESQL;
+            throw new IllegalStateException(
+                    "Failed to detect database dialect from the DataSource", e);
         }
     }
 

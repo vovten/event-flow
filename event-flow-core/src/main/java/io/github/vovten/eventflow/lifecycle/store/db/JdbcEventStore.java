@@ -95,8 +95,22 @@ public class JdbcEventStore implements EventStore {
      * and schema initialization. UUID strategy is derived from the detected dialect.
      */
     public JdbcEventStore(DataSource dataSource, String tableName, boolean autoInitSchema) {
-        this(dataSource, tableName, SqlDialect.forDialect(detectDialect(dataSource)),
-                SqlDialect.forDialect(detectDialect(dataSource)).uuidType(), autoInitSchema);
+        this(dataSource, tableName, detectDialect(dataSource), autoInitSchema);
+    }
+
+    /**
+     * Creates a JdbcEventStore with an explicit dialect and schema initialization flag.
+     * The UUID strategy is derived from the dialect.
+     *
+     * @param dataSource     the JDBC DataSource
+     * @param tableName      the name of the event store table
+     * @param dialect        the database dialect
+     * @param autoInitSchema whether to create the schema automatically
+     */
+    public JdbcEventStore(DataSource dataSource, String tableName, DatabaseDialect dialect,
+                          boolean autoInitSchema) {
+        this(dataSource, tableName, SqlDialect.forDialect(dialect),
+                SqlDialect.forDialect(dialect).uuidType(), autoInitSchema);
     }
 
     /**
@@ -161,8 +175,8 @@ public class JdbcEventStore implements EventStore {
         try (Connection conn = dataSource.getConnection()) {
             return DatabaseDialect.detect(conn);
         } catch (SQLException e) {
-            log.warn("Failed to detect database dialect, defaulting to PostgreSQL", e);
-            return DatabaseDialect.POSTGRESQL;
+            throw new IllegalStateException(
+                    "Failed to detect database dialect from the DataSource", e);
         }
     }
 

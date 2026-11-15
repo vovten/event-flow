@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DisplayName("JdbcEventStore Tests")
 class JdbcEventStoreTest {
@@ -54,6 +56,33 @@ class JdbcEventStoreTest {
         ds.setUser("sa");
         ds.setPassword("");
         return ds;
+    }
+
+    @Test
+    @DisplayName("DEFECT-2.6: Should fail fast when the dialect cannot be detected")
+    void shouldFailFastWhenDialectCannotBeDetected() throws SQLException {
+        DataSource failing = mock(DataSource.class);
+        when(failing.getConnection()).thenThrow(new SQLException("no connection"));
+
+        assertThatThrownBy(() -> new JdbcEventStore(failing, "event_store", false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to detect database dialect");
+    }
+
+    @Test
+    @DisplayName("DEFECT-2.6: Should fail fast for an unsupported database instead of assuming PostgreSQL")
+    void shouldFailFastForUnsupportedDatabase() throws SQLException {
+        DataSource unsupported = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+        when(unsupported.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metadata);
+        when(metadata.getDatabaseProductName()).thenReturn("SQLite");
+
+        assertThatThrownBy(() -> new JdbcEventStore(unsupported, "event_store", false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unsupported database")
+                .hasMessageContaining("SQLite");
     }
 
     @Test

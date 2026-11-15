@@ -36,22 +36,30 @@ public enum DatabaseDialect {
      *
      * @param conn an active JDBC connection
      * @return the detected dialect (never {@code null})
-     * @throws SQLException if metadata cannot be obtained
+     * @throws SQLException         if metadata cannot be obtained
+     * @throws IllegalStateException if the database product is not supported
      */
     public static DatabaseDialect detect(Connection conn) throws SQLException {
-        String name = conn.getMetaData().getDatabaseProductName().toLowerCase();
-        if (name.contains("oracle")) {
+        String name = conn.getMetaData().getDatabaseProductName();
+        String normalized = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+        if (normalized.contains("oracle")) {
             return ORACLE;
         }
-        if (name.contains("mysql") || name.contains("mariadb")) {
+        if (normalized.contains("mysql") || normalized.contains("mariadb")) {
             return MYSQL;
         }
-        if (name.contains("microsoft") || name.contains("sql server")) {
+        if (normalized.contains("microsoft") || normalized.contains("sql server")) {
             return SQLSERVER;
         }
-        if (name.contains("h2")) {
+        if (normalized.contains("h2")) {
             return H2;
         }
-        return POSTGRESQL;
+        if (normalized.contains("postgres") || normalized.contains("cockroach")
+                || normalized.contains("yugabyte")) {
+            return POSTGRESQL;
+        }
+        throw new IllegalStateException(
+                "Unsupported database '" + name + "'. Supported databases: "
+                        + "PostgreSQL/CockroachDB/YugabyteDB, MySQL/MariaDB, H2, Oracle, SQL Server");
     }
 }
