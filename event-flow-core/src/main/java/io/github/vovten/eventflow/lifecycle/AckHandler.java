@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -113,12 +114,20 @@ public final class AckHandler implements EventSubscriber {
 
     @Override
     public void onEvent(Event event) {
-        switch (event) {
-            case AcceptedAck acceptedAck -> handle(acceptedAck);
-            case NoHandlerAck noHandlerAck -> handle(noHandlerAck);
-            case SuccessAck successAck -> handle(successAck);
-            case FailureAck failureAck -> handle(failureAck);
-            default -> log.trace("Ignoring non-ack event: {}", event);
+        try {
+            switch (event) {
+                case AcceptedAck acceptedAck -> handle(acceptedAck);
+                case NoHandlerAck noHandlerAck -> handle(noHandlerAck);
+                case SuccessAck successAck -> handle(successAck);
+                case FailureAck failureAck -> handle(failureAck);
+                default -> log.trace("Ignoring non-ack event: {}", event);
+            }
+        } catch (NoSuchElementException e) {
+            // A missing event is a normal race (foreign acks, cleanup, multiple
+            // instances), not an incident: no stack trace, no ERROR alert.
+            log.info("Ignoring ack for unknown event: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to process ack event: {}", event, e);
         }
     }
 
@@ -245,16 +254,12 @@ public final class AckHandler implements EventSubscriber {
         if (shouldSkipForForeignService(originalService)) {
             return;
         }
-        try {
-            boolean applied = eventStore.transitionStatus(originalEventId, allowedSources, target, error);
-            if (applied) {
-                log.debug("Event {} status updated to {} ({})", originalEventId, target, eventType);
-            } else {
-                log.debug("Rejected ack transition for event {} to {}: current status is not in {} ({})",
-                        originalEventId, target, allowedSources, eventType);
-            }
-        } catch (Exception e) {
-            log.error("Failed to update event status to {} for {}", target, originalEventId, e);
+        boolean applied = eventStore.transitionStatus(originalEventId, allowedSources, target, error);
+        if (applied) {
+            log.debug("Event {} status updated to {} ({})", originalEventId, target, eventType);
+        } else {
+            log.debug("Rejected ack transition for event {} to {}: current status is not in {} ({})",
+                    originalEventId, target, allowedSources, eventType);
         }
     }
 

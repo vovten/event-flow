@@ -1,18 +1,30 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.retry.RetryKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DisplayName("AckHandler Tests")
 class AckHandlerTest {
@@ -127,6 +139,58 @@ class AckHandlerTest {
 
         // Should not throw
         handler.onEvent(ack);
+    }
+
+    @Test
+    @DisplayName("DEFECT-3.2: A missing event is logged at INFO without a stack trace, not as ERROR")
+    void shouldLogMissingEventAtInfo() {
+        Logger logger = (Logger) LoggerFactory.getLogger(AckHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            EventStore store = mock(EventStore.class);
+            when(store.transitionStatus(any(), anySet(), any(), any()))
+                    .thenThrow(new NoSuchElementException("Event not found: " + eventId));
+            AckHandler missingHandler = new AckHandler(store, "test-service");
+            SuccessAck ack = new SuccessAck(
+                    UUID.randomUUID(), eventId, "TestEvent", "test-service",
+                    List.of(), null, Instant.now());
+
+            assertThatCode(() -> missingHandler.onEvent(ack)).doesNotThrowAnyException();
+
+            assertThat(appender.list)
+                    .as("A missing event is a normal race, not an incident")
+                    .anyMatch(e -> e.getLevel() == Level.INFO
+                            && e.getFormattedMessage().contains("unknown event"))
+                    .noneMatch(e -> e.getLevel() == Level.ERROR);
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
+    @DisplayName("DEFECT-3.2: A database failure is still logged as ERROR")
+    void shouldLogDatabaseFailureAsError() {
+        Logger logger = (Logger) LoggerFactory.getLogger(AckHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            EventStore store = mock(EventStore.class);
+            when(store.transitionStatus(any(), anySet(), any(), any()))
+                    .thenThrow(new RuntimeException("db down"));
+            AckHandler failingHandler = new AckHandler(store, "test-service");
+            SuccessAck ack = new SuccessAck(
+                    UUID.randomUUID(), eventId, "TestEvent", "test-service",
+                    List.of(), null, Instant.now());
+
+            assertThatCode(() -> failingHandler.onEvent(ack)).doesNotThrowAnyException();
+
+            assertThat(appender.list).anyMatch(e -> e.getLevel() == Level.ERROR);
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 
     @Test
