@@ -235,6 +235,19 @@ final class SchemaSupport {
                 || indexExists(meta, baseName.toLowerCase(), indexName);
     }
 
+    private static boolean indexExists(DatabaseMetaData meta, String tableName,
+                                       String indexName) throws SQLException {
+        try (ResultSet rs = meta.getIndexInfo(null, null, tableName, false, false)) {
+            while (rs.next()) {
+                String found = rs.getString("INDEX_NAME");
+                if (found != null && found.equalsIgnoreCase(indexName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /**
      * Checks whether an index exists, tolerating a failing metadata lookup.
      * <p>
@@ -261,19 +274,6 @@ final class SchemaSupport {
                     indexName, tableName, e.getMessage());
             return true;
         }
-    }
-
-    private static boolean indexExists(DatabaseMetaData meta, String tableName,
-                                       String indexName) throws SQLException {
-        try (ResultSet rs = meta.getIndexInfo(null, null, tableName, false, false)) {
-            while (rs.next()) {
-                String found = rs.getString("INDEX_NAME");
-                if (found != null && found.equalsIgnoreCase(indexName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /**
