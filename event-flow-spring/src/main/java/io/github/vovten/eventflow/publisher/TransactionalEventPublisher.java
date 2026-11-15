@@ -127,28 +127,45 @@ public class TransactionalEventPublisher implements EventPublisher {
      */
     private void registerTransactionSynchronization(CompletableFuture<SendResults> resultFuture,
                                                     Runnable publishAction) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                try {
-                    publishAction.run();
-                } catch (Throwable t) {
-                    // Spring swallows exceptions thrown from afterCommit (it only
-                    // logs them), so the future would otherwise never complete and
-                    // the caller would block forever.
-                    log.error("Deferred event publication failed after transaction commit", t);
-                    resultFuture.completeExceptionally(
-                            new EventPublisherException("Deferred event publication failed", t));
-                }
-            }
+        TransactionSynchronizationManager.registerSynchronization(
+                new DeferredPublicationSynchronization(resultFuture, publishAction));
+    }
 
-            @Override
-            public void afterCompletion(int status) {
-                if (status != TransactionSynchronization.STATUS_COMMITTED) {
-                    resultFuture.completeExceptionally(new IllegalStateException(
-                            "Transaction was not committed (status: " + status + "), event publication aborted"));
-                }
+    /**
+     * Completes the deferred publication future on transaction commit/rollback.
+     * <p>
+     * Spring swallows exceptions thrown from {@code afterCommit} (it only logs
+     * them), so any synchronous publication failure must be translated into an
+     * exceptional completion; otherwise the caller would block forever.
+     */
+    private static final class DeferredPublicationSynchronization implements TransactionSynchronization {
+
+        private final CompletableFuture<SendResults> resultFuture;
+        private final Runnable publishAction;
+
+        private DeferredPublicationSynchronization(CompletableFuture<SendResults> resultFuture,
+                                                   Runnable publishAction) {
+            this.resultFuture = resultFuture;
+            this.publishAction = publishAction;
+        }
+
+        @Override
+        public void afterCommit() {
+            try {
+                publishAction.run();
+            } catch (Exception e) {
+                log.error("Deferred event publication failed after transaction commit", e);
+                resultFuture.completeExceptionally(
+                        new EventPublisherException("Deferred event publication failed", e));
             }
-        });
+        }
+
+        @Override
+        public void afterCompletion(int status) {
+            if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                resultFuture.completeExceptionally(new IllegalStateException(
+                        "Transaction was not committed (status: " + status + "), event publication aborted"));
+            }
+        }
     }
 }
