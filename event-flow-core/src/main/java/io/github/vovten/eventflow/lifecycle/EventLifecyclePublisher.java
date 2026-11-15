@@ -18,6 +18,9 @@ import org.slf4j.LoggerFactory;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A decorator for {@link EventPublisher} that persists events to an {@link EventStore}
@@ -39,6 +42,11 @@ import java.util.concurrent.CompletableFuture;
  * <p>
  * {@link LifecycleAckEvent} instances are passed through without persistence
  * (they are technical events used for lifecycle tracking, not business events).
+ * <p>
+ * Lifecycle-store updates after a publish complete are executed on a dedicated
+ * daemon executor ({@code event-flow-store-updater-*}), so transport completion
+ * threads (Kafka producer callbacks, Netty event loops) are never blocked by a
+ * synchronous JDBC update.
  *
  * @author Vladimir Aleshkov
  * @since 1.2.0
@@ -48,6 +56,19 @@ public final class EventLifecyclePublisher implements EventPublisher {
     private static final Logger log = LoggerFactory.getLogger(EventLifecyclePublisher.class);
 
     private static final String PUBLISHER_SERVICE_KEY = "pubSrv";
+
+    private static final AtomicInteger UPDATER_THREADS = new AtomicInteger();
+
+    /**
+     * Dedicated daemon executor for lifecycle-store updates. Transports may
+     * complete their publish future on an IO thread (Kafka producer callback,
+     * Netty event loop); a blocking JDBC update must never run there.
+     */
+    private static final Executor STORE_UPDATER = Executors.newCachedThreadPool(task -> {
+        Thread thread = new Thread(task, "event-flow-store-updater-" + UPDATER_THREADS.incrementAndGet());
+        thread.setDaemon(true);
+        return thread;
+    });
 
     /**
      * Statuses from which a retry publish may reset the event to {@code NEW}.
@@ -165,7 +186,7 @@ public final class EventLifecyclePublisher implements EventPublisher {
             // Persist with UNDEFINED status, no further tracking
             persistNewOnly(eventId, enriched);
             return origin.publish(enriched)
-                    .whenComplete((result, error) -> completePersistedRetry(eventId));
+                    .whenCompleteAsync((result, error) -> completePersistedRetry(eventId), STORE_UPDATER);
         }
         // MANAGED — persist with NEW status, full lifecycle tracking
         if (!persistOrReset(eventId, enriched)) {
@@ -173,8 +194,8 @@ public final class EventLifecyclePublisher implements EventPublisher {
             return CompletableFuture.completedFuture(SendResults.empty());
         }
         return origin.publish(enriched)
-                .whenComplete((result, error) ->
-                        updatePublishResult(eventId, attempt, schedulerInitiated, result, error));
+                .whenCompleteAsync((result, error) ->
+                        updatePublishResult(eventId, attempt, schedulerInitiated, result, error), STORE_UPDATER);
     }
 
     private boolean shouldSkipPersistence(Event event) {
