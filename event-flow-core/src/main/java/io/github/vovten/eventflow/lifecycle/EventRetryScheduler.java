@@ -223,7 +223,10 @@ public final class EventRetryScheduler implements AutoCloseable {
             return;
         }
         try {
-            publisher.publish(event);
+            // Wait for the publish result (and the lifecycle status update that
+            // follows it) so the next retry cycle sees the applied state and a
+            // failed delivery is accounted for in this attempt.
+            publisher.publish(event).join();
             log.info("Retried event id={} (attempt {}/{})", stored.eventId(), stored.retryCount() + 1, maxRetries);
         } catch (Exception e) {
             // Count the attempt so the exponential backoff grows and the retry
