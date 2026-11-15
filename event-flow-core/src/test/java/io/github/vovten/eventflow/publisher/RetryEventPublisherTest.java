@@ -177,6 +177,60 @@ class RetryEventPublisherTest {
     }
 
     @Test
+    @DisplayName("DEFECT-6.7: Should retry when all destinations fail with a result (e.g. full local queue)")
+    void shouldRetryWhenAllDestinationsFail() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = event -> {
+            if (callCount.incrementAndGet() < 2) {
+                return CompletableFuture.completedFuture(SendResults.of(List.of(
+                        SendResult.failure("local-queue", "Queue is full, event rejected"))));
+            }
+            return CompletableFuture.completedFuture(SendResults.of(List.of(SendResult.success("local-queue"))));
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 2, Duration.ofMillis(10), 2.0);
+
+        SendResults results = publisher.publish(event).join();
+
+        assertThat(callCount).hasValue(2);
+        assertThat(results.isAllSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("DEFECT-6.7: Should complete with the last failed results when retries are exhausted")
+    void shouldCompleteWithFailedResultsAfterRetriesExhausted() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = event -> {
+            callCount.incrementAndGet();
+            return CompletableFuture.completedFuture(SendResults.of(List.of(
+                    SendResult.failure("local-queue", "Queue is full, event rejected"))));
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 1, Duration.ofMillis(10), 2.0);
+
+        SendResults results = publisher.publish(event).join();
+
+        assertThat(callCount).hasValue(2);
+        assertThat(results.isAllFailure()).isTrue();
+    }
+
+    @Test
+    @DisplayName("DEFECT-6.7: Should not retry a partial success to avoid duplicate delivery")
+    void shouldNotRetryPartialSuccess() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = event -> {
+            callCount.incrementAndGet();
+            return CompletableFuture.completedFuture(SendResults.of(List.of(
+                    SendResult.success("channel-a"),
+                    SendResult.failure("channel-b", "timeout"))));
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0);
+
+        SendResults results = publisher.publish(event).join();
+
+        assertThat(callCount).hasValue(1);
+        assertThat(results.isPartialSuccess()).isTrue();
+    }
+
+    @Test
     @DisplayName("Should complete exceptionally after all retries exhausted")
     void shouldCompleteExceptionallyAfterAllRetriesExhausted() {
         // Arrange

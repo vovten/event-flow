@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,9 +21,15 @@ import java.util.concurrent.TimeUnit;
  * <b>Retry strategy:</b>
  * <ul>
  *   <li>Uses exponential backoff: delay = initialDelay * (multiplier ^ (attempt - 1))</li>
- *   <li>Only retries transient exceptions (network, timeout), not configuration errors</li>
+ *   <li>Retries transient exceptions (network, timeout), not configuration errors</li>
+ *   <li>Also retries when the delegate reports that <b>all</b> destinations failed
+ *       (e.g. a full local queue or a rejected transport), because no durable
+ *       delivery happened for any destination</li>
+ *   <li>Does not retry partial success: some destinations already received the
+ *       event, so a retry would duplicate delivery</li>
  *   <li>Logs each retry attempt with delay information</li>
- *   <li>After all retries exhausted, completes the future exceptionally</li>
+ *   <li>After all retries exhausted: exceptions complete the future exceptionally;
+ *       all-failure results complete it with the last failed {@link SendResults}</li>
  * </ul>
  * <p>
  * <b>Usage example:</b>
@@ -137,29 +144,57 @@ public class RetryEventPublisher implements EventPublisher {
 
     private void retryPublish(Event event, int attempt, CompletableFuture<SendResults> resultFuture) {
         String eventTypeName = event.type().getSimpleName();
-        origin.publish(event)
-                .thenAccept(resultFuture::complete)
-                .exceptionally(ex -> {
-                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null
-                            ? ex.getCause()
-                            : ex;
-                    if (!shouldRetry(cause)) {
-                        log.warn("Non-retryable error publishing event {}: {}", eventTypeName, cause.getMessage());
-                        resultFuture.completeExceptionally(ex);
-                        return null;
-                    }
-                    if (attempt <= maxRetries) {
-                        long delayMs = calculateDelay(attempt);
-                        log.warn("Failed to publish event {} (attempt {}/{}). Retrying in {}ms: {}",
-                                eventTypeName, attempt, maxRetries + 1, delayMs, cause.getMessage());
-                        scheduleRetry(event, attempt, delayMs, resultFuture);
-                    } else {
-                        log.error("Failed to publish event {} after {} attempts", eventTypeName, maxRetries + 1, cause);
-                        String msg = String.format("Failed to publish event %s after %d attempts", eventTypeName, maxRetries + 1);
-                        resultFuture.completeExceptionally(new EventPublisherException(msg, cause));
-                    }
-                    return null;
-                });
+        origin.publish(event).whenComplete((results, error) -> {
+            if (error != null) {
+                handleError(event, attempt, resultFuture, eventTypeName, error);
+                return;
+            }
+            if (results != null && results.isAllFailure()) {
+                // Transport-level rejection reported as a result (for example a full
+                // local queue): nothing was delivered, so retrying is safe.
+                String details = results.getFirstFailure()
+                        .map(SendResult::errorDetails)
+                        .orElse("all destinations failed");
+                if (scheduleRetryIfAllowed(event, attempt, resultFuture, eventTypeName, details)) {
+                    return;
+                }
+                log.error("Failed to publish event {} after {} attempts: {}",
+                        eventTypeName, maxRetries + 1, details);
+                resultFuture.complete(results);
+                return;
+            }
+            resultFuture.complete(results);
+        });
+    }
+
+    private void handleError(Event event, int attempt, CompletableFuture<SendResults> resultFuture,
+                             String eventTypeName, Throwable error) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null
+                ? error.getCause()
+                : error;
+        if (!shouldRetry(cause)) {
+            log.warn("Non-retryable error publishing event {}: {}", eventTypeName, cause.getMessage());
+            resultFuture.completeExceptionally(error);
+            return;
+        }
+        if (scheduleRetryIfAllowed(event, attempt, resultFuture, eventTypeName, cause.getMessage())) {
+            return;
+        }
+        log.error("Failed to publish event {} after {} attempts", eventTypeName, maxRetries + 1, cause);
+        String msg = String.format("Failed to publish event %s after %d attempts", eventTypeName, maxRetries + 1);
+        resultFuture.completeExceptionally(new EventPublisherException(msg, cause));
+    }
+
+    private boolean scheduleRetryIfAllowed(Event event, int attempt, CompletableFuture<SendResults> resultFuture,
+                                           String eventTypeName, String reason) {
+        if (attempt > maxRetries) {
+            return false;
+        }
+        long delayMs = calculateDelay(attempt);
+        log.warn("Failed to publish event {} (attempt {}/{}). Retrying in {}ms: {}",
+                eventTypeName, attempt, maxRetries + 1, delayMs, reason);
+        scheduleRetry(event, attempt, delayMs, resultFuture);
+        return true;
     }
 
     private void scheduleRetry(Event event, int attempt, long delayMs, CompletableFuture<SendResults> resultFuture) {
