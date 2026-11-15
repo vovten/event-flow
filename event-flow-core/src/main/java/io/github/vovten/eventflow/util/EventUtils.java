@@ -12,10 +12,18 @@ import io.github.vovten.eventflow.serialization.EventPolymorphicTypeValidator;
 import io.github.vovten.eventflow.serialization.EventSerializationException;
 
 /**
- * Utilities for working with events
+ * JSON helpers used by the lifecycle store (persisted event payloads).
+ * <p>
+ * The {@link ObjectMapper} here is intentionally separate from
+ * {@link io.github.vovten.eventflow.serialization.json.JsonEventSerializer} and
+ * {@link io.github.vovten.eventflow.serialization.msgpack.MsgPackEventSerializer}:
+ * the stored payload and the wire formats can evolve independently. Current
+ * deliberate differences: this mapper does <b>not</b> enable {@code NON_NULL}
+ * inclusion (all fields are persisted) and has no magic-byte envelope. When a
+ * new Jackson module/feature is added to one mapper, review the other two.
  *
  * @author Vladimir Aleshkov
- * @since 1.0.0
+ * @since 1.1.0
  */
 public final class EventUtils {
 

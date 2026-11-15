@@ -28,6 +28,11 @@ import java.util.Arrays;
  * Uses {@link EventPolymorphicTypeValidator} to prevent deserialization attacks
  * by validating class names against a whitelist of allowed packages/classes.
  *
+ * <p>
+ * Deliberate differences from the other mappers: MessagePack framing with a
+ * magic byte, {@code NON_NULL} inclusion and an ISO-string {@code Instant}
+ * serializer (instead of numeric timestamps).
+ *
  * @author Vladimir Aleshkov
  * @since 1.0.0
  */

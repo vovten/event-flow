@@ -25,6 +25,20 @@ import java.util.concurrent.CompletableFuture;
  * }</pre>
  * This ensures events flow through the decorator before reaching the origin dispatcher.
  *
+ * <p>
+ * <b>Limitations.</b> Deduplication is an in-memory, per-instance Caffeine cache:
+ * <ul>
+ *   <li>entries expire after the configured TTL (10 minutes by default), so a
+ *       redelivery after the TTL is processed again;</li>
+ *   <li>a JVM restart loses the cache — replayed messages are treated as new;</li>
+ *   <li>each consumer instance has its own cache, so a cluster can process the
+ *       same delivery on two instances after a rebalance.</li>
+ * </ul>
+ * These are accepted at-least-once semantics; listeners must be idempotent
+ * (for example deduplicate by {@code eventId}/{@code processId} on their side).
+ * The cache is invalidated when a dispatch is not fully successful, so a retry
+ * of a partially/fully failed event is re-executed.
+ *
  * @author Vladimir Aleshkov
  * @since 1.0.0
  */

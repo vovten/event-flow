@@ -32,6 +32,12 @@ import java.util.Arrays;
  * Uses {@link EventPolymorphicTypeValidator} to prevent deserialization attacks
  * by validating class names against a whitelist of allowed packages/classes.
  *
+ * <p>
+ * Deliberate differences from the other mappers: this serializer prefixes the
+ * payload with a magic byte and omits {@code null} fields ({@code NON_NULL});
+ * {@link io.github.vovten.eventflow.util.EventUtils} keeps all fields, and the
+ * MessagePack serializer uses an ISO-string {@code Instant} representation.
+ *
  * @author Vladimir Aleshkov
  * @since 1.0.0
  */

@@ -307,6 +307,17 @@ public final class Envelope<T> implements TraceableEvent {
         return LifecycleResolver.standard().resolve(this);
     }
 
+    /**
+     * Two envelopes are equal when their {@code eventId} is equal.
+     * <p>
+     * This is deliberate event-identity semantics used by idempotency and
+     * deduplication: the payload, metadata and channel routing are not part of
+     * the identity. Two envelopes with the same {@code eventId} but different
+     * payloads are therefore considered the same event.
+     *
+     * @param o the object to compare
+     * @return true when the event ids match
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
