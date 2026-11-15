@@ -700,7 +700,13 @@ public class EventFlowProperties {
         private boolean enabled = false;
         private Duration ttl = Duration.ofMinutes(10);
         private long maxSize = 10_000;
-        private boolean warnOnDuplicate = false;
+        /**
+         * Whether duplicate deliveries ignored by the idempotent dispatcher are
+         * logged at WARN. Enabled by default (same as the core builder) so that
+         * dispatch skips are visible during incident analysis; set to
+         * {@code false} for high-volume channels where duplicates are expected.
+         */
+        private boolean warnOnDuplicate = true;
 
         public boolean isEnabled() {
             return enabled;

@@ -45,6 +45,9 @@ class EventFlowPropertiesTest {
         assertThat(eventFlowProperties.getDispatcher().getThreadPool().getQueueCapacity()).isEqualTo(100);
         assertThat(eventFlowProperties.getDispatcher().getThreadPool().getKeepAliveSeconds()).isEqualTo(60);
         assertThat(eventFlowProperties.getDispatcher().getTransports()).isEmpty();
+        assertThat(eventFlowProperties.getDispatcher().getIdempotent().isWarnOnDuplicate())
+                .as("DEFECT-5.5: the Spring default must match the core builder default")
+                .isTrue();
     }
 
     @Test
