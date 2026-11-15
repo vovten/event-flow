@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -142,19 +142,18 @@ class AckHandlerTest {
     }
 
     @Test
-    @DisplayName("DEFECT-3.2: A missing event is logged at INFO without a stack trace, not as ERROR")
+    @DisplayName("DEFECT-3.2: An ack for an unknown event is logged at INFO without an ERROR")
     void shouldLogMissingEventAtInfo() {
         Logger logger = (Logger) LoggerFactory.getLogger(AckHandler.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
         try {
-            EventStore store = mock(EventStore.class);
-            when(store.transitionStatus(any(), anySet(), any(), any()))
-                    .thenThrow(new NoSuchElementException("Event not found: " + eventId));
-            AckHandler missingHandler = new AckHandler(store, "test-service");
+            EventStore emptyStore = new InMemoryEventStore();
+            AckHandler missingHandler = new AckHandler(emptyStore, "test-service");
+            UUID unknownEventId = UUID.randomUUID();
             SuccessAck ack = new SuccessAck(
-                    UUID.randomUUID(), eventId, "TestEvent", "test-service",
+                    UUID.randomUUID(), unknownEventId, "TestEvent", "test-service",
                     List.of(), null, Instant.now());
 
             assertThatCode(() -> missingHandler.onEvent(ack)).doesNotThrowAnyException();
@@ -162,7 +161,8 @@ class AckHandlerTest {
             assertThat(appender.list)
                     .as("A missing event is a normal race, not an incident")
                     .anyMatch(e -> e.getLevel() == Level.INFO
-                            && e.getFormattedMessage().contains("unknown event"))
+                            && e.getFormattedMessage().contains("Ignoring ack for unknown event")
+                            && e.getFormattedMessage().contains(unknownEventId.toString()))
                     .noneMatch(e -> e.getLevel() == Level.ERROR);
         } finally {
             logger.detachAppender(appender);
@@ -178,6 +178,9 @@ class AckHandlerTest {
         logger.addAppender(appender);
         try {
             EventStore store = mock(EventStore.class);
+            when(store.findById(eventId)).thenReturn(Optional.of(
+                    StoredEvent.newEvent(eventId, "test.TestEvent", null,
+                            "{\"data\":\"test\"}", null)));
             when(store.transitionStatus(any(), anySet(), any(), any()))
                     .thenThrow(new RuntimeException("db down"));
             AckHandler failingHandler = new AckHandler(store, "test-service");

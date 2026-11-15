@@ -254,6 +254,10 @@ public final class AckHandler implements EventSubscriber {
         if (shouldSkipForForeignService(originalService)) {
             return;
         }
+        if (eventStore.findById(originalEventId).isEmpty()) {
+            log.info("Ignoring ack for unknown event: {}", originalEventId);
+            return;
+        }
         boolean applied = eventStore.transitionStatus(originalEventId, allowedSources, target, error);
         if (applied) {
             log.debug("Event {} status updated to {} ({})", originalEventId, target, eventType);
