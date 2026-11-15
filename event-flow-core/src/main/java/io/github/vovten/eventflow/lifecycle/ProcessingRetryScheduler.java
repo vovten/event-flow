@@ -182,8 +182,19 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
     }
 
     private void publish(RetryTask task, StoredEvent stored, int attempt, Instant now) {
+        Event event;
         try {
-            Event event = RetryEventFactory.forRetry(stored, RetryKind.PROCESSING, attempt);
+            event = RetryEventFactory.forRetry(stored, RetryKind.PROCESSING, attempt);
+        } catch (RuntimeException e) {
+            // An unreadable payload can never be delivered. Counting attempts
+            // would only burn the retry budget and leave the row in the loop.
+            log.error("Failed to deserialize retry payload for event {}; dead-lettering",
+                    task.eventId(), e);
+            support.deadLetter(task, RetryReason.PAYLOAD_UNREADABLE,
+                    "retry payload cannot be deserialized: " + e.getMessage());
+            return;
+        }
+        try {
             SendResults results = publisher.publish(event).join();
             if (results == null || results.isAllFailure()) {
                 String error = results == null ? "null publish result" : results.getSummary();

@@ -240,6 +240,25 @@ class ProcessingRetrySchedulerTest {
         }
 
         @Test
+        @DisplayName("should dead-letter an invalid payload without burning the budget")
+        void deadLettersInvalidPayload() {
+            UUID invalidId = UUID.randomUUID();
+            eventStore.save(new StoredEvent(
+                    invalidId, TestEvent.class.getName(), SERVICE, "{invalid-json", null, null,
+                    EventStatus.FAILED, 0, false,
+                    Instant.now().minusSeconds(20), Instant.now().minusSeconds(20), "stored error"));
+            scheduleProcessing(invalidId, 1);
+
+            scheduler(3).retryCycle();
+
+            assertThat(origin.published).isEmpty();
+            assertThat(status(invalidId)).isEqualTo(EventStatus.DEAD);
+            RetryTask row = retryStore.find(invalidId, RetryKind.PROCESSING).orElseThrow();
+            assertThat(row.state()).isEqualTo(RetryState.DEAD);
+            assertThat(row.reason()).isEqualTo(RetryReason.PAYLOAD_UNREADABLE);
+        }
+
+        @Test
         @DisplayName("should only process rows owned by its own service")
         void onlyProcessesOwnServiceRows() {
             UUID eventId = storeEvent(EventStatus.FAILED);

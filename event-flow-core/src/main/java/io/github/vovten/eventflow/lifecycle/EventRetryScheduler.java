@@ -49,10 +49,18 @@ import java.util.concurrent.TimeUnit;
  * the second waits {@code 2 × minAge}, the third {@code 4 × minAge}, and so on.
  * <p>
  * Implements {@link AutoCloseable} for resource management.
+ * <p>
+ * This class is not connected to the runtime auto-configuration. Durable retries
+ * are handled by {@link DeliveryRetryScheduler} and
+ * {@link ProcessingRetryScheduler}; the unreadable-payload semantics introduced
+ * here live in those active schedulers.
  *
  * @author Vladimir Aleshkov
  * @since 1.2.0
+ * @deprecated use {@link DeliveryRetryScheduler} or {@link ProcessingRetryScheduler};
+ *             this class is kept for source compatibility only
  */
+@Deprecated
 public final class EventRetryScheduler implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(EventRetryScheduler.class);

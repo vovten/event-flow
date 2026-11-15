@@ -39,6 +39,11 @@ public enum RetryReason {
     NO_HANDLER,
 
     /**
+     * The stored payload cannot be deserialized, so no retry can succeed.
+     */
+    PAYLOAD_UNREADABLE,
+
+    /**
      * The configured retry budget was exhausted.
      */
     CAP_EXCEEDED

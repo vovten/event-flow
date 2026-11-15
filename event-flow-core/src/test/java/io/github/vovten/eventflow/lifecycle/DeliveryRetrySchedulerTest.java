@@ -295,8 +295,8 @@ class DeliveryRetrySchedulerTest {
         }
 
         @Test
-        @DisplayName("should keep processing other events when one payload is invalid")
-        void survivesInvalidPayload() {
+        @DisplayName("should dead-letter an invalid payload without burning the budget")
+        void deadLettersInvalidPayload() {
             UUID invalidId = UUID.randomUUID();
             eventStore.save(new StoredEvent(
                     invalidId, TestEvent.class.getName(), SERVICE, "{invalid-json", null, null,
@@ -309,8 +309,10 @@ class DeliveryRetrySchedulerTest {
             scheduler(3).retryCycle();
 
             assertThat(origin.published).hasSize(1);
-            assertThat(retryStore.find(invalidId, RetryKind.DELIVERY).orElseThrow().state())
-                    .isEqualTo(RetryState.PENDING);
+            assertThat(status(invalidId)).isEqualTo(EventStatus.DEAD);
+            RetryTask invalidRow = retryStore.find(invalidId, RetryKind.DELIVERY).orElseThrow();
+            assertThat(invalidRow.state()).isEqualTo(RetryState.DEAD);
+            assertThat(invalidRow.reason()).isEqualTo(RetryReason.PAYLOAD_UNREADABLE);
             assertThat(retryStore.find(validId, RetryKind.DELIVERY).orElseThrow().state())
                     .isEqualTo(RetryState.IN_PROGRESS);
         }
