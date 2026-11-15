@@ -283,4 +283,29 @@ class ChannelConfigurationTest {
             assertThat(channels).isEmpty();
         }
     }
+
+    @Test
+    @DisplayName("DEFECT-7.3: Rejects a publisher-channel local-queue capacity that differs from the dispatcher")
+    void shouldRejectPublisherCapacityMismatch() {
+        EventFlowProperties properties = new EventFlowProperties();
+        properties.getPublisher().getChannels().clear();
+        EventFlowProperties.ChannelConfig channel = new EventFlowProperties.ChannelConfig();
+        channel.setName("internal");
+        EventFlowProperties.TransportConfig transport = new EventFlowProperties.TransportConfig();
+        transport.setName("local-queue");
+        transport.setCapacity(5000);
+        channel.getTransports().add(transport);
+        properties.getPublisher().getChannels().add(channel);
+
+        DefaultLocalQueueProvider queueProvider = new DefaultLocalQueueProvider(1000);
+        LocalQueueOutTransportFactory factory = new LocalQueueOutTransportFactory(queueProvider);
+        ChannelConfiguration configuration = new ChannelConfiguration(properties, List.of(factory));
+
+        assertThatThrownBy(configuration::eventChannels)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("capacity=5000")
+                .hasMessageContaining("dispatcher");
+    }
+
 }
+

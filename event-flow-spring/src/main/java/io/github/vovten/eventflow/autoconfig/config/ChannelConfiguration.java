@@ -86,7 +86,6 @@ public class ChannelConfiguration {
                           - name: internal
                             transports:
                               - name: local-queue
-                                capacity: 1000
                     Available transport types: {}
                     """, publisherTransportFactories.keySet());
         }
@@ -136,8 +135,36 @@ public class ChannelConfiguration {
             String msg = "No factory found for transport name '%s'. Available factories: %s";
             throw new IllegalStateException(String.format(msg, name, publisherTransportFactories.keySet()));
         }
+        validateLocalQueueCapacity(transportConfig);
         factory.validate(transportConfig);
         return factory.createPublisher(transportConfig);
+    }
+
+    /**
+     * Local-queue capacity belongs to the shared queue provider, which is sized
+     * from the dispatcher transport configuration. A different capacity on a
+     * publisher channel transport would be silently ignored, so it is rejected.
+     *
+     * @param transportConfig the publisher transport configuration
+     * @throws IllegalStateException when the publisher capacity differs from the
+     *                               dispatcher-provided queue capacity
+     */
+    private void validateLocalQueueCapacity(EventFlowProperties.TransportConfig transportConfig) {
+        if (!"local-queue".equalsIgnoreCase(transportConfig.getName())) {
+            return;
+        }
+        int dispatcherCapacity = properties.getDispatcher().getTransports().stream()
+                .filter(config -> "local-queue".equalsIgnoreCase(config.getName()))
+                .findFirst()
+                .map(EventFlowProperties.TransportConfig::getCapacity)
+                .orElse(1000);
+        if (transportConfig.getCapacity() != dispatcherCapacity) {
+            throw new IllegalStateException(String.format(
+                    "Publisher channel transport 'local-queue' capacity=%d is not supported: the shared "
+                            + "queue capacity is configured by the dispatcher transport (%d). "
+                            + "Move the capacity setting to event-flow.dispatcher.transports.",
+                    transportConfig.getCapacity(), dispatcherCapacity));
+        }
     }
 
     /**

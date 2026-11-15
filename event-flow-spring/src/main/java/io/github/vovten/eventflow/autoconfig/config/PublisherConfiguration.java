@@ -76,7 +76,6 @@ public class PublisherConfiguration {
                           - name: internal
                             transports:
                               - name: local-queue
-                                capacity: 1000
                     Available transport types: {}
                     """, publisherTransportFactories.keySet());
             return null;
