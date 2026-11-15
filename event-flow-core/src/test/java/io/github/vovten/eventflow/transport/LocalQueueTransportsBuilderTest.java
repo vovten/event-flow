@@ -109,7 +109,10 @@ class LocalQueueTransportsBuilderTest {
         AtomicInteger receivedValue = new AtomicInteger(0);
 
         // Act
-        transports.dispatcher().start(e -> receivedValue.set(((TestEvent) e).getValue()));
+        transports.dispatcher().start(e -> {
+            receivedValue.set(((TestEvent) e).getValue());
+            return CompletableFuture.completedFuture(null);
+        });
 
         TestEvent event = new TestEvent(42);
         transports.publisher().send(event);
@@ -131,7 +134,10 @@ class LocalQueueTransportsBuilderTest {
         java.util.List<Integer> deliveredValues = new java.util.concurrent.CopyOnWriteArrayList<>();
 
         // Act
-        transports.dispatcher().start(e -> deliveredValues.add(((TestEvent) e).getValue()));
+        transports.dispatcher().start(e -> {
+            deliveredValues.add(((TestEvent) e).getValue());
+            return CompletableFuture.completedFuture(null);
+        });
 
         transports.publisher().send(new TestEvent(1));
         transports.publisher().send(new TestEvent(2));
@@ -179,8 +185,14 @@ class LocalQueueTransportsBuilderTest {
         AtomicInteger receivedValue1 = new AtomicInteger(0);
         AtomicInteger receivedValue2 = new AtomicInteger(0);
 
-        transports1.dispatcher().start(e -> receivedValue1.set(((TestEvent) e).getValue()));
-        transports2.dispatcher().start(e -> receivedValue2.set(((TestEvent) e).getValue()));
+        transports1.dispatcher().start(e -> {
+            receivedValue1.set(((TestEvent) e).getValue());
+            return CompletableFuture.completedFuture(null);
+        });
+        transports2.dispatcher().start(e -> {
+            receivedValue2.set(((TestEvent) e).getValue());
+            return CompletableFuture.completedFuture(null);
+        });
 
         // Act - send event to first transport pair
         transports1.publisher().send(new TestEvent(100));

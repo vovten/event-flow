@@ -7,6 +7,7 @@ import io.github.vovten.eventflow.retry.FailureKind;
 import io.github.vovten.eventflow.retry.ResolvedRetryPolicy;
 import io.github.vovten.eventflow.retry.RetryDelayScheduler;
 import io.github.vovten.eventflow.retry.RetryMetadata;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.transport.InTransport;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
@@ -20,7 +21,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 import static java.util.stream.Collectors.joining;
 
@@ -183,7 +183,7 @@ public class UnifiedEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void start(Consumer<Event> dispatchConsumer) {
+    public void start(AsyncEventConsumer dispatchConsumer) {
         if (started.compareAndSet(false, true)) {
             for (InTransport transport : transports) {
                 transport.start(dispatchConsumer);

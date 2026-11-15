@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 import io.github.vovten.eventflow.registry.EventSubscriberRegistry;
 import io.github.vovten.eventflow.transport.InTransport;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -185,7 +186,7 @@ class UnifiedEventDispatcherConcurrencyLimitTest {
         }
 
         @Override
-        public void start(java.util.function.Consumer<Event> eventConsumer) {
+        public void start(AsyncEventConsumer eventConsumer) {
             for (Event event : events) {
                 eventConsumer.accept(event);
             }

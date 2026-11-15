@@ -1,16 +1,17 @@
 package io.github.vovten.eventflow.transport.incoming;
 
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.transport.InTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 /**
  * Local-queue dispatcher transport for receiving internal events.
@@ -74,7 +75,7 @@ public class LocalQueueInTransport implements InTransport {
     }
 
     @Override
-    public void start(Consumer<Event> eventConsumer) {
+    public void start(AsyncEventConsumer eventConsumer) {
         if (running.compareAndSet(false, true)) {
             executorService.execute(() -> consumeLoop(eventConsumer));
             log.debug("LocalQueueDispatcherTransport started");
@@ -93,7 +94,7 @@ public class LocalQueueInTransport implements InTransport {
         }
     }
 
-    private void consumeLoop(Consumer<Event> eventConsumer) {
+    private void consumeLoop(AsyncEventConsumer eventConsumer) {
         try {
             while (running.get() && !Thread.currentThread().isInterrupted()) {
                 try {
@@ -116,10 +117,17 @@ public class LocalQueueInTransport implements InTransport {
         }
     }
 
-    private void tryDeliver(Event event, Consumer<Event> eventConsumer) {
+    private void tryDeliver(Event event, AsyncEventConsumer eventConsumer) {
         try {
             MDC.put("deliveredFrom", name());
-            eventConsumer.accept(event);
+            CompletableFuture<?> processing = eventConsumer.accept(event);
+            if (processing != null) {
+                processing.whenComplete((result, error) -> {
+                    if (error != null) {
+                        log.error("Event processing failed after local-queue delivery: {}", event, error);
+                    }
+                });
+            }
             log.debug("Event delivered from local-queue: {}", event.type().getSimpleName());
         } catch (Exception e) {
             log.error("Error delivering event from local-queue: {}", event, e);

@@ -1,9 +1,5 @@
 package io.github.vovten.eventflow.transport;
 
-import io.github.vovten.eventflow.event.Event;
-
-import java.util.function.Consumer;
-
 /**
  * Incoming transport — a mechanism for receiving events from external sources.
  * <p>
@@ -20,7 +16,7 @@ import java.util.function.Consumer;
  * <b>Usage example:</b>
  * <pre>{@code
  * InTransport transport = new KafkaInTransport(bootstrapServers, "events", "group-1");
- * transport.start(event -> dispatcher.dispatch(event));
+ * transport.start(dispatcher::dispatch);
  * }</pre>
  *
  * @author Vladimir Aleshkov
@@ -38,11 +34,13 @@ public interface InTransport {
      * <p>
      * This method should be called to activate the transport. It will start
      * listening for events from the source and deliver them to the provided
-     * consumer as they arrive.
+     * consumer as they arrive. The transport may rely on the returned future
+     * to acknowledge the source only after processing has completed
+     * (at-least-once delivery).
      *
      * @param eventConsumer the consumer to deliver events to
      */
-    void start(Consumer<Event> eventConsumer);
+    void start(AsyncEventConsumer eventConsumer);
 
     /**
      * Stop receiving events.

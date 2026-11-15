@@ -1,6 +1,7 @@
 package io.github.vovten.eventflow.dispatcher;
 
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.util.EventLogUtils;
 import io.github.vovten.eventflow.util.JsonBuilder;
 import org.slf4j.Logger;
@@ -15,7 +16,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 /**
  * Decorator for {@link EventDispatcher} that adds structured logging when events are dispatched.
@@ -254,7 +254,7 @@ public final class LoggingEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void start(Consumer<Event> dispatchConsumer) {
+    public void start(AsyncEventConsumer dispatchConsumer) {
         origin.start(dispatchConsumer);
     }
 

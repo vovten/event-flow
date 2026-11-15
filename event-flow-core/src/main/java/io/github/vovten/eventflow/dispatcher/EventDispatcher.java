@@ -1,9 +1,9 @@
 package io.github.vovten.eventflow.dispatcher;
 
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 /**
  * <p>Event dispatcher.
@@ -58,10 +58,12 @@ public interface EventDispatcher {
      * This method activates all transports and begins delivering events to
      * registered handlers. The provided {@code dispatchConsumer} is used to
      * dispatch events from transports, enabling decorator pattern support.
+     * Transports may await the returned future to acknowledge the source
+     * only after processing completes.
      *
      * @param dispatchConsumer the consumer to dispatch events to
      */
-    void start(Consumer<Event> dispatchConsumer);
+    void start(AsyncEventConsumer dispatchConsumer);
 
     /**
      * Stop the dispatcher and all configured transports.

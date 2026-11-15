@@ -7,6 +7,7 @@ import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.retry.RetryKind;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.retry.RetryMetadata;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -17,7 +18,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 /**
  * A decorator for {@link EventDispatcher} that publishes acknowledgment events
@@ -323,7 +323,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void start(Consumer<Event> dispatchConsumer) {
+    public void start(AsyncEventConsumer dispatchConsumer) {
         origin.start(dispatchConsumer);
     }
 

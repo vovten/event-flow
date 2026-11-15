@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.channel.EventChannel;
 import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.event.Envelope;
@@ -26,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -485,7 +485,7 @@ class LoggingEventDispatcherTest {
         }
 
         @Override
-        public void start(Consumer<Event> dispatchConsumer) {
+        public void start(AsyncEventConsumer dispatchConsumer) {
         }
 
         @Override

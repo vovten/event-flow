@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -51,6 +52,7 @@ class LocalQueueInTransportTest {
         transport.start(e -> {
             receivedValue.set(((TestEvent) e).getValue());
             deliveredCount.incrementAndGet();
+            return CompletableFuture.completedFuture(null);
         });
 
         queue.offer(event);
@@ -67,8 +69,8 @@ class LocalQueueInTransportTest {
         BlockingDeque<Event> queue = new LinkedBlockingDeque<>(10);
         LocalQueueInTransport transport = new LocalQueueInTransport(queue, testExecutor);
 
-        transport.start(e -> {});
-        assertDoesNotThrow(() -> transport.start(e -> {}));
+        transport.start(e -> CompletableFuture.completedFuture(null));
+        assertDoesNotThrow(() -> transport.start(e -> CompletableFuture.completedFuture(null)));
 
         transport.stop();
     }
@@ -80,12 +82,18 @@ class LocalQueueInTransportTest {
         LocalQueueInTransport transport = new LocalQueueInTransport(queue, testExecutor);
         AtomicInteger deliveredCount = new AtomicInteger(0);
 
-        transport.start(e -> deliveredCount.incrementAndGet());
+        transport.start(e -> {
+            deliveredCount.incrementAndGet();
+            return CompletableFuture.completedFuture(null);
+        });
 
         queue.offer(new TestEvent(1));
         await().atMost(Duration.ofSeconds(2)).until(() -> deliveredCount.get() >= 1);
 
         transport.stop();
+        // stop() requests termination asynchronously; wait for the loop to end
+        // before offering another event, otherwise the test races the interrupt.
+        await().atMost(Duration.ofSeconds(2)).until(testExecutor::isTerminated);
 
         queue.offer(new TestEvent(2));
         await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1))
@@ -123,7 +131,10 @@ class LocalQueueInTransportTest {
         LocalQueueInTransport transport = new LocalQueueInTransport(queue, testExecutor);
         java.util.List<Integer> deliveredValues = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-        transport.start(e -> deliveredValues.add(((TestEvent) e).getValue()));
+        transport.start(e -> {
+            deliveredValues.add(((TestEvent) e).getValue());
+            return CompletableFuture.completedFuture(null);
+        });
 
         queue.offer(new TestEvent(1));
         queue.offer(new TestEvent(2));

@@ -5,6 +5,7 @@ import io.github.vovten.eventflow.event.Envelope;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.registry.EventListenerRegistry;
 import io.github.vovten.eventflow.transport.InTransport;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class UnifiedEventDispatcherDefectTest {
         registry = new EventListenerRegistry();
         transport = new InTransport() {
             @Override
-            public void start(java.util.function.Consumer<Event> eventConsumer) {
+            public void start(AsyncEventConsumer eventConsumer) {
             }
 
             @Override

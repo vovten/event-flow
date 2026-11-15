@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.dispatcher.EventDispatcher;
 import io.github.vovten.eventflow.dispatcher.HandlerResults;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.publisher.EventPublisher;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.transport.SendResults;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Conditional;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -138,7 +138,7 @@ class NoEventBeansConditionTest {
         }
 
         @Override
-        public void start(Consumer<Event> dispatchConsumer) {
+        public void start(AsyncEventConsumer dispatchConsumer) {
         }
 
         @Override

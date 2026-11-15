@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.dispatcher;
 
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
@@ -20,7 +21,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -253,7 +253,7 @@ class IdempotentEventDispatcherDefectTest {
         }
 
         @Override
-        public void start(Consumer<Event> dispatchConsumer) {
+        public void start(AsyncEventConsumer dispatchConsumer) {
         }
 
         @Override

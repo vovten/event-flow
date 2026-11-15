@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.EventHandler;
 import io.github.vovten.eventflow.EventSubscriber;
 import io.github.vovten.eventflow.registry.EventHandlerRegistry;
 import io.github.vovten.eventflow.transport.InTransport;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -188,7 +189,7 @@ class UnifiedEventDispatcherTest {
         }
 
         @Override
-        public void start(java.util.function.Consumer<Event> dispatchConsumer) {
+        public void start(AsyncEventConsumer dispatchConsumer) {
             started = true;
         }
 
@@ -211,7 +212,7 @@ class UnifiedEventDispatcherTest {
         }
 
         @Override
-        public void start(java.util.function.Consumer<Event> dispatchConsumer) {
+        public void start(AsyncEventConsumer dispatchConsumer) {
         }
 
         @Override

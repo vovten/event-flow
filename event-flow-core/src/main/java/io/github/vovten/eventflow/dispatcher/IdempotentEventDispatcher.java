@@ -4,13 +4,13 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.vovten.eventflow.event.Event;
 import io.github.vovten.eventflow.event.TraceableEvent;
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 /**
  * Event dispatcher decorator that ensures idempotent event processing using a Caffeine cache.
@@ -49,7 +49,7 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void start(Consumer<Event> dispatchConsumer) {
+    public void start(AsyncEventConsumer dispatchConsumer) {
         origin.start(dispatchConsumer);
     }
 

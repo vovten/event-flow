@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.dispatcher.EventDispatcher;
 import io.github.vovten.eventflow.dispatcher.HandlerResult;
 import io.github.vovten.eventflow.dispatcher.HandlerResults;
@@ -20,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -310,7 +310,7 @@ class EventLifecycleDispatcherTest {
 
         dispatcher.register(new Object());
         dispatcher.isRegistered(new Object());
-        dispatcher.start(e -> {});
+        dispatcher.start(e -> CompletableFuture.completedFuture(null));
         dispatcher.stop();
 
         assertThat(origin.registerCalled).isTrue();
@@ -354,7 +354,7 @@ class EventLifecycleDispatcherTest {
         }
 
         @Override
-        public void start(Consumer<Event> dispatchConsumer) {
+        public void start(AsyncEventConsumer dispatchConsumer) {
             startCalled = true;
         }
 
@@ -397,7 +397,7 @@ class EventLifecycleDispatcherTest {
         }
 
         @Override
-        public void start(Consumer<Event> dispatchConsumer) {
+        public void start(AsyncEventConsumer dispatchConsumer) {
         }
 
         @Override
