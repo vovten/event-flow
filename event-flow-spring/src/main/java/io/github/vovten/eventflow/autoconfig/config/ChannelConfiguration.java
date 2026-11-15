@@ -152,9 +152,10 @@ public class ChannelConfiguration {
                         OutTransportFactory::getName,
                         Function.identity(),
                         (existing, replacement) -> {
-                            log.warn("Duplicate publisher transport factory for type '{}', using: {}",
-                                    existing.getName(), existing.getClass().getSimpleName());
-                            return existing;
+                            throw new IllegalStateException(
+                                    "Duplicate publisher transport factory for type '" + existing.getName()
+                                            + "': " + existing.getClass().getName()
+                                            + " and " + replacement.getClass().getName());
                         }
                 ));
     }

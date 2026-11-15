@@ -174,9 +174,10 @@ public class DispatcherConfiguration {
                         InTransportFactory::getType,
                         Function.identity(),
                         (existing, replacement) -> {
-                            log.warn("Duplicate dispatcher transport factory for type '{}', using: {}",
-                                    existing.getType(), existing.getClass().getSimpleName());
-                            return existing;
+                            throw new IllegalStateException(
+                                    "Duplicate dispatcher transport factory for type '" + existing.getType()
+                                            + "': " + existing.getClass().getName()
+                                            + " and " + replacement.getClass().getName());
                         }
                 ));
     }
