@@ -148,6 +148,21 @@ public final class StoredEventMapper {
     }
 
     /**
+     * Sets the parameters of the retry-failure UPDATE.
+     *
+     * @param ps           the PreparedStatement
+     * @param eventId      the event identifier
+     * @param errorDetails optional error details
+     * @throws SQLException if a database access error occurs
+     */
+    public void setRetryFailureParameters(PreparedStatement ps, UUID eventId,
+                                          String errorDetails) throws SQLException {
+        setOptionalString(ps, 1, errorDetails);
+        ps.setTimestamp(2, Timestamp.from(Instant.now()), UTC);
+        setUuid(ps, 3, eventId);
+    }
+
+    /**
      * Sets the status code characters on a PreparedStatement for an IN clause.
      *
      * @param ps       the PreparedStatement

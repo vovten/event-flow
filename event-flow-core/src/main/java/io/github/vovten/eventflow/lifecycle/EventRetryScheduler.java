@@ -209,13 +209,44 @@ public final class EventRetryScheduler implements AutoCloseable {
     }
 
     private void retryEvent(StoredEvent stored) {
+        Event event;
         try {
-            Event event = EventUtils.fromJson(stored.payload(), Event.class);
+            event = EventUtils.fromJson(stored.payload(), Event.class);
             event = restoreChannels(event, stored.channels());
+        } catch (Exception e) {
+            // The payload can never be deserialized: counting the attempt would
+            // only keep an undecodable event in the retry loop. Move it to the
+            // terminal DEAD state (manual markForRetry can resurrect it).
+            log.error("Failed to deserialize retry payload for event id={}; moving it to DEAD",
+                    stored.eventId(), e);
+            markAsDead(stored, e);
+            return;
+        }
+        try {
             publisher.publish(event);
             log.info("Retried event id={} (attempt {}/{})", stored.eventId(), stored.retryCount() + 1, maxRetries);
         } catch (Exception e) {
-            log.error("Failed to retry event id={}: {}", stored.eventId(), e.getMessage());
+            // Count the attempt so the exponential backoff grows and the retry
+            // budget is eventually exhausted instead of looping forever.
+            log.error("Failed to retry event id={}; the attempt is counted", stored.eventId(), e);
+            recordRetryFailure(stored, e);
+        }
+    }
+
+    private void markAsDead(StoredEvent stored, Exception failure) {
+        try {
+            eventStore.updateStatus(stored.eventId(), EventStatus.DEAD,
+                    "Retry payload cannot be deserialized: " + failure.getMessage());
+        } catch (Exception e) {
+            log.warn("Failed to move event id={} to DEAD", stored.eventId(), e);
+        }
+    }
+
+    private void recordRetryFailure(StoredEvent stored, Exception failure) {
+        try {
+            eventStore.recordRetryFailure(stored.eventId(), failure.getMessage());
+        } catch (Exception e) {
+            log.warn("Failed to record the retry failure for event id={}", stored.eventId(), e);
         }
     }
 

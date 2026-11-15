@@ -56,6 +56,18 @@ public class InMemoryEventStore implements EventStore {
     }
 
     @Override
+    public void recordRetryFailure(UUID eventId, String errorDetails) {
+        StoredEvent existing = store.computeIfPresent(eventId, (id, event) -> new StoredEvent(
+                event.eventId(), event.eventType(), event.service(), event.payload(),
+                event.channels(), event.processId(), event.status(),
+                event.retry() ? event.retryCount() : event.retryCount() + 1,
+                false, event.createdAt(), Instant.now(), errorDetails));
+        if (existing == null) {
+            throw new NoSuchElementException("Event not found: " + eventId);
+        }
+    }
+
+    @Override
     public boolean transitionStatus(UUID eventId, Set<EventStatus> allowedSources,
                                     EventStatus target, String errorDetails) {
         Objects.requireNonNull(eventId, "eventId must not be null");

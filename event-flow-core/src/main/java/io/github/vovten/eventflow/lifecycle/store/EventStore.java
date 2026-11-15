@@ -87,6 +87,28 @@ public interface EventStore {
     }
 
     /**
+     * Records a failed retry attempt without changing the lifecycle status.
+     * <p>
+     * The retry counter is incremented so the exponential backoff grows and the
+     * configured {@code maxRetries} budget is eventually exhausted. A manual
+     * retry ({@code retry = TRUE}) does not consume the budget, but its flag is
+     * cleared so a permanently failing event is not retried in an endless loop.
+     * <p>
+     * Built-in stores implement this precisely. The default implementation
+     * delegates to {@link #updateStatus(UUID, EventStatus, String)} with
+     * {@link EventStatus#NEW} for backward compatibility with custom stores;
+     * such stores therefore reset the status instead of preserving it.
+     *
+     * @param eventId      the event whose retry failed
+     * @param errorDetails optional error details (null if none)
+     * @throws java.util.NoSuchElementException if the event is not found
+     * @since 1.4.0
+     */
+    default void recordRetryFailure(UUID eventId, String errorDetails) {
+        updateStatus(eventId, EventStatus.NEW, errorDetails);
+    }
+
+    /**
      * Finds all events with the given status that were last updated before
      * the given timestamp.
      * <p>

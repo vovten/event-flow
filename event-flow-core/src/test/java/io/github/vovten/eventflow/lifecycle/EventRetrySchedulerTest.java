@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,6 +68,18 @@ class EventRetrySchedulerTest {
                 Duration.ofMinutes(1),
                 minAge, maxRetries, batchSize, service
         );
+    }
+
+    private EventRetryScheduler scheduler(EventPublisher publisher, int maxRetries) {
+        return new EventRetryScheduler(
+                eventStore, publisher, Duration.ofMinutes(1),
+                Duration.ZERO, maxRetries, 1000, SERVICE);
+    }
+
+    private static EventPublisher failingPublisher() {
+        return event -> {
+            throw new IllegalStateException("boom");
+        };
     }
 
     /**
@@ -215,7 +228,7 @@ class EventRetrySchedulerTest {
         }
 
         @Test
-        @DisplayName("handles invalid JSON payload without crashing the cycle")
+        @DisplayName("DEFECT-1.2: moves an undecodable payload to DEAD and never retries it again")
         void invalidJsonPayload() {
             UUID eventId = UUID.randomUUID();
             StoredEvent invalid = new StoredEvent(
@@ -225,8 +238,63 @@ class EventRetrySchedulerTest {
             );
             eventStore.save(invalid);
 
-            // Should not throw
             scheduler(3).retryCycle();
+
+            StoredEvent after = eventStore.findById(eventId).orElseThrow();
+            assertThat(after.status()).isEqualTo(EventStatus.DEAD);
+            assertThat(after.errorDetails()).contains("cannot be deserialized");
+
+            // A terminal event must not be selected by the next cycle.
+            scheduler(3).retryCycle();
+            assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.DEAD);
+        }
+
+        @Test
+        @DisplayName("DEFECT-1.2: counts a failed retry attempt and preserves the status")
+        void countsFailedRetryAttempt() {
+            UUID eventId = createFailedEvent(0);
+            StoredEvent before = eventStore.findById(eventId).orElseThrow();
+
+            scheduler(failingPublisher(), 3).retryCycle();
+
+            StoredEvent after = eventStore.findById(eventId).orElseThrow();
+            assertThat(after.retryCount()).isEqualTo(1);
+            assertThat(after.status()).isEqualTo(EventStatus.FAILED);
+            assertThat(after.updatedAt()).isAfter(before.updatedAt());
+            assertThat(after.errorDetails()).contains("boom");
+        }
+
+        @Test
+        @DisplayName("DEFECT-1.2: clears the manual retry flag on failure without consuming the budget")
+        void manualRetryFailureClearsFlag() {
+            UUID eventId = createRetryFlaggedEvent(EventStatus.HANDLED, 0, Instant.now().minusSeconds(10));
+
+            scheduler(failingPublisher(), 3).retryCycle();
+
+            StoredEvent after = eventStore.findById(eventId).orElseThrow();
+            assertThat(after.retry()).isFalse();
+            assertThat(after.retryCount()).isZero();
+            assertThat(after.status()).isEqualTo(EventStatus.HANDLED);
+            assertThat(after.errorDetails()).contains("boom");
+        }
+
+        @Test
+        @DisplayName("DEFECT-1.2: stops retrying after the retry budget is exhausted")
+        void stopsAfterBudgetExhausted() {
+            UUID eventId = createFailedEvent(2);
+            AtomicInteger attempts = new AtomicInteger();
+            EventPublisher failing = event -> {
+                attempts.incrementAndGet();
+                throw new IllegalStateException("boom");
+            };
+            EventRetryScheduler scheduler = new EventRetryScheduler(eventStore, failing,
+                    Duration.ofMinutes(1), Duration.ZERO, 3, 1000, SERVICE);
+
+            scheduler.retryCycle();
+            scheduler.retryCycle();
+
+            assertThat(attempts).hasValue(1);
+            assertThat(eventStore.findById(eventId).orElseThrow().retryCount()).isEqualTo(3);
         }
 
         @Test

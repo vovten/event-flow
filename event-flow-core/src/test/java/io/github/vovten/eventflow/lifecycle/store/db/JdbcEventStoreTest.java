@@ -192,6 +192,52 @@ class JdbcEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should record a retry failure preserving the status and incrementing the count")
+    void shouldRecordRetryFailure() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.FAILED, "initial");
+        Instant before = store.findById(eventId).orElseThrow().updatedAt();
+
+        store.recordRetryFailure(eventId, "retry boom");
+
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.FAILED);
+        assertThat(updated.retryCount()).isEqualTo(1);
+        assertThat(updated.retry()).isFalse();
+        assertThat(updated.errorDetails()).isEqualTo("retry boom");
+        assertThat(updated.updatedAt()).isAfter(before);
+    }
+
+    @Test
+    @DisplayName("Should record a manual retry failure without consuming the budget and clear the flag")
+    void shouldRecordManualRetryFailure() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        UUID eventId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(eventId, "test.T", null, "{}", null));
+        store.updateStatus(eventId, EventStatus.FAILED, "initial");
+        store.markForRetry(eventId);
+
+        store.recordRetryFailure(eventId, "retry boom");
+
+        StoredEvent updated = store.findById(eventId).orElseThrow();
+        assertThat(updated.status()).isEqualTo(EventStatus.FAILED);
+        assertThat(updated.retryCount()).isZero();
+        assertThat(updated.retry()).isFalse();
+        assertThat(updated.errorDetails()).isEqualTo("retry boom");
+    }
+
+    @Test
+    @DisplayName("Should throw when recording a retry failure for a non-existent event")
+    void shouldThrowWhenRecordingRetryFailureForMissingEvent() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+
+        assertThatThrownBy(() -> store.recordRetryFailure(UUID.randomUUID(), "boom"))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
     @DisplayName("Should throw when updating non-existent event")
     void shouldThrowWhenUpdatingNonExistent() {
         JdbcEventStore store = new JdbcEventStore(dataSource);

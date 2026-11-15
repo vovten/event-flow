@@ -224,6 +224,24 @@ public interface SqlDialect {
     }
 
     /**
+     * UPDATE recording a failed retry attempt: stores the error, advances the
+     * timestamp used for backoff, increments the retry counter unless the event
+     * is a manual retry, and clears the manual retry flag.
+     *
+     * @return UPDATE SQL with placeholders for error details, updated_at, event_id
+     * @since 1.4.0
+     */
+    default String recordRetryFailureStatement() {
+        return """
+                UPDATE %s
+                SET error_details = ?, updated_at = ?,
+                    retry_count = CASE WHEN %s THEN retry_count ELSE retry_count + 1 END,
+                    retry = %s
+                WHERE event_id = ?
+                """.formatted("%s", booleanPredicate("retry"), booleanLiteral(false));
+    }
+
+    /**
      * UPDATE to mark an event for manual retry.
      * <p>
      * Sets {@code retry = TRUE}, clears error details, and updates the timestamp.

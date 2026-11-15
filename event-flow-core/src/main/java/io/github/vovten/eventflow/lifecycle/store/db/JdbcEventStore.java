@@ -66,6 +66,7 @@ public class JdbcEventStore implements EventStore {
     private final String selectByIdSql;
     private final String updateStatusOnlySql;
     private final String updateStatusWithRetrySql;
+    private final String recordRetryFailureSql;
     private final String markForRetrySql;
     private final Map<Set<EventStatus>, String> selectByStatusesCache = new ConcurrentHashMap<>();
     private final Map<Set<EventStatus>, String> selectRetryableEventsCache = new ConcurrentHashMap<>();
@@ -141,6 +142,7 @@ public class JdbcEventStore implements EventStore {
         this.selectByIdSql = sqlDialect.selectByIdStatement().formatted(tableName);
         this.updateStatusOnlySql = sqlDialect.updateStatusOnlyStatement().formatted(tableName);
         this.updateStatusWithRetrySql = sqlDialect.updateStatusWithRetryStatement().formatted(tableName);
+        this.recordRetryFailureSql = sqlDialect.recordRetryFailureStatement().formatted(tableName);
         this.markForRetrySql = sqlDialect.markForRetryStatement().formatted(tableName);
         var schemaInitializer = new SchemaInitializer(dataSource, tableName, sqlDialect, uuidType);
         if (autoInitSchema) {
@@ -205,6 +207,20 @@ public class JdbcEventStore implements EventStore {
 
     private String selectUpdateSql(EventStatus status) {
         return status == EventStatus.NEW ? updateStatusWithRetrySql : updateStatusOnlySql;
+    }
+
+    @Override
+    public void recordRetryFailure(UUID eventId, String errorDetails) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(recordRetryFailureSql)) {
+            mapper.setRetryFailureParameters(ps, eventId, errorDetails);
+            int affected = ps.executeUpdate();
+            if (affected == 0) {
+                throw new NoSuchElementException("Event not found: " + eventId);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to record retry failure for event: " + eventId, e);
+        }
     }
 
     @Override
