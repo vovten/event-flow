@@ -3,11 +3,10 @@ package io.github.vovten.eventflow.serialization;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.cfg.MapperConfig;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Polymorphic type validator for secure event deserialization.
@@ -28,7 +27,14 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
 
     private static final Logger log = LoggerFactory.getLogger(EventPolymorphicTypeValidator.class);
 
-    private final Set<String> knownClasses = ConcurrentHashMap.newKeySet();
+    /**
+     * Bounded presence cache: both positive and negative lookups are cached so a
+     * flood of unknown/denied classes cannot turn every deserialization attempt
+     * into repeated {@code Class.forName} calls.
+     */
+    private final Cache<String, Boolean> classPresence = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
 
     /**
      * Validate the base type (the type passed to readValue).
@@ -101,15 +107,39 @@ public class EventPolymorphicTypeValidator extends PolymorphicTypeValidator.Base
      * @return true if class exists, false otherwise
      */
     boolean classExists(String className) {
-        if (knownClasses.contains(className)) {
-            return true;
+        Boolean known = classPresence.getIfPresent(className);
+        if (known != null) {
+            return known;
         }
+        boolean exists = resolveClass(className) != null;
+        classPresence.put(className, exists);
+        return exists;
+    }
+
+    /**
+     * Resolves a class using the context class loader first and the validator's
+     * own class loader as a fallback. Executor/producer threads may not have a
+     * useful TCCL; falling back avoids a false "class not found" that would
+     * silently deny a legitimate event.
+     *
+     * @param className fully qualified class name
+     * @return the resolved class, or null when no loader can see it
+     */
+    private static Class<?> resolveClass(String className) {
+        ClassLoader tccl = Thread.currentThread().getContextClassLoader();
+        if (tccl != null) {
+            try {
+                return Class.forName(className, false, tccl);
+            } catch (ClassNotFoundException e) {
+                log.debug("Class '{}' not visible to the context class loader, trying the library loader",
+                        className);
+            }
+        }
+        ClassLoader own = EventPolymorphicTypeValidator.class.getClassLoader();
         try {
-            Class.forName(className, false, Thread.currentThread().getContextClassLoader());
-            knownClasses.add(className);
-            return true;
+            return Class.forName(className, false, own);
         } catch (ClassNotFoundException e) {
-            return false;
+            return null;
         }
     }
 
