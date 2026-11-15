@@ -78,6 +78,28 @@ class SchemaDdlRecoveryTest {
         verify(jdbc.statement).execute(contains("idx_event_store_service"));
     }
 
+    @Test
+    @DisplayName("DEFECT: A failing index-existence re-check is tolerated instead of failing the startup")
+    void shouldTolerateFailingIndexExistenceRecheck() throws Exception {
+        PoisonedJdbc jdbc = new PoisonedJdbc();
+        // The CREATE INDEX fails with an unrecognized error and the metadata
+        // re-check fails as well (H2 reports an internal
+        // ConcurrentModificationException while rival sessions run DDL).
+        // Indexes are performance-only: the startup must survive.
+        jdbc.failIndexesWith(
+                new SQLException("General error: \"java.util.ConcurrentModificationException\"", "50000", 0));
+        jdbc.indexRecheckFailsWith(
+                new SQLException("General error: \"java.util.ConcurrentModificationException\"", "50000", 0));
+
+        SchemaInitializer initializer = new SchemaInitializer(jdbc.dataSource, "event_store",
+                SqlDialect.forDialect(DatabaseDialect.POSTGRESQL), UuidType.BINARY);
+
+        assertThatCode(initializer::ensureSchema).doesNotThrowAnyException();
+
+        verify(jdbc.connection, atLeastOnce()).rollback(any(Savepoint.class));
+        verify(jdbc.statement).execute(contains("idx_event_store_service"));
+    }
+
     /**
      * Mock JDBC graph modeling PostgreSQL transaction semantics: once a DDL
      * statement has failed, every metadata call fails with "current transaction
@@ -163,6 +185,16 @@ class SchemaDdlRecoveryTest {
                         }
                         return rs;
                     });
+        }
+
+        /**
+         * Makes the index-existence re-check itself fail with the given error,
+         * modeling an unstable metadata read during concurrent DDL.
+         */
+        private void indexRecheckFailsWith(SQLException error) throws SQLException {
+            when(metadata.getIndexInfo(nullable(String.class), nullable(String.class),
+                    anyString(), anyBoolean(), anyBoolean()))
+                    .thenThrow(error);
         }
     }
 }

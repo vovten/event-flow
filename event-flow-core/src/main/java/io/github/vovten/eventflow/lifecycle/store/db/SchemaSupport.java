@@ -183,8 +183,13 @@ final class SchemaSupport {
                     // Some databases (for example H2) may still report a
                     // duplicate object for CREATE INDEX IF NOT EXISTS during a
                     // concurrent start, so confirm the index existence instead
-                    // of relying on the error code alone.
-                    if (!isDuplicateObject(e) && !indexExists(conn, tableName, index.name())) {
+                    // of relying on the error code alone. The confirmation
+                    // itself can fail while rival instances churn the schema
+                    // (H2 reports an internal ConcurrentModificationException):
+                    // indexes are performance-only, so an unverifiable failure
+                    // is treated as a duplicate instead of failing the startup.
+                    if (!isDuplicateObject(e)
+                            && !indexExistsTolerant(conn, tableName, index.name(), log)) {
                         throw e;
                     }
                     log.debug("Ignoring already-existing index for table '{}': {}",
@@ -228,6 +233,34 @@ final class SchemaSupport {
         return indexExists(meta, baseName, indexName)
                 || indexExists(meta, baseName.toUpperCase(), indexName)
                 || indexExists(meta, baseName.toLowerCase(), indexName);
+    }
+
+    /**
+     * Checks whether an index exists, tolerating a failing metadata lookup.
+     * <p>
+     * Concurrent schema initialization makes the metadata unstable on some
+     * databases (H2 throws an internal {@code ConcurrentModificationException}
+     * from {@code getIndexInfo} while rival sessions run DDL). Because indexes
+     * are performance-only and the CREATE INDEX failed in exactly such a churn
+     * window, an unverifiable existence is reported as "exists" with a warning.
+     *
+     * @param conn      the connection
+     * @param tableName the table name
+     * @param indexName the index name
+     * @param log       the caller's logger
+     * @return true when the index exists or its existence cannot be verified
+     * @throws SQLException never: lookup failures are downgraded to a warning
+     */
+    private static boolean indexExistsTolerant(Connection conn, String tableName,
+                                               String indexName, Logger log) {
+        try {
+            return indexExists(conn, tableName, indexName);
+        } catch (SQLException e) {
+            log.warn("Cannot verify index '{}' existence for table '{}' ({}); "
+                            + "treating the failed CREATE INDEX as a duplicate object",
+                    indexName, tableName, e.getMessage());
+            return true;
+        }
     }
 
     private static boolean indexExists(DatabaseMetaData meta, String tableName,
