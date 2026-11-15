@@ -187,7 +187,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                     event.type().getName(),
                     originalService,
                     event.channels(),
-                    null,
+                    extractProcessId(event),
                     Instant.now(),
                     retryContext.retryKind(),
                     retryContext.attempt()
@@ -211,7 +211,7 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                     originalService,
                     errorMessage,
                     event.channels(),
-                    null,
+                    extractProcessId(event),
                     Instant.now(),
                     retryContext.retryKind(),
                     retryContext.attempt(),
@@ -294,6 +294,17 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
      */
     private static int deliveryAttempt(RetryContext retryContext) {
         return retryContext.retryKind() == RetryKind.DELIVERY ? retryContext.attempt() : 1;
+    }
+
+    /**
+     * Extracts the process/correlation identity of the original event so acks can
+     * be correlated with the saga/process they belong to.
+     *
+     * @param event the original event
+     * @return the process id, or null when the event has none
+     */
+    private UUID extractProcessId(Event event) {
+        return event instanceof TraceableEvent traceable ? traceable.processId() : null;
     }
 
     /**

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -58,6 +59,36 @@ class EventLifecycleDispatcherTest {
         assertThat(lastAck()).isInstanceOf(SuccessAck.class);
         SuccessAck ack = (SuccessAck) lastAck();
         assertThat(ack.originalEventId()).isEqualTo(event.eventId());
+    }
+
+    @Test
+    @DisplayName("DEFECT-3.1: Should propagate the original processId into SuccessAck")
+    void shouldPropagateProcessIdIntoSuccessAck() {
+        UUID processId = UUID.randomUUID();
+        Envelope<TestEvent> envelope = new Envelope<>(event.eventId(), processId, event.occurredAt(),
+                event, Map.of(), event.channels());
+        EventDispatcher origin = successDispatcher();
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(envelope).join();
+
+        SuccessAck success = (SuccessAck) lastAck();
+        assertThat(success.processId()).isEqualTo(processId);
+    }
+
+    @Test
+    @DisplayName("DEFECT-3.1: Should propagate the original processId into FailureAck")
+    void shouldPropagateProcessIdIntoFailureAck() {
+        UUID processId = UUID.randomUUID();
+        Envelope<TestEvent> envelope = new Envelope<>(event.eventId(), processId, event.occurredAt(),
+                event, Map.of(), event.channels());
+        EventDispatcher origin = failureDispatcher(new RuntimeException("Handler error"));
+        EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
+
+        dispatcher.dispatch(envelope).join();
+
+        FailureAck failure = (FailureAck) lastAck();
+        assertThat(failure.processId()).isEqualTo(processId);
     }
 
     @Test
