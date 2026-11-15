@@ -33,6 +33,11 @@ public class MySqlDialect implements SqlDialect {
     }
 
     @Override
+    public boolean supportsIfNotExistsForTable() {
+        return true;
+    }
+
+    @Override
     public String insertStatement() {
         return """
                 INSERT INTO %s (event_id, event_type, service, payload, channels, process_id,

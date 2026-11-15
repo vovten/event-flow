@@ -6,16 +6,16 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 /**
  * Manages database schema initialization for the {@code event_retry} table.
  * <p>
  * Creates the table, its indexes and best-effort column comments. Supports the
- * same dialect and UUID conventions as the event store schema.
+ * same dialect and UUID conventions as the event store schema, including the
+ * concurrent-startup handling described in {@link SchemaSupport#executeDdl}.
  *
  * @author Vladimir Aleshkov
  * @since 1.4.0
@@ -65,27 +65,33 @@ public final class RetrySchemaInitializer {
 
     /**
      * Creates the retry table and indexes when they do not exist.
+     * <p>
+     * A concurrent initialization by another instance is recovered silently: the
+     * table is re-checked after a failed {@code CREATE TABLE} and treated as
+     * created. Index creation tolerates already-existing objects.
      *
      * @throws IllegalStateException if schema initialization fails
      */
     public void ensureSchema() {
         try (Connection conn = dataSource.getConnection()) {
-            if (tableExists(conn, tableName)) {
+            if (SchemaSupport.tableExists(conn, tableName)) {
                 log.debug("Retry table '{}' already exists, skipping schema creation", tableName);
                 return;
             }
-            String baseName = tableBase(tableName);
+            String baseName = SchemaSupport.tableBase(tableName);
             String createTable = buildCreateTableSql().formatted(tableName);
-            String dueIndex = "CREATE INDEX idx_%s_due ON %s(retry_kind, state, next_attempt_at)"
-                    .formatted(baseName, tableName);
-            String serviceIndex =
-                    "CREATE INDEX idx_%s_service_due ON %s(service, retry_kind, state, next_attempt_at)"
-                            .formatted(baseName, tableName);
+            String indexKeyword = sqlDialect.supportsIfNotExistsForIndex() ? "IF NOT EXISTS " : "";
+            String dueIndexName = "idx_%s_due".formatted(baseName);
+            String serviceIndexName = "idx_%s_service_due".formatted(baseName);
+            String dueIndex = "CREATE INDEX " + indexKeyword
+                    + dueIndexName + " ON " + tableName + "(retry_kind, state, next_attempt_at)";
+            String serviceIndex = "CREATE INDEX " + indexKeyword
+                    + serviceIndexName + " ON " + tableName + "(service, retry_kind, state, next_attempt_at)";
             conn.setAutoCommit(false);
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute(createTable);
-                stmt.execute(dueIndex);
-                stmt.execute(serviceIndex);
+            try {
+                SchemaSupport.executeDdl(conn, tableName, createTable,
+                        List.of(new SchemaSupport.IndexStatement(dueIndex, dueIndexName),
+                                new SchemaSupport.IndexStatement(serviceIndex, serviceIndexName)), log);
                 conn.commit();
             } catch (SQLException e) {
                 try {
@@ -120,7 +126,7 @@ public final class RetrySchemaInitializer {
      */
     public void verifyTableExists() {
         try (Connection conn = dataSource.getConnection()) {
-            if (!tableExists(conn, tableName)) {
+            if (!SchemaSupport.tableExists(conn, tableName)) {
                 throw new IllegalStateException(
                         "Retry table '" + tableName + "' does not exist. " +
                                 "Either set auto-init-schema: true or create it manually using the " +
@@ -133,11 +139,12 @@ public final class RetrySchemaInitializer {
     }
 
     private String buildCreateTableSql() {
+        String tableKeyword = sqlDialect.supportsIfNotExistsForTable() ? "IF NOT EXISTS " : "";
         String uuidDdl = uuidType == UuidType.NATIVE ? "UUID" : "BINARY(16)";
         String textDdl = sqlDialect.textType();
         String tsDdl = sqlDialect.timestampType();
         return """
-                CREATE TABLE %%s (
+                CREATE TABLE %s%%s (
                     event_id        %s NOT NULL,
                     service         VARCHAR(255) NOT NULL,
                     retry_kind      VARCHAR(16) NOT NULL,
@@ -154,7 +161,7 @@ public final class RetrySchemaInitializer {
                     updated_at      %s NOT NULL,
                     PRIMARY KEY (event_id, retry_kind)
                 )
-                """.formatted(uuidDdl, tsDdl, textDdl, tsDdl, tsDdl, tsDdl);
+                """.formatted(tableKeyword, uuidDdl, tsDdl, textDdl, tsDdl, tsDdl, tsDdl);
     }
 
     private void addColumnComments(Statement stmt) {
@@ -175,28 +182,5 @@ public final class RetrySchemaInitializer {
                         e.getMessage());
             }
         }
-    }
-
-    private boolean tableExists(Connection conn, String name) throws SQLException {
-        DatabaseMetaData meta = conn.getMetaData();
-        String baseName = tableBase(name);
-        try (ResultSet rs = meta.getTables(null, null, baseName, null)) {
-            if (rs.next()) {
-                return true;
-            }
-        }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toUpperCase(), null)) {
-            if (rs.next()) {
-                return true;
-            }
-        }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toLowerCase(), null)) {
-            return rs.next();
-        }
-    }
-
-    private String tableBase(String fullName) {
-        int dot = fullName.indexOf('.');
-        return dot > 0 ? fullName.substring(dot + 1) : fullName;
     }
 }

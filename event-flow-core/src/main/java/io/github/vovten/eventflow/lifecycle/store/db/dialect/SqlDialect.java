@@ -53,6 +53,30 @@ public interface SqlDialect {
     }
 
     /**
+     * Whether the database supports {@code CREATE TABLE IF NOT EXISTS}.
+     * <p>
+     * Used by the auto-DDL initializers to make table creation idempotent and
+     * safe under concurrent application startup.
+     *
+     * @return true when the syntax is supported
+     */
+    default boolean supportsIfNotExistsForTable() {
+        return false;
+    }
+
+    /**
+     * Whether the database supports {@code CREATE INDEX IF NOT EXISTS}.
+     * <p>
+     * Used by the auto-DDL initializers to make index creation idempotent and
+     * safe under concurrent application startup.
+     *
+     * @return true when the syntax is supported
+     */
+    default boolean supportsIfNotExistsForIndex() {
+        return false;
+    }
+
+    /**
      * SQL literal for the given boolean value.
      * <p>
      * Databases without a native boolean type (Oracle before 23c, SQL Server)

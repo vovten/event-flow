@@ -5,7 +5,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
 
 /**
  * Manages database schema initialization for the event store table.
@@ -13,6 +16,11 @@ import java.sql.*;
  * Handles table creation, index creation, and optional column comments.
  * Supports auto-detection of the database dialect and UUID storage strategy,
  * and graceful handling of concurrent schema initialization across multiple instances.
+ * <p>
+ * The DDL is idempotent where the database supports {@code IF NOT EXISTS}; on the
+ * other databases a concurrent initialization is detected by re-checking the
+ * table after a failed {@code CREATE TABLE}. Index creation is also tolerant to
+ * objects created by a rival instance.
  * <p>
  * This class is package-private and used exclusively by {@link JdbcEventStore}.
  *
@@ -37,16 +45,6 @@ public class SchemaInitializer {
             COMMENT ON COLUMN %s.created_at IS 'Timestamp when the event was first stored';
             COMMENT ON COLUMN %s.updated_at IS 'Timestamp of the last status update';
             COMMENT ON COLUMN %s.error_details IS 'Error description for failed events';
-            """;
-
-    private static final String CREATE_INDEX = """
-            CREATE INDEX %s
-            ON %s(status, updated_at)
-            """;
-
-    private static final String CREATE_INDEX_SERVICE = """
-            CREATE INDEX %s
-            ON %s(service)
             """;
 
     private static final String INDEX_NAME = "idx_%s_status";
@@ -78,51 +76,54 @@ public class SchemaInitializer {
      * <p>
      * If concurrent schema initialization is detected (another instance
      * created the table between our check and DDL execution), the error
-     * is silently recovered.
+     * is silently recovered: the table is re-checked and treated as created.
      *
      * @throws IllegalStateException if schema initialization fails and was not caused
      *                               by concurrent table creation
      */
     public void ensureSchema() {
         try (Connection conn = dataSource.getConnection()) {
-            if (!tableExists(conn, tableName)) {
-                String ddl = buildCreateTableSql(sqlDialect, uuidType).formatted(tableName);
-                String baseName = tableBase(tableName);
-                String statusIndexName = INDEX_NAME.formatted(baseName);
-                String createStatusIndexSql = CREATE_INDEX.formatted(statusIndexName, tableName);
-                String serviceIndexName = INDEX_SERVICE_NAME.formatted(baseName);
-                String createServiceIndexSql = CREATE_INDEX_SERVICE.formatted(serviceIndexName, tableName);
-                conn.setAutoCommit(false);
-                try (Statement stmt = conn.createStatement()) {
-                    stmt.execute(ddl);
-                    stmt.execute(createStatusIndexSql);
-                    stmt.execute(createServiceIndexSql);
-                    conn.commit();
-                } catch (SQLException e) {
-                    try {
-                        conn.rollback();
-                    } catch (SQLException ex) {
-                        log.warn("Failed to rollback DDL for table '{}'", tableName, ex);
-                    }
-                    throw e;
-                } finally {
-                    try {
-                        conn.setAutoCommit(true);
-                    } catch (SQLException ex) {
-                        log.warn("Failed to reset auto-commit for table '{}'", tableName, ex);
-                    }
-                }
-                // Column comments are best-effort metadata outside the DDL transaction
-                try (Statement commentStmt = conn.createStatement()) {
-                    addColumnComments(commentStmt);
-                } catch (SQLException e) {
-                    log.warn("Failed to add column comments for table '{}'", tableName, e);
-                }
-                log.info("Event store schema initialized for table '{}' with UUID strategy {}",
-                        tableName, uuidType);
-            } else {
+            if (SchemaSupport.tableExists(conn, tableName)) {
                 log.debug("Event store table '{}' already exists, skipping schema creation", tableName);
+                return;
             }
+            String baseName = SchemaSupport.tableBase(tableName);
+            String createTableSql = buildCreateTableSql(sqlDialect, uuidType).formatted(tableName);
+            String indexKeyword = sqlDialect.supportsIfNotExistsForIndex() ? "IF NOT EXISTS " : "";
+            String statusIndexName = INDEX_NAME.formatted(baseName);
+            String serviceIndexName = INDEX_SERVICE_NAME.formatted(baseName);
+            String createStatusIndexSql = "CREATE INDEX " + indexKeyword + statusIndexName
+                    + " ON " + tableName + "(status, updated_at)";
+            String createServiceIndexSql = "CREATE INDEX " + indexKeyword + serviceIndexName
+                    + " ON " + tableName + "(service)";
+            conn.setAutoCommit(false);
+            try {
+                SchemaSupport.executeDdl(conn, tableName, createTableSql,
+                        List.of(new SchemaSupport.IndexStatement(createStatusIndexSql, statusIndexName),
+                                new SchemaSupport.IndexStatement(createServiceIndexSql, serviceIndexName)), log);
+                conn.commit();
+            } catch (SQLException e) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    log.warn("Failed to rollback DDL for table '{}'", tableName, ex);
+                }
+                throw e;
+            } finally {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException ex) {
+                    log.warn("Failed to reset auto-commit for table '{}'", tableName, ex);
+                }
+            }
+            // Column comments are best-effort metadata outside the DDL transaction
+            try (Statement commentStmt = conn.createStatement()) {
+                addColumnComments(commentStmt);
+            } catch (SQLException e) {
+                log.warn("Failed to add column comments for table '{}'", tableName, e);
+            }
+            log.info("Event store schema initialized for table '{}' with UUID strategy {}",
+                    tableName, uuidType);
         } catch (SQLException e) {
             throw new IllegalStateException(
                     "Failed to initialize event store schema for table '" + tableName + "'", e);
@@ -136,7 +137,7 @@ public class SchemaInitializer {
      */
     public void verifyTableExists() {
         try (Connection conn = dataSource.getConnection()) {
-            if (!tableExists(conn, tableName)) {
+            if (!SchemaSupport.tableExists(conn, tableName)) {
                 throw new IllegalStateException(
                         "Event store table '" + tableName + "' does not exist. " +
                         "Either set auto-init-schema: true to allow automatic table creation, " +
@@ -168,11 +169,12 @@ public class SchemaInitializer {
     }
 
     private String buildCreateTableSql(SqlDialect sqlDialect, UuidType uuidType) {
+        String tableKeyword = sqlDialect.supportsIfNotExistsForTable() ? "IF NOT EXISTS " : "";
         String uuidDdl = uuidType == UuidType.NATIVE ? "UUID" : "BINARY(16)";
         String textDdl = sqlDialect.textType();
         String tsDdl = sqlDialect.timestampType();
         return """
-                CREATE TABLE %%s (
+                CREATE TABLE %s%%s (
                     event_id        %s PRIMARY KEY,
                     event_type      VARCHAR(512) NOT NULL,
                     service         VARCHAR(255),
@@ -186,26 +188,7 @@ public class SchemaInitializer {
                     retry           %s DEFAULT %s NOT NULL,
                     error_details   %s
                 )
-                """.formatted(uuidDdl, textDdl, textDdl, uuidDdl, tsDdl, tsDdl,
+                """.formatted(tableKeyword, uuidDdl, textDdl, textDdl, uuidDdl, tsDdl, tsDdl,
                 sqlDialect.booleanType(), sqlDialect.booleanLiteral(false), textDdl);
-    }
-
-    private boolean tableExists(Connection conn, String tableName) throws SQLException {
-        DatabaseMetaData meta = conn.getMetaData();
-        String baseName = tableBase(tableName);
-        try (ResultSet rs = meta.getTables(null, null, baseName, null)) {
-            if (rs.next()) return true;
-        }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toUpperCase(), null)) {
-            if (rs.next()) return true;
-        }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toLowerCase(), null)) {
-            return rs.next();
-        }
-    }
-
-    private String tableBase(String fullName) {
-        int dot = fullName.indexOf('.');
-        return dot > 0 ? fullName.substring(dot + 1) : fullName;
     }
 }
