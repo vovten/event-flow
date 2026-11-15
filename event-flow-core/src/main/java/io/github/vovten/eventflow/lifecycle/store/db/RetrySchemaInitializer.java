@@ -148,22 +148,27 @@ public final class RetrySchemaInitializer {
         return """
                 CREATE TABLE %s%%s (
                     event_id        %s NOT NULL,
-                    service         VARCHAR(255) NOT NULL,
-                    retry_kind      VARCHAR(16) NOT NULL,
+                    service         %s NOT NULL,
+                    retry_kind      %s NOT NULL,
                     attempt         INT NOT NULL,
-                    state           VARCHAR(16) NOT NULL,
-                    reason          VARCHAR(64) NOT NULL,
+                    state           %s NOT NULL,
+                    reason          %s NOT NULL,
                     next_attempt_at %s NOT NULL,
-                    last_error_type VARCHAR(512),
+                    last_error_type %s,
                     last_error      %s,
-                    policy_name     VARCHAR(255),
-                    claimed_by      VARCHAR(255),
+                    policy_name     %s,
+                    claimed_by      %s,
                     claimed_until   %s,
                     created_at      %s NOT NULL,
                     updated_at      %s NOT NULL,
                     PRIMARY KEY (event_id, retry_kind)
                 )
-                """.formatted(tableKeyword, uuidDdl, tsDdl, textDdl, tsDdl, tsDdl, tsDdl);
+                """.formatted(tableKeyword, uuidDdl,
+                sqlDialect.shortTextType(255), sqlDialect.shortTextType(16),
+                sqlDialect.shortTextType(16), sqlDialect.shortTextType(64),
+                tsDdl, sqlDialect.shortTextType(512), textDdl,
+                sqlDialect.shortTextType(255), sqlDialect.shortTextType(255),
+                tsDdl, tsDdl, tsDdl);
     }
 
     private void addColumnComments(Statement stmt) {

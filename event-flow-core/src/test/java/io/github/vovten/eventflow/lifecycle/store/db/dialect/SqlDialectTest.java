@@ -86,6 +86,19 @@ class SqlDialectTest {
     }
 
     @Test
+    @DisplayName("DEFECT-2.8: SQL Server uses NVARCHAR for short text columns")
+    void shortTextType() {
+        assertThat(SqlDialect.forDialect(DatabaseDialect.SQLSERVER).shortTextType(512))
+                .isEqualTo("NVARCHAR(512)");
+        assertThat(SqlDialect.forDialect(DatabaseDialect.SQLSERVER).shortTextType(255))
+                .isEqualTo("NVARCHAR(255)");
+        assertThat(SqlDialect.forDialect(DatabaseDialect.POSTGRESQL).shortTextType(512))
+                .isEqualTo("VARCHAR(512)");
+        assertThat(SqlDialect.forDialect(DatabaseDialect.MYSQL).shortTextType(64))
+                .isEqualTo("VARCHAR(64)");
+    }
+
+    @Test
     @DisplayName("DEFECT-2.7: MySQL does not support COMMENT ON, other dialects do")
     void commentOnSupport() {
         assertThat(SqlDialect.forDialect(DatabaseDialect.MYSQL).supportsCommentOn()).isFalse();

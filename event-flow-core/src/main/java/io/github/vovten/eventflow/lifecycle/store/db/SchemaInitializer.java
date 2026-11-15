@@ -179,8 +179,8 @@ public class SchemaInitializer {
         return """
                 CREATE TABLE %s%%s (
                     event_id        %s PRIMARY KEY,
-                    event_type      VARCHAR(512) NOT NULL,
-                    service         VARCHAR(255),
+                    event_type      %s NOT NULL,
+                    service         %s,
                     status          CHAR(1) NOT NULL DEFAULT 'U',
                     payload         %s NOT NULL,
                     channels        %s,
@@ -191,7 +191,9 @@ public class SchemaInitializer {
                     retry           %s DEFAULT %s NOT NULL,
                     error_details   %s
                 )
-                """.formatted(tableKeyword, uuidDdl, textDdl, textDdl, uuidDdl, tsDdl, tsDdl,
+                """.formatted(tableKeyword, uuidDdl,
+                sqlDialect.shortTextType(512), sqlDialect.shortTextType(255),
+                textDdl, textDdl, uuidDdl, tsDdl, tsDdl,
                 sqlDialect.booleanType(), sqlDialect.booleanLiteral(false), textDdl);
     }
 }

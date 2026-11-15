@@ -4,7 +4,7 @@ package io.github.vovten.eventflow.lifecycle.store.db.dialect;
  * {@link SqlDialect} for Microsoft SQL Server 2012+.
  * <p>
  * Uses {@code OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY} for row limiting,
- * {@code NVARCHAR(MAX)} for large text columns, and {@code DATETIME2} for timestamps
+ * {@code NVARCHAR} for text columns, and {@code DATETIME2} for timestamps
  * (because SQL Server's native {@code TIMESTAMP} type is a binary row version,
  * not a date/time type).
  *
@@ -26,6 +26,11 @@ public class SqlServerDialect implements SqlDialect {
     @Override
     public String textType() {
         return "NVARCHAR(MAX)";
+    }
+
+    @Override
+    public String shortTextType(int length) {
+        return "NVARCHAR(" + length + ")";
     }
 
     @Override

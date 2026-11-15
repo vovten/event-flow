@@ -68,6 +68,20 @@ public interface SqlDialect {
     }
 
     /**
+     * SQL type for short text columns such as {@code event_type} or {@code service}.
+     * <p>
+     * Defaults to {@code VARCHAR(n)}. SQL Server overrides it with
+     * {@code NVARCHAR(n)} so non-ASCII values are stored correctly regardless of
+     * the database default collation.
+     *
+     * @param length maximum length of the column
+     * @return the dialect-specific column type
+     */
+    default String shortTextType(int length) {
+        return "VARCHAR(" + length + ")";
+    }
+
+    /**
      * Whether the database supports {@code COMMENT ON TABLE/COLUMN} statements.
      * <p>
      * MySQL embeds comments in the DDL instead, so the auto-initializers skip

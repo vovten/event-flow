@@ -160,6 +160,34 @@ class SchemaInitializerConcurrencyTest {
     }
 
     @Test
+    @DisplayName("DEFECT-2.8: SQL Server auto-DDL uses NVARCHAR for short text columns")
+    void shouldUseNvarcharForSqlServerEventStore() throws Exception {
+        MockJdbc jdbc = new MockJdbc();
+
+        new SchemaInitializer(jdbc.dataSource, TABLE,
+                SqlDialect.forDialect(DatabaseDialect.SQLSERVER), UuidType.BINARY).ensureSchema();
+
+        List<String> executed = capturedSql(jdbc.statement);
+        assertThat(executed).anyMatch(sql -> sql.contains("event_type      NVARCHAR(512) NOT NULL"));
+        assertThat(executed).anyMatch(sql -> sql.contains("service         NVARCHAR(255)"));
+        assertThat(executed).noneMatch(sql -> sql.contains(" VARCHAR("));
+    }
+
+    @Test
+    @DisplayName("DEFECT-2.8: SQL Server retry-table DDL uses NVARCHAR for short text columns")
+    void shouldUseNvarcharForSqlServerRetryTable() throws Exception {
+        MockJdbc jdbc = new MockJdbc();
+
+        new RetrySchemaInitializer(jdbc.dataSource, "event_retry",
+                SqlDialect.forDialect(DatabaseDialect.SQLSERVER), UuidType.BINARY).ensureSchema();
+
+        List<String> executed = capturedSql(jdbc.statement);
+        assertThat(executed).anyMatch(sql -> sql.contains("service         NVARCHAR(255) NOT NULL"));
+        assertThat(executed).anyMatch(sql -> sql.contains("last_error_type NVARCHAR(512)"));
+        assertThat(executed).noneMatch(sql -> sql.contains(" VARCHAR("));
+    }
+
+    @Test
     @DisplayName("DEFECT-2.1: Concurrent initialization against a real database does not fail")
     void shouldInitializeSchemaConcurrently() throws Exception {
         JdbcDataSource dataSource = inMemoryDataSource();
