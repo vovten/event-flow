@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
+import java.sql.Savepoint;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.LinkedHashSet;
@@ -129,6 +130,12 @@ final class SchemaSupport {
      * successful concurrent initialization (the winning instance owns the
      * indexes). Index failures caused by an already-existing object are ignored;
      * all other failures are propagated.
+     * <p>
+     * Every DDL statement runs against its own savepoint. On PostgreSQL any
+     * statement error aborts the current transaction, and every following
+     * command — including the recovery re-check and the remaining index
+     * statements — would fail with "current transaction is aborted" unless the
+     * failed statement is first isolated by rolling back to a savepoint.
      *
      * @param conn            the connection (auto-commit disabled by the caller)
      * @param tableName       the table name
@@ -141,9 +148,11 @@ final class SchemaSupport {
     static void executeDdl(Connection conn, String tableName, String createTableSql,
                            List<IndexStatement> indexStatements, Logger log) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
+            Savepoint tableSavepoint = conn.setSavepoint();
             try {
                 stmt.execute(createTableSql);
             } catch (SQLException e) {
+                rollbackTo(conn, tableSavepoint, log);
                 if (tableExists(conn, tableName)) {
                     log.info("Concurrent schema initialization detected for table '{}': the table "
                             + "was created by another instance, skipping DDL", tableName);
@@ -152,9 +161,14 @@ final class SchemaSupport {
                 throw e;
             }
             for (IndexStatement index : indexStatements) {
+                Savepoint indexSavepoint = conn.setSavepoint();
                 try {
                     stmt.execute(index.sql());
                 } catch (SQLException e) {
+                    // Isolate the failed statement before deciding its fate; on
+                    // PostgreSQL the aborted transaction would otherwise poison
+                    // the index-existence re-check below.
+                    rollbackTo(conn, indexSavepoint, log);
                     // Some databases (for example H2) may still report a
                     // duplicate object for CREATE INDEX IF NOT EXISTS during a
                     // concurrent start, so confirm the index existence instead
@@ -166,6 +180,24 @@ final class SchemaSupport {
                             tableName, e.getMessage());
                 }
             }
+        }
+    }
+
+    /**
+     * Rolls the transaction back to the given savepoint so the transaction stays
+     * usable after a failed statement. The savepoint may be gone already (some
+     * databases implicitly commit on DDL, for example MySQL); the failure is
+     * logged and the caller continues with its recovery decision.
+     *
+     * @param conn      the connection whose transaction is rolled back
+     * @param savepoint the savepoint to return to
+     * @param log       the caller's logger
+     */
+    private static void rollbackTo(Connection conn, Savepoint savepoint, Logger log) {
+        try {
+            conn.rollback(savepoint);
+        } catch (SQLException e) {
+            log.warn("Failed to roll back to a savepoint during DDL recovery", e);
         }
     }
 
