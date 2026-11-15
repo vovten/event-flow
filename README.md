@@ -735,6 +735,11 @@ backoff. `RetryWatchdog` raises retry rows for lost `AcceptedAck` / final acks.
 The `EventRetryScheduler` class remains available for manual wiring, but it is not part
 of the Spring auto-configuration.
 
+Both durable schedulers are **opt-in** (`event-flow.publisher.lifecycle.retry.delivery.enabled`
+and `...processing.enabled`, default `false`). When disabled, `FAILED`/`ACCEPTED` rows are
+not re-published automatically; they remain in the store for inspection and can be
+resurrected with `markForRetry(eventId)`.
+
 ### Two-domain durable retry (delivery vs processing)
 
 The two-domain model answers two separate questions instead of overloading `FAILED`:
