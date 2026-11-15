@@ -155,6 +155,49 @@ class BroadcastKafkaOutTransportTest {
     }
 
     @Test
+    @DisplayName("DEFECT-6.6: Should cache partition metadata across sends")
+    void shouldCachePartitionMetadata() {
+        List<PartitionInfo> partitions = createPartitionInfo(2);
+        when(mockProducer.partitionsFor("test-topic")).thenReturn(partitions);
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata(), null);
+            return null;
+        }).when(mockProducer).send(any(), any(Callback.class));
+
+        BroadcastKafkaOutTransport transport = new BroadcastKafkaOutTransport("localhost:9092", "test-topic");
+        transport.producer = mockProducer;
+        TestEvent event = TestEvent.create("test-id", "test-message");
+
+        transport.send(event).join();
+        transport.send(event).join();
+
+        verify(mockProducer, times(1)).partitionsFor("test-topic");
+    }
+
+    @Test
+    @DisplayName("DEFECT-6.6: Should refresh partition metadata after the cache is invalidated")
+    void shouldRefreshPartitionMetadataAfterInvalidation() {
+        List<PartitionInfo> partitions = createPartitionInfo(1);
+        when(mockProducer.partitionsFor("test-topic")).thenReturn(partitions);
+        doAnswer(invocation -> {
+            Callback callback = invocation.getArgument(1);
+            callback.onCompletion(mockMetadata(), null);
+            return null;
+        }).when(mockProducer).send(any(), any(Callback.class));
+
+        BroadcastKafkaOutTransport transport = new BroadcastKafkaOutTransport("localhost:9092", "test-topic");
+        transport.producer = mockProducer;
+        TestEvent event = TestEvent.create("test-id", "test-message");
+
+        transport.send(event).join();
+        transport.invalidatePartitionCache();
+        transport.send(event).join();
+
+        verify(mockProducer, times(2)).partitionsFor("test-topic");
+    }
+
+    @Test
     @DisplayName("Should fail the future when topic has no partitions")
     void shouldFailFutureWhenTopicHasNoPartitions() {
         when(mockProducer.partitionsFor("test-topic")).thenReturn(List.of());

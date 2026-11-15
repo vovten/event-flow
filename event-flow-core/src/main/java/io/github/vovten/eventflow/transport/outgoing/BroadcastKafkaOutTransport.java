@@ -10,6 +10,8 @@ import org.apache.kafka.common.PartitionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,16 @@ import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS
 public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
 
     private static final Logger log = LoggerFactory.getLogger(BroadcastKafkaOutTransport.class);
+
+    /**
+     * How long the partition metadata is reused before it is fetched again.
+     * Partition changes are rare, and a metadata request on every send adds a
+     * blocking round-trip (up to {@code max.block.ms}).
+     */
+    static final Duration PARTITION_CACHE_TTL = Duration.ofMinutes(5);
+
+    private volatile List<PartitionInfo> cachedPartitions;
+    private volatile Instant partitionsFetchedAt;
 
     /**
      * Create broadcast Kafka transport with custom configuration.
@@ -132,7 +144,7 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
      */
     @Override
     protected CompletableFuture<SendResult> dispatch(Event event, String key, byte[] value) {
-        List<PartitionInfo> partitions = producer.partitionsFor(topic);
+        List<PartitionInfo> partitions = partitions();
         if (partitions.isEmpty()) {
             throw new TransportException(
                     String.format("Topic '%s' has no partitions for event %s", topic, event.type().getSimpleName())
@@ -152,6 +164,43 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
         }
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                 .thenApply(v -> applyBroadcastStrategy(collectResults(futures), event, partitions.size()));
+    }
+
+    /**
+     * Returns the topic partitions, reusing the cached metadata while it is fresh.
+     * <p>
+     * {@code KafkaProducer.partitionsFor} is a blocking metadata request; caching
+     * keeps the broadcast path free of a network round-trip per event. An empty
+     * result is not cached so a topic created later becomes visible immediately.
+     * Partition changes are picked up after {@link #PARTITION_CACHE_TTL} or after
+     * an explicit {@link #invalidatePartitionCache()}.
+     *
+     * @return the current partitions of the topic
+     */
+    private List<PartitionInfo> partitions() {
+        List<PartitionInfo> cached = cachedPartitions;
+        Instant fetchedAt = partitionsFetchedAt;
+        if (cached != null && fetchedAt != null
+                && Duration.between(fetchedAt, Instant.now()).compareTo(PARTITION_CACHE_TTL) < 0) {
+            return cached;
+        }
+        List<PartitionInfo> fetched = producer.partitionsFor(topic);
+        if (!fetched.isEmpty()) {
+            cachedPartitions = List.copyOf(fetched);
+            partitionsFetchedAt = Instant.now();
+        }
+        return fetched;
+    }
+
+    /**
+     * Drops the cached partition metadata so the next send re-reads it.
+     * <p>
+     * Package-private: used by tests and by callers that need to react to a
+     * partition change before the cache TTL expires.
+     */
+    void invalidatePartitionCache() {
+        cachedPartitions = null;
+        partitionsFetchedAt = null;
     }
 
     private SendResult applyBroadcastStrategy(
