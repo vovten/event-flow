@@ -432,6 +432,15 @@ public class EventFlowProperties {
      */
     public static class LoggingConfig {
         private boolean enabled = false;
+        /**
+         * Maximum number of payload characters written to the structured log.
+         * <p>
+         * <b>Privacy:</b> the payload is event data and may contain personal or
+         * sensitive information (PII). The library does not mask fields — it only
+         * truncates the payload to this length. Use {@code excluded-events} or
+         * {@code log-levels} to suppress sensitive event types, or disable
+         * structured logging for them.
+         */
         private int maxPayloadLength = 500;
         /**
          * List of event simple class names to exclude from logging.

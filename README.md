@@ -1319,6 +1319,28 @@ Lifecycle acknowledgment events are excluded from structured logs by default:
 `AcceptedAck`, `NoHandlerAck`, `SuccessAck`, and `FailureAck`. Override
 `excluded-events` if you need to log them.
 
+### Payload privacy (PII)
+
+The structured log includes the event payload (truncated to
+`max-payload-length`, 500 characters by default). Payloads are arbitrary event
+data and may contain personal or sensitive information. **The library does not
+mask fields** — it only truncates. To avoid writing sensitive data to logs:
+
+- add the event type to `excluded-events`, or
+- raise its `log-levels` threshold (e.g. `ERROR`), or
+- disable structured logging for that channel entirely.
+
+```yaml
+event-flow:
+  dispatcher:
+    logging:
+      enabled: true
+      excluded-events:
+        - PaymentCardDataEvent
+      log-levels:
+        CustomerProfileEvent: ERROR
+```
+
 ### Per-Event Log Level Thresholds
 
 By default, log level is determined by the outcome:
@@ -1329,7 +1351,9 @@ By default, log level is determined by the outcome:
 | Partial success (some fail) | `WARN` |
 | All fail or exception | `ERROR` |
 
-With `logLevels` you can set a minimum log level threshold for specific event types. The value acts as a **suppression threshold** — only outcomes at or above it are logged:
+With `logLevels` you can set a minimum log level threshold for specific event types. The value acts as a **suppression threshold** — only outcomes at or above it are logged.
+`TRACE` and `DEBUG` thresholds mean "no suppression": the entry is still emitted at
+its natural status-based level (the configured value does not raise it).
 
 | Threshold | ERROR outcome | WARN outcome | INFO outcome |
 |----------|:------------:|:------------:|:------------:|
