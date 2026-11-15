@@ -7,7 +7,9 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Shared JDBC helpers for the event store and retry schema initializers.
@@ -26,8 +28,14 @@ final class SchemaSupport {
     }
 
     /**
-     * Checks whether a table exists, trying the name as written and in upper and
-     * lower case to accommodate databases that normalize identifiers.
+     * Checks whether a table exists.
+     * <p>
+     * A schema-qualified name ({@code schema.table}) is looked up only in that
+     * schema, so a table with the same base name in another schema is ignored.
+     * An unqualified name is constrained to the connection's current schema
+     * (falling back to the driver-wide lookup only when the driver cannot report
+     * a schema). Identifier case variants are tried to accommodate databases
+     * that normalize identifiers.
      *
      * @param conn      the connection
      * @param tableName the table name (may be schema-qualified)
@@ -35,21 +43,22 @@ final class SchemaSupport {
      * @throws SQLException if metadata cannot be read
      */
     static boolean tableExists(Connection conn, String tableName) throws SQLException {
-        DatabaseMetaData meta = conn.getMetaData();
-        String baseName = tableBase(tableName);
-        try (ResultSet rs = meta.getTables(null, null, baseName, null)) {
-            if (rs.next()) {
-                return true;
-            }
+        String schema = schemaPart(tableName);
+        if (schema == null) {
+            schema = currentSchema(conn);
         }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toUpperCase(), null)) {
-            if (rs.next()) {
-                return true;
-            }
-        }
-        try (ResultSet rs = meta.getTables(null, null, baseName.toLowerCase(), null)) {
-            return rs.next();
-        }
+        return tableExistsInScope(conn.getMetaData(), conn.getCatalog(), schema, tableBase(tableName));
+    }
+
+    /**
+     * Returns the schema part of a possibly schema-qualified table name.
+     *
+     * @param fullName the table name
+     * @return the schema, or null when the name is unqualified
+     */
+    static String schemaPart(String fullName) {
+        int dot = fullName.indexOf('.');
+        return dot > 0 ? fullName.substring(0, dot) : null;
     }
 
     /**
@@ -61,6 +70,54 @@ final class SchemaSupport {
     static String tableBase(String fullName) {
         int dot = fullName.indexOf('.');
         return dot > 0 ? fullName.substring(dot + 1) : fullName;
+    }
+
+    private static boolean tableExistsInScope(DatabaseMetaData meta, String catalog, String schema,
+                                              String tableName) throws SQLException {
+        if (schema == null) {
+            for (String name : identifierVariants(tableName)) {
+                if (hasTable(meta, catalog, null, name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (String schemaCandidate : identifierVariants(schema)) {
+            for (String nameCandidate : identifierVariants(tableName)) {
+                // schema as a schema pattern (PostgreSQL, SQL Server, Oracle, H2)
+                if (hasTable(meta, catalog, schemaCandidate, nameCandidate)) {
+                    return true;
+                }
+                // schema as a catalog (MySQL treats a database as the catalog)
+                if (hasTable(meta, schemaCandidate, null, nameCandidate)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasTable(DatabaseMetaData meta, String catalog, String schemaPattern,
+                                    String tableName) throws SQLException {
+        try (ResultSet rs = meta.getTables(catalog, schemaPattern, tableName, null)) {
+            return rs.next();
+        }
+    }
+
+    private static String currentSchema(Connection conn) {
+        try {
+            return conn.getSchema();
+        } catch (SQLException e) {
+            return null;
+        }
+    }
+
+    private static List<String> identifierVariants(String identifier) {
+        LinkedHashSet<String> variants = new LinkedHashSet<>();
+        variants.add(identifier);
+        variants.add(identifier.toUpperCase(Locale.ROOT));
+        variants.add(identifier.toLowerCase(Locale.ROOT));
+        return List.copyOf(variants);
     }
 
     /**
