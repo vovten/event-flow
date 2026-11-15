@@ -116,11 +116,14 @@ public class SchemaInitializer {
                     log.warn("Failed to reset auto-commit for table '{}'", tableName, ex);
                 }
             }
-            // Column comments are best-effort metadata outside the DDL transaction
-            try (Statement commentStmt = conn.createStatement()) {
-                addColumnComments(commentStmt);
-            } catch (SQLException e) {
-                log.warn("Failed to add column comments for table '{}'", tableName, e);
+            // Column comments are best-effort metadata outside the DDL transaction.
+            // Databases that embed comments in the DDL (MySQL) skip this block.
+            if (sqlDialect.supportsCommentOn()) {
+                try (Statement commentStmt = conn.createStatement()) {
+                    addColumnComments(commentStmt);
+                } catch (SQLException e) {
+                    log.warn("Failed to add column comments for table '{}'", tableName, e);
+                }
             }
             log.info("Event store schema initialized for table '{}' with UUID strategy {}",
                     tableName, uuidType);

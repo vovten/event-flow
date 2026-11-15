@@ -68,6 +68,18 @@ public interface SqlDialect {
     }
 
     /**
+     * Whether the database supports {@code COMMENT ON TABLE/COLUMN} statements.
+     * <p>
+     * MySQL embeds comments in the DDL instead, so the auto-initializers skip
+     * the standalone comment statements for it to avoid warning noise on startup.
+     *
+     * @return true when {@code COMMENT ON} is supported
+     */
+    default boolean supportsCommentOn() {
+        return true;
+    }
+
+    /**
      * Whether the database supports {@code CREATE TABLE IF NOT EXISTS}.
      * <p>
      * Used by the auto-DDL initializers to make table creation idempotent and

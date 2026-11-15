@@ -107,10 +107,12 @@ public final class RetrySchemaInitializer {
                     log.warn("Failed to reset auto-commit for retry table '{}'", tableName, e);
                 }
             }
-            try (Statement stmt = conn.createStatement()) {
-                addColumnComments(stmt);
-            } catch (SQLException e) {
-                log.warn("Failed to add retry table comments for '{}'", tableName, e);
+            if (sqlDialect.supportsCommentOn()) {
+                try (Statement stmt = conn.createStatement()) {
+                    addColumnComments(stmt);
+                } catch (SQLException e) {
+                    log.warn("Failed to add retry table comments for '{}'", tableName, e);
+                }
             }
             log.info("Retry schema initialized for table '{}' with UUID strategy {}", tableName, uuidType);
         } catch (SQLException e) {

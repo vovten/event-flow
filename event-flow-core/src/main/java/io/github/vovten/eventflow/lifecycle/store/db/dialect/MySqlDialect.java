@@ -39,6 +39,11 @@ public class MySqlDialect implements SqlDialect {
     }
 
     @Override
+    public boolean supportsCommentOn() {
+        return false;
+    }
+
+    @Override
     public String insertStatement() {
         return """
                 INSERT INTO %s (event_id, event_type, service, payload, channels, process_id,

@@ -125,6 +125,41 @@ class SchemaInitializerConcurrencyTest {
     }
 
     @Test
+    @DisplayName("DEFECT-2.7: Does not emit COMMENT ON statements for MySQL")
+    void shouldSkipCommentOnForMySql() throws Exception {
+        MockJdbc jdbc = new MockJdbc();
+
+        new SchemaInitializer(jdbc.dataSource, TABLE,
+                SqlDialect.forDialect(DatabaseDialect.MYSQL), UuidType.BINARY).ensureSchema();
+
+        assertThat(capturedSql(jdbc.statement))
+                .as("MySQL does not support COMMENT ON; no noisy statements must be executed")
+                .noneMatch(sql -> sql.contains("COMMENT ON"));
+    }
+
+    @Test
+    @DisplayName("DEFECT-2.7: Does not emit COMMENT ON statements for the MySQL retry table")
+    void shouldSkipRetryCommentOnForMySql() throws Exception {
+        MockJdbc jdbc = new MockJdbc();
+
+        new RetrySchemaInitializer(jdbc.dataSource, "event_retry",
+                SqlDialect.forDialect(DatabaseDialect.MYSQL), UuidType.BINARY).ensureSchema();
+
+        assertThat(capturedSql(jdbc.statement)).noneMatch(sql -> sql.contains("COMMENT ON"));
+    }
+
+    @Test
+    @DisplayName("DEFECT-2.7: Still emits COMMENT ON for databases that support it")
+    void shouldEmitCommentOnForPostgres() throws Exception {
+        MockJdbc jdbc = new MockJdbc();
+
+        new SchemaInitializer(jdbc.dataSource, TABLE,
+                SqlDialect.forDialect(DatabaseDialect.POSTGRESQL), UuidType.BINARY).ensureSchema();
+
+        assertThat(capturedSql(jdbc.statement)).anyMatch(sql -> sql.contains("COMMENT ON"));
+    }
+
+    @Test
     @DisplayName("DEFECT-2.1: Concurrent initialization against a real database does not fail")
     void shouldInitializeSchemaConcurrently() throws Exception {
         JdbcDataSource dataSource = inMemoryDataSource();

@@ -86,6 +86,16 @@ class SqlDialectTest {
     }
 
     @Test
+    @DisplayName("DEFECT-2.7: MySQL does not support COMMENT ON, other dialects do")
+    void commentOnSupport() {
+        assertThat(SqlDialect.forDialect(DatabaseDialect.MYSQL).supportsCommentOn()).isFalse();
+        assertThat(SqlDialect.forDialect(DatabaseDialect.POSTGRESQL).supportsCommentOn()).isTrue();
+        assertThat(SqlDialect.forDialect(DatabaseDialect.H2).supportsCommentOn()).isTrue();
+        assertThat(SqlDialect.forDialect(DatabaseDialect.ORACLE).supportsCommentOn()).isTrue();
+        assertThat(SqlDialect.forDialect(DatabaseDialect.SQLSERVER).supportsCommentOn()).isTrue();
+    }
+
+    @Test
     @DisplayName("Should provide DATETIME2 for SQL Server")
     void sqlServerTimestampType() {
         SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.SQLSERVER);
