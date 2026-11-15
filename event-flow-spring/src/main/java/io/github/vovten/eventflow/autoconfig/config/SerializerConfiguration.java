@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.serialization.EventTypeRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -71,6 +72,7 @@ public class SerializerConfiguration {
      * @return configured EventSerializerFactory
      */
     @Bean
+    @ConditionalOnMissingBean(EventSerializerFactory.class)
     public EventSerializerFactory eventSerializerFactory() {
         EventSerializerFactory factory = new EventSerializerFactory();
         registerSerializers(factory);
