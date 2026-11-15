@@ -1,47 +1,35 @@
 package io.github.vovten.eventflow.transport.incoming;
 
-import io.github.vovten.eventflow.event.Envelope;
-import io.github.vovten.eventflow.event.Event;
-import io.github.vovten.eventflow.serialization.EventSerializationException;
-import io.github.vovten.eventflow.serialization.EventSerializer;
 import io.github.vovten.eventflow.serialization.EventSerializerFactory;
 import io.github.vovten.eventflow.transport.AsyncEventConsumer;
 import io.github.vovten.eventflow.transport.InTransport;
+import io.github.vovten.eventflow.transport.incoming.kafka.BackpressureController;
+import io.github.vovten.eventflow.transport.incoming.kafka.KafkaConsumerProperties;
+import io.github.vovten.eventflow.transport.incoming.kafka.KafkaOffsetCommitter;
+import io.github.vovten.eventflow.transport.incoming.kafka.KafkaRebalanceListener;
+import io.github.vovten.eventflow.transport.incoming.kafka.KafkaRecordDelivery;
+import io.github.vovten.eventflow.transport.incoming.kafka.PartitionStateTracker;
+import io.github.vovten.eventflow.transport.incoming.kafka.PartitionUnblockQueue;
 import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Kafka incoming transport for receiving external events with
@@ -122,13 +110,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A transport instance is <b>single-use</b>: after {@link #stop()} (or
  * {@link #close()}) it cannot be started again; {@link #start(AsyncEventConsumer)}
  * throws {@link IllegalStateException}.
- * <p>
- * <b>When to use:</b>
- * <ul>
- *   <li>Cross-application event communication</li>
- *   <li>Event-driven microservices architecture</li>
- *   <li>Receiving events from external systems</li>
- * </ul>
  *
  * @author Vladimir Aleshkov
  * @since 1.0.0
@@ -138,9 +119,7 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaInTransport.class);
 
-    private static final String AUTO_OFFSET_RESET_EARLIEST = "earliest";
-
-    private static final String MDC_DELIVERED_FROM = "deliveredFrom";
+    private static final String NAME = "kafka";
 
     /**
      * Poll timeout in milliseconds.
@@ -167,70 +146,12 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
-    private final EventSerializerFactory serializerFactory;
 
-    /**
-     * Offsets of records polled in this session, ordered per partition.
-     * A record stays in the map until the contiguous commit frontier passes
-     * it; records behind a stuck head remain buffered (bounded by the hard
-     * buffer cap). Only the consume-loop thread mutates this map, so no
-     * synchronization is required. A record that never completes keeps its
-     * partition paused once the buffer cap is reached.
-     */
-    private final Map<TopicPartition, TreeMap<Long, CompletableFuture<?>>> pendingByPartition = new HashMap<>();
-
-    /**
-     * Number of not-yet-completed futures per partition. Incremented when a
-     * record is tracked and decremented by the completion callback, which may
-     * run on a handler thread — hence the atomic counter value.
-     * <p>
-     * <b>Thread-safety invariant:</b> the {@code HashMap} itself is mutated only
-     * by the consume-loop thread ({@code computeIfAbsent}/{@code get}/{@code remove});
-     * handler threads only decrement the {@link AtomicInteger} instance captured
-     * by their callback, never touching the map.
-     * <p>
-     * Counters are per-generation: when a partition is unblocked or revoked, its
-     * entry is removed and a later tracking starts a fresh counter. Futures left
-     * over from the dropped generation belong to intentionally discarded work
-     * (the records are re-delivered) and therefore do not count towards
-     * backpressure of the new generation.
-     */
-    private final Map<TopicPartition, AtomicInteger> inFlightByPartition = new HashMap<>();
-
-    /**
-     * Highest offset (exclusive) successfully committed per partition. Guards
-     * against re-committing after a transient commit failure: the frontier is
-     * retried on the next loop iteration.
-     */
-    private final Map<TopicPartition, Long> committedFrontiers = new HashMap<>();
-
-    /**
-     * First offset whose processing failed per partition. A blocked partition
-     * cannot advance its frontier and stays paused until a rebalance, restart
-     * or an explicit {@link #unblock(TopicPartition)}.
-     */
-    private final Map<TopicPartition, Long> blockedFrontiers = new HashMap<>();
-
-    /**
-     * Partitions currently paused for backpressure or because they are blocked.
-     */
-    private final Set<TopicPartition> pausedPartitions = new HashSet<>();
-
-    /**
-     * Unblock requests from other threads, processed by the consume loop.
-     */
-    private final Queue<TopicPartition> unblockRequests = new ConcurrentLinkedQueue<>();
-
-    /**
-     * Maximum number of in-flight records per partition before pausing.
-     */
-    private final int maxInFlightRecordsPerPartition;
-
-    /**
-     * Hard cap on buffered records per partition; protects memory when a head
-     * record stays pending while later records complete.
-     */
-    private final int maxBufferedRecordsPerPartition;
+    private final KafkaRecordDelivery recordDelivery;
+    private final PartitionStateTracker tracker = new PartitionStateTracker();
+    private final KafkaOffsetCommitter offsetCommitter = new KafkaOffsetCommitter();
+    private final BackpressureController backpressure;
+    private final PartitionUnblockQueue unblockQueue = new PartitionUnblockQueue();
 
     /**
      * Create Kafka transport with bootstrap servers, topics, and group ID.
@@ -338,25 +259,20 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
                      ExecutorService executorService,
                      EventSerializerFactory serializerFactory,
                      int maxInFlightRecordsPerPartition) {
-        if (maxInFlightRecordsPerPartition <= 0) {
-            throw new IllegalArgumentException("maxInFlightRecordsPerPartition must be positive");
-        }
         if (topics == null || topics.isEmpty()) {
             throw new IllegalArgumentException("At least one Kafka topic must be configured");
         }
         this.topics = List.copyOf(topics);
         this.kafkaConsumer = Objects.requireNonNull(kafkaConsumer, "kafkaConsumer must not be null");
         this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
-        this.serializerFactory = Objects.requireNonNull(serializerFactory, "serializerFactory must not be null");
-        this.maxInFlightRecordsPerPartition = maxInFlightRecordsPerPartition;
-        // Guard against int overflow for very large limits.
-        long buffered = (long) maxInFlightRecordsPerPartition * 2;
-        this.maxBufferedRecordsPerPartition = (int) Math.min(buffered, Integer.MAX_VALUE);
+        this.recordDelivery = new KafkaRecordDelivery(
+                Objects.requireNonNull(serializerFactory, "serializerFactory must not be null"), NAME);
+        this.backpressure = new BackpressureController(maxInFlightRecordsPerPartition);
     }
 
     @Override
     public String name() {
-        return "kafka";
+        return NAME;
     }
 
     @Override
@@ -392,7 +308,7 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
             // consumer is closed by the loop thread itself in its finally block.
             kafkaConsumer.wakeup();
         }
-        unblockRequests.clear();
+        unblockQueue.clear();
         // Shut the executor down regardless of how the loop ended: a fatal
         // consumer error sets running=false and would otherwise leak the thread.
         executorService.shutdown();
@@ -424,7 +340,7 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
             log.debug("Ignoring unblock request for {}: transport is not running", partition);
             return;
         }
-        unblockRequests.add(partition);
+        unblockQueue.request(partition);
     }
 
     /**
@@ -462,16 +378,17 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
 
     private void consumeLoop(AsyncEventConsumer eventConsumer) {
         try {
-            kafkaConsumer.subscribe(topics, rebalanceListener(kafkaConsumer));
+            kafkaConsumer.subscribe(topics,
+                    new KafkaRebalanceListener(kafkaConsumer, tracker, offsetCommitter, backpressure));
             while (running.get()) {
-                processUnblockRequests(kafkaConsumer);
+                unblockQueue.process(kafkaConsumer, tracker, backpressure);
                 pollAndDeliver(kafkaConsumer, eventConsumer);
                 if (!running.get()) {
                     break;
                 }
                 commitCompletedOffsets(kafkaConsumer);
-                applyBackpressure(kafkaConsumer);
-                releaseBackpressure(kafkaConsumer);
+                backpressure.apply(kafkaConsumer, tracker);
+                backpressure.release(kafkaConsumer, tracker);
             }
         } catch (WakeupException e) {
             log.debug("KafkaInTransport loop woken up for shutdown");
@@ -511,8 +428,8 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
     private void pollAndDeliver(Consumer<String, byte[]> consumer, AsyncEventConsumer eventConsumer) {
         try {
             for (ConsumerRecord<String, byte[]> record : consumer.poll(POLL_TIMEOUT)) {
-                CompletableFuture<?> processing = tryDeliverEvent(record, eventConsumer);
-                trackRecord(new TopicPartition(record.topic(), record.partition()),
+                CompletableFuture<?> processing = recordDelivery.deliver(record, eventConsumer);
+                tracker.track(new TopicPartition(record.topic(), record.partition()),
                         record.offset(), processing);
             }
         } catch (WakeupException e) {
@@ -527,87 +444,8 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
         }
     }
 
-    /**
-     * Stores the processing future of a record and keeps the in-flight counter
-     * up to date.
-     *
-     * @param partition  the record partition
-     * @param offset     the record offset
-     * @param processing the processing future
-     */
-    private void trackRecord(TopicPartition partition, long offset, CompletableFuture<?> processing) {
-        pendingByPartition.computeIfAbsent(partition, key -> new TreeMap<>()).put(offset, processing);
-        AtomicInteger inFlight = inFlightByPartition.computeIfAbsent(partition, key -> new AtomicInteger());
-        inFlight.incrementAndGet();
-        processing.whenComplete((result, error) -> inFlight.decrementAndGet());
-    }
-
-    /**
-     * Releases partitions requested via {@link #unblock(TopicPartition)}:
-     * re-positions them at the failed offset, resumes them and drops their
-     * buffered state. Executed on the consume-loop thread.
-     *
-     * @param consumer the Kafka consumer
-     */
-    private void processUnblockRequests(Consumer<String, byte[]> consumer) {
-        TopicPartition partition;
-        while ((partition = unblockRequests.poll()) != null) {
-            Long blockedAt = blockedFrontiers.get(partition);
-            if (blockedAt == null) {
-                log.debug("Ignoring unblock request for non-blocked partition {}", partition);
-                continue;
-            }
-            // Apply the consumer-side changes first: if seek/resume fails the
-            // bookkeeping must stay intact so the request can be retried and the
-            // partition is not left paused without anyone tracking it.
-            try {
-                consumer.seek(partition, blockedAt);
-                consumer.resume(List.of(partition));
-            } catch (RuntimeException e) {
-                log.warn("Failed to unblock partition {} ({}: {}); it stays blocked and will be retried",
-                        partition, e.getClass().getSimpleName(), e.getMessage());
-                continue;
-            }
-            blockedFrontiers.remove(partition);
-            pendingByPartition.remove(partition);
-            inFlightByPartition.remove(partition);
-            pausedPartitions.remove(partition);
-            log.info("Unblocked partition {}; reprocessing from offset {}", partition, blockedAt);
-        }
-    }
-
-    /**
-     * Commits the offset after the last contiguously completed record of each
-     * partition. A record whose processing failed (exceptional future) or has
-     * not completed yet stops the frontier: nothing after it is committed, so
-     * those records are re-delivered after a restart.
-     *
-     * @param consumer the Kafka consumer
-     */
     private void commitCompletedOffsets(Consumer<String, byte[]> consumer) {
-        commitCompletedOffsets(consumer, "will retry on the next loop iteration");
-    }
-
-    /**
-     * Commits the completed offsets, using the hint in the failure log.
-     *
-     * @param consumer  the Kafka consumer
-     * @param retryHint explanation of what happens after a failed commit
-     */
-    private void commitCompletedOffsets(Consumer<String, byte[]> consumer, String retryHint) {
-        Map<TopicPartition, Long> frontiers = new HashMap<>();
-        for (Map.Entry<TopicPartition, TreeMap<Long, CompletableFuture<?>>> entry : pendingByPartition.entrySet()) {
-            TopicPartition partition = entry.getKey();
-            Long frontier = advanceOrBlock(partition, entry.getValue());
-            Long committed = committedFrontiers.get(partition);
-            if (frontier != null && (committed == null || frontier > committed)) {
-                frontiers.put(partition, frontier);
-            }
-        }
-        Map<TopicPartition, Long> committedNow = commitFrontiers(consumer, frontiers, retryHint);
-        // Completed records are removed only after Kafka confirmed the commit:
-        // if commitSync fails, the frontier stays recoverable and is retried.
-        committedNow.forEach(this::pruneCommitted);
+        commitFrontiers(consumer, committableFrontiers(), "will retry on the next loop iteration");
     }
 
     /**
@@ -618,422 +456,41 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
      * @param consumer the Kafka consumer
      */
     private void commitFinalOffsets(Consumer<String, byte[]> consumer) {
+        commitFrontiers(consumer, finalFrontiers(), "final commit is best-effort");
+    }
+
+    private Map<TopicPartition, Long> committableFrontiers() {
         Map<TopicPartition, Long> frontiers = new HashMap<>();
-        for (Map.Entry<TopicPartition, TreeMap<Long, CompletableFuture<?>>> entry : pendingByPartition.entrySet()) {
-            TopicPartition partition = entry.getKey();
-            Long frontier = completedFrontierOnly(entry.getValue());
-            Long committed = committedFrontiers.get(partition);
-            if (frontier != null && (committed == null || frontier > committed)) {
-                frontiers.put(partition, frontier);
-            }
+        for (TopicPartition partition : tracker.partitions()) {
+            addIfAdvanced(frontiers, partition, tracker.advanceOrBlock(partition));
         }
-        commitFrontiers(consumer, frontiers, "final commit is best-effort");
+        return frontiers;
     }
 
-    /**
-     * Removes buffered records below a confirmed commit frontier.
-     *
-     * @param partition the partition
-     * @param frontier  the committed offset (exclusive)
-     */
-    private void pruneCommitted(TopicPartition partition, long frontier) {
-        TreeMap<Long, CompletableFuture<?>> pending = pendingByPartition.get(partition);
-        if (pending != null) {
-            pending.headMap(frontier, false).clear();
-        }
-    }
-
-    /**
-     * Computes the contiguous completed frontier without applying the failure
-     * policy: the scan stops silently at the first pending or failed record.
-     * <p>
-     * Used during revocation, when the partition is handed to another consumer
-     * and a local failure must not be reported as a block.
-     *
-     * @param pending offsets of in-session records ordered by offset
-     * @return the offset after the last contiguously completed record, or null
-     */
-    private Long completedFrontierOnly(TreeMap<Long, CompletableFuture<?>> pending) {
-        Long frontier = null;
-        for (Map.Entry<Long, CompletableFuture<?>> entry : pending.entrySet()) {
-            CompletableFuture<?> future = entry.getValue();
-            if (!future.isDone() || future.isCompletedExceptionally()) {
-                break;
-            }
-            frontier = entry.getKey() + 1;
-        }
-        return frontier;
-    }
-
-    /**
-     * Advances the contiguous completed frontier of a partition and marks the
-     * partition blocked when the head record failed.
-     * <p>
-     * <b>Side effects:</b> on the first failure records the blocked offset and
-     * logs an error. {@code pending} is not mutated: completed records are
-     * removed only after Kafka confirmed the commit (see {@link #pruneCommitted}),
-     * so a failed commit can safely be retried with the same frontier. Buffered
-     * records are intentionally kept: records that already completed must not be
-     * reprocessed after a restart of the same session state. Memory stays bounded
-     * because a blocked partition is paused.
-     *
-     * @param partition the partition the pending map belongs to
-     * @param pending   offsets of in-session records ordered by offset
-     * @return the offset after the last contiguously completed record, or null
-     *         when no new offset became committable
-     */
-    private Long advanceOrBlock(TopicPartition partition, TreeMap<Long, CompletableFuture<?>> pending) {
-        Long frontier = null;
-        for (Map.Entry<Long, CompletableFuture<?>> entry : pending.entrySet()) {
-            CompletableFuture<?> future = entry.getValue();
-            if (!future.isDone()) {
-                break;
-            }
-            if (future.isCompletedExceptionally()) {
-                Long previous = blockedFrontiers.putIfAbsent(partition, entry.getKey());
-                if (previous == null) {
-                    log.error("Partition {} blocked at offset {}: processing failed; no further offsets "
-                                    + "are committed or processed until rebalance, restart or unblock()",
-                            partition, entry.getKey());
-                }
-                break;
-            }
-            frontier = entry.getKey() + 1;
-        }
-        return frontier;
-    }
-
-    /**
-     * Commits the given frontiers and remembers them. A transient commit
-     * failure leaves the pending state untouched so the same frontier is
-     * retried on the next loop iteration.
-     *
-     * @param consumer  the Kafka consumer
-     * @param frontiers partition to offset (exclusive) to commit
-     * @param retryHint explanation of what happens after a failed commit
-     * @return the frontiers Kafka confirmed; empty when the commit failed
-     */
-    private Map<TopicPartition, Long> commitFrontiers(Consumer<String, byte[]> consumer,
-                                                      Map<TopicPartition, Long> frontiers, String retryHint) {
-        if (frontiers.isEmpty()) {
-            return Map.of();
-        }
-        Map<TopicPartition, OffsetAndMetadata> toCommit = new HashMap<>();
-        frontiers.forEach((partition, offset) -> toCommit.put(partition, new OffsetAndMetadata(offset)));
-        try {
-            consumer.commitSync(toCommit);
-            toCommit.forEach((partition, offset) -> committedFrontiers.put(partition, offset.offset()));
-            if (log.isDebugEnabled()) {
-                log.debug("Committed offsets: {}", toCommit);
-            }
-            return frontiers;
-        } catch (WakeupException e) {
-            throw e;
-        } catch (Exception e) {
-            log.warn("Failed to commit offsets {} ({}): {}: {}",
-                    toCommit.keySet(), retryHint, e.getClass().getSimpleName(), e.getMessage());
-            return Map.of();
-        }
-    }
-
-    /**
-     * Deserializes and delivers a single record.
-     *
-     * @param record        the Kafka record
-     * @param eventConsumer the event consumer
-     * @return the processing future to track for offset commitment; poison
-     *         pills return an already completed future so that the offset
-     *         frontier advances past them (skip)
-     */
-    private CompletableFuture<?> tryDeliverEvent(ConsumerRecord<String, byte[]> record,
-                                                 AsyncEventConsumer eventConsumer) {
-        byte[] data = record.value();
-        if (data == null) {
-            // Kafka tombstone: not an event. Skip and advance the frontier,
-            // otherwise it would be re-delivered forever.
-            log.warn("Skipping tombstone record from topic: {}, partition: {}, offset: {} — "
-                            + "its offset will be committed",
-                    record.topic(), record.partition(), record.offset());
-            return CompletableFuture.completedFuture(null);
-        }
-        try {
-            EventSerializer serializer = serializerFactory.getByData(data);
-            Event event = serializer.deserialize(data, Event.class);
-            if (event == null) {
-                throw new EventSerializationException("Deserializer returned null for event data");
-            }
-            return deliverEvent(record, event, eventConsumer);
-        } catch (EventSerializationException e) {
-            // Poison pill: the record can never be deserialized, skipping its
-            // offset avoids an endless redelivery loop. A completed future
-            // lets the contiguous frontier advance past the poison record.
-            // A dead-letter policy is a planned follow-up.
-            log.error("Failed to deserialize event from topic: {}, partition: {}, offset: {}, key: {} — "
-                            + "record is skipped and its offset will be committed",
-                    record.topic(), record.partition(), record.offset(), record.key(), e);
-            return CompletableFuture.completedFuture(null);
-        } catch (Exception e) {
-            // Not a data-format problem (e.g. serializer configuration error):
-            // do not silently drop the record — fail it so the partition is
-            // blocked and the record is re-delivered after restart.
-            log.error("Unexpected error while preparing event from topic: {}, partition: {}, offset: {}, "
-                            + "key: {} — the partition will be blocked and the record re-delivered after restart",
-                    record.topic(), record.partition(), record.offset(), record.key(), e);
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    /**
-     * Delivers a deserialized event to the consumer.
-     *
-     * @param record        the Kafka record the event came from
-     * @param event         the deserialized event
-     * @param eventConsumer the event consumer
-     * @return the processing future to track for offset commitment
-     */
-    private CompletableFuture<?> deliverEvent(ConsumerRecord<String, byte[]> record, Event event,
-                                              AsyncEventConsumer eventConsumer) {
-        String previousDeliveredFrom = MDC.get(MDC_DELIVERED_FROM);
-        MDC.put(MDC_DELIVERED_FROM, name() + "-" + record.topic() + "-p" + record.partition());
-        Map<String, String> context = MDC.getCopyOfContextMap();
-        try {
-            CompletableFuture<?> processing = Objects.requireNonNull(eventConsumer.accept(event),
-                    "AsyncEventConsumer.accept() must not return null; return a completed future "
-                            + "for synchronous processing");
-            CompletableFuture<?> tracked = processing.whenComplete((result, error) -> {
-                if (error != null) {
-                    runWithMdc(context, () -> log.error(
-                            "Event processing failed for topic: {}, partition: {}, offset: {} — "
-                                    + "the record will be re-delivered after restart",
-                            record.topic(), record.partition(), record.offset(), error));
-                }
-            });
-            if (log.isDebugEnabled()) {
-                String payloadType;
-                if (event instanceof Envelope<?> envelope) {
-                    payloadType = envelope.payload() == null
-                            ? "null"
-                            : envelope.payload().getClass().getSimpleName();
-                } else {
-                    payloadType = event.getClass().getSimpleName();
-                }
-                log.debug("Event delivered from Kafka topic: {}, key: {}, event type: {}, payload type: {}",
-                        record.topic(), record.key(), event.type().getSimpleName(), payloadType);
-            }
-            return tracked;
-        } catch (Exception e) {
-            // Synchronous consumer failure: the record must be re-delivered,
-            // so its offset must not advance.
-            log.error("Event delivery failed for topic: {}, partition: {}, offset: {} — "
-                            + "offset will not be committed; the record will be re-delivered after restart",
-                    record.topic(), record.partition(), record.offset(), e);
-            return CompletableFuture.failedFuture(e);
-        } finally {
-            restoreMdc(previousDeliveredFrom);
-        }
-    }
-
-    /**
-     * Runs the action with the captured MDC context so asynchronous callbacks
-     * keep the delivery diagnostics.
-     *
-     * @param context captured MDC context, may be null
-     * @param action  the action to run
-     */
-    private static void runWithMdc(Map<String, String> context, Runnable action) {
-        Map<String, String> previous = MDC.getCopyOfContextMap();
-        try {
-            if (context != null) {
-                MDC.setContextMap(context);
-            } else {
-                MDC.clear();
-            }
-            action.run();
-        } finally {
-            if (previous != null) {
-                MDC.setContextMap(previous);
-            } else {
-                MDC.clear();
-            }
-        }
-    }
-
-    /**
-     * Restores the previous value of the delivery MDC key.
-     *
-     * @param previousDeliveredFrom the previous value, or null when absent
-     */
-    private static void restoreMdc(String previousDeliveredFrom) {
-        if (previousDeliveredFrom != null) {
-            MDC.put(MDC_DELIVERED_FROM, previousDeliveredFrom);
-        } else {
-            MDC.remove(MDC_DELIVERED_FROM);
-        }
-    }
-
-    /**
-     * Builds the rebalance listener that persists completed progress before a
-     * partition is revoked and drops in-memory state for revoked, assigned and
-     * lost partitions. Callbacks run on the consume-loop (poll) thread.
-     *
-     * @param consumer the Kafka consumer
-     * @return the rebalance listener
-     */
-    private ConsumerRebalanceListener rebalanceListener(Consumer<String, byte[]> consumer) {
-        return new ConsumerRebalanceListener() {
-            @Override
-            public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-                commitRevokedPartitions(consumer, partitions);
-                clearPartitionState(partitions);
-            }
-
-            @Override
-            public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                // Defensive: a fresh assignment must not inherit stale state.
-                clearPartitionState(partitions);
-            }
-
-            @Override
-            public void onPartitionsLost(Collection<TopicPartition> partitions) {
-                // Ownership is already gone, committing would fail.
-                clearPartitionState(partitions);
-            }
-        };
-    }
-
-    /**
-     * Commits the contiguous completed frontier of partitions about to be
-     * revoked, so the new owner continues from the acknowledged position.
-     *
-     * @param consumer   the Kafka consumer
-     * @param partitions revoked partitions
-     */
-    private void commitRevokedPartitions(Consumer<String, byte[]> consumer,
-                                         Collection<TopicPartition> partitions) {
+    private Map<TopicPartition, Long> finalFrontiers() {
         Map<TopicPartition, Long> frontiers = new HashMap<>();
-        for (TopicPartition partition : partitions) {
-            TreeMap<Long, CompletableFuture<?>> pending = pendingByPartition.get(partition);
-            if (pending == null) {
-                continue;
-            }
-            // Ownership is moving: a failure is the new owner's concern, so do
-            // not mark the partition blocked or log an error here.
-            Long frontier = completedFrontierOnly(pending);
-            Long committed = committedFrontiers.get(partition);
-            if (frontier != null && (committed == null || frontier > committed)) {
-                frontiers.put(partition, frontier);
-            }
+        for (TopicPartition partition : tracker.partitions()) {
+            addIfAdvanced(frontiers, partition, tracker.completedFrontierOnly(partition));
         }
-        commitFrontiers(consumer, frontiers,
-                "commit during revocation failed; the new owner will re-deliver uncommitted records");
+        return frontiers;
     }
 
-    /**
-     * Drops all in-memory offset tracking for the given partitions.
-     *
-     * @param partitions partitions to forget
-     */
-    private void clearPartitionState(Collection<TopicPartition> partitions) {
-        for (TopicPartition partition : partitions) {
-            pendingByPartition.remove(partition);
-            inFlightByPartition.remove(partition);
-            committedFrontiers.remove(partition);
-            blockedFrontiers.remove(partition);
-            pausedPartitions.remove(partition);
+    private void addIfAdvanced(Map<TopicPartition, Long> frontiers, TopicPartition partition, Long frontier) {
+        Long committed = tracker.committedFrontier(partition);
+        if (frontier != null && (committed == null || frontier > committed)) {
+            frontiers.put(partition, frontier);
         }
     }
 
-    /**
-     * Pauses partitions that are blocked by a failure, have too many in-flight
-     * records, or have reached the hard buffer cap.
-     *
-     * @param consumer the Kafka consumer
-     */
-    private void applyBackpressure(Consumer<String, byte[]> consumer) {
-        List<TopicPartition> toPause = new ArrayList<>();
-        for (TopicPartition partition : pendingByPartition.keySet()) {
-            if (pausedPartitions.contains(partition)) {
-                continue;
-            }
-            TreeMap<Long, CompletableFuture<?>> pending = pendingByPartition.get(partition);
-            int buffered = pending == null ? 0 : pending.size();
-            boolean blocked = blockedFrontiers.containsKey(partition);
-            boolean tooManyInFlight = inFlightCount(partition) >= maxInFlightRecordsPerPartition;
-            boolean bufferFull = buffered >= maxBufferedRecordsPerPartition;
-            if (blocked || tooManyInFlight || bufferFull) {
-                toPause.add(partition);
-            }
-        }
-        if (toPause.isEmpty()) {
-            return;
-        }
-        try {
-            consumer.pause(toPause);
-            pausedPartitions.addAll(toPause);
-            log.debug("Paused partitions due to backpressure or failure: {}", toPause);
-        } catch (RuntimeException e) {
-            // pause() is a local operation; a failure must not kill the consume
-            // loop. The pause is retried on the next iteration.
-            log.warn("Failed to pause partitions {} ({}: {})",
-                    toPause, e.getClass().getSimpleName(), e.getMessage());
-        }
-    }
-
-    /**
-     * Resumes paused, assigned partitions whose in-flight count and buffer size
-     * have dropped below the limits. Blocked partitions are never resumed
-     * automatically.
-     *
-     * @param consumer the Kafka consumer
-     */
-    private void releaseBackpressure(Consumer<String, byte[]> consumer) {
-        Set<TopicPartition> assigned = assignedPartitions(consumer);
-        List<TopicPartition> toResume = new ArrayList<>();
-        for (TopicPartition partition : pausedPartitions) {
-            if (blockedFrontiers.containsKey(partition) || !assigned.contains(partition)) {
-                continue;
-            }
-            TreeMap<Long, CompletableFuture<?>> pending = pendingByPartition.get(partition);
-            int buffered = pending == null ? 0 : pending.size();
-            if (inFlightCount(partition) < maxInFlightRecordsPerPartition
-                    && buffered < maxBufferedRecordsPerPartition) {
-                toResume.add(partition);
-            }
-        }
-        if (toResume.isEmpty()) {
-            return;
-        }
-        try {
-            consumer.resume(toResume);
-            toResume.forEach(pausedPartitions::remove);
-            log.debug("Resumed partitions after backpressure: {}", toResume);
-        } catch (RuntimeException e) {
-            // resume() is a local operation; keep the paused bookkeeping and
-            // retry on the next iteration instead of killing the loop.
-            log.warn("Failed to resume partitions {} ({}: {})",
-                    toResume, e.getClass().getSimpleName(), e.getMessage());
-        }
-    }
-
-    private static Set<TopicPartition> assignedPartitions(Consumer<String, byte[]> consumer) {
-        try {
-            return consumer.assignment();
-        } catch (RuntimeException e) {
-            log.debug("Failed to read consumer assignment ({}): {}",
-                    e.getClass().getSimpleName(), e.getMessage());
-            return Set.of();
-        }
-    }
-
-    /**
-     * Returns the current in-flight record count of a partition.
-     *
-     * @param partition the partition
-     * @return number of not-yet-completed futures
-     */
-    private int inFlightCount(TopicPartition partition) {
-        AtomicInteger counter = inFlightByPartition.get(partition);
-        return counter == null ? 0 : counter.get();
+    private void commitFrontiers(Consumer<String, byte[]> consumer,
+                                 Map<TopicPartition, Long> frontiers, String retryHint) {
+        Map<TopicPartition, Long> confirmed = offsetCommitter.commit(consumer, frontiers, retryHint);
+        // Completed records are removed only after Kafka confirmed the commit:
+        // if commitSync fails, the frontier stays recoverable and is retried.
+        confirmed.forEach((partition, frontier) -> {
+            tracker.markCommitted(partition, frontier);
+            tracker.pruneCommitted(partition, frontier);
+        });
     }
 
     private void tryCloseConsumer() {
@@ -1045,73 +502,33 @@ public class KafkaInTransport implements InTransport, AutoCloseable {
     }
 
     /**
-     * Builds the default consumer properties for at-least-once delivery:
-     * auto-commit disabled and {@code auto.offset.reset=earliest}.
+     * Builds the default consumer properties for at-least-once delivery.
      *
      * @param bootstrapServers Kafka bootstrap servers
      * @param groupId          consumer group ID
      * @return consumer properties
      */
     static Properties defaultConsumerProperties(String bootstrapServers, String groupId) {
-        Properties props = new Properties();
-        props.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        props.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-        applyAtLeastOnceDefaults(props);
-        return props;
-    }
-
-    private static Consumer<String, byte[]> createConsumer(String bootstrapServers, String groupId) {
-        return new KafkaConsumer<>(defaultConsumerProperties(bootstrapServers, groupId));
-    }
-
-    private static Consumer<String, byte[]> createConsumer(Properties properties, String groupId) {
-        Properties props = new Properties();
-        props.putAll(properties);
-        props.putIfAbsent(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        props.putIfAbsent(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.putIfAbsent(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-        applyAtLeastOnceDefaults(props);
-        return new KafkaConsumer<>(props);
+        return KafkaConsumerProperties.defaults(bootstrapServers, groupId);
     }
 
     /**
-     * Applies the at-least-once defaults for values the caller did not set.
-     * <p>
-     * User-provided values always win: explicitly setting
-     * {@code enable.auto.commit=true} or a different {@code auto.offset.reset}
-     * disables the corresponding at-least-once guarantee, and the transport will
-     * rely on the caller's offset management.
-     *
-     * @param props consumer properties to complete
-     */
-    private static void applyAtLeastOnceDefaults(Properties props) {
-        props.putIfAbsent(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, AUTO_OFFSET_RESET_EARLIEST);
-        props.putIfAbsent(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        props.putIfAbsent(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1000");
-        props.putIfAbsent(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "524288");
-        props.putIfAbsent(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "500");
-    }
-
-    /**
-     * Splits a comma-separated topic list, trimming each name and ignoring
-     * blank entries.
-     * <p>
-     * The result may be empty for a blank input; the transport constructors
-     * reject an empty topic list.
+     * Splits a comma-separated topic list, trimming each name and ignoring blank
+     * entries.
      *
      * @param topics comma-separated topics
      * @return list of topic names
      * @throws IllegalArgumentException if {@code topics} is null
      */
     static List<String> parseTopics(String topics) {
-        if (topics == null) {
-            throw new IllegalArgumentException("Topic list must not be null");
-        }
-        return Arrays.stream(topics.split(","))
-                .map(String::trim)
-                .filter(name -> !name.isEmpty())
-                .toList();
+        return KafkaConsumerProperties.parseTopics(topics);
+    }
+
+    private static Consumer<String, byte[]> createConsumer(String bootstrapServers, String groupId) {
+        return new KafkaConsumer<>(KafkaConsumerProperties.defaults(bootstrapServers, groupId));
+    }
+
+    private static Consumer<String, byte[]> createConsumer(Properties properties, String groupId) {
+        return new KafkaConsumer<>(KafkaConsumerProperties.withOverrides(properties, groupId));
     }
 }
