@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 
@@ -24,8 +25,12 @@ import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS
  * targeted explicitly); it is only written into the record metadata. The default
  * key strategy is {@link EventKeyResolver#eventType()}.
  * <p>
- * If all partitions fail, the result contains the error.
- * If some partitions fail, a warning is logged and the first successful result is returned.
+ * The broadcast semantics are strict: if <b>any</b> partition fails, the whole
+ * send is reported as failed and contains the successful/failed partition lists
+ * in the result metadata. Reporting partial delivery as success would silently
+ * lose the event for subscribers of the failed partitions; with a failure result
+ * the publisher's retry path re-delivers the event (successful partitions receive
+ * a duplicate, which the at-least-once contract allows).
  *
  * @author Vladimir Aleshkov
  * @since 1.0.0
@@ -112,11 +117,9 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
      * Send event to all partitions of the Kafka topic.
      * <p>
      * This method retrieves partition metadata and sends the event to each partition.
-     * It tracks successes and failures to provide detailed error handling:
-     * <ul>
-     *   <li>If all sends fail — the result contains the error</li>
-     *   <li>If some sends fail — a warning is logged with partition details</li>
-     * </ul>
+     * The semantics are strict: a failure in any partition fails the whole
+     * broadcast. The result then carries the failure cause, a detailed message
+     * and the successful/failed partition lists in its metadata.
      * A failure to resolve the key, serialize the event or enumerate partitions
      * (e.g., when the topic has no partitions) is surfaced through the returned
      * future, consistent with the base {@link #send(Event)} contract.
@@ -124,7 +127,8 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
      * @param event the event to send
      * @param key   the Kafka record key (does not influence routing, partitions are explicit)
      * @param value the serialized event payload
-     * @return CompletableFuture with SendResult from the first successful partition
+     * @return CompletableFuture with the send result: successful only when every
+     *         partition accepted the event
      */
     @Override
     protected CompletableFuture<SendResult> dispatch(Event event, String key, byte[] value) {
@@ -155,27 +159,34 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
             Event event,
             int totalPartitions
     ) {
-        List<Integer> successfulPartitions = extractSuccessfulPartitions(results);
         List<PartitionSendResult> failedPartitions = extractFailedPartitions(results);
+        if (failedPartitions.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug(
+                        "Successfully broadcast event {} to all {} partitions of topic '{}'",
+                        event.type().getSimpleName(), totalPartitions, topic
+                );
+            }
+            return findFirstSuccessfulResult(results, topic);
+        }
 
-        if (successfulPartitions.isEmpty()) {
-            String errorMessage = buildErrorMessage(event, totalPartitions, failedPartitions);
-            PartitionSendResult firstFailure = failedPartitions.getFirst();
-            Throwable cause = firstFailure.exception() != null
-                    ? firstFailure.exception()
-                    : firstFailure.sendResult().error();
-            return SendResult.failure(topic, cause, errorMessage);
-        }
-        if (!failedPartitions.isEmpty()) {
-            log.warn(buildWarningMessage(event, totalPartitions, successfulPartitions, failedPartitions));
-        }
-        if (log.isDebugEnabled() && successfulPartitions.size() == totalPartitions) {
-            log.debug(
-                    "Successfully broadcast event {} to all {} partitions of topic '{}'",
-                    event.type().getSimpleName(), totalPartitions, topic
-            );
-        }
-        return findFirstSuccessfulResult(results, topic);
+        List<Integer> successfulPartitions = extractSuccessfulPartitions(results);
+        List<Integer> failedPartitionIds = failedPartitions.stream()
+                .map(PartitionSendResult::partitionId)
+                .toList();
+        String errorMessage = buildFailureMessage(event, totalPartitions, successfulPartitions, failedPartitions);
+        log.warn(errorMessage);
+
+        PartitionSendResult firstFailure = failedPartitions.getFirst();
+        Throwable cause = firstFailure.exception() != null
+                ? firstFailure.exception()
+                : firstFailure.sendResult().error();
+        Map<String, Object> metadata = Map.of(
+                "totalPartitions", totalPartitions,
+                "successfulPartitions", successfulPartitions,
+                "failedPartitions", failedPartitionIds
+        );
+        return SendResult.failure(topic, cause, errorMessage, metadata);
     }
 
     private List<PartitionSendResult> collectResults(
@@ -207,43 +218,14 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
                 .orElse(SendResult.failure(topic, "All partitions failed"));
     }
 
-    private String buildErrorMessage(
-            Event event,
-            int totalPartitions,
-            List<PartitionSendResult> failedPartitions
-    ) {
-        StringBuilder sb = new StringBuilder(256);
-        sb.append("Failed to broadcast event ")
-                .append(event.type().getSimpleName())
-                .append(" to any partition of topic '")
-                .append(topic)
-                .append("' (0/")
-                .append(totalPartitions)
-                .append(" successful)");
-        if (!failedPartitions.isEmpty()) {
-            sb.append(". Failures:");
-            for (PartitionSendResult result : failedPartitions) {
-                String error = result.exception() != null
-                        ? result.exception().getMessage()
-                        : result.sendResult().errorDetails();
-                sb.append(" [partition=")
-                        .append(result.partitionId())
-                        .append(": ")
-                        .append(error)
-                        .append("]");
-            }
-        }
-        return sb.toString();
-    }
-
-    private String buildWarningMessage(
+    private String buildFailureMessage(
             Event event,
             int totalPartitions,
             List<Integer> successfulPartitions,
             List<PartitionSendResult> failedPartitions
     ) {
         StringBuilder sb = new StringBuilder(256);
-        sb.append("Partial broadcast of event ")
+        sb.append("Failed to broadcast event ")
                 .append(event.type().getSimpleName())
                 .append(" to topic '")
                 .append(topic)
@@ -251,9 +233,11 @@ public class BroadcastKafkaOutTransport extends AbstractKafkaOutTransport {
                 .append(successfulPartitions.size())
                 .append("/")
                 .append(totalPartitions)
-                .append(" successful). Successful partitions: ")
-                .append(successfulPartitions)
-                .append(". Failed partitions:");
+                .append(" successful)");
+        if (!successfulPartitions.isEmpty()) {
+            sb.append(". Successful partitions: ").append(successfulPartitions);
+        }
+        sb.append(". Failures:");
         for (PartitionSendResult result : failedPartitions) {
             String error = result.exception() != null
                     ? result.exception().getMessage()

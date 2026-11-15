@@ -54,6 +54,13 @@ public record SendResult(
         return new SendResult(false, destination, Instant.now(), null, Map.of(), error, errorDetails);
     }
 
+    /** Failed send result with exception, detailed message and metadata. */
+    public static SendResult failure(String destination, Throwable error, String errorDetails,
+                                     Map<String, Object> metadata) {
+        return new SendResult(false, destination, Instant.now(), null,
+                metadata != null ? Map.copyOf(metadata) : Map.of(), error, errorDetails);
+    }
+
     /** Failed send result with exception and metadata. */
     public static SendResult failure(String destination, Throwable error, Map<String, Object> metadata) {
         return new SendResult(false, destination, Instant.now(), null,

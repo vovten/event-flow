@@ -116,8 +116,8 @@ class BroadcastKafkaOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should succeed with partial failures and log warning")
-    void shouldSucceedWithPartialFailures() {
+    @DisplayName("DEFECT-6.2: Should fail when any partition fails (strict broadcast semantics)")
+    void shouldFailWhenAnyPartitionFails() {
         List<PartitionInfo> partitions = createPartitionInfo(3);
         when(mockProducer.partitionsFor("test-topic")).thenReturn(partitions);
 
@@ -144,7 +144,13 @@ class BroadcastKafkaOutTransportTest {
         CompletableFuture<SendResult> future = transport.send(event);
         SendResult result = future.join();
 
-        assertThat(result.success()).isTrue();
+        assertThat(result.success())
+                .as("A partially delivered broadcast must not be reported as success")
+                .isFalse();
+        assertThat(result.error()).isInstanceOf(NetworkException.class);
+        assertThat(result.errorDetails()).contains("2/3 successful");
+        assertThat(result.metadata().get("successfulPartitions")).isEqualTo(List.of(0, 1));
+        assertThat(result.metadata().get("failedPartitions")).isEqualTo(List.of(2));
         verify(mockProducer, times(3)).send(any(), any(Callback.class));
     }
 
