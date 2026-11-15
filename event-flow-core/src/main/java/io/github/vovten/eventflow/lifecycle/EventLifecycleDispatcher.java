@@ -14,7 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -43,6 +46,12 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
     private static final Logger log = LoggerFactory.getLogger(EventLifecycleDispatcher.class);
 
     private static final String PUBLISHER_SERVICE_KEY = "pubSrv";
+
+    /**
+     * Maximum number of causes included in an error chain message. Bounds the
+     * work and the log size for pathological or cyclic exception graphs.
+     */
+    static final int MAX_CAUSE_DEPTH = 16;
 
     private final EventDispatcher origin;
     private final EventPublisher ackPublisher;
@@ -159,23 +168,41 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
      * @param error the throwable to build chain from, may be null
      * @return formatted chain message, never null
      */
-    private String buildErrorChain(Throwable error) {
+    static String buildErrorChain(Throwable error) {
         if (error == null) {
             return "Handler execution failed";
         }
         StringBuilder sb = new StringBuilder();
-        for (Throwable t = error; t != null; t = t.getCause()) {
-            if (!sb.isEmpty()) {
-                sb.append(" → ");
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = error;
+        int depth = 0;
+        while (current != null && depth < MAX_CAUSE_DEPTH) {
+            if (!seen.add(current)) {
+                appendSeparator(sb).append("[cycle detected: ")
+                        .append(current.getClass().getSimpleName()).append("]");
+                return sb.toString();
             }
-            String msg = t.getMessage();
+            appendSeparator(sb);
+            String msg = current.getMessage();
             if (msg != null) {
-                sb.append("[").append(t.getClass().getSimpleName()).append("] ").append(msg);
+                sb.append("[").append(current.getClass().getSimpleName()).append("] ").append(msg);
             } else {
-                sb.append(t.getClass().getSimpleName());
+                sb.append(current.getClass().getSimpleName());
             }
+            current = current.getCause();
+            depth++;
+        }
+        if (current != null) {
+            appendSeparator(sb).append("…");
         }
         return sb.toString();
+    }
+
+    private static StringBuilder appendSeparator(StringBuilder sb) {
+        if (!sb.isEmpty()) {
+            sb.append(" → ");
+        }
+        return sb;
     }
 
     private void publishSuccessAck(Event event, String originalService, RetryContext retryContext) {

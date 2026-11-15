@@ -286,6 +286,35 @@ class EventLifecycleDispatcherTest {
     }
 
     @Test
+    @DisplayName("DEFECT-3.4: Limits the cause chain depth and stops on cycles")
+    void shouldLimitCauseChainDepth() {
+        Throwable current = new RuntimeException("root");
+        for (int i = 0; i < 50; i++) {
+            current = new RuntimeException("level-" + i, current);
+        }
+
+        String chain = EventLifecycleDispatcher.buildErrorChain(current);
+
+        assertThat(chain).contains("level-49");
+        assertThat(chain.split("→", -1).length)
+                .as("The chain must be bounded")
+                .isLessThanOrEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("DEFECT-3.4: Does not loop forever on a cyclic cause chain")
+    void shouldHandleCyclicCauseChain() {
+        RuntimeException first = new RuntimeException("first");
+        RuntimeException second = new RuntimeException("second");
+        first.initCause(second);
+        second.initCause(first);
+
+        String chain = EventLifecycleDispatcher.buildErrorChain(first);
+
+        assertThat(chain).contains("first").contains("second").contains("cycle detected");
+    }
+
+    @Test
     @DisplayName("Should not publish ack for LifecycleAckEvent")
     void shouldNotPublishAckForAckEvents() {
         EventDispatcher origin = successDispatcher();
