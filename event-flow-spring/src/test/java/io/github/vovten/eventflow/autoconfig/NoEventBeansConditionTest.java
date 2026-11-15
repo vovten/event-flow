@@ -12,8 +12,10 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Conditional;
+import org.springframework.context.annotation.Lazy;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -72,6 +74,37 @@ class NoEventBeansConditionTest {
 
             // when & then
             assertThat(context.containsBean("testConditionalBean")).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("DEFECT-7.1: Should not instantiate a lazy EventPublisher while evaluating the condition")
+    void shouldNotInstantiateLazyPublisher() {
+        LazyPublisherConfig.INSTANTIATIONS.set(0);
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.register(LazyPublisherConfig.class, ConditionalBeanConfig.class);
+            context.refresh();
+
+            assertThat(context.containsBean("testConditionalBean"))
+                    .as("A registered publisher definition must make the condition false")
+                    .isFalse();
+            assertThat(LazyPublisherConfig.INSTANTIATIONS)
+                    .as("Condition evaluation must inspect bean definitions, not instantiate them")
+                    .hasValue(0);
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class LazyPublisherConfig {
+
+        static final AtomicInteger INSTANTIATIONS = new AtomicInteger();
+
+        @Bean
+        @Lazy
+        public EventPublisher lazyEventPublisher() {
+            INSTANTIATIONS.incrementAndGet();
+            return event -> CompletableFuture.completedFuture(SendResults.empty());
         }
     }
 
