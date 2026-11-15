@@ -180,6 +180,15 @@ public final class JsonBuilder {
         }
     }
 
+    private static void appendUnicodeEscape(StringBuilder target, char value) {
+        target.append("\\u");
+        String hex = Integer.toHexString(value);
+        for (int i = hex.length(); i < 4; i++) {
+            target.append('0');
+        }
+        target.append(hex);
+    }
+
     private void appendQuoted(String value) {
         if (value == null) {
             sb.append("\"\"");
@@ -194,7 +203,15 @@ public final class JsonBuilder {
                 case '\n' -> sb.append("\\n");
                 case '\r' -> sb.append("\\r");
                 case '\t' -> sb.append("\\t");
-                default -> sb.append(c);
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    if (c < 0x20 || c == (char) 0x2028 || c == (char) 0x2029) {
+                        appendUnicodeEscape(sb, c);
+                    } else {
+                        sb.append(c);
+                    }
+                }
             }
         }
         sb.append('"');
