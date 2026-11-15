@@ -251,18 +251,29 @@ public final class StoredEventMapper {
         }
     }
 
-    private boolean isDuplicateKey(SQLException e) {
+    /**
+     * Checks whether an SQL failure is a unique-constraint violation.
+     * <p>
+     * SQL class {@code 23} covers all integrity violations (NOT NULL, foreign
+     * key, CHECK, ...), so the concrete unique-violation identifiers are matched
+     * instead:
+     * <ul>
+     *   <li>SQL standard, PostgreSQL, H2: SQLState {@code 23505}</li>
+     *   <li>MySQL/MariaDB: error 1062 (duplicate entry)</li>
+     *   <li>SQL Server: error 2627 (unique constraint) or 2601 (unique index)</li>
+     *   <li>Oracle: ORA-00001 (error 1) with SQLState {@code 23000}</li>
+     * </ul>
+     *
+     * @param e the SQL exception
+     * @return true only for unique-constraint violations
+     */
+    static boolean isDuplicateKey(SQLException e) {
         String sqlState = e.getSQLState();
-        if (sqlState == null) {
-            return false;
-        }
-        // SQL standard class "23" covers all integrity constraint violations,
-        // including unique constraint violations across all major databases:
-        //   - PostgreSQL: SQLSTATE 23505
-        //   - MySQL:      SQLSTATE 23000
-        //   - Oracle:     SQLSTATE 23000 (ORA-00001)
-        //   - SQL Server: SQLSTATE 23000 (error 2627)
-        //   - H2:         SQLSTATE 23505
-        return sqlState.startsWith("23");
+        int errorCode = e.getErrorCode();
+        return "23505".equals(sqlState)
+                || errorCode == 1062
+                || errorCode == 2627
+                || errorCode == 2601
+                || (errorCode == 1 && "23000".equals(sqlState));
     }
 }

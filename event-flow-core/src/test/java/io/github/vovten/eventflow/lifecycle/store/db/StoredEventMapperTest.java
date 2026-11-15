@@ -162,6 +162,36 @@ class StoredEventMapperTest {
     // ---- Insert/Read roundtrip ----
 
     @Test
+    @DisplayName("DEFECT-2.5: Recognizes unique-constraint violations of supported databases")
+    void shouldRecognizeUniqueViolations() {
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("dup", "23505", 0)))
+                .as("PostgreSQL / H2 unique violation").isTrue();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("dup", "23000", 1062)))
+                .as("MySQL duplicate entry").isTrue();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("dup", "23000", 2627)))
+                .as("SQL Server unique constraint").isTrue();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("dup", "23000", 2601)))
+                .as("SQL Server duplicate key in unique index").isTrue();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("dup", "23000", 1)))
+                .as("Oracle ORA-00001").isTrue();
+    }
+
+    @Test
+    @DisplayName("DEFECT-2.5: Does not treat other integrity violations as duplicate keys")
+    void shouldNotTreatOtherIntegrityViolationsAsDuplicate() {
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("not null", "23502", 0)))
+                .as("PostgreSQL NOT NULL violation").isFalse();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("fk", "23503", 0)))
+                .as("PostgreSQL foreign key violation").isFalse();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("check", "23514", 0)))
+                .as("PostgreSQL CHECK violation").isFalse();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("fk", "23000", 1452)))
+                .as("MySQL foreign key violation").isFalse();
+        assertThat(StoredEventMapper.isDuplicateKey(new SQLException("unknown", null, 0)))
+                .as("Unknown SQLState").isFalse();
+    }
+
+    @Test
     @DisplayName("Should insert event and read it back via mapSingleResult")
     void shouldInsertAndReadBack() throws SQLException {
         StoredEventMapper mapper = new StoredEventMapper(UuidType.NATIVE);
