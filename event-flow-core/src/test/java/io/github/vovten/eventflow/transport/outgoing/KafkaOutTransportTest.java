@@ -232,17 +232,22 @@ class KafkaOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when sending on closed transport")
-    void shouldThrowExceptionWhenSendingOnClosedTransport() {
+    @DisplayName("DEFECT-6.3: Should return a failed future when sending on a closed transport")
+    void shouldFailFutureWhenSendingOnClosedTransport() {
         TestEvent event = TestEvent.create("test-id", "test-message");
 
         KafkaOutTransport transport = new KafkaOutTransport("localhost:9092", "test-topic", new JsonEventSerializer());
         transport.producer = mockProducer;
         transport.close();
 
-        assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("KafkaOutTransport is already closed");
+        var future = transport.send(event);
+
+        assertThat(future.isCompletedExceptionally())
+                .as("send() must never throw synchronously; the failure belongs to the future")
+                .isTrue();
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("KafkaOutTransport is already closed");
     }
 
     @Test

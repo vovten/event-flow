@@ -118,17 +118,18 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
      * This is a template method: it checks the transport state, resolves the record
      * key via the configured {@link EventKeyResolver}, serializes the event and
      * delegates the actual delivery to {@link #dispatch(Event, String, byte[])}.
-     * Any failure — key resolution, serialization or dispatch — completes the
-     * returned future exceptionally, so subclasses share one error contract.
+     * Any failure — a closed transport, key resolution, serialization or dispatch —
+     * completes the returned future exceptionally. The method never throws
+     * synchronously, so callers have a single error contract.
      *
      * @param event the event to send
      * @return CompletableFuture with SendResult
-     * @throws IllegalStateException if transport is closed
      */
     @Override
     public final CompletableFuture<SendResult> send(Event event) {
         if (closed) {
-            throw new IllegalStateException("%s is already closed".formatted(getClass().getSimpleName()));
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("%s is already closed".formatted(getClass().getSimpleName())));
         }
         try {
             String key = keyResolver.resolveKey(event);

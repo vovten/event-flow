@@ -186,14 +186,19 @@ class BroadcastKafkaOutTransportTest {
     }
 
     @Test
-    @DisplayName("Should throw IllegalStateException when sending on a closed transport")
-    void shouldThrowWhenSendingOnClosedTransport() {
+    @DisplayName("DEFECT-6.3: Should return a failed future when sending on a closed transport")
+    void shouldFailFutureWhenSendingOnClosedTransport() {
         BroadcastKafkaOutTransport transport = new BroadcastKafkaOutTransport("localhost:9092", "test-topic");
         transport.close();
 
-        assertThatThrownBy(() -> transport.send(TestEvent.create("test-id", "test-message")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("already closed");
+        var future = transport.send(TestEvent.create("test-id", "test-message"));
+
+        assertThat(future.isCompletedExceptionally())
+                .as("send() must never throw synchronously; the failure belongs to the future")
+                .isTrue();
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("BroadcastKafkaOutTransport is already closed");
     }
 
     @Test

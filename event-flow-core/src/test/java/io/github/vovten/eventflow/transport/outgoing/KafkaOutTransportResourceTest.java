@@ -83,16 +83,21 @@ class KafkaOutTransportResourceTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when sending after close")
-    void shouldThrowWhenSendingAfterClose() throws Exception {
+    @DisplayName("DEFECT-6.3: Should return a failed future when sending after close")
+    void shouldFailFutureWhenSendingAfterClose() throws Exception {
         TestEvent event = new TestEvent("test-1", "Test message");
 
         KafkaOutTransport transport = createTransportWithMockProducer();
         transport.close();
 
-        assertThatThrownBy(() -> transport.send(event))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("KafkaOutTransport is already closed");
+        var future = transport.send(event);
+
+        assertThat(future.isCompletedExceptionally())
+                .as("send() must never throw synchronously; the failure belongs to the future")
+                .isTrue();
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("KafkaOutTransport is already closed");
     }
 
     private KafkaOutTransport createTransportWithMockProducer() throws Exception {
