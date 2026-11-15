@@ -32,6 +32,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 
 import javax.sql.DataSource;
 import java.util.List;
@@ -60,6 +61,12 @@ import java.util.UUID;
  * The {@link EventPublisher} from {@link PublisherConfiguration} is automatically
  * wrapped in an {@link io.github.vovten.eventflow.lifecycle.EventLifecyclePublisher}
  * when lifecycle-aware publishing is enabled.
+ * <p>
+ * JDBC lifecycle components receive the application {@link DataSource} wrapped in
+ * a {@link TransactionAwareDataSourceProxy}. After-commit publishing still runs
+ * while the transaction connection is bound to the thread, so store access during
+ * {@code afterCommit} reuses that connection instead of requesting a second one
+ * from the pool. This prevents pool starvation with a small connection pool.
  *
  * @author Vladimir Aleshkov
  * @since 1.2.0
@@ -116,7 +123,7 @@ public class LifecycleConfiguration {
             log.warn("Using InMemoryEventStore — event data is NOT persisted across restarts");
             return new InMemoryEventStore();
         }
-        DataSource dataSource = dataSourceProvider.getIfAvailable();
+        DataSource dataSource = transactionAwareDataSource(dataSourceProvider);
         if (dataSource != null) {
             LifecyclePublisherConfig.StoreConfig cfg = properties.getPublisher().getLifecycle().getStore();
             log.info("Creating JdbcEventStore: table={}, autoInit={}", cfg.getTableName(), cfg.isAutoInitSchema());
@@ -143,7 +150,7 @@ public class LifecycleConfiguration {
     public EventRetryStore eventRetryStore(EventStore eventStore,
                                            ObjectProvider<DataSource> dataSourceProvider) {
         if (eventStore instanceof JdbcEventStore) {
-            DataSource dataSource = dataSourceProvider.getIfAvailable();
+            DataSource dataSource = transactionAwareDataSource(dataSourceProvider);
             if (dataSource == null) {
                 throw new IllegalStateException(
                         "Durable retry requires a DataSource when the event store is JDBC");
@@ -180,7 +187,7 @@ public class LifecycleConfiguration {
                                                    ObjectProvider<DataSource> dataSourceProvider) {
         if (eventStore instanceof JdbcEventStore jdbcEventStore
                 && retryStore instanceof JdbcEventRetryStore jdbcRetryStore) {
-            DataSource dataSource = dataSourceProvider.getIfAvailable();
+            DataSource dataSource = transactionAwareDataSource(dataSourceProvider);
             if (dataSource == null) {
                 throw new IllegalStateException(
                         "JdbcLifecycleRepository requires a DataSource");
@@ -366,6 +373,26 @@ public class LifecycleConfiguration {
                 cleanup.getBatchSize(),
                 cleanup.getPauseBetweenBatches()
         );
+    }
+
+    /**
+     * Returns the application DataSource wrapped so that JDBC access inside an
+     * active Spring transaction reuses the transaction-bound connection.
+     * <p>
+     * The lifecycle stores are created by this configuration and would otherwise
+     * call {@code DataSource.getConnection()} directly, requesting a second
+     * connection during {@code afterCommit} and exhausting a small pool. The
+     * wrapper is transparent outside a transaction.
+     *
+     * @param dataSourceProvider provider for the application DataSource
+     * @return the transaction-aware DataSource, or {@code null} when none is available
+     */
+    private static DataSource transactionAwareDataSource(ObjectProvider<DataSource> dataSourceProvider) {
+        DataSource dataSource = dataSourceProvider.getIfAvailable();
+        if (dataSource == null || dataSource instanceof TransactionAwareDataSourceProxy) {
+            return dataSource;
+        }
+        return new TransactionAwareDataSourceProxy(dataSource);
     }
 
     private String requireService() {

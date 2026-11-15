@@ -418,7 +418,7 @@ public class JdbcEventStore implements EventStore {
             mapper.setUuid(ps, 1, eventId);
             return mapSingleResult(ps);
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find event: " + eventId, e);
+            throw new RuntimeException("Failed to query event: " + eventId, e);
         }
     }
 
