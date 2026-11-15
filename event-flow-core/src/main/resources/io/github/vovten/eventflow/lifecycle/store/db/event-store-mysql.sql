@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS event_store (
     payload         TEXT NOT NULL COMMENT 'JSON-serialized event body',
     channels        TEXT COMMENT 'Comma-separated channel class names (local routing metadata for retry)',
     process_id      BINARY(16) COMMENT 'Correlation or process identifier',
-    created_at      TIMESTAMP NOT NULL COMMENT 'Timestamp when the event was first stored',
-    updated_at      TIMESTAMP NOT NULL COMMENT 'Timestamp of the last status update',
+    created_at      DATETIME(6) NOT NULL COMMENT 'Timestamp when the event was first stored',
+    updated_at      DATETIME(6) NOT NULL COMMENT 'Timestamp of the last status update',
     retry_count     INT DEFAULT 0 NOT NULL COMMENT 'Number of retry attempts for failed events',
     retry           BOOLEAN DEFAULT FALSE NOT NULL COMMENT 'Manual retry flag: when TRUE, the event is eligible for retry regardless of lifecycle status',
     error_details   TEXT COMMENT 'Error description for failed events'

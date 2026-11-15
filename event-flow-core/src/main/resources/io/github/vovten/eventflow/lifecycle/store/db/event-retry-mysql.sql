@@ -10,14 +10,14 @@ CREATE TABLE IF NOT EXISTS event_retry (
     attempt         INT NOT NULL,
     state           VARCHAR(16) NOT NULL,
     reason          VARCHAR(64) NOT NULL,
-    next_attempt_at TIMESTAMP NOT NULL,
+    next_attempt_at DATETIME(6) NOT NULL,
     last_error_type VARCHAR(512),
     last_error      TEXT,
     policy_name     VARCHAR(255),
     claimed_by      VARCHAR(255),
-    claimed_until   TIMESTAMP,
-    created_at      TIMESTAMP NOT NULL,
-    updated_at      TIMESTAMP NOT NULL,
+    claimed_until   DATETIME(6),
+    created_at      DATETIME(6) NOT NULL,
+    updated_at      DATETIME(6) NOT NULL,
     PRIMARY KEY (event_id, retry_kind)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Durable retry queue for lifecycle events';

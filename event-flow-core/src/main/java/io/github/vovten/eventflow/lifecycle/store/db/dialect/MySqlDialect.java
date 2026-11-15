@@ -3,7 +3,8 @@ package io.github.vovten.eventflow.lifecycle.store.db.dialect;
 /**
  * {@link SqlDialect} for MySQL (and compatible databases such as MariaDB).
  * <p>
- * Uses {@code LIMIT ?} for row limiting, standard {@code TEXT} and {@code TIMESTAMP} types,
+ * Uses {@code LIMIT ?} for row limiting, standard {@code TEXT} and {@code DATETIME(6)} types
+ * (microsecond precision, no 2038 limit),
  * and a double-nested subquery for DELETE (MySQL forbids referencing the target table
  * directly in a subquery).
  *
@@ -29,7 +30,7 @@ public class MySqlDialect implements SqlDialect {
 
     @Override
     public String timestampType() {
-        return "TIMESTAMP";
+        return "DATETIME(6)";
     }
 
     @Override

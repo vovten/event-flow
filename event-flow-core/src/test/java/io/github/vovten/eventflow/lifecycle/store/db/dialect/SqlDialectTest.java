@@ -79,6 +79,13 @@ class SqlDialectTest {
     }
 
     @Test
+    @DisplayName("DEFECT-2.4: Should provide DATETIME(6) for MySQL (microseconds, no 2038 limit)")
+    void mysqlTimestampType() {
+        SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.MYSQL);
+        assertThat(dialect.timestampType()).isEqualTo("DATETIME(6)");
+    }
+
+    @Test
     @DisplayName("Should provide DATETIME2 for SQL Server")
     void sqlServerTimestampType() {
         SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.SQLSERVER);
