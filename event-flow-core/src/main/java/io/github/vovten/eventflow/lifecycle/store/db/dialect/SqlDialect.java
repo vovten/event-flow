@@ -53,6 +53,21 @@ public interface SqlDialect {
     }
 
     /**
+     * SQL column type used to store a UUID, derived from the storage strategy.
+     * <p>
+     * The default maps {@link UuidType#NATIVE} to {@code UUID} and
+     * {@link UuidType#BINARY} to {@code BINARY(16)}. Dialects whose binary UUID
+     * type differs (for example Oracle's {@code RAW(16)}) override this method
+     * instead of relying on the default.
+     *
+     * @param uuidType the UUID storage strategy
+     * @return the dialect-specific column type
+     */
+    default String uuidDdlType(UuidType uuidType) {
+        return uuidType == UuidType.NATIVE ? "UUID" : "BINARY(16)";
+    }
+
+    /**
      * Whether the database supports {@code CREATE TABLE IF NOT EXISTS}.
      * <p>
      * Used by the auto-DDL initializers to make table creation idempotent and

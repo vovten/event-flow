@@ -170,7 +170,7 @@ public class SchemaInitializer {
 
     private String buildCreateTableSql(SqlDialect sqlDialect, UuidType uuidType) {
         String tableKeyword = sqlDialect.supportsIfNotExistsForTable() ? "IF NOT EXISTS " : "";
-        String uuidDdl = uuidType == UuidType.NATIVE ? "UUID" : "BINARY(16)";
+        String uuidDdl = sqlDialect.uuidDdlType(uuidType);
         String textDdl = sqlDialect.textType();
         String tsDdl = sqlDialect.timestampType();
         return """

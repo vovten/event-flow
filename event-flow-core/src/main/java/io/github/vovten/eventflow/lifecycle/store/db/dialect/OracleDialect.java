@@ -1,10 +1,13 @@
 package io.github.vovten.eventflow.lifecycle.store.db.dialect;
 
+import io.github.vovten.eventflow.lifecycle.store.db.UuidType;
+
 /**
  * {@link SqlDialect} for Oracle Database 12c+.
  * <p>
  * Uses {@code OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY} for row limiting,
- * {@code CLOB} for large text columns, and standard {@code TIMESTAMP} type.
+ * {@code CLOB} for large text columns, standard {@code TIMESTAMP} type and
+ * {@code RAW(16)} for binary UUID storage.
  *
  * @author Vladimir Aleshkov
  * @since 1.2.0
@@ -29,6 +32,12 @@ public class OracleDialect implements SqlDialect {
     @Override
     public String timestampType() {
         return "TIMESTAMP";
+    }
+
+    @Override
+    public String uuidDdlType(UuidType uuidType) {
+        // Oracle has no dedicated UUID type; UUIDs are stored as raw bytes.
+        return "RAW(16)";
     }
 
     @Override

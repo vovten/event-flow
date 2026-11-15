@@ -34,7 +34,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * The {@code event_id} and {@code process_id} column types adapt to the database:
  * <ul>
  *   <li><b>PostgreSQL / H2</b> — native {@code UUID} type</li>
- *   <li><b>Other databases</b> (MySQL, Oracle, SQL Server, SQLite, etc.) — {@code BINARY(16)}</li>
+ *   <li><b>MySQL / SQL Server</b> — {@code BINARY(16)}</li>
+ *   <li><b>Oracle</b> — {@code RAW(16)}</li>
  * </ul>
  * Detection is automatic via {@link DatabaseMetaData#getDatabaseProductName()}.
  * <p>
