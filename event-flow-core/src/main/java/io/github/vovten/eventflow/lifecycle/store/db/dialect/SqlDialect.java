@@ -94,6 +94,22 @@ public interface SqlDialect {
     }
 
     /**
+     * Whether the database treats a schema name as a catalog name.
+     * <p>
+     * In MySQL a database is exposed as a catalog, so a qualified table name
+     * must be looked up through the catalog argument of
+     * {@link java.sql.DatabaseMetaData#getTables(String, String, String, String[])}
+     * instead of the schema-pattern argument. Other supported databases expose
+     * the schema as a schema pattern.
+     *
+     * @return true when a schema name must be passed as a catalog
+     * @since 1.4.0
+     */
+    default boolean supportsSchemaAsCatalog() {
+        return false;
+    }
+
+    /**
      * Whether the database supports {@code CREATE TABLE IF NOT EXISTS}.
      * <p>
      * Used by the auto-DDL initializers to make table creation idempotent and

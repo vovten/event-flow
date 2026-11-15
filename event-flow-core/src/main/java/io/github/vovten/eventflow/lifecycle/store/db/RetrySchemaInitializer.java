@@ -74,7 +74,7 @@ public final class RetrySchemaInitializer {
      */
     public void ensureSchema() {
         try (Connection conn = dataSource.getConnection()) {
-            if (SchemaSupport.tableExists(conn, tableName)) {
+            if (SchemaSupport.tableExists(conn, tableName, sqlDialect.supportsSchemaAsCatalog())) {
                 log.debug("Retry table '{}' already exists, skipping schema creation", tableName);
                 return;
             }
@@ -91,7 +91,8 @@ public final class RetrySchemaInitializer {
             try {
                 SchemaSupport.executeDdl(conn, tableName, createTable,
                         List.of(new SchemaSupport.IndexStatement(dueIndex, dueIndexName),
-                                new SchemaSupport.IndexStatement(serviceIndex, serviceIndexName)), log);
+                                new SchemaSupport.IndexStatement(serviceIndex, serviceIndexName)),
+                        sqlDialect.supportsSchemaAsCatalog(), log);
                 conn.commit();
             } catch (SQLException e) {
                 try {
@@ -128,7 +129,7 @@ public final class RetrySchemaInitializer {
      */
     public void verifyTableExists() {
         try (Connection conn = dataSource.getConnection()) {
-            if (!SchemaSupport.tableExists(conn, tableName)) {
+            if (!SchemaSupport.tableExists(conn, tableName, sqlDialect.supportsSchemaAsCatalog())) {
                 throw new IllegalStateException(
                         "Retry table '" + tableName + "' does not exist. " +
                                 "Either set auto-init-schema: true or create it manually using the " +

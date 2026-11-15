@@ -39,6 +39,11 @@ public class MySqlDialect implements SqlDialect {
     }
 
     @Override
+    public boolean supportsSchemaAsCatalog() {
+        return true;
+    }
+
+    @Override
     public boolean supportsCommentOn() {
         return false;
     }

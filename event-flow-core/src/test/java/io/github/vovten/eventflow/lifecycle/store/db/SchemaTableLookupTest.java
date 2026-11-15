@@ -84,6 +84,44 @@ class SchemaTableLookupTest {
                 .hasMessageContaining("does not exist");
     }
 
+    @Test
+    @DisplayName("DEFECT: PostgreSQL qualified lookup does not fall back to every schema")
+    void shouldNotFallBackToAnySchemaOnPostgres() throws Exception {
+        // The PostgreSQL driver ignores the catalog argument. A fallback that
+        // passes the schema as a catalog with a null schema pattern therefore
+        // matches the table in *any* schema.
+        PostgresScopedJdbc jdbc = new PostgresScopedJdbc("probe_a");
+
+        assertThat(SchemaSupport.tableExists(jdbc.connection, "probe_b.event_store", false))
+                .as("probe_a.event_store must not satisfy a lookup scoped to probe_b")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("DEFECT: SQL Server does not treat the current schema as a catalog")
+    void shouldNotTreatCurrentSchemaAsCatalogForSqlServer() throws Exception {
+        // The old fallback called getTables(catalog='dbo'), which SQL Server
+        // rejects with "Database 'dbo' does not exist".
+        SqlServerCatalogJdbc jdbc = new SqlServerCatalogJdbc("appdb", "dbo");
+
+        assertThat(SchemaSupport.tableExists(jdbc.connection, "event_store", false))
+                .as("an unqualified lookup in schema dbo must not query a catalog named dbo")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("schema-as-catalog dialects look up a qualified name by catalog")
+    void shouldLookUpQualifiedNameByCatalog() throws Exception {
+        CatalogScopedJdbc jdbc = new CatalogScopedJdbc("tenant_b");
+
+        assertThat(SchemaSupport.tableExists(jdbc.connection, "tenant_b.event_store", true))
+                .as("MySQL exposes the schema as a catalog")
+                .isTrue();
+        assertThat(SchemaSupport.tableExists(jdbc.connection, "tenant_b.event_store", false))
+                .as("the same lookup must not succeed when the dialect does not use schema-as-catalog")
+                .isFalse();
+    }
+
     private static List<String> capturedSql(Statement statement) throws Exception {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(statement, atLeastOnce()).execute(captor.capture());
@@ -94,6 +132,81 @@ class SchemaTableLookupTest {
         ResultSet rs = mock(ResultSet.class);
         when(rs.next()).thenReturn(exists);
         return rs;
+    }
+
+    /**
+     * PostgreSQL-style metadata: the catalog is ignored and a null schema
+     * pattern lists every schema.
+     */
+    private static final class PostgresScopedJdbc {
+
+        private final Connection connection = mock(Connection.class);
+
+        private PostgresScopedJdbc(String schemaWithTable) throws SQLException {
+            DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+            when(connection.getMetaData()).thenReturn(metadata);
+            when(connection.getCatalog()).thenReturn("appdb");
+            when(connection.getSchema()).thenReturn("public");
+            when(metadata.getTables(nullable(String.class), nullable(String.class),
+                    anyString(), nullable(String[].class)))
+                    .thenAnswer(invocation -> {
+                        String schemaPattern = invocation.getArgument(1);
+                        boolean exists = schemaPattern == null
+                                || schemaWithTable.equalsIgnoreCase(schemaPattern);
+                        return resultSet(exists);
+                    });
+        }
+    }
+
+    /**
+     * SQL Server-style metadata: the catalog must be a real database name, and
+     * passing the schema as the catalog is an error.
+     */
+    private static final class SqlServerCatalogJdbc {
+
+        private final Connection connection = mock(Connection.class);
+
+        private SqlServerCatalogJdbc(String catalog, String currentSchema) throws SQLException {
+            DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+            when(connection.getMetaData()).thenReturn(metadata);
+            when(connection.getCatalog()).thenReturn(catalog);
+            when(connection.getSchema()).thenReturn(currentSchema);
+            when(metadata.getTables(nullable(String.class), nullable(String.class),
+                    anyString(), nullable(String[].class)))
+                    .thenAnswer(invocation -> {
+                        String lookupCatalog = invocation.getArgument(0);
+                        if (currentSchema.equalsIgnoreCase(lookupCatalog)) {
+                            throw new SQLException("Database '" + lookupCatalog + "' does not exist",
+                                    "S0001", 4060);
+                        }
+                        return resultSet(false);
+                    });
+        }
+    }
+
+    /**
+     * Catalog-scoped metadata: a table is found only when the target schema is
+     * passed as the catalog and the schema pattern is left unrestricted.
+     */
+    private static final class CatalogScopedJdbc {
+
+        private final Connection connection = mock(Connection.class);
+
+        private CatalogScopedJdbc(String catalogWithTable) throws SQLException {
+            DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+            when(connection.getMetaData()).thenReturn(metadata);
+            when(connection.getCatalog()).thenReturn("appdb");
+            when(connection.getSchema()).thenReturn(null);
+            when(metadata.getTables(nullable(String.class), nullable(String.class),
+                    anyString(), nullable(String[].class)))
+                    .thenAnswer(invocation -> {
+                        String catalog = invocation.getArgument(0);
+                        String schemaPattern = invocation.getArgument(1);
+                        boolean exists = schemaPattern == null
+                                && catalogWithTable.equalsIgnoreCase(catalog);
+                        return resultSet(exists);
+                    });
+        }
     }
 
     /**

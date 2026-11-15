@@ -212,7 +212,7 @@ class SchemaInitializerConcurrencyTest {
         }
 
         try (Connection conn = dataSource.getConnection()) {
-            assertThat(SchemaSupport.tableExists(conn, TABLE)).isTrue();
+            assertThat(SchemaSupport.tableExists(conn, TABLE, false)).isTrue();
         }
     }
 

@@ -33,22 +33,33 @@ final class SchemaSupport {
      * <p>
      * A schema-qualified name ({@code schema.table}) is looked up only in that
      * schema, so a table with the same base name in another schema is ignored.
-     * An unqualified name is constrained to the connection's current schema
-     * (falling back to the driver-wide lookup only when the driver cannot report
-     * a schema). Identifier case variants are tried to accommodate databases
-     * that normalize identifiers.
+     * When {@code schemaAsCatalog} is true, the schema part is passed to the
+     * metadata lookup as a catalog instead (the MySQL convention). An
+     * unqualified name is constrained to the connection's current schema; only
+     * when the driver cannot report a schema does the lookup fall back to the
+     * driver-wide scan. Identifier case variants are tried to accommodate
+     * databases that normalize identifiers.
      *
-     * @param conn      the connection
-     * @param tableName the table name (may be schema-qualified)
+     * @param conn             the connection
+     * @param tableName        the table name (may be schema-qualified)
+     * @param schemaAsCatalog  whether the schema is exposed as a catalog
      * @return true when the table exists
      * @throws SQLException if metadata cannot be read
      */
-    static boolean tableExists(Connection conn, String tableName) throws SQLException {
+    static boolean tableExists(Connection conn, String tableName, boolean schemaAsCatalog)
+            throws SQLException {
         String schema = schemaPart(tableName);
         if (schema == null) {
             schema = currentSchema(conn);
         }
-        return tableExistsInScope(conn.getMetaData(), conn.getCatalog(), schema, tableBase(tableName));
+        if (schema == null) {
+            // Last resort for drivers that cannot report the current schema:
+            // keep the historical driver-wide lookup.
+            return tableExistsInScope(conn.getMetaData(), conn.getCatalog(), null,
+                    tableBase(tableName), false);
+        }
+        return tableExistsInScope(conn.getMetaData(), conn.getCatalog(), schema,
+                tableBase(tableName), schemaAsCatalog);
     }
 
     /**
@@ -74,7 +85,8 @@ final class SchemaSupport {
     }
 
     private static boolean tableExistsInScope(DatabaseMetaData meta, String catalog, String schema,
-                                              String tableName) throws SQLException {
+                                              String tableName, boolean schemaAsCatalog)
+            throws SQLException {
         if (schema == null) {
             for (String name : identifierVariants(tableName)) {
                 if (hasTable(meta, catalog, null, name)) {
@@ -85,12 +97,9 @@ final class SchemaSupport {
         }
         for (String schemaCandidate : identifierVariants(schema)) {
             for (String nameCandidate : identifierVariants(tableName)) {
-                // schema as a schema pattern (PostgreSQL, SQL Server, Oracle, H2)
-                if (hasTable(meta, catalog, schemaCandidate, nameCandidate)) {
-                    return true;
-                }
-                // schema as a catalog (MySQL treats a database as the catalog)
-                if (hasTable(meta, schemaCandidate, null, nameCandidate)) {
+                String lookupCatalog = schemaAsCatalog ? schemaCandidate : catalog;
+                String schemaPattern = schemaAsCatalog ? null : schemaCandidate;
+                if (hasTable(meta, lookupCatalog, schemaPattern, nameCandidate)) {
                     return true;
                 }
             }
@@ -141,19 +150,21 @@ final class SchemaSupport {
      * @param tableName       the table name
      * @param createTableSql  the CREATE TABLE statement
      * @param indexStatements the CREATE INDEX statements with their names
+     * @param schemaAsCatalog whether the schema is exposed as a catalog
      * @param log             the caller's logger
      * @throws SQLException if the DDL fails for a reason other than a concurrent
      *                      initialization
      */
     static void executeDdl(Connection conn, String tableName, String createTableSql,
-                           List<IndexStatement> indexStatements, Logger log) throws SQLException {
+                           List<IndexStatement> indexStatements, boolean schemaAsCatalog,
+                           Logger log) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             Savepoint tableSavepoint = conn.setSavepoint();
             try {
                 stmt.execute(createTableSql);
             } catch (SQLException e) {
                 rollbackTo(conn, tableSavepoint, log);
-                if (tableExists(conn, tableName)) {
+                if (tableExists(conn, tableName, schemaAsCatalog)) {
                     log.info("Concurrent schema initialization detected for table '{}': the table "
                             + "was created by another instance, skipping DDL", tableName);
                     return;

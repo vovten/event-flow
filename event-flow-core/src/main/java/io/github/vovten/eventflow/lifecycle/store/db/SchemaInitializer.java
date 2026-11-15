@@ -83,7 +83,7 @@ public class SchemaInitializer {
      */
     public void ensureSchema() {
         try (Connection conn = dataSource.getConnection()) {
-            if (SchemaSupport.tableExists(conn, tableName)) {
+            if (SchemaSupport.tableExists(conn, tableName, sqlDialect.supportsSchemaAsCatalog())) {
                 log.debug("Event store table '{}' already exists, skipping schema creation", tableName);
                 return;
             }
@@ -100,7 +100,8 @@ public class SchemaInitializer {
             try {
                 SchemaSupport.executeDdl(conn, tableName, createTableSql,
                         List.of(new SchemaSupport.IndexStatement(createStatusIndexSql, statusIndexName),
-                                new SchemaSupport.IndexStatement(createServiceIndexSql, serviceIndexName)), log);
+                                new SchemaSupport.IndexStatement(createServiceIndexSql, serviceIndexName)),
+                        sqlDialect.supportsSchemaAsCatalog(), log);
                 conn.commit();
             } catch (SQLException e) {
                 try {
@@ -140,7 +141,7 @@ public class SchemaInitializer {
      */
     public void verifyTableExists() {
         try (Connection conn = dataSource.getConnection()) {
-            if (!SchemaSupport.tableExists(conn, tableName)) {
+            if (!SchemaSupport.tableExists(conn, tableName, sqlDialect.supportsSchemaAsCatalog())) {
                 throw new IllegalStateException(
                         "Event store table '" + tableName + "' does not exist. " +
                         "Either set auto-init-schema: true to allow automatic table creation, " +
