@@ -33,6 +33,9 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  *   <li>Delivery timeout: 35s</li>
  *   <li>Buffer memory: 64MB</li>
  *   <li>Max block time: 5s (backpressure)</li>
+ *   <li>Max request size: 1MB — matches the typical broker
+ *       {@code message.max.bytes}; raise both the broker and this setting if
+ *       larger events are required</li>
  * </ul>
  *
  * @author Vladimir Aleshkov
@@ -47,6 +50,13 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
 
     private static final long DEFAULT_BUFFER_MEMORY = 67_108_864;
     private static final long DEFAULT_MAX_BLOCK_MS = 5000;
+
+    /**
+     * Default producer request size (1MB). The Kafka broker default for
+     * {@code message.max.bytes} is 1MB as well; a larger producer limit only moves
+     * the failure from the client to the broker ({@code RecordTooLargeException}).
+     */
+    static final int DEFAULT_MAX_REQUEST_SIZE = 1_048_576;
 
     /**
      * Key resolver for determining the Kafka record key and thus partition routing.
@@ -88,6 +98,17 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
         this.serializer = Objects.requireNonNull(serializer, "Serializer must not be null");
         this.keyResolver = Objects.requireNonNull(keyResolver, "EventKeyResolver must not be null");
 
+        this.producer = new KafkaProducer<>(buildProducerProperties(properties));
+    }
+
+    /**
+     * Builds the effective producer properties: user values win, the library
+     * defaults fill the gaps.
+     *
+     * @param properties user-provided properties (must not be null)
+     * @return completed producer properties
+     */
+    static Properties buildProducerProperties(Properties properties) {
         Properties props = new Properties();
         props.putAll(Objects.requireNonNull(properties, "Properties must not be null"));
         props.putIfAbsent(KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
@@ -101,9 +122,8 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
         props.putIfAbsent(BATCH_SIZE_CONFIG, "131072"); // 128KB
         props.putIfAbsent(LINGER_MS_CONFIG, "10");
         props.putIfAbsent(COMPRESSION_TYPE_CONFIG, "snappy");
-        props.putIfAbsent(MAX_REQUEST_SIZE_CONFIG, "5242880"); // 5MB
-
-        this.producer = new KafkaProducer<>(props);
+        props.putIfAbsent(MAX_REQUEST_SIZE_CONFIG, String.valueOf(DEFAULT_MAX_REQUEST_SIZE));
+        return props;
     }
 
     @Override
