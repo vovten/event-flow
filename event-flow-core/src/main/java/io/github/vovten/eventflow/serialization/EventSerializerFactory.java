@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * Custom serializers can be registered using {@link #register(EventSerializer)}.
  * The name and code are taken automatically from the serializer itself.
+ * Registering a name or code that is already in use is rejected; replacing a
+ * built-in serializer requires an explicit
+ * {@link #register(EventSerializer, boolean) register(serializer, true)}.
  *
  * @author Vladimir Aleshkov
  * @since 1.0.0
@@ -35,6 +39,13 @@ public class EventSerializerFactory {
     private static final Logger log = LoggerFactory.getLogger(EventSerializerFactory.class);
 
     private static final byte JSON_START_BYTE = 0x7B;
+
+    /**
+     * Built-in JSON format code. Legacy data (without a magic byte) is decoded by
+     * this code, never by the {@code "json"} name: a replacement serializer can
+     * be registered under a different name.
+     */
+    private static final byte JSON_CODE = 0x01;
 
     private final Map<String, EventSerializer> byName = new ConcurrentHashMap<>();
     private final Map<Byte, EventSerializer> byCode = new ConcurrentHashMap<>();
@@ -62,31 +73,100 @@ public class EventSerializerFactory {
     /**
      * Register a custom serializer.
      * <p>
+     * Registration fails if the name or the code is already in use; use
+     * {@link #register(EventSerializer, boolean)} with {@code overwrite=true} to
+     * replace an existing serializer explicitly.
+     * <p>
      * <b>Examples:</b>
      * <pre>{@code
-     * // Override default MessagePack serializer
-     * registry.register(new CustomMsgPackSerializer());
-     *
      * // Register a new Protobuf serializer
      * registry.register(new ProtobufEventSerializer());
+     *
+     * // Explicitly replace the default JSON serializer
+     * registry.register(new CustomJsonSerializer(), true);
      * }</pre>
      *
      * @param serializer the serializer instance
-     * @throws IllegalArgumentException if serializer is null
+     * @throws IllegalArgumentException if serializer is null or its name is blank
+     * @throws EventSerializationException if the name or code is already registered
      */
     public void register(EventSerializer serializer) {
+        register(serializer, false);
+    }
+
+    /**
+     * Register a custom serializer, optionally replacing an existing one.
+     * <p>
+     * Without {@code overwrite}, a name or code conflict is rejected so that a
+     * custom serializer can never silently replace a built-in format (which would
+     * break deserialization for every component and for legacy payloads).
+     * <p>
+     * With {@code overwrite}, the new serializer takes over the keys of the
+     * replaced one: it is registered under its own name and code <b>and</b> under
+     * the previous serializer's name and code. This keeps every lookup path
+     * consistent — for example, a custom serializer registered with code
+     * {@code 0x01} and a different name still answers the {@code "json"} name and
+     * legacy {@code 0x7B} payloads.
+     *
+     * @param serializer the serializer instance
+     * @param overwrite  whether an existing serializer with the same name or code
+     *                   may be replaced
+     * @throws IllegalArgumentException if serializer is null or its name is blank
+     * @throws EventSerializationException if the name or code is already registered
+     *                                     and {@code overwrite} is false
+     */
+    public void register(EventSerializer serializer, boolean overwrite) {
         if (serializer == null) {
             throw new IllegalArgumentException("Serializer must not be null");
         }
         String name = serializer.getName();
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Serializer name must not be blank");
+        }
         byte code = serializer.getCode();
 
-        if (byName.containsKey(name) || byCode.containsKey(code)) {
-            log.warn("Overwriting existing serializer: name='{}', code=0x{}",
-                    name, Integer.toHexString(code & 0xFF));
+        EventSerializer existingByName = byName.get(name);
+        EventSerializer existingByCode = byCode.get(code);
+        if (existingByName == serializer && existingByCode == serializer) {
+            // Registering the very same instance again is idempotent.
+            return;
         }
-        byName.put(name, serializer);
-        byCode.put(code, serializer);
+        if ((existingByName != null || existingByCode != null) && !overwrite) {
+            throw new EventSerializationException(
+                    "Serializer name '" + name + "' or code 0x"
+                            + Integer.toHexString(code & 0xFF)
+                            + " is already registered; use register(serializer, true) to replace it");
+        }
+        if (!overwrite) {
+            byName.put(name, serializer);
+            byCode.put(code, serializer);
+            return;
+        }
+        Set<String> names = new LinkedHashSet<>();
+        Set<Byte> codes = new LinkedHashSet<>();
+        takeOver(existingByName, names, codes);
+        takeOver(existingByCode, names, codes);
+        names.add(name);
+        codes.add(code);
+        names.forEach(alias -> byName.put(alias, serializer));
+        codes.forEach(alias -> byCode.put(alias, serializer));
+        log.info("Replaced serializer: name='{}', code=0x{}",
+                name, Integer.toHexString(code & 0xFF));
+    }
+
+    private void takeOver(EventSerializer existing, Set<String> names, Set<Byte> codes) {
+        if (existing != null) {
+            names.add(existing.getName());
+            codes.add(existing.getCode());
+            removeSerializer(existing);
+        }
+    }
+
+    private void removeSerializer(EventSerializer existing) {
+        if (existing != null) {
+            byName.remove(existing.getName(), existing);
+            byCode.remove(existing.getCode(), existing);
+        }
     }
 
     /**
@@ -140,9 +220,11 @@ public class EventSerializerFactory {
             throw new EventSerializationException("Empty data");
         }
         byte firstByte = data[0];
-        // Backward compatibility: old JSON format without magic byte
+        // Backward compatibility: old JSON format without magic byte. Route by
+        // the JSON format code, never by the "json" name: a custom serializer
+        // could be registered under that name with a different code.
         if (firstByte == JSON_START_BYTE) {
-            return byName.get("json");
+            return getByCode(JSON_CODE);
         }
         // New format with magic byte
         return getByCode(firstByte);
