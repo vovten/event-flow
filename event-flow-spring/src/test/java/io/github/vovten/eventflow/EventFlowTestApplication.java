@@ -20,6 +20,10 @@ import org.springframework.context.annotation.FilterType;
                 @ComponentScan.Filter(
                         type = FilterType.REGEX,
                         pattern = ".*NoEventBeansConditionTest.*"
+                ),
+                @ComponentScan.Filter(
+                        type = FilterType.REGEX,
+                        pattern = ".*SerializerConfigurationTest.*"
                 )
         }
 )
