@@ -49,6 +49,7 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -85,6 +86,7 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -125,6 +127,7 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -157,6 +160,7 @@ class DispatcherConfigurationTest {
             // Only local-queue factory, not kafka
             context.registerBean("testDispatcherTransportFactory4", LocalQueueInTransportFactory.class,
                     () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
 
             // when & then
@@ -190,6 +194,7 @@ class DispatcherConfigurationTest {
                     () -> new SpringEventSubscriberRegistry(context));
             context.registerBean(EventSerializerFactory.class, () -> new EventSerializerFactory());
             context.registerBean(KafkaInTransportFactory.class, () -> new KafkaInTransportFactory(context.getBean(EventSerializerFactory.class)));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -219,6 +224,7 @@ class DispatcherConfigurationTest {
             context.registerBean("customDispatcher", EventDispatcher.class, () -> null);
             context.registerBean("testDispatcherTransportFactory5", LocalQueueInTransportFactory.class,
                     () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -245,6 +251,7 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherTransports", List.class, () -> List.of());
             context.registerBean("testDispatcherTransportFactory6", LocalQueueInTransportFactory.class,
                     () -> new LocalQueueInTransportFactory(context.getBean(DefaultLocalQueueProvider.class)));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -275,6 +282,7 @@ class DispatcherConfigurationTest {
             context.registerBean("dispatcherExecutor", ExecutorService.class, () -> Executors.newFixedThreadPool(2));
             context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
                     () -> new SpringEventSubscriberRegistry(context));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
             context.register(DispatcherConfiguration.class);
             context.refresh();
 
@@ -283,6 +291,29 @@ class DispatcherConfigurationTest {
 
             // then - dispatcher should be started (no exception thrown)
             assertThat(dispatcher).isNotNull();
+        }
+    }
+
+    @Test
+    @DisplayName("DEFECT-7.2: eventDispatcher depends on serializerRegistrationComplete")
+    void shouldDependOnSerializerRegistration() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context,
+                    "event-flow.enabled=true",
+                    "event-flow.dispatcher.enabled=true");
+            EventFlowProperties properties = new EventFlowProperties();
+            context.registerBean(EventFlowProperties.class, () -> properties);
+            context.registerBean("dispatcherExecutor", ExecutorService.class,
+                    () -> Executors.newFixedThreadPool(1));
+            context.registerBean("eventHandlerRegistry", EventHandlerRegistry.class,
+                    () -> new SpringEventSubscriberRegistry(context));
+            context.registerBean("serializerRegistrationComplete", Object.class, Object::new);
+            context.register(DispatcherConfiguration.class);
+            context.refresh();
+
+            assertThat(((org.springframework.beans.factory.support.AbstractBeanDefinition)
+                    context.getBeanDefinition("eventDispatcher")).getDependsOn())
+                    .contains("serializerRegistrationComplete");
         }
     }
 }
