@@ -64,7 +64,7 @@ class KafkaOutTransportResourceTest {
 
         transport.close();
 
-        verify(mockProducer).close();
+        verify(mockProducer).close(AbstractKafkaOutTransport.CLOSE_TIMEOUT);
     }
 
     @Test
@@ -79,7 +79,7 @@ class KafkaOutTransportResourceTest {
         }
 
         // Verify producer was closed via try-with-resources
-        verify(mockProducer).close();
+        verify(mockProducer).close(AbstractKafkaOutTransport.CLOSE_TIMEOUT);
     }
 
     @Test

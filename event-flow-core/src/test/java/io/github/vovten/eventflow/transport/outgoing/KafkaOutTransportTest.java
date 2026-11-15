@@ -258,7 +258,7 @@ class KafkaOutTransportTest {
 
         transport.close();
 
-        verify(mockProducer).close();
+        verify(mockProducer).close(AbstractKafkaOutTransport.CLOSE_TIMEOUT);
     }
 
     @Test
@@ -270,7 +270,7 @@ class KafkaOutTransportTest {
         transport.close();
         transport.close(); // Second close should be safe
 
-        verify(mockProducer, times(1)).close();
+        verify(mockProducer, times(1)).close(AbstractKafkaOutTransport.CLOSE_TIMEOUT);
     }
 
     @Test

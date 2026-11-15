@@ -107,6 +107,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * oldest retained record instead of silently skipping the backlog.
  * Custom {@link Properties} constructors may override these values.
  * <p>
+ * <b>Fetch tuning defaults:</b> {@code fetch.min.bytes=512KB} and
+ * {@code fetch.max.wait.ms=500} — on low-traffic topics an event may wait up to
+ * 0.5s for a batch to fill. Override both via {@link Properties} when latency
+ * matters more than batching.
+ * <p>
  * A transport instance is <b>single-use</b>: after {@link #stop()} (or
  * {@link #close()}) it cannot be started again; {@link #start(AsyncEventConsumer)}
  * throws {@link IllegalStateException}.

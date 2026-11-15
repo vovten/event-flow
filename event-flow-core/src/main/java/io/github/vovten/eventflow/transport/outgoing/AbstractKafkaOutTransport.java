@@ -11,6 +11,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -36,6 +37,7 @@ import static org.apache.kafka.clients.producer.ProducerConfig.*;
  *   <li>Max request size: 1MB — matches the typical broker
  *       {@code message.max.bytes}; raise both the broker and this setting if
  *       larger events are required</li>
+ *   <li>Close timeout: 5s — pending sends are not waited for beyond this bound</li>
  * </ul>
  *
  * @author Vladimir Aleshkov
@@ -57,6 +59,11 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
      * the failure from the client to the broker ({@code RecordTooLargeException}).
      */
     static final int DEFAULT_MAX_REQUEST_SIZE = 1_048_576;
+
+    /**
+     * Maximum time to wait for pending sends while closing the producer.
+     */
+    static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(5);
 
     /**
      * Key resolver for determining the Kafka record key and thus partition routing.
@@ -218,13 +225,16 @@ public abstract class AbstractKafkaOutTransport implements OutTransport, AutoClo
 
     /**
      * Close the Kafka producer and release all resources.
-     * Safe to call multiple times.
+     * <p>
+     * The close is bounded: waiting for pending sends is capped at
+     * {@link #CLOSE_TIMEOUT} (5s), so shutdown cannot hang on an unreachable
+     * broker. Safe to call multiple times.
      */
     @Override
     public void close() {
         if (!closed && producer != null) {
             closed = true;
-            producer.close();
+            producer.close(CLOSE_TIMEOUT);
             if (log.isDebugEnabled()) {
                 log.debug("{} closed for topic '{}'", getClass().getSimpleName(), topic);
             }
