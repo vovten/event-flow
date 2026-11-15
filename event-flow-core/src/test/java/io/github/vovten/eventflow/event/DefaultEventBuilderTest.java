@@ -6,15 +6,18 @@ import io.github.vovten.eventflow.channel.InternalEventChannel;
 import io.github.vovten.eventflow.publisher.ChannelEventPublisher;
 import io.github.vovten.eventflow.publisher.EventPublisher;
 import io.github.vovten.eventflow.transport.OutTransport;
+import io.github.vovten.eventflow.transport.SendResults;
 import io.github.vovten.eventflow.transport.outgoing.LocalQueueOutTransport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -269,6 +272,58 @@ class DefaultEventBuilderTest {
         assertThatThrownBy(() -> new DefaultEventBuilder<>(publisher, payload)
                 .withChannels(List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("DEFECT-8.1: Rejects a null metadata value immediately with a helpful message")
+    void shouldRejectNullMetadataValue() {
+        EventPublisher publisher = event -> CompletableFuture.completedFuture(SendResults.empty());
+        DefaultEventBuilder<TestPayload> builder =
+                new DefaultEventBuilder<>(publisher, new TestPayload("test"));
+
+        assertThatThrownBy(() -> builder.withMetadata("parent", null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("parent");
+    }
+
+    @Test
+    @DisplayName("DEFECT-8.2: Rejects null values from a metadata map")
+    void shouldRejectNullMetadataValueInMap() {
+        EventPublisher publisher = event -> CompletableFuture.completedFuture(SendResults.empty());
+        DefaultEventBuilder<TestPayload> builder =
+                new DefaultEventBuilder<>(publisher, new TestPayload("test"));
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("parent", null);
+
+        assertThatThrownBy(() -> builder.withMetadata(metadata))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("parent");
+    }
+
+    @Test
+    @DisplayName("DEFECT-8.2: Rejects a null metadata key from a map")
+    void shouldRejectNullMetadataKeyInMap() {
+        EventPublisher publisher = event -> CompletableFuture.completedFuture(SendResults.empty());
+        DefaultEventBuilder<TestPayload> builder =
+                new DefaultEventBuilder<>(publisher, new TestPayload("test"));
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put(null, "value");
+
+        assertThatThrownBy(() -> builder.withMetadata(metadata))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("key");
+    }
+
+    @Test
+    @DisplayName("Should accept non-null metadata")
+    void shouldAcceptValidMetadata() {
+        EventPublisher publisher = event -> CompletableFuture.completedFuture(SendResults.empty());
+        EventBuilder<TestPayload> builder =
+                new DefaultEventBuilder<>(publisher, new TestPayload("test"))
+                        .withMetadata("parent", "123")
+                        .withMetadata(Map.of("source", "test"));
+
+        assertThat(builder).isNotNull();
     }
 
     record TestPayload(String value) {}

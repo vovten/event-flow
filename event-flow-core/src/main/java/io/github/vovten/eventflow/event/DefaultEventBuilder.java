@@ -55,15 +55,22 @@ public final class DefaultEventBuilder<T> implements EventBuilder<T> {
 
     @Override
     public EventBuilder<T> withMetadata(String key, String value) {
-        this.metadata.put(
-                Objects.requireNonNull(key, "metadata key must not be null"),
-                value);
+        Objects.requireNonNull(key, "metadata key must not be null");
+        // Fail fast: Map.copyOf at publish time would throw an NPE without
+        // pointing at the offending key.
+        Objects.requireNonNull(value, "metadata value for key '" + key + "' must not be null");
+        this.metadata.put(key, value);
         return this;
     }
 
     @Override
     public EventBuilder<T> withMetadata(Map<String, String> metadata) {
         Objects.requireNonNull(metadata, "metadata map must not be null");
+        for (Map.Entry<String, String> entry : metadata.entrySet()) {
+            Objects.requireNonNull(entry.getKey(), "metadata key must not be null");
+            Objects.requireNonNull(entry.getValue(),
+                    "metadata value for key '" + entry.getKey() + "' must not be null");
+        }
         this.metadata.putAll(metadata);
         return this;
     }

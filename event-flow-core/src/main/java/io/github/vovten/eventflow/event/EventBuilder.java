@@ -58,6 +58,8 @@ public interface EventBuilder<T> {
      * @param key   the metadata key
      * @param value the metadata value
      * @return this builder
+     * @throws NullPointerException if the key or the value is null
+     *                              (the message names the offending key)
      */
     EventBuilder<T> withMetadata(String key, String value);
 
@@ -66,6 +68,8 @@ public interface EventBuilder<T> {
      *
      * @param metadata the metadata map to merge
      * @return this builder
+     * @throws NullPointerException if the map, a key or a value is null
+     *                              (the message names the offending key)
      */
     EventBuilder<T> withMetadata(Map<String, String> metadata);
 
