@@ -187,6 +187,14 @@ class EventSerializerFactoryTest {
     }
 
     @Test
+    @DisplayName("DEFECT-4.3: Rejects the magic byte reserved for legacy JSON detection")
+    void shouldRejectReservedLegacyJsonCode() {
+        FixedSerializer custom = new FixedSerializer("legacy-collision", (byte) 0x7B);
+
+        assertThrows(EventSerializationException.class, () -> factory.register(custom));
+    }
+
+    @Test
     @DisplayName("Should reject a blank serializer name")
     void shouldRejectBlankSerializerName() {
         assertThrows(IllegalArgumentException.class,

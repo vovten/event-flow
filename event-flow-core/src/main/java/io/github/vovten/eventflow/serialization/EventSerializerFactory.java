@@ -124,6 +124,11 @@ public class EventSerializerFactory {
             throw new IllegalArgumentException("Serializer name must not be blank");
         }
         byte code = serializer.getCode();
+        if (code == JSON_START_BYTE) {
+            throw new EventSerializationException(
+                    "Serializer code 0x7b is reserved for legacy JSON detection; "
+                            + "use a different magic byte");
+        }
 
         EventSerializer existingByName = byName.get(name);
         EventSerializer existingByCode = byCode.get(code);
