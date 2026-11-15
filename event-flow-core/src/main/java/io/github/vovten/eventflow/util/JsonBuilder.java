@@ -96,7 +96,8 @@ public final class JsonBuilder {
     /**
      * Append a string field.
      * <p>
-     * The value is automatically quoted and escaped.
+     * The value is automatically quoted and escaped; a {@code null} value is
+     * emitted as JSON {@code null} (not as an empty string).
      *
      * @param key   the field name
      * @param value the field value
@@ -106,7 +107,7 @@ public final class JsonBuilder {
         appendComma();
         appendQuoted(key);
         sb.append(':');
-        appendQuoted(value);
+        appendStringValue(value);
         hasItems = true;
         return this;
     }
@@ -148,14 +149,15 @@ public final class JsonBuilder {
     /**
      * Append a string item inside an array.
      * <p>
-     * A comma is automatically added before the item if it is not the first in the array.
+     * A comma is automatically added before the item if it is not the first in
+     * the array. A {@code null} value is emitted as JSON {@code null}.
      *
      * @param value the array item value
      * @return this builder
      */
     public JsonBuilder appendArrayItem(String value) {
         appendComma();
-        appendQuoted(value);
+        appendStringValue(value);
         hasItems = true;
         return this;
     }
@@ -177,6 +179,15 @@ public final class JsonBuilder {
     private void appendComma() {
         if (hasItems) {
             sb.append(',');
+        }
+    }
+
+    private void appendStringValue(String value) {
+        if (value == null) {
+            // Preserve the null/empty-string distinction in the log output.
+            sb.append("null");
+        } else {
+            appendQuoted(value);
         }
     }
 

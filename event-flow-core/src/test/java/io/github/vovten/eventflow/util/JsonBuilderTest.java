@@ -48,6 +48,29 @@ class JsonBuilderTest {
     }
 
     @Test
+    @DisplayName("DEFECT-9.2: A null string value is emitted as JSON null, not as an empty string")
+    void shouldEmitNullForNullStringValue() throws Exception {
+        String json = new JsonBuilder().beginObject().appendString("missing", null).endObject().build();
+
+        JsonNode parsed = MAPPER.readTree(json);
+        assertThat(parsed.has("missing")).isTrue();
+        assertThat(parsed.get("missing").isNull())
+                .as("null and the empty string are different values")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("DEFECT-9.2: A null array item is emitted as JSON null")
+    void shouldEmitNullForNullArrayItem() throws Exception {
+        String json = new JsonBuilder().beginObject().beginArray("items")
+                .appendArrayItem(null).appendArrayItem("x").endArray().endObject().build();
+
+        JsonNode parsed = MAPPER.readTree(json);
+        assertThat(parsed.get("items").get(0).isNull()).isTrue();
+        assertThat(parsed.get("items").get(1).asText()).isEqualTo("x");
+    }
+
+    @Test
     @DisplayName("DEFECT-9.1: Escapes control characters in array items as well")
     void shouldEscapeControlCharactersInArrayItems() throws Exception {
         String value = "x" + (char) 1 + "y" + LINE_SEPARATOR + "z";
