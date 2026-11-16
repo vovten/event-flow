@@ -214,6 +214,29 @@ class AckHandlerRetryTest {
             assertThat(status(eventId)).isEqualTo(EventStatus.FAILED);
             assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isPresent();
         }
+
+        @Test
+        @DisplayName("should not report an unknown event as handled")
+        void doesNotReportUnknownEventAsHandled() {
+            UUID unknownEventId = UUID.randomUUID();
+            Logger logger = (Logger) LoggerFactory.getLogger(AckHandler.class);
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            logger.addAppender(appender);
+            try {
+                handler().onEvent(successAck(unknownEventId, RetryKind.PROCESSING, 1));
+
+                assertThat(eventStore.findById(unknownEventId)).isEmpty();
+                assertThat(appender.list).anySatisfy(event -> {
+                    assertThat(event.getLevel()).isEqualTo(Level.INFO);
+                    assertThat(event.getFormattedMessage())
+                            .contains("Ignoring ack for unknown event")
+                            .contains(unknownEventId.toString());
+                });
+            } finally {
+                logger.detachAppender(appender);
+            }
+        }
     }
 
     @Nested

@@ -178,9 +178,13 @@ public final class AckHandler implements EventSubscriber {
         if (isStale(ack.originalEventId(), ack.retryKind(), ack.attempt(), ack.eventType())) {
             return;
         }
-        lifecycleRepository.onHandled(ack.originalEventId(), ack.attempt());
-        log.debug("Event {} handled on {} attempt {} ({})",
-                ack.originalEventId(), ack.retryKind(), ack.attempt(), ack.eventType());
+        boolean applied = lifecycleRepository.tryOnHandled(ack.originalEventId(), ack.attempt());
+        if (applied) {
+            log.debug("Event {} handled on {} attempt {} ({})",
+                    ack.originalEventId(), ack.retryKind(), ack.attempt(), ack.eventType());
+        } else {
+            log.info("Ignoring ack for unknown event: {}", ack.originalEventId());
+        }
     }
 
     private void handle(FailureAck ack) {

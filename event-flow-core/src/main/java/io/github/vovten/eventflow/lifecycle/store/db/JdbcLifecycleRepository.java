@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * JDBC implementation of {@link LifecycleRepository}.
@@ -117,14 +118,22 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
 
     @Override
     public void onHandled(UUID eventId, int attempt) {
+        tryOnHandled(eventId, attempt);
+    }
+
+    @Override
+    public boolean tryOnHandled(UUID eventId, int attempt) {
+        AtomicBoolean applied = new AtomicBoolean(false);
         inTransaction(conn -> {
-            boolean applied = eventStore.transitionStatus(
+            boolean updated = eventStore.transitionStatus(
                     conn, eventId, PROCESSING_SOURCES, EventStatus.HANDLED, null);
-            if (applied) {
+            applied.set(updated);
+            if (updated) {
                 retryStore.complete(conn, eventId, RetryKind.DELIVERY);
                 retryStore.complete(conn, eventId, RetryKind.PROCESSING);
             }
         });
+        return applied.get();
     }
 
     @Override

@@ -75,6 +75,23 @@ public interface LifecycleRepository {
     void onHandled(UUID eventId, int attempt);
 
     /**
+     * Records successful handling and reports whether the event was updated.
+     * <p>
+     * The default implementation delegates to {@link #onHandled(UUID, int)} and
+     * returns {@code true} to preserve the legacy contract. Built-in repositories
+     * override it so acknowledgments for unknown or already-terminal events are
+     * not reported as successfully handled.
+     *
+     * @param eventId event identifier
+     * @param attempt attempt number that succeeded
+     * @return {@code true} when the event existed and the transition was applied
+     */
+    default boolean tryOnHandled(UUID eventId, int attempt) {
+        onHandled(eventId, attempt);
+        return true;
+    }
+
+    /**
      * Records that no handler was resolved; this is a terminal configuration failure.
      *
      * @param eventId   event identifier

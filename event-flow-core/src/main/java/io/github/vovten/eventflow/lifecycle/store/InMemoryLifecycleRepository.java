@@ -94,12 +94,18 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
 
     @Override
     public synchronized void onHandled(UUID eventId, int attempt) {
+        tryOnHandled(eventId, attempt);
+    }
+
+    @Override
+    public synchronized boolean tryOnHandled(UUID eventId, int attempt) {
         boolean applied = eventStore.transitionStatus(
                 eventId, PROCESSING_SOURCES, EventStatus.HANDLED, null);
         if (applied) {
             retryStore.complete(eventId, RetryKind.DELIVERY);
             retryStore.complete(eventId, RetryKind.PROCESSING);
         }
+        return applied;
     }
 
     @Override
