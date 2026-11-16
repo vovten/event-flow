@@ -310,14 +310,14 @@ public class UnifiedEventDispatcher implements EventDispatcher {
         }
         if (policy.isLocalRetryAllowed(attempt) && attempt < localRetryCap) {
             Duration delay = policy.backoff(attempt);
-            log.warn("Handler {} failed on attempt {}/{} for event {}; retrying in {}ms",
+            log.debug("Handler {} failed on attempt {}/{} for event {}; retrying in {}ms",
                     handler.name(), attempt, policy.totalRetries(), event.type().getSimpleName(),
                     delay.toMillis());
             return retryDelayScheduler.delay(delay)
                     .thenCompose(ignored -> executeHandlerWithRetry(handler, event, attempt + 1));
         }
         long retryAfterMs = policy.backoff(attempt).toMillis();
-        log.warn("Handler {} failed on attempt {} for event {}; handing off to durable retry after {}ms",
+        log.debug("Handler {} failed on attempt {} for event {}; handing off to durable retry after {}ms",
                 handler.name(), attempt, event.type().getSimpleName(), retryAfterMs);
         return CompletableFuture.completedFuture(failure(
                 handler, error, attempt, policy, FailureKind.TRANSIENT_EXHAUSTED, true, retryAfterMs));
