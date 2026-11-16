@@ -203,7 +203,7 @@ public final class EventCleanupScheduler implements AutoCloseable {
             }
             List<UUID> deletable = candidates.stream()
                     .map(StoredEvent::eventId)
-                    .filter(eventId -> !hasRetryRow(eventId))
+                    .filter(this::retryIsTerminal)
                     .toList();
             if (deletable.isEmpty()) {
                 break;
@@ -247,12 +247,6 @@ public final class EventCleanupScheduler implements AutoCloseable {
         int deleted = eventStore.deleteByIds(eventIds);
         retryStore.deleteByEventIds(eventIds);
         return deleted;
-    }
-
-    private boolean hasRetryRow(UUID eventId) {
-        return retryStore.find(eventId, RetryKind.DELIVERY).isPresent()
-                || retryStore.find(eventId, RetryKind.PROCESSING)
-                .isPresent();
     }
 
     private boolean retryIsTerminal(UUID eventId) {

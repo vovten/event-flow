@@ -89,6 +89,21 @@ class EventCleanupSchedulerTest {
         }
 
         @Test
+        @DisplayName("deletes a terminal event together with its dead retry row")
+        void deletesTerminalEventWithDeadRetryRow() {
+            InMemoryEventRetryStore retryStore = new InMemoryEventRetryStore();
+            UUID eventId = createEvent(EventStatus.HANDLED, oldTimestamp);
+            retryStore.schedule(RetryTask.pending(eventId, "test-service", RetryKind.PROCESSING,
+                            1, RetryReason.HANDLER_FAILED, oldTimestamp, "payment")
+                    .withDead(RetryReason.HANDLER_FAILED, "Type", "error"));
+
+            schedulerWithRetries(retryStore, Duration.ofDays(30)).cleanupCycle();
+
+            assertThat(eventStore.findById(eventId)).isEmpty();
+            assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isEmpty();
+        }
+
+        @Test
         @DisplayName("deletes a dead-lettered event after dead-letter retention")
         void deletesDeadLetterAfterRetention() {
             InMemoryEventRetryStore retryStore = new InMemoryEventRetryStore();
