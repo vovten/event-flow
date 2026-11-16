@@ -5,6 +5,8 @@ import io.github.vovten.eventflow.lifecycle.AckHandler;
 import io.github.vovten.eventflow.lifecycle.DeliveryRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.EventCleanupScheduler;
 import io.github.vovten.eventflow.lifecycle.EventRetryScheduler;
+import io.github.vovten.eventflow.lifecycle.FailureAck;
+import io.github.vovten.eventflow.retry.RetryKind;
 import io.github.vovten.eventflow.lifecycle.LifecycleRepository;
 import io.github.vovten.eventflow.lifecycle.ProcessingRetryScheduler;
 import io.github.vovten.eventflow.lifecycle.RetrySchedulerSupport;
@@ -69,6 +71,30 @@ class LifecycleConfigurationTest {
             EventStore store = ctx.getBean(EventStore.class);
             assertThat(store).isInstanceOf(InMemoryEventStore.class);
             assertThat(store.getType()).isEqualTo("in-memory");
+        }
+    }
+
+    @Test
+    @DisplayName("Should record FAILED for a terminal FailureAck when durable retries are disabled")
+    void shouldRecordFailedWhenDurableRetriesAreDisabled() {
+        try (AnnotationConfigApplicationContext ctx = createContext(inMemoryProps(), false)) {
+            EventStore store = ctx.getBean(EventStore.class);
+            AckHandler handler = ctx.getBean(AckHandler.class);
+
+            UUID eventId = UUID.randomUUID();
+            store.save(StoredEvent.newEvent(eventId, "TestEvent", "test-service",
+                    "{}", null, EventStatus.ACCEPTED));
+
+            handler.onEvent(new FailureAck(UUID.randomUUID(), eventId, "TestEvent",
+                    "test-service", "handler failed", List.of(), null, Instant.now(),
+                    RetryKind.PROCESSING, 1, false, List.of(),
+                    "IllegalStateException", 0L, "default"));
+
+            assertThat(store.findById(eventId).orElseThrow().status())
+                    .isEqualTo(EventStatus.FAILED);
+            assertThat(ctx.getBeanNamesForType(EventRetryStore.class))
+                    .as("durable retry store must not be created when retries are disabled")
+                    .isEmpty();
         }
     }
 

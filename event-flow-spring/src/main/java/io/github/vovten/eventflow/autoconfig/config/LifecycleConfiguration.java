@@ -321,15 +321,28 @@ public class LifecycleConfiguration {
         LifecycleRepository repository = repositoryProvider.getIfAvailable();
         EventRetryStore retryStore = retryStoreProvider.getIfAvailable();
         log.info("Creating AckHandler with service: {}", service);
+        EventFlowProperties.ProcessingConfig processing =
+                properties.getPublisher().getLifecycle().getRetry().getProcessing();
         if (repository != null && retryStore != null) {
-            EventFlowProperties.ProcessingConfig processing =
-                    properties.getPublisher().getLifecycle().getRetry().getProcessing();
             return new AckHandler(repository, retryStore, service,
                     new AckHandlerOptions(processing.isEnabled(),
                             processing.getDefaultDelay(), processing.getMaxDelay(),
                             processing.getMaxAttempts()));
         }
-        return new AckHandler(eventStore, service);
+        // Durable retries are disabled, but acknowledgments must still follow the
+        // "processing disabled" contract: a terminal FailureAck leaves the event
+        // in FAILED, not DEAD, and DEAD is never produced without a retry row.
+        // An in-memory retry context keeps the same AckHandler transitions without
+        // creating durable retry rows or requiring the event_retry table.
+        log.info("Creating retry-aware AckHandler with in-memory retry context "
+                + "(durable retries disabled)");
+        EventRetryStore inMemoryRetryStore = new InMemoryEventRetryStore();
+        LifecycleRepository inMemoryRepository =
+                new InMemoryLifecycleRepository(eventStore, inMemoryRetryStore);
+        return new AckHandler(inMemoryRepository, inMemoryRetryStore, service,
+                new AckHandlerOptions(processing.isEnabled(),
+                        processing.getDefaultDelay(), processing.getMaxDelay(),
+                        processing.getMaxAttempts()));
     }
 
     /**
