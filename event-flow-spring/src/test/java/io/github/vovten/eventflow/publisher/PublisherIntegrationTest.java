@@ -133,7 +133,7 @@ class PublisherIntegrationTest {
 
         TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
-            publisher.publish(event);
+            CompletableFuture<SendResults> future = publisher.publish(event);
 
             // Nothing happens before the transaction completes
             assertThat(sendCalled.get()).isFalse();
@@ -142,6 +142,8 @@ class PublisherIntegrationTest {
             for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
                 sync.afterCommit();
             }
+            // Deferred publication runs outside the transaction thread
+            future.join();
 
             assertThat(sendCalled.get()).isTrue();
             Optional<StoredEvent> stored = store.findById(event.eventId());

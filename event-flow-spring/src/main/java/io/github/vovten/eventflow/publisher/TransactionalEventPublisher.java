@@ -8,6 +8,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Decorator for {@link EventPublisher} that adds transactional event publishing support.
@@ -27,6 +30,9 @@ import java.util.concurrent.CompletableFuture;
  * <ol>
  *   <li>Checks if Spring transaction is active via {@code TransactionSynchronizationManager}</li>
  *   <li>If active, registers {@code TransactionSynchronization} to publish after commit</li>
+ *   <li>After commit, the publication runs on a separate thread so that a JDBC
+ *       event-store write does not reuse the completed transaction's bound connection;
+ *       the saved row becomes visible before the event is delivered</li>
  *   <li>If not active, publishes immediately</li>
  * </ol>
  * <p>
@@ -68,6 +74,25 @@ import java.util.concurrent.CompletableFuture;
 public class TransactionalEventPublisher implements EventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionalEventPublisher.class);
+
+    private static final AtomicInteger DEFERRED_THREADS = new AtomicInteger();
+
+    /**
+     * Executor for work that must run outside the committing thread.
+     * <p>
+     * Spring keeps transaction resources bound to the committing thread until
+     * {@code afterCompletion}. Publishing on that thread would make a JDBC
+     * event-store write reuse the already-completed transaction connection,
+     * so the saved row would not be visible to a consumer that acknowledges the
+     * event immediately. A separate thread has no transaction context and
+     * therefore uses an independent, auto-committed connection.
+     */
+    private static final Executor DEFERRED_EXECUTOR = Executors.newCachedThreadPool(task -> {
+        Thread thread = new Thread(task,
+                "event-flow-transactional-publisher-" + DEFERRED_THREADS.incrementAndGet());
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final EventPublisher origin;
 
@@ -151,13 +176,15 @@ public class TransactionalEventPublisher implements EventPublisher {
 
         @Override
         public void afterCommit() {
-            try {
-                publishAction.run();
-            } catch (Exception e) {
-                log.error("Deferred event publication failed after transaction commit", e);
-                resultFuture.completeExceptionally(
-                        new EventPublisherException("Deferred event publication failed", e));
-            }
+            DEFERRED_EXECUTOR.execute(() -> {
+                try {
+                    publishAction.run();
+                } catch (Exception e) {
+                    log.error("Deferred event publication failed after transaction commit", e);
+                    resultFuture.completeExceptionally(
+                            new EventPublisherException("Deferred event publication failed", e));
+                }
+            });
         }
 
         @Override

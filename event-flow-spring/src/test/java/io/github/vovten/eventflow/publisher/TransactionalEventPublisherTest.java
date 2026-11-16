@@ -63,6 +63,9 @@ class TransactionalEventPublisherTest {
             // so the lookup must not leak the exception to the transaction manager.
             assertThatCode(synchronization::afterCommit).doesNotThrowAnyException();
 
+            // Deferred publication runs outside the transaction thread.
+            future.exceptionally(error -> null).join();
+
             assertThat(future.isDone())
                     .as("The future must not hang when the deferred publication throws synchronously")
                     .isTrue();
