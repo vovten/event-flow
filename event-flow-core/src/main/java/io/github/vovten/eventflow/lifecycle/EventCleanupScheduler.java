@@ -106,6 +106,9 @@ public final class EventCleanupScheduler implements AutoCloseable {
         this.eventStore = Objects.requireNonNull(eventStore, "eventStore must not be null");
         this.interval = Objects.requireNonNull(interval, "interval must not be null");
         this.maxAge = Objects.requireNonNull(maxAge, "maxAge must not be null");
+        if (maxAge.isZero() || maxAge.isNegative()) {
+            throw new IllegalArgumentException("maxAge must be positive");
+        }
         this.batchSize = batchSize;
         this.pauseBetweenBatches = Objects.requireNonNull(pauseBetweenBatches,
                 "pauseBetweenBatches must not be null");
@@ -116,6 +119,9 @@ public final class EventCleanupScheduler implements AutoCloseable {
         if (deadLetterMaxAge != null
                 && (deadLetterMaxAge.isZero() || deadLetterMaxAge.isNegative())) {
             throw new IllegalArgumentException("deadLetterMaxAge must be positive");
+        }
+        if (deadLetterMaxAge != null && deadLetterMaxAge.compareTo(maxAge) <= 0) {
+            throw new IllegalArgumentException("deadLetterMaxAge must be greater than maxAge");
         }
         this.retryStore = retryStore;
         this.deadLetterMaxAge = deadLetterMaxAge;

@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("EventCleanupScheduler Tests")
 class EventCleanupSchedulerTest {
@@ -112,7 +113,7 @@ class EventCleanupSchedulerTest {
                             1, RetryReason.HANDLER_FAILED, oldTimestamp, "payment")
                     .withDead(RetryReason.CAP_EXCEEDED, "Type", "error"));
 
-            schedulerWithRetries(retryStore, Duration.ofMinutes(30)).cleanupCycle();
+            schedulerWithRetries(retryStore, Duration.ofMinutes(31)).cleanupCycle();
 
             assertThat(eventStore.findById(eventId)).isEmpty();
             assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isEmpty();
@@ -140,7 +141,7 @@ class EventCleanupSchedulerTest {
             retryStore.schedule(RetryTask.pending(eventId, "test-service", RetryKind.PROCESSING,
                     2, RetryReason.HANDLER_FAILED, Instant.now(), "payment"));
 
-            schedulerWithRetries(retryStore, Duration.ofMinutes(30)).cleanupCycle();
+            schedulerWithRetries(retryStore, Duration.ofMinutes(31)).cleanupCycle();
 
             assertThat(eventStore.findById(eventId)).isPresent();
             assertThat(retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow().state())
@@ -269,6 +270,31 @@ class EventCleanupSchedulerTest {
             for (UUID id : ids) {
                 assertThat(eventStore.findById(id)).isEmpty();
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("validation")
+    class Validation {
+
+        @Test
+        @DisplayName("rejects a zero maxAge")
+        void rejectsZeroMaxAge() {
+            assertThatThrownBy(() -> new EventCleanupScheduler(
+                    eventStore, Duration.ofMinutes(1), Duration.ZERO, 100, Duration.ZERO))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("maxAge");
+        }
+
+        @Test
+        @DisplayName("rejects deadLetterMaxAge not greater than maxAge")
+        void rejectsDeadLetterRetentionNotGreaterThanMaxAge() {
+            InMemoryEventRetryStore retryStore = new InMemoryEventRetryStore();
+            assertThatThrownBy(() -> new EventCleanupScheduler(
+                    eventStore, Duration.ofMinutes(1), Duration.ofMinutes(30), 100,
+                    Duration.ZERO, retryStore, Duration.ofMinutes(30)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("deadLetterMaxAge");
         }
     }
 
