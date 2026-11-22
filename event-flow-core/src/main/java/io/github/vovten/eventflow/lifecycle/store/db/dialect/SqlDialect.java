@@ -376,6 +376,28 @@ public interface SqlDialect {
     }
 
     /**
+     * Optimistic claim statement that advances a due retry row to the next attempt.
+     * <p>
+     * The {@code attempt = ?} guard makes the claim a compare-and-set: a row
+     * completed by a concurrent ack or already advanced by another instance is
+     * not claimed and is never re-inserted.
+     *
+     * @return UPDATE SQL with placeholders for next attempt, owner, lease, now,
+     *         event id, kind, expected attempt, now, and now
+     */
+    default String claimNextAttemptRetryStatement() {
+        return """
+                UPDATE %s
+                SET state = 'IN_PROGRESS', attempt = ?, claimed_by = ?, claimed_until = ?,
+                    updated_at = ?
+                WHERE event_id = ? AND retry_kind = ?
+                  AND attempt = ?
+                  AND ((state = 'PENDING' AND next_attempt_at <= ?)
+                       OR (state = 'IN_PROGRESS' AND claimed_until <= ?))
+                """;
+    }
+
+    /**
      * UPDATE statement rescheduling a retry row.
      *
      * @return UPDATE SQL with placeholders for attempt, next attempt, errors, now, event id, kind
@@ -387,6 +409,26 @@ public interface SqlDialect {
                     last_error_type = ?, last_error = ?,
                     claimed_by = NULL, claimed_until = NULL, updated_at = ?
                 WHERE event_id = ? AND retry_kind = ?
+                """;
+    }
+
+    /**
+     * UPDATE-only reschedule statement that never inserts a missing row.
+     * <p>
+     * Terminal {@code DEAD} rows are left untouched, so a late scheduler cycle
+     * cannot revive a completed retry.
+     *
+     * @return UPDATE SQL with placeholders for service, attempt, reason,
+     *         next attempt, errors, policy name, now, event id, and kind
+     */
+    default String tryRescheduleRetryStatement() {
+        return """
+                UPDATE %s
+                SET service = ?, state = 'PENDING', attempt = ?, reason = ?, next_attempt_at = ?,
+                    last_error_type = ?, last_error = ?, policy_name = ?,
+                    claimed_by = NULL, claimed_until = NULL, updated_at = ?
+                WHERE event_id = ? AND retry_kind = ?
+                  AND state IN ('PENDING', 'IN_PROGRESS')
                 """;
     }
 

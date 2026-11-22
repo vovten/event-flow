@@ -69,6 +69,25 @@ public final class InMemoryEventRetryStore implements EventRetryStore {
     }
 
     @Override
+    public synchronized boolean claimNextAttempt(UUID eventId, RetryKind retryKind,
+                                                 int expectedAttempt, int nextAttempt,
+                                                 String owner, Instant now, Instant claimedUntil) {
+        Objects.requireNonNull(eventId, "eventId must not be null");
+        Objects.requireNonNull(retryKind, "retryKind must not be null");
+        Objects.requireNonNull(owner, "owner must not be null");
+        Objects.requireNonNull(now, "now must not be null");
+        Objects.requireNonNull(claimedUntil, "claimedUntil must not be null");
+        RetryKey key = new RetryKey(eventId, retryKind);
+        RetryTask task = tasks.get(key);
+        if (task == null || task.attempt() != expectedAttempt
+                || !(task.isDue(now) || task.isClaimExpired(now))) {
+            return false;
+        }
+        tasks.put(key, task.withClaim(nextAttempt, owner, claimedUntil));
+        return true;
+    }
+
+    @Override
     public synchronized void reschedule(UUID eventId, RetryKind retryKind, int attempt,
                                         Instant nextAttemptAt, String errorType, String error) {
         RetryKey key = new RetryKey(eventId, retryKind);
@@ -77,6 +96,19 @@ public final class InMemoryEventRetryStore implements EventRetryStore {
             throw new NoSuchElementException("Retry task not found: " + eventId + "/" + retryKind);
         }
         tasks.put(key, task.withReschedule(attempt, nextAttemptAt, errorType, error));
+    }
+
+    @Override
+    public synchronized boolean tryReschedule(RetryTask task) {
+        Objects.requireNonNull(task, "task must not be null");
+        RetryKey key = new RetryKey(task.eventId(), task.retryKind());
+        RetryTask existing = tasks.get(key);
+        if (existing == null || existing.state() == RetryState.DEAD) {
+            return false;
+        }
+        tasks.put(key, task.withReschedule(
+                task.attempt(), task.nextAttemptAt(), task.lastErrorType(), task.lastError()));
+        return true;
     }
 
     @Override

@@ -366,8 +366,15 @@ class SqlDialectTest {
             assertThat(dialect.claimRetryStatement().formatted("event_retry"))
                     .contains("UPDATE event_retry")
                     .contains("IN_PROGRESS");
+            assertThat(dialect.claimNextAttemptRetryStatement().formatted("event_retry"))
+                    .contains("UPDATE event_retry")
+                    .contains("IN_PROGRESS")
+                    .contains("attempt = ?");
             assertThat(dialect.rescheduleRetryStatement().formatted("event_retry"))
                     .contains("PENDING");
+            assertThat(dialect.tryRescheduleRetryStatement().formatted("event_retry"))
+                    .contains("PENDING")
+                    .contains("state IN ('PENDING', 'IN_PROGRESS')");
             assertThat(dialect.completeRetryStatement().formatted("event_retry"))
                     .contains("DELETE FROM event_retry");
             assertThat(dialect.deadRetryStatement().formatted("event_retry"))

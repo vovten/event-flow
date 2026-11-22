@@ -145,10 +145,15 @@ public final class RetryWatchdog implements AutoCloseable {
         }
         RetryTask task = existing.get();
         if (task.state() == RetryState.PENDING && task.nextAttemptAt().isAfter(now)) {
-            retryStore.schedule(task.withNextAttempt(
+            boolean raised = retryStore.tryReschedule(task.withNextAttempt(
                     task.attempt(), reason, now, task.lastErrorType(), task.lastError()));
-            log.warn("Raised {} retry for stale event {} (status {})",
-                    retryKind, event.eventId(), event.status());
+            if (raised) {
+                log.warn("Raised {} retry for stale event {} (status {})",
+                        retryKind, event.eventId(), event.status());
+            } else {
+                log.debug("{} retry for stale event {} was completed before raise",
+                        retryKind, event.eventId());
+            }
         } else {
             log.trace("{} retry for stale event {} is already {}", retryKind, event.eventId(),
                     task.state());

@@ -99,7 +99,19 @@ public record RetryTask(
      * @return the claimed copy
      */
     public RetryTask withClaim(String owner, Instant claimedUntil) {
-        return new RetryTask(eventId, service, retryKind, attempt,
+        return withClaim(attempt, owner, claimedUntil);
+    }
+
+    /**
+     * Returns a copy claimed by the given scheduler instance at a new attempt.
+     *
+     * @param newAttempt   new 1-based attempt number
+     * @param owner        scheduler instance identifier
+     * @param claimedUntil lease expiration
+     * @return the claimed copy
+     */
+    public RetryTask withClaim(int newAttempt, String owner, Instant claimedUntil) {
+        return new RetryTask(eventId, service, retryKind, newAttempt,
                 RetryState.IN_PROGRESS, reason, nextAttemptAt,
                 lastErrorType, lastError, policyName,
                 owner, claimedUntil, createdAt, Instant.now());

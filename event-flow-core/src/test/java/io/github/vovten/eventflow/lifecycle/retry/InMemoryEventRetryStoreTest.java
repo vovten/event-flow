@@ -95,6 +95,76 @@ class InMemoryEventRetryStoreTest {
     }
 
     @Test
+    @DisplayName("Should claim the next attempt and advance the attempt number")
+    void shouldClaimNextAttemptAndAdvanceAttempt() {
+        Instant now = Instant.now();
+        store.schedule(task(RetryKind.PROCESSING, 1, now.minusSeconds(1), SERVICE));
+
+        boolean claimed = store.claimNextAttempt(eventId, RetryKind.PROCESSING, 1, 2,
+                "scheduler-1", now, now.plusSeconds(30));
+
+        assertThat(claimed).isTrue();
+        RetryTask claimedTask = store.find(eventId, RetryKind.PROCESSING).orElseThrow();
+        assertThat(claimedTask.state()).isEqualTo(RetryState.IN_PROGRESS);
+        assertThat(claimedTask.attempt()).isEqualTo(2);
+        assertThat(claimedTask.claimedBy()).isEqualTo("scheduler-1");
+    }
+
+    @Test
+    @DisplayName("Should not resurrect a retry row completed before the claim")
+    void shouldNotClaimNextAttemptWhenRowWasCompleted() {
+        Instant now = Instant.now();
+        store.schedule(task(RetryKind.PROCESSING, 1, now.minusSeconds(1), SERVICE));
+        store.complete(eventId, RetryKind.PROCESSING);
+
+        boolean claimed = store.claimNextAttempt(eventId, RetryKind.PROCESSING, 1, 2,
+                "scheduler-1", now, now.plusSeconds(30));
+
+        assertThat(claimed).isFalse();
+        assertThat(store.find(eventId, RetryKind.PROCESSING))
+                .as("a completed row must not be re-inserted by the scheduler")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should not claim the next attempt from a stale attempt number")
+    void shouldNotClaimNextAttemptWithStaleAttempt() {
+        Instant now = Instant.now();
+        store.schedule(task(RetryKind.PROCESSING, 2, now.minusSeconds(1), SERVICE));
+
+        boolean claimed = store.claimNextAttempt(eventId, RetryKind.PROCESSING, 1, 2,
+                "scheduler-1", now, now.plusSeconds(30));
+
+        assertThat(claimed).isFalse();
+        assertThat(store.find(eventId, RetryKind.PROCESSING).orElseThrow().attempt()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Should not reschedule a missing retry row")
+    void shouldNotRescheduleMissingTask() {
+        RetryTask task = task(RetryKind.PROCESSING, 2, Instant.now(), SERVICE);
+
+        boolean updated = store.tryReschedule(task);
+
+        assertThat(updated).isFalse();
+        assertThat(store.find(eventId, RetryKind.PROCESSING)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should not reschedule a dead retry row")
+    void shouldNotRescheduleDeadTask() {
+        store.schedule(task(RetryKind.PROCESSING, 1, Instant.now().minusSeconds(1), SERVICE));
+        store.dead(eventId, RetryKind.PROCESSING, RetryReason.CAP_EXCEEDED, null, "exhausted");
+        RetryTask pending = task(RetryKind.PROCESSING, 2, Instant.now(), SERVICE);
+
+        boolean updated = store.tryReschedule(pending);
+
+        assertThat(updated).isFalse();
+        assertThat(store.find(eventId, RetryKind.PROCESSING).orElseThrow().state())
+                .isEqualTo(RetryState.DEAD);
+    }
+
+    @Test
     @DisplayName("Should reschedule and complete a task")
     void shouldRescheduleAndCompleteTask() {
         store.schedule(task(RetryKind.PROCESSING, 1, Instant.now().minusSeconds(1), SERVICE));

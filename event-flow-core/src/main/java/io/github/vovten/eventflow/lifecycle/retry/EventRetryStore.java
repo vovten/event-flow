@@ -54,6 +54,27 @@ public interface EventRetryStore {
     boolean claim(UUID eventId, RetryKind retryKind, String owner, Instant claimedUntil);
 
     /**
+     * Atomically claims the next attempt of a due row.
+     * <p>
+     * The claim succeeds only when the row still exists with
+     * {@code expectedAttempt} and is either pending and due or in progress with
+     * an expired lease. Implementations must perform this as a single
+     * conditional update so a row completed by a concurrent ack is never
+     * resurrected.
+     *
+     * @param eventId         event identifier
+     * @param retryKind       delivery or processing
+     * @param expectedAttempt attempt number observed when the row was read
+     * @param nextAttempt     new 1-based attempt number
+     * @param owner           scheduler instance identifier
+     * @param now             current time
+     * @param claimedUntil    lease expiration
+     * @return true if the row was claimed and advanced
+     */
+    boolean claimNextAttempt(UUID eventId, RetryKind retryKind, int expectedAttempt,
+                             int nextAttempt, String owner, Instant now, Instant claimedUntil);
+
+    /**
      * Reschedules a claimed row for another attempt.
      *
      * @param eventId       event identifier
@@ -65,6 +86,17 @@ public interface EventRetryStore {
      */
     void reschedule(UUID eventId, RetryKind retryKind, int attempt, Instant nextAttemptAt,
                     String errorType, String error);
+
+    /**
+     * Updates an existing retry row without creating one.
+     * <p>
+     * Returns {@code false} when the row is absent or terminal, so a scheduler
+     * cannot resurrect a row completed by a concurrent ack.
+     *
+     * @param task the updated row
+     * @return true if an existing row was updated
+     */
+    boolean tryReschedule(RetryTask task);
 
     /**
      * Deletes a retry row after a successful outcome.

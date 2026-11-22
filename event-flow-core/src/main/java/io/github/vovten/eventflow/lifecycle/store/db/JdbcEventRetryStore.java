@@ -50,7 +50,9 @@ public final class JdbcEventRetryStore implements EventRetryStore {
     private final String updateSql;
     private final String selectDueSql;
     private final String claimSql;
+    private final String claimNextAttemptSql;
     private final String rescheduleSql;
+    private final String tryRescheduleSql;
     private final String completeSql;
     private final String deadSql;
     private final String selectByIdSql;
@@ -120,7 +122,9 @@ public final class JdbcEventRetryStore implements EventRetryStore {
         this.updateSql = sqlDialect.updateRetryStatement().formatted(tableName);
         this.selectDueSql = sqlDialect.selectDueRetriesStatement().formatted(tableName);
         this.claimSql = sqlDialect.claimRetryStatement().formatted(tableName);
+        this.claimNextAttemptSql = sqlDialect.claimNextAttemptRetryStatement().formatted(tableName);
         this.rescheduleSql = sqlDialect.rescheduleRetryStatement().formatted(tableName);
+        this.tryRescheduleSql = sqlDialect.tryRescheduleRetryStatement().formatted(tableName);
         this.completeSql = sqlDialect.completeRetryStatement().formatted(tableName);
         this.deadSql = sqlDialect.deadRetryStatement().formatted(tableName);
         this.selectByIdSql = sqlDialect.selectRetryByIdStatement().formatted(tableName);
@@ -210,6 +214,27 @@ public final class JdbcEventRetryStore implements EventRetryStore {
     }
 
     @Override
+    public boolean claimNextAttempt(UUID eventId, RetryKind retryKind, int expectedAttempt,
+                                    int nextAttempt, String owner, Instant now,
+                                    Instant claimedUntil) {
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(claimNextAttemptSql)) {
+            ps.setInt(1, nextAttempt);
+            ps.setString(2, owner);
+            mapper.setTimestamp(ps, 3, claimedUntil);
+            mapper.setTimestamp(ps, 4, now);
+            mapper.setUuid(ps, 5, eventId);
+            ps.setString(6, retryKind.name());
+            ps.setInt(7, expectedAttempt);
+            mapper.setTimestamp(ps, 8, now);
+            mapper.setTimestamp(ps, 9, now);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to claim next retry attempt for event: " + eventId, e);
+        }
+    }
+
+    @Override
     public void reschedule(UUID eventId, RetryKind retryKind, int attempt, Instant nextAttemptAt,
                            String errorType, String error) {
         try (Connection conn = dataSource.getConnection();
@@ -226,6 +251,27 @@ public final class JdbcEventRetryStore implements EventRetryStore {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to reschedule retry for event: " + eventId, e);
+        }
+    }
+
+    @Override
+    public boolean tryReschedule(RetryTask task) {
+        Objects.requireNonNull(task, "task must not be null");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(tryRescheduleSql)) {
+            ps.setString(1, task.service());
+            ps.setInt(2, task.attempt());
+            ps.setString(3, task.reason().name());
+            mapper.setTimestamp(ps, 4, task.nextAttemptAt());
+            mapper.setOptionalString(ps, 5, task.lastErrorType());
+            mapper.setOptionalString(ps, 6, task.lastError());
+            mapper.setOptionalString(ps, 7, task.policyName());
+            mapper.setTimestamp(ps, 8, task.updatedAt());
+            mapper.setUuid(ps, 9, task.eventId());
+            ps.setString(10, task.retryKind().name());
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to reschedule retry for event: " + task.eventId(), e);
         }
     }
 

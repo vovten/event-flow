@@ -132,6 +132,42 @@ class RetrySchedulerSupportTest {
         assertThat(dead.reason()).isEqualTo(RetryReason.CAP_EXCEEDED);
     }
 
+    @Test
+    @DisplayName("should not resurrect a retry row completed before the next attempt claim")
+    void doesNotResurrectCompletedRowOnClaim() {
+        UUID eventId = storeEvent(EventStatus.FAILED);
+        scheduleDelivery(eventId);
+        RetrySchedulerSupport support = new RetrySchedulerSupport(
+                retryStore, lifecycleRepository, "owner-1");
+        RetryTask task = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
+        retryStore.complete(eventId, RetryKind.DELIVERY);
+
+        boolean claimed = support.claimNextAttempt(
+                task, task.attempt() + 1, Instant.now(), Duration.ofSeconds(30));
+
+        assertThat(claimed).isFalse();
+        assertThat(retryStore.find(eventId, RetryKind.DELIVERY))
+                .as("an ack that completed the row must win over a stale scheduler claim")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("should not resurrect a retry row completed before reschedule")
+    void doesNotResurrectCompletedRowOnReschedule() {
+        UUID eventId = storeEvent(EventStatus.FAILED);
+        scheduleDelivery(eventId);
+        RetrySchedulerSupport support = new RetrySchedulerSupport(
+                retryStore, lifecycleRepository, "owner-1");
+        RetryTask task = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
+        retryStore.complete(eventId, RetryKind.DELIVERY);
+
+        support.reschedule(task, 2, RetryReason.PUBLISH_FAILED, Instant.now(), null, "failed");
+
+        assertThat(retryStore.find(eventId, RetryKind.DELIVERY))
+                .as("reschedule must update an existing row only")
+                .isEmpty();
+    }
+
     private UUID storeEvent(EventStatus status) {
         UUID eventId = UUID.randomUUID();
         Envelope<TestEvent> envelope = new Envelope<>(

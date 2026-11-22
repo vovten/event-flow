@@ -1,5 +1,6 @@
 package io.github.vovten.eventflow.lifecycle;
 
+import io.github.vovten.eventflow.lifecycle.retry.EventRetryStore;
 import io.github.vovten.eventflow.lifecycle.retry.InMemoryEventRetryStore;
 import io.github.vovten.eventflow.lifecycle.retry.RetryReason;
 import io.github.vovten.eventflow.lifecycle.retry.RetryState;
@@ -15,10 +16,16 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @DisplayName("RetryWatchdog Tests")
 class RetryWatchdogTest {
@@ -147,6 +154,23 @@ class RetryWatchdogTest {
             assertThat(task.state()).isEqualTo(RetryState.PENDING);
             assertThat(task.attempt()).isEqualTo(2);
             assertThat(task.nextAttemptAt()).isBeforeOrEqualTo(Instant.now());
+        }
+
+        @Test
+        @DisplayName("should not recreate a pending retry row completed before the raise")
+        void doesNotResurrectRowCompletedBeforeRaise() {
+            UUID eventId = storeEvent(EventStatus.PUBLISHED, Duration.ofHours(1));
+            EventRetryStore mockedRetryStore = mock(EventRetryStore.class);
+            RetryTask pending = RetryTask.pending(
+                    eventId, SERVICE, RetryKind.DELIVERY, 2,
+                    RetryReason.PUBLISH_FAILED, Instant.now().plusSeconds(3600), null);
+            when(mockedRetryStore.find(eventId, RetryKind.DELIVERY))
+                    .thenReturn(Optional.of(pending));
+            when(mockedRetryStore.tryReschedule(any())).thenReturn(false);
+
+            new RetryWatchdog(eventStore, mockedRetryStore, options(true)).watchdogCycle();
+
+            verify(mockedRetryStore, never()).schedule(any());
         }
 
         @Test

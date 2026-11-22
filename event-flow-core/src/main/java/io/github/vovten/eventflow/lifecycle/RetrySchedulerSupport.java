@@ -88,8 +88,8 @@ public final class RetrySchedulerSupport {
      * @return true if this instance claimed the row
      */
     public boolean claimNextAttempt(RetryTask task, int nextAttempt, Instant now, Duration lease) {
-        retryStore.schedule(task.withNextAttempt(nextAttempt, task.reason(), now, null, null));
-        return claim(task, now, lease);
+        return retryStore.claimNextAttempt(task.eventId(), task.retryKind(), task.attempt(),
+                nextAttempt, owner, now, now.plus(lease));
     }
 
     /**
@@ -116,7 +116,11 @@ public final class RetrySchedulerSupport {
      */
     public void reschedule(RetryTask task, int nextAttempt, RetryReason reason,
                            Instant nextAttemptAt, String errorType, String error) {
-        retryStore.schedule(task.withNextAttempt(nextAttempt, reason, nextAttemptAt, errorType, error));
+        RetryTask next = task.withNextAttempt(nextAttempt, reason, nextAttemptAt, errorType, error);
+        if (!retryStore.tryReschedule(next)) {
+            log.debug("Retry row for event {} was completed before reschedule",
+                    task.eventId());
+        }
     }
 
     /**
