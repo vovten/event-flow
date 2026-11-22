@@ -67,6 +67,10 @@ class ResolvedRetryPolicyTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxDelay");
 
+        assertThatThrownBy(() -> policy(1, 0, Duration.ofSeconds(5), 2.0, Duration.ofSeconds(1), 0.0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxDelay must be >= initialDelay");
+
         assertThatThrownBy(() -> policy(1, 0, Duration.ofMillis(1), 2.0, Duration.ofSeconds(1), 1.5))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jitter");

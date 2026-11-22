@@ -79,6 +79,9 @@ public record ResolvedRetryPolicy(
         if (maxDelay.isNegative()) {
             throw new IllegalArgumentException("maxDelay must not be negative");
         }
+        if (maxDelay.compareTo(initialDelay) < 0) {
+            throw new IllegalArgumentException("maxDelay must be >= initialDelay");
+        }
         if (jitter < 0.0 || jitter > 1.0) {
             throw new IllegalArgumentException("jitter must be in [0, 1]");
         }
