@@ -4,9 +4,7 @@
 - **Date:** 2026-11-01
 - **Author:** project maintainer (design review)
 - **Relates to:**
-  - supersedes [ADR-0001](0001-listener-retry-policies.md);
-  - supersedes [ADR-0002](0002-listener-retry-two-layer.md), retaining its local per-listener retry idea in a revised form;
-  - supersedes [ADR-0003](0003-retry-delivery-processing.md), adopting its delivery/processing boundary but simplifying storage and MVP scope.
+  - supersedes ADR-0001, ADR-0002 and ADR-0003 — the earlier listener-retry and delivery-processing drafts consolidated into this document; the superseded files were removed from the repository (see git history for their content).
 - **Implementation plan:** [ADR-0004 Implementation Plan](../plans/adr-0004-implementation-plan.md)
 - **Tags:** retry, delivery, processing, lifecycle, dead-letter, event-store, ack, api
 
@@ -425,8 +423,8 @@ Scheduling rules:
 - If both a `DELIVERY` and a `PROCESSING` row are due for the same event, group by `event_id` in a cycle and perform one re-publish. The same delivery can satisfy the delivery ack and provide the processing attempt.
 - `DeliveryRetryScheduler` selects only `DELIVERY` rows. It never selects an `ACCEPTED` event and never creates a delivery row for one: `ACCEPTED` belongs to the processing domain.
 - Watchdogs avoid a row per healthy event:
-  - scan `event_store` for `PUBLISHED` older than `deliveryAckTimeout` → create or raise a `DELIVERY` row;
-  - scan `event_store` for `ACCEPTED` older than `processingAckTimeout` → create or raise a `PROCESSING` row; this watchdog runs only when publisher `processing.enabled = true`.
+  - scan `event_store` for `PUBLISHED` older than `deliveryAckTimeout` → create a `DELIVERY` row (implementation note 1: create-only, existing rows are never raised);
+  - scan `event_store` for `ACCEPTED` older than `processingAckTimeout` → create a `PROCESSING` row; this watchdog runs only when publisher `processing.enabled = true`.
 - `claimed_until` must exceed the maximum expected publish + ack window. An expired lease returns the row to `PENDING`; this is at-least-once, not exactly-once.
 - Manual `markForRetry(eventId)` resets the relevant row to `PENDING` and the event to `FAILED`/`NEW` atomically. It bypasses the current backoff but not the hard safety cap unless an explicit operator override is configured.
 
@@ -807,3 +805,33 @@ Alerting sees the dead letter; a redeploy with the missing handler plus `markFor
 
 **Phase 4 — operations and deferred features.**
 Dead-letter retention, manual retry, overview view, optional backfill, per-handler durable isolation / `PARTIALLY_HANDLED`, per-destination delivery, DB policy table and seeding, DLQ event with payload.
+
+## Implementation notes (post-review deviations)
+
+Deviation log kept in sync with the defect review
+([docs/defects/0002-retry-schedulers-defects.md](../defects/0002-retry-schedulers-defects.md)).
+Where the shipped implementation differs from the decision text above, the
+implementation is authoritative for the current release:
+
+1. **Watchdogs create rows, they do not raise them.** D7's "create or raise"
+   wording is implemented as create-only: a watchdog seeds a missing
+   `DELIVERY` / `PROCESSING` row at attempt `1` and never touches an existing
+   row. A `PENDING` row keeps its scheduled `next_attempt_at` (including a
+   backoff derived from a consumer's `FailureAck.retryAfterMs`), so the
+   watchdog cannot cancel an active backoff. The stale-event scan filters by
+   `service` in the database (`EventStore.findByStatusesAndService`).
+2. **D8.2 backoff/jitter.** Implemented for both durable schedulers via
+   `event-flow.publisher.lifecycle.retry.delivery.multiplier` / `.jitter` /
+   `.max-retry-delay` and `...processing.multiplier` / `.jitter` (defaults
+   `2.0` / `0.5` / `10m`). Delivery rows reschedule with
+   `retry-delay × multiplier^(attempt-1)` capped by `max-retry-delay`.
+3. **D7 grouping is a mutual defer.** `DeliveryRetryScheduler` defers a due
+   row while an active (`PENDING` / `IN_PROGRESS`) `PROCESSING` row exists;
+   `ProcessingRetryScheduler` mirrors this by deferring while a `DELIVERY`
+   row is `IN_PROGRESS`. The full group-by-`event_id` cycle is not
+   implemented, but the mutual defer closes the double re-publish race
+   (DEF-008).
+4. **D8.6 `AcceptedAck.maxProcessingMs` is emitted but not consumed.**
+   The publisher-side watchdog compares the `ACCEPTED` age with the fixed
+   `ack-timeout`; the consumer-provided local-campaign estimate is carried in
+   the ack only (DEF-007).
