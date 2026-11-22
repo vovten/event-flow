@@ -32,8 +32,14 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
     private static final Set<EventStatus> PROCESSING_SOURCES =
             Set.of(EventStatus.NEW, EventStatus.PUBLISHED, EventStatus.ACCEPTED, EventStatus.FAILED);
 
-    private static final Set<EventStatus> MANUAL_RETRY_SOURCES =
-            Set.of(EventStatus.values());
+    /**
+     * Manual retry may resurrect any terminal or failed status, but never
+     * an event that is already {@code NEW}: a second manual retry while the
+     * retry is already scheduled must not increment {@code retry_count} again.
+     */
+    private static final Set<EventStatus> MANUAL_RETRY_SOURCES = Set.of(
+            EventStatus.UNDEFINED, EventStatus.PUBLISHED, EventStatus.ACCEPTED,
+            EventStatus.HANDLED, EventStatus.FAILED, EventStatus.DEAD);
 
     private final EventStore eventStore;
     private final EventRetryStore retryStore;
@@ -132,16 +138,22 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
 
     @Override
     public synchronized void markForRetry(UUID eventId, String service) {
+        tryMarkForRetry(eventId, service);
+    }
+
+    @Override
+    public synchronized boolean tryMarkForRetry(UUID eventId, String service) {
         boolean applied = eventStore.transitionStatus(
                 eventId, MANUAL_RETRY_SOURCES, EventStatus.NEW, null);
         if (!applied) {
-            return;
+            return false;
         }
         RetryKind kind = resolveKind(eventId);
         Optional<RetryTask> existing = retryStore.find(eventId, kind);
         String policyName = existing.map(RetryTask::policyName).orElse(null);
         schedule(eventId, service, kind, 1, RetryReason.HANDLER_FAILED,
                 Instant.now(), policyName, null, null);
+        return true;
     }
 
     private void schedule(UUID eventId, String service, RetryKind kind, int attempt,

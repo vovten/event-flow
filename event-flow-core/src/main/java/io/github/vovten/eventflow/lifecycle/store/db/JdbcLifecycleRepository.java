@@ -41,8 +41,14 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
     private static final Set<EventStatus> PROCESSING_SOURCES =
             Set.of(EventStatus.NEW, EventStatus.PUBLISHED, EventStatus.ACCEPTED, EventStatus.FAILED);
 
-    private static final Set<EventStatus> MANUAL_RETRY_SOURCES =
-            Set.of(EventStatus.values());
+    /**
+     * Manual retry may resurrect any terminal or failed status, but never
+     * an event that is already {@code NEW}: a second manual retry while the
+     * retry is already scheduled must not increment {@code retry_count} again.
+     */
+    private static final Set<EventStatus> MANUAL_RETRY_SOURCES = Set.of(
+            EventStatus.UNDEFINED, EventStatus.PUBLISHED, EventStatus.ACCEPTED,
+            EventStatus.HANDLED, EventStatus.FAILED, EventStatus.DEAD);
 
     private final DataSource dataSource;
     private final JdbcEventStore eventStore;
@@ -164,10 +170,17 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
 
     @Override
     public void markForRetry(UUID eventId, String service) {
+        tryMarkForRetry(eventId, service);
+    }
+
+    @Override
+    public boolean tryMarkForRetry(UUID eventId, String service) {
+        AtomicBoolean applied = new AtomicBoolean(false);
         inTransaction(conn -> {
-            boolean applied = eventStore.transitionStatus(
+            boolean updated = eventStore.transitionStatus(
                     conn, eventId, MANUAL_RETRY_SOURCES, EventStatus.NEW, null);
-            if (!applied) {
+            applied.set(updated);
+            if (!updated) {
                 return;
             }
             RetryKind kind = resolveKind(conn, eventId);

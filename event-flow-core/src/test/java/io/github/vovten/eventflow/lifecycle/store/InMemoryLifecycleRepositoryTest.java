@@ -163,6 +163,23 @@ class InMemoryLifecycleRepositoryTest {
     }
 
     @Test
+    @DisplayName("Should report whether manual retry was applied")
+    void shouldReportManualRetryApplied() {
+        repository.onProcessingFailed(eventId, SERVICE, 1, false,
+                Instant.now(), "payment", "Type", "error");
+        assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.DEAD);
+
+        assertThat(repository.tryMarkForRetry(eventId, SERVICE)).isTrue();
+        assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.NEW);
+        assertThat(repository.tryMarkForRetry(eventId, SERVICE))
+                .as("manual retry must not be applied twice while the event is NEW")
+                .isFalse();
+        assertThat(repository.tryMarkForRetry(UUID.randomUUID(), SERVICE))
+                .as("manual retry must report an unknown event")
+                .isFalse();
+    }
+
+    @Test
     @DisplayName("Should dead-letter an explicit retry kind")
     void shouldDeadLetterExplicitKind() {
         repository.onDeadLetter(eventId, SERVICE, RetryKind.DELIVERY,

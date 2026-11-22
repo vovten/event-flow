@@ -122,4 +122,21 @@ public interface LifecycleRepository {
      * @param service owning service
      */
     void markForRetry(UUID eventId, String service);
+
+    /**
+     * Resets an event for manual retry and reports whether the reset was applied.
+     * <p>
+     * The default implementation delegates to {@link #markForRetry(UUID, String)}
+     * and returns {@code true} to preserve the legacy contract. Built-in
+     * repositories override it so callers can distinguish a scheduled retry
+     * from an unknown event or an event that is already {@code NEW}.
+     *
+     * @param eventId event identifier
+     * @param service owning service
+     * @return {@code true} when the event existed and the transition to {@code NEW} was applied
+     */
+    default boolean tryMarkForRetry(UUID eventId, String service) {
+        markForRetry(eventId, service);
+        return true;
+    }
 }
