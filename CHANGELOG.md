@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Durable retry storage: the `event_retry` table (keyed by `event_id`, `retry_kind`) and the `EventRetryStore` SPI with JDBC and in-memory implementations. The table is created automatically when schema initialization is enabled.
 - Transactional `LifecycleRepository`: coordinated `event_store` + `event_retry` writes with rollback on either side (`JdbcLifecycleRepository`, `InMemoryLifecycleRepository`).
 - `DeliveryRetryScheduler` and `ProcessingRetryScheduler`: durable retries with lease-based claims, attempt counters, exponential backoff, jitter and hard caps. A shared `RetrySchedulerSupport` groups both retry kinds by `eventId` so an event is re-published once per cycle.
-- `RetryWatchdog`: raises `DELIVERY` rows for stale `PUBLISHED` events and `PROCESSING` rows for stale `ACCEPTED` events.
+- Configurable durable backoff for both retry domains: `event-flow.publisher.lifecycle.retry.delivery.multiplier` / `.jitter` / `.max-retry-delay` and `event-flow.publisher.lifecycle.retry.processing.multiplier` / `.jitter` (all default to `2.0` / `0.5` / `10m`). Delivery retries now reschedule with exponential backoff (`retry-delay × multiplier^(attempt-1)`, capped by `max-retry-delay`) and jitter instead of re-publishing on every scheduler cycle; durable processing retries honour the configured multiplier and jitter instead of a fixed delay.
+- `RetryWatchdog`: creates `DELIVERY` rows for stale `PUBLISHED` events and `PROCESSING` rows for stale `ACCEPTED` events. Created rows are seeded at attempt `1` and the stale-event scan filters by service in the database (`EventStore.findByStatusesAndService`), so events of other services cannot consume the batch. The watchdog never reschedules an existing row: a `PENDING` row keeps its scheduled backoff delay, `IN_PROGRESS` / `DEAD` rows are left as is.
 - Retry-aware `AckHandler`: routes all four acks through `LifecycleRepository`, applies stale-ack guards by `retryKind` and `attempt`, persists `retryAfterMs`/`policyName`, and supports delivery-only mode.
 - Retry-aware `EventLifecyclePublisher`: creates a `DELIVERY` retry row on publish failure, supports `require-accepted-ack = false` (publish success equals `ACCEPTED`), and never rolls back terminal statuses.
 - Spring properties split by ownership: publisher-side `event-flow.publisher.lifecycle.retry.delivery.*` / `.processing.*` (shared interval, ack-timeout, batch-size, table) and dispatcher-side `event-flow.dispatcher.lifecycle.retry.*` (processing policy). The publisher no longer reads the dispatcher policy; it enforces its own `processing.max-attempts` safety cap.
@@ -45,10 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Retry-row claims now use compare-and-set (`EventRetryStore.claimNextAttempt`) instead of a blind upsert, eliminating the race where a completed retry row was resurrected and an already accepted event was re-published.
+- The two retry domains no longer re-publish the same event concurrently: `DeliveryRetryScheduler` defers while a `PROCESSING` row is active, and `ProcessingRetryScheduler` now mirrors this by deferring while a `DELIVERY` row is in flight (previously only the delivery side deferred, so two due rows could produce two concurrent dispatches).
+- A retry row whose dead-letter transition cannot be applied (event status outside the transition sources) is forced to `DEAD` in the retry store instead of looping forever on every `ack-timeout` cycle.
+- Watchdog-created retry rows are seeded at attempt `1` (the first attempt of their own domain) instead of inheriting the cross-domain legacy `retry_count`, which could dead-letter an event without a single delivery attempt.
+- `IdempotentEventDispatcher` now shares the in-flight outcome with duplicate deliveries: a duplicate completes with the original future instead of an immediate synthetic success, so the transport no longer commits the offset while the original processing is still running.
+- `EventLifecycleDispatcher` no longer publishes `SuccessAck` for a skipped duplicate; the in-flight original owns the final ack.
+- The watchdog no longer pulls a pending retry row's scheduled time forward to `now`, preserving the backoff delay computed from a consumer's `FailureAck.retryAfterMs`.
 - `IdempotentEventDispatcher` now invalidates its cache on any handler failure, not only when all handlers fail. A partial failure is therefore eligible for a processing retry instead of being dropped as a duplicate.
 - `EventStatus` status comments in all SQL dialects and `SchemaInitializer` now document the new `A` and `D` codes.
 - Retry rows now persist the publish error type and message instead of dropping them.
 - Delivery attempt numbers now count from the first publish, so stale acks from the original attempt cannot clear a newer delivery retry.
+- `DeliveryRetryOptions` rejects a `maxRetryDelay` shorter than `retryDelay`; `EventCleanupScheduler` rejects unsafe retention settings (`max-age` / `dead-letter-max-age` must be positive, `dead-letter-max-age` must exceed `max-age`).
+- Acks for unknown or terminal events are ignored (logged at info/debug) instead of failing; a duplicate manual `markForRetry` reset is rejected and reported.
+- Cleanup now also deletes terminal events whose retry rows are already `DEAD`, so dead-lettered events no longer block retention.
 
 ## [1.3.1] - 2026-10-19
 

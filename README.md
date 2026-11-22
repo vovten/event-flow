@@ -537,7 +537,7 @@ The durable two-domain model adds the following components:
 
 - **`DeliveryRetryScheduler`** — retries events that were not accepted by the consumer (`DELIVERY` rows).
 - **`ProcessingRetryScheduler`** — retries handler processing after the consumer accepted the event (`PROCESSING` rows).
-- **`RetryWatchdog`** — creates or raises retry rows for stale `PUBLISHED` / `ACCEPTED` events whose acks were lost.
+- **`RetryWatchdog`** — creates retry rows for stale `PUBLISHED` / `ACCEPTED` events whose acks were lost. Existing rows are never modified: a `PENDING` row keeps its scheduled backoff, and `IN_PROGRESS` / `DEAD` rows are left as is. The stale-event scan filters by service in the database, so foreign events cannot consume the batch.
 - **`LifecycleRepository`** — transactional facade coordinating `event_store` and `event_retry` writes (`JdbcLifecycleRepository`, `InMemoryLifecycleRepository`).
 - **`EventRetryStore`** — durable retry-row persistence (`JdbcEventRetryStore`, `InMemoryEventRetryStore`).
 
@@ -703,11 +703,16 @@ event-flow:
           enabled: true
           max-retries: 3
           retry-delay: 30s         # base delay before the first delivery retry
+          multiplier: 2.0          # exponential backoff multiplier
+          jitter: 0.5              # symmetric jitter fraction in [0, 1]
+          max-retry-delay: 10m     # backoff upper bound
           require-accepted-ack: true
         processing:                # durable PROCESSING execution
           enabled: true
           max-attempts: 100        # publisher-side safety cap
           default-delay: 30s
+          multiplier: 2.0
+          jitter: 0.5
           max-delay: 10m
   dispatcher:
     lifecycle:
@@ -730,7 +735,9 @@ The `service-name` is mandatory — it identifies this service instance so that 
 The legacy `EventRetryScheduler` is no longer auto-configured. Retries are handled by
 the two-domain durable model below: `event_retry` rows are the source of truth, and
 `DeliveryRetryScheduler` / `ProcessingRetryScheduler` process due rows with exponential
-backoff. `RetryWatchdog` raises retry rows for lost `AcceptedAck` / final acks.
+backoff and jitter. `RetryWatchdog` creates retry rows for lost `AcceptedAck` / final
+acks; it never reschedules an existing row, so a backoff delay scheduled from an ack is
+preserved.
 
 The `EventRetryScheduler` class remains available for manual wiring, but it is not part
 of the Spring auto-configuration.
@@ -771,18 +778,21 @@ ignored. `HANDLED` and `DEAD` are terminal for acks; only an explicit
 
 #### Durable retry table
 
-The single `event_retry` table is keyed by `(event_id, retry_kind)` and is
-created automatically when `auto-init-schema=true`:
+The single `event_retry` table is keyed by `(event_id, retry_kind)`. It is created
+together with the event store when schema initialization is enabled
+(`auto-init-schema=true`); otherwise apply the shipped DDL script
+`io/github/vovten/eventflow/lifecycle/store/db/event-retry-<dialect>.sql`
+manually. PostgreSQL version:
 
 ```sql
 CREATE TABLE IF NOT EXISTS event_retry (
     event_id         UUID         NOT NULL,
     service          VARCHAR(255) NOT NULL,
     retry_kind       VARCHAR(16)  NOT NULL,   -- DELIVERY | PROCESSING
-    attempt          INT          NOT NULL DEFAULT 1,
-    next_attempt_at  TIMESTAMP    NOT NULL,
+    attempt          INT          NOT NULL,   -- 1-based, per retry domain
     state            VARCHAR(16)  NOT NULL,   -- PENDING | IN_PROGRESS | DEAD
     reason           VARCHAR(64)  NOT NULL,
+    next_attempt_at  TIMESTAMP    NOT NULL,
     last_error_type  VARCHAR(512),
     last_error       TEXT,
     policy_name      VARCHAR(255),
@@ -793,6 +803,10 @@ CREATE TABLE IF NOT EXISTS event_retry (
     PRIMARY KEY (event_id, retry_kind)
 );
 ```
+
+The script also creates `idx_event_retry_due (retry_kind, state, next_attempt_at)`
+and `idx_event_retry_service_due (service, retry_kind, state, next_attempt_at)`
+indexes.
 
 #### Configuration
 
@@ -812,11 +826,16 @@ event-flow:
           enabled: true
           max-retries: 3
           retry-delay: 30s        # base delay before the first delivery retry
+          multiplier: 2.0         # exponential backoff multiplier
+          jitter: 0.5             # symmetric jitter fraction in [0, 1]
+          max-retry-delay: 10m    # backoff upper bound
           require-accepted-ack: true # set false during a mixed-fleet migration
         processing:               # durable PROCESSING execution
           enabled: true
           max-attempts: 100       # publisher-side safety cap
           default-delay: 30s
+          multiplier: 2.0
+          jitter: 0.5
           max-delay: 10m
   dispatcher:
     lifecycle:
@@ -966,7 +985,7 @@ event-flow:
 
 The `EventStore` interface has two built-in implementations:
 
-- **`JdbcEventStore`** — production grade, backed by a relational database. Table is created automatically by default. Dialect-specific DDL scripts are shipped at `io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql` for manual migration tooling.
+- **`JdbcEventStore`** — production grade, backed by a relational database. Schema auto-initialization is disabled by default (`auto-init-schema: false`); enable it for development, or manage DDL via a migration tool — dialect-specific scripts are shipped at `io/github/vovten/eventflow/lifecycle/store/db/event-store-<dialect>.sql` (and `event-retry-<dialect>.sql` for the retry table).
 - **`InMemoryEventStore`** — `ConcurrentHashMap`-backed, for testing and single-JVM scenarios where persistence is not needed.
 
 You can also implement `EventStore` with your own backend (Redis, MongoDB, etc.) and configure it via `store.type`.
@@ -1258,18 +1277,23 @@ For detailed configuration examples, see:
 | `event-flow.publisher.lifecycle.service-name` | `""` | **Required!** Service name for ack filtering |
 | `event-flow.publisher.lifecycle.store.type` | `db` | Store type: `db`, `in-memory`, or custom |
 | `event-flow.publisher.lifecycle.store.table-name` | `event_store` | Custom table name (for `db` type) |
-| `event-flow.publisher.lifecycle.store.auto-init-schema` | `true` | Auto-create table on startup |
+| `event-flow.publisher.lifecycle.store.auto-init-schema` | `false` | Auto-create table on startup (enable for development; manage DDL via Flyway in production) |
 | `event-flow.publisher.lifecycle.retry.interval` | `30s` | Interval between delivery/processing retry cycles |
 | `event-flow.publisher.lifecycle.retry.ack-timeout` | `5m` | Wait time for `AcceptedAck` / final ack |
 | `event-flow.publisher.lifecycle.retry.batch-size` | `100` | Retry rows per delivery/processing cycle |
 | `event-flow.publisher.lifecycle.retry.table-name` | `event_retry` | Shared durable retry table |
 | `event-flow.publisher.lifecycle.retry.delivery.enabled` | `false` | Enable durable delivery retries |
 | `event-flow.publisher.lifecycle.retry.delivery.max-retries` | `3` | Maximum delivery retries after the first publish |
-| `event-flow.publisher.lifecycle.retry.delivery.retry-delay` | `30s` | Base delay before the first delivery retry |
+| `event-flow.publisher.lifecycle.retry.delivery.retry-delay` | `30s` | Base delay for delivery retries (multiplier applies to subsequent attempts) |
+| `event-flow.publisher.lifecycle.retry.delivery.multiplier` | `2.0` | Exponential backoff multiplier for delivery retries |
+| `event-flow.publisher.lifecycle.retry.delivery.jitter` | `0.5` | Symmetric jitter fraction in `[0, 1]` applied to delivery backoff |
+| `event-flow.publisher.lifecycle.retry.delivery.max-retry-delay` | `10m` | Upper bound for delivery backoff delay |
 | `event-flow.publisher.lifecycle.retry.delivery.require-accepted-ack` | `true` | Require explicit `AcceptedAck` |
 | `event-flow.publisher.lifecycle.retry.processing.enabled` | `false` | Enable durable processing retries on the publisher |
 | `event-flow.publisher.lifecycle.retry.processing.max-attempts` | `100` | Global hard cap for processing attempts |
 | `event-flow.publisher.lifecycle.retry.processing.default-delay` | `30s` | Fallback delay when `retryAfterMs` is absent |
+| `event-flow.publisher.lifecycle.retry.processing.multiplier` | `2.0` | Exponential backoff multiplier for durable processing retries |
+| `event-flow.publisher.lifecycle.retry.processing.jitter` | `0.5` | Symmetric jitter fraction in `[0, 1]` applied to processing backoff |
 | `event-flow.publisher.lifecycle.retry.processing.max-delay` | `10m` | Upper clamp for `retryAfterMs` |
 | `event-flow.dispatcher.lifecycle.enabled` | `false` | Enable ack-based lifecycle tracking on dispatcher |
 | `event-flow.dispatcher.lifecycle.retry.enabled` | `false` | Enable processing retries |
