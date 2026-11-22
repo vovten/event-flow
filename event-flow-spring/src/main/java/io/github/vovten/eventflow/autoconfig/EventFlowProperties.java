@@ -54,6 +54,7 @@ import java.util.Map;
  *       max-attempts: 3
  *       initial-delay: 100ms
  *       multiplier: 2.0
+ *       jitter: 0.15
  *     channels:
  *       - name: internal
  *         transports:
@@ -519,6 +520,11 @@ public class EventFlowProperties {
         private int maxAttempts = 3;
         private Duration initialDelay = Duration.ofMillis(100);
         private double multiplier = 2.0;
+        /**
+         * Symmetric jitter fraction in {@code [0, 1]} applied to the immediate
+         * publisher retry backoff; {@code 0} disables jitter.
+         */
+        private double jitter = 0.15;
 
         public boolean isEnabled() {
             return enabled;
@@ -550,6 +556,14 @@ public class EventFlowProperties {
 
         public void setMultiplier(double multiplier) {
             this.multiplier = multiplier;
+        }
+
+        public double getJitter() {
+            return jitter;
+        }
+
+        public void setJitter(double jitter) {
+            this.jitter = jitter;
         }
     }
 

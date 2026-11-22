@@ -6,10 +6,12 @@ import java.util.Objects;
 /**
  * Configuration for the retry-aware {@link AckHandler}.
  *
- * @param processingEnabled     whether processing retries are enabled
+ * @param processingEnabled      whether processing retries are enabled
  * @param defaultProcessingDelay fallback delay used when a {@code FailureAck} has no relative delay
- * @param maxProcessingDelay    upper clamp for a consumer-provided retry delay (must be positive)
- * @param maxProcessingRetries  global hard cap for processing retries after the first attempt
+ * @param maxProcessingDelay     upper clamp for a consumer-provided retry delay (must be positive)
+ * @param processingAckTimeout   default processing watchdog timeout; a larger
+ *                               {@code AcceptedAck.maxProcessingMs} extends it (must be positive)
+ * @param maxProcessingRetries   global hard cap for processing retries after the first attempt
  * @author Vladimir Aleshkov
  * @since 1.4.0
  */
@@ -17,12 +19,14 @@ public record AckHandlerOptions(
         boolean processingEnabled,
         Duration defaultProcessingDelay,
         Duration maxProcessingDelay,
+        Duration processingAckTimeout,
         int maxProcessingRetries
 ) {
 
     public AckHandlerOptions {
         Objects.requireNonNull(defaultProcessingDelay, "defaultProcessingDelay must not be null");
         Objects.requireNonNull(maxProcessingDelay, "maxProcessingDelay must not be null");
+        Objects.requireNonNull(processingAckTimeout, "processingAckTimeout must not be null");
         if (defaultProcessingDelay.isNegative()) {
             throw new IllegalArgumentException("defaultProcessingDelay must not be negative");
         }
@@ -32,6 +36,9 @@ public record AckHandlerOptions(
         if (maxProcessingDelay.compareTo(defaultProcessingDelay) < 0) {
             throw new IllegalArgumentException(
                     "maxProcessingDelay must not be shorter than defaultProcessingDelay");
+        }
+        if (processingAckTimeout.isZero() || processingAckTimeout.isNegative()) {
+            throw new IllegalArgumentException("processingAckTimeout must be positive");
         }
         if (maxProcessingRetries < 0) {
             throw new IllegalArgumentException("maxProcessingRetries must be >= 0");

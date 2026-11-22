@@ -104,6 +104,16 @@ class RetryEventPublisherTest {
     }
 
     @Test
+    @DisplayName("Should throw exception when jitter is outside the zero-to-one range")
+    void shouldThrowExceptionWhenJitterIsOutsideRange() {
+        assertThatThrownBy(() ->
+                new RetryEventPublisher(e -> CompletableFuture.completedFuture(SendResults.empty()),
+                        3, Duration.ofMillis(100), 2.0, Duration.ofSeconds(1), 1.5))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Jitter must be between 0 and 1");
+    }
+
+    @Test
     @DisplayName("Should cap delay at maxDelay")
     void shouldCapDelayAtMaxDelay() {
         // Arrange
@@ -288,6 +298,46 @@ class RetryEventPublisherTest {
         CompletableFuture<SendResults> future = publisher.publish(event);
         assertThatThrownBy(future::join)
                 .hasCauseInstanceOf(IllegalArgumentException.class);
+        assertEquals(1, callCount.get());
+    }
+
+    @Test
+    @DisplayName("Should convert a synchronous publish throw into a failed future")
+    void shouldConvertSynchronousThrowIntoFailedFuture() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<SendResults> publish(Event event) {
+                callCount.incrementAndGet();
+                throw new IllegalStateException("sync boom");
+            }
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 1, Duration.ofMillis(10), 2.0);
+
+        CompletableFuture<SendResults> future = publisher.publish(event);
+
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(EventPublisherException.class);
+        assertEquals(2, callCount.get());
+    }
+
+    @Test
+    @DisplayName("Should not retry a synchronous EventPublisherConfigException")
+    void shouldNotRetrySynchronousConfigException() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<SendResults> publish(Event event) {
+                callCount.incrementAndGet();
+                throw new EventPublisherConfigException("config boom");
+            }
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0);
+
+        CompletableFuture<SendResults> future = publisher.publish(event);
+
+        assertThatThrownBy(future::join)
+                .hasCauseInstanceOf(EventPublisherConfigException.class);
         assertEquals(1, callCount.get());
     }
 

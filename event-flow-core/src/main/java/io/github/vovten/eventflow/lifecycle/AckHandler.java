@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -63,6 +64,17 @@ public final class AckHandler implements EventSubscriber {
      */
     private static final Set<EventStatus> PROCESSING_SOURCES =
             Set.of(NEW, PUBLISHED, ACCEPTED, FAILED);
+
+    /**
+     * Upper bound for a consumer-provided processing estimate. A malicious or
+     * buggy ack must not be able to park a row for centuries.
+     */
+    private static final Duration MAX_PROCESSING_DEADLINE = Duration.ofDays(365);
+
+    /**
+     * Minimum grace period added to the consumer's local-campaign estimate.
+     */
+    private static final long MIN_PROCESSING_MARGIN_MS = 1_000L;
 
     private final String serviceName;
     private final EventStore eventStore;
@@ -143,7 +155,8 @@ public final class AckHandler implements EventSubscriber {
         if (isStale(ack.originalEventId(), RetryKind.DELIVERY, ack.attempt(), ack.eventType())) {
             return;
         }
-        boolean applied = lifecycleRepository.tryOnAccepted(ack.originalEventId(), ack.attempt());
+        boolean applied = lifecycleRepository.tryOnAccepted(
+                ack.originalEventId(), ack.attempt(), serviceName, processingDeadline(ack));
         if (applied) {
             log.debug("Event {} accepted on delivery attempt {} ({})",
                     ack.originalEventId(), ack.attempt(), ack.eventType());
@@ -253,6 +266,34 @@ public final class AckHandler implements EventSubscriber {
         }
         long capped = Math.min(retryAfterMs, options.maxProcessingDelay().toMillis());
         return Instant.now().plusMillis(capped);
+    }
+
+    /**
+     * Derives the processing watchdog deadline from the consumer's estimate.
+     * <p>
+     * Returns {@code null} when the configured ack timeout already covers the
+     * campaign (or processing is disabled), so a {@code PROCESSING} row is not
+     * created for every accepted event. When the estimate is longer, a margin
+     * of 10% (at least one second) is added and capped at one year.
+     *
+     * @param ack the acceptance ack
+     * @return the watchdog deadline, or {@code null} to use the fixed timeout
+     */
+    private Instant processingDeadline(AcceptedAck ack) {
+        if (!options.processingEnabled()) {
+            return null;
+        }
+        long maxProcessingMs = ack.maxProcessingMs();
+        if (maxProcessingMs <= 0) {
+            return null;
+        }
+        long capped = Math.min(maxProcessingMs, MAX_PROCESSING_DEADLINE.toMillis());
+        long margin = Math.max(MIN_PROCESSING_MARGIN_MS, capped / 10);
+        long deadlineMs = Math.min(capped + margin, MAX_PROCESSING_DEADLINE.toMillis());
+        if (deadlineMs <= options.processingAckTimeout().toMillis()) {
+            return null;
+        }
+        return Instant.now().plusMillis(deadlineMs);
     }
 
     private boolean isStale(UUID eventId, RetryKind retryKind, int attempt, String eventType) {

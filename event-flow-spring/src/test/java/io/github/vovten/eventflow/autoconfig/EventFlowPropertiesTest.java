@@ -38,6 +38,7 @@ class EventFlowPropertiesTest {
         assertThat(eventFlowProperties.getPublisher().getRetry().getMaxAttempts()).isEqualTo(3);
         assertThat(eventFlowProperties.getPublisher().getRetry().getInitialDelay()).isEqualTo(Duration.ofMillis(100));
         assertThat(eventFlowProperties.getPublisher().getRetry().getMultiplier()).isEqualTo(2.0);
+        assertThat(eventFlowProperties.getPublisher().getRetry().getJitter()).isEqualTo(0.15);
         assertThat(eventFlowProperties.getPublisher().getChannels()).isEmpty();
         assertThat(eventFlowProperties.getDispatcher().isEnabled()).isFalse();
         assertThat(eventFlowProperties.getDispatcher().getThreadPool().getCoreSize()).isEqualTo(4);
@@ -161,7 +162,8 @@ class EventFlowPropertiesTest {
                 "event-flow.publisher.retry.enabled", "true",
                 "event-flow.publisher.retry.max-attempts", "5",
                 "event-flow.publisher.retry.initial-delay", "200ms",
-                "event-flow.publisher.retry.multiplier", "3.0"
+                "event-flow.publisher.retry.multiplier", "3.0",
+                "event-flow.publisher.retry.jitter", "0.25"
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
         Binder binder = new Binder(source);
@@ -177,6 +179,7 @@ class EventFlowPropertiesTest {
         assertThat(eventFlowProperties.getPublisher().getRetry().getMaxAttempts()).isEqualTo(5);
         assertThat(eventFlowProperties.getPublisher().getRetry().getInitialDelay()).isEqualTo(Duration.ofMillis(200));
         assertThat(eventFlowProperties.getPublisher().getRetry().getMultiplier()).isEqualTo(3.0);
+        assertThat(eventFlowProperties.getPublisher().getRetry().getJitter()).isEqualTo(0.25);
     }
 
     @Test

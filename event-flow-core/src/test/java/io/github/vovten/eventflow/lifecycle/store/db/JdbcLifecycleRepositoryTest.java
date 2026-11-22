@@ -81,6 +81,38 @@ class JdbcLifecycleRepositoryTest {
     }
 
     @Test
+    @DisplayName("Should seed a processing watchdog row when accepting with a deadline")
+    void shouldSeedProcessingWatchdogRowOnAccept() {
+        Instant deadline = Instant.now().plusSeconds(600);
+
+        boolean applied = repository.tryOnAccepted(eventId, 1, SERVICE, deadline);
+
+        assertThat(applied).isTrue();
+        assertThat(status()).isEqualTo(EventStatus.ACCEPTED);
+        RetryTask task = retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow();
+        assertThat(task.state()).isEqualTo(RetryState.PENDING);
+        assertThat(task.reason()).isEqualTo(RetryReason.PROCESSING_TIMEOUT);
+        assertThat(task.attempt()).isEqualTo(1);
+        assertThat(task.nextAttemptAt()).isAfter(Instant.now().plusSeconds(599));
+    }
+
+    @Test
+    @DisplayName("Should not overwrite an existing processing row when accepting with a deadline")
+    void shouldNotOverwriteProcessingRowOnAccept() {
+        retryStore.schedule(RetryTask.pending(
+                eventId, SERVICE, RetryKind.PROCESSING, 1,
+                RetryReason.HANDLER_FAILED, Instant.now().minusSeconds(1), null));
+        Instant existing = retryStore.find(eventId, RetryKind.PROCESSING)
+                .orElseThrow().nextAttemptAt();
+
+        repository.tryOnAccepted(eventId, 1, SERVICE, Instant.now().plusSeconds(600));
+
+        RetryTask task = retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow();
+        assertThat(task.reason()).isEqualTo(RetryReason.HANDLER_FAILED);
+        assertThat(task.nextAttemptAt()).isEqualTo(existing);
+    }
+
+    @Test
     @DisplayName("Should record retryable processing failure")
     void shouldRecordRetryableProcessingFailure() {
         repository.onProcessingFailed(eventId, SERVICE, 2, true,

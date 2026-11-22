@@ -137,7 +137,7 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      */
     @SuppressWarnings("unchecked")
     public T retryable() {
-        this.retryConfig = new RetryConfig(3, Duration.ofMillis(100), 2.0);
+        this.retryConfig = new RetryConfig(3, Duration.ofMillis(100), 2.0, 0.0);
         return (T) this;
     }
 
@@ -151,7 +151,22 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      */
     @SuppressWarnings("unchecked")
     public T retryable(int maxRetries, Duration initialDelay, double multiplier) {
-        this.retryConfig = new RetryConfig(maxRetries, initialDelay, multiplier);
+        this.retryConfig = new RetryConfig(maxRetries, initialDelay, multiplier, 0.0);
+        return (T) this;
+    }
+
+    /**
+     * Enable retry with custom settings, including symmetric jitter.
+     *
+     * @param maxRetries   maximum number of retry attempts
+     * @param initialDelay initial delay between retries
+     * @param multiplier   backoff multiplier
+     * @param jitter       symmetric jitter fraction in {@code [0, 1]}
+     * @return this builder
+     */
+    @SuppressWarnings("unchecked")
+    public T retryable(int maxRetries, Duration initialDelay, double multiplier, double jitter) {
+        this.retryConfig = new RetryConfig(maxRetries, initialDelay, multiplier, jitter);
         return (T) this;
     }
 
@@ -249,10 +264,13 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
                     publisher,
                     retryConfig.maxRetries,
                     retryConfig.initialDelay,
-                    retryConfig.multiplier
+                    retryConfig.multiplier,
+                    retryConfig.maxDelay,
+                    retryConfig.jitter
             );
-            log.debug("Applied retry decorator with maxRetries={}, initialDelay={}, multiplier={}",
-                    retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier);
+            log.debug("Applied retry decorator with maxRetries={}, initialDelay={}, multiplier={}, jitter={}",
+                    retryConfig.maxRetries, retryConfig.initialDelay, retryConfig.multiplier,
+                    retryConfig.jitter);
         }
 
         // Apply lifecycle-aware publisher if configured (wraps retry, so save/status update happens once)
@@ -326,14 +344,25 @@ public class EventPublisherBuilder<T extends EventPublisherBuilder<T>> {
      * Internal configuration class for retry settings.
      */
     private static class RetryConfig {
+        private static final Duration DEFAULT_MAX_DELAY = Duration.ofSeconds(10);
+
         final int maxRetries;
         final Duration initialDelay;
         final double multiplier;
+        final double jitter;
+        final Duration maxDelay;
 
-        RetryConfig(int maxRetries, Duration initialDelay, double multiplier) {
+        RetryConfig(int maxRetries, Duration initialDelay, double multiplier, double jitter) {
+            this(maxRetries, initialDelay, multiplier, jitter, DEFAULT_MAX_DELAY);
+        }
+
+        RetryConfig(int maxRetries, Duration initialDelay, double multiplier,
+                    double jitter, Duration maxDelay) {
             this.maxRetries = maxRetries;
             this.initialDelay = initialDelay;
             this.multiplier = multiplier;
+            this.jitter = jitter;
+            this.maxDelay = maxDelay;
         }
     }
 }

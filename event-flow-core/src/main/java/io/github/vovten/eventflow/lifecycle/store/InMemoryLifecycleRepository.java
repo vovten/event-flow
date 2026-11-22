@@ -68,18 +68,34 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
 
     @Override
     public synchronized void onAccepted(UUID eventId, int deliveryAttempt) {
-        tryOnAccepted(eventId, deliveryAttempt);
+        tryOnAccepted(eventId, deliveryAttempt, null, null);
     }
 
     @Override
     public synchronized boolean tryOnAccepted(UUID eventId, int deliveryAttempt) {
-        if (eventStore.findById(eventId).isEmpty()) {
+        return tryOnAccepted(eventId, deliveryAttempt, null, null);
+    }
+
+    @Override
+    public synchronized boolean tryOnAccepted(UUID eventId, int deliveryAttempt, String service,
+                                              Instant processingDeadline) {
+        Optional<StoredEvent> event = eventStore.findById(eventId);
+        if (event.isEmpty()) {
             return false;
         }
         // A delivery confirmation for a terminal event preserves the status
         // but must still clear the DELIVERY row.
-        eventStore.transitionStatus(eventId, ACCEPTANCE_SOURCES, EventStatus.ACCEPTED, null);
+        boolean applied = eventStore.transitionStatus(
+                eventId, ACCEPTANCE_SOURCES, EventStatus.ACCEPTED, null);
         retryStore.complete(eventId, RetryKind.DELIVERY);
+        if (applied && processingDeadline != null
+                && retryStore.find(eventId, RetryKind.PROCESSING).isEmpty()) {
+            String owner = service != null ? service : event.get().service();
+            if (owner != null && !owner.isBlank()) {
+                schedule(eventId, owner, RetryKind.PROCESSING, 1,
+                        RetryReason.PROCESSING_TIMEOUT, processingDeadline, null, null, null);
+            }
+        }
         return true;
     }
 

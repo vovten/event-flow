@@ -47,9 +47,15 @@ class AckHandlerRetryTest {
     }
 
     private AckHandler handler(boolean processingEnabled, int maxRetries) {
+        return handler(processingEnabled, maxRetries, Duration.ofMinutes(5));
+    }
+
+    private AckHandler handler(boolean processingEnabled, int maxRetries,
+                              Duration processingAckTimeout) {
         return new AckHandler(lifecycleRepository, retryStore, SERVICE,
                 new AckHandlerOptions(processingEnabled,
-                        Duration.ofSeconds(30), Duration.ofMinutes(10), maxRetries));
+                        Duration.ofSeconds(30), Duration.ofMinutes(10),
+                        processingAckTimeout, maxRetries));
     }
 
     private UUID storeEvent(EventStatus status) {
@@ -76,8 +82,12 @@ class AckHandlerRetryTest {
     }
 
     private AcceptedAck acceptedAck(UUID eventId, int attempt) {
+        return acceptedAck(eventId, attempt, 0L);
+    }
+
+    private AcceptedAck acceptedAck(UUID eventId, int attempt, long maxProcessingMs) {
         return new AcceptedAck(UUID.randomUUID(), eventId, "TestEvent", SERVICE,
-                attempt, 0L, List.of(), Instant.now());
+                attempt, maxProcessingMs, List.of(), Instant.now());
     }
 
     private NoHandlerAck noHandlerAck(UUID eventId, int attempt) {
@@ -163,6 +173,62 @@ class AckHandlerRetryTest {
 
             assertThat(status(eventId)).isEqualTo(EventStatus.ACCEPTED);
             assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should seed a processing watchdog row when the local campaign exceeds the ack timeout")
+        void seedsProcessingDeadlineForLongLocalCampaign() {
+            UUID eventId = storeEvent(EventStatus.PUBLISHED);
+
+            handler(true, 3, Duration.ofMinutes(1))
+                    .onEvent(acceptedAck(eventId, 1, Duration.ofMinutes(5).toMillis()));
+
+            assertThat(status(eventId)).isEqualTo(EventStatus.ACCEPTED);
+            RetryTask row = retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow();
+            assertThat(row.state()).isEqualTo(RetryState.PENDING);
+            assertThat(row.reason()).isEqualTo(RetryReason.PROCESSING_TIMEOUT);
+            assertThat(row.attempt()).isEqualTo(1);
+            assertThat(row.nextAttemptAt()).isAfter(Instant.now().plusSeconds(300));
+        }
+
+        @Test
+        @DisplayName("should not seed a processing row when the estimate fits the ack timeout")
+        void doesNotSeedProcessingRowWhenEstimateFits() {
+            UUID eventId = storeEvent(EventStatus.PUBLISHED);
+
+            handler(true, 3, Duration.ofMinutes(10))
+                    .onEvent(acceptedAck(eventId, 1, Duration.ofMinutes(1).toMillis()));
+
+            assertThat(status(eventId)).isEqualTo(EventStatus.ACCEPTED);
+            assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should not seed a processing row when processing retries are disabled")
+        void doesNotSeedProcessingRowWhenDisabled() {
+            UUID eventId = storeEvent(EventStatus.PUBLISHED);
+
+            handler(false, 3, Duration.ofMinutes(1))
+                    .onEvent(acceptedAck(eventId, 1, Duration.ofHours(1).toMillis()));
+
+            assertThat(status(eventId)).isEqualTo(EventStatus.ACCEPTED);
+            assertThat(retryStore.find(eventId, RetryKind.PROCESSING)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should not overwrite an existing processing row")
+        void doesNotOverwriteExistingProcessingRow() {
+            UUID eventId = storeEvent(EventStatus.PUBLISHED);
+            scheduleProcessing(eventId, 1);
+            Instant existingNextAttemptAt = retryStore.find(eventId, RetryKind.PROCESSING)
+                    .orElseThrow().nextAttemptAt();
+
+            handler(true, 3, Duration.ofMinutes(1))
+                    .onEvent(acceptedAck(eventId, 1, Duration.ofHours(1).toMillis()));
+
+            RetryTask row = retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow();
+            assertThat(row.reason()).isEqualTo(RetryReason.HANDLER_FAILED);
+            assertThat(row.nextAttemptAt()).isEqualTo(existingNextAttemptAt);
         }
 
         @Test

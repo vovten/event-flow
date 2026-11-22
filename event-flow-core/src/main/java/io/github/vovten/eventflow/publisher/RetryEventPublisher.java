@@ -9,6 +9,9 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -20,8 +23,12 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * <b>Retry strategy:</b>
  * <ul>
- *   <li>Uses exponential backoff: delay = initialDelay * (multiplier ^ (attempt - 1))</li>
- *   <li>Retries transient exceptions (network, timeout), not configuration errors</li>
+ *   <li>Uses exponential backoff: delay = initialDelay * (multiplier ^ (attempt - 1)),
+ *       capped by {@code maxDelay} and optionally jittered by ±{@code jitter}</li>
+ *   <li>Retries every failure except {@link EventPublisherConfigException} and
+ *       {@link IllegalArgumentException}, which are treated as configuration or
+ *       programmer errors. This includes NPEs and serialization failures: the
+ *       decorator is best-effort and leaves the retry budget to bound them</li>
  *   <li>Also retries when the delegate reports that <b>all</b> destinations failed
  *       (e.g. a full local queue or a rejected transport), because no durable
  *       delivery happened for any destination</li>
@@ -69,12 +76,25 @@ public class RetryEventPublisher implements EventPublisher {
     private static final Logger log = LoggerFactory.getLogger(RetryEventPublisher.class);
 
     private static final Duration DEFAULT_MAX_DELAY = Duration.ofSeconds(10);
+    private static final double DEFAULT_JITTER = 0.0;
+
+    /**
+     * Dedicated scheduler for retry delays. The common ForkJoinPool is shared
+     * with unrelated work and can delay or starve these timers.
+     */
+    private static final ScheduledExecutorService DELAYER =
+            Executors.newSingleThreadScheduledExecutor(task -> {
+                Thread thread = new Thread(task, "retry-publisher-delayer");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     private final EventPublisher origin;
     private final int maxRetries;
     private final Duration initialDelay;
     private final double multiplier;
     private final Duration maxDelay;
+    private final double jitter;
 
     /**
      * Create retry decorator with default settings.
@@ -88,7 +108,7 @@ public class RetryEventPublisher implements EventPublisher {
      * @param origin the delegate publisher to wrap
      */
     public RetryEventPublisher(EventPublisher origin) {
-        this(origin, 3, Duration.ofMillis(100), 2.0, DEFAULT_MAX_DELAY);
+        this(origin, 3, Duration.ofMillis(100), 2.0, DEFAULT_MAX_DELAY, DEFAULT_JITTER);
     }
 
     /**
@@ -101,7 +121,7 @@ public class RetryEventPublisher implements EventPublisher {
      * @throws IllegalArgumentException if maxRetries &lt; 0 or multiplier &lt; 1.0
      */
     public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay, double multiplier) {
-        this(origin, maxRetries, initialDelay, multiplier, DEFAULT_MAX_DELAY);
+        this(origin, maxRetries, initialDelay, multiplier, DEFAULT_MAX_DELAY, DEFAULT_JITTER);
     }
 
     /**
@@ -116,6 +136,24 @@ public class RetryEventPublisher implements EventPublisher {
      */
     public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay,
                                double multiplier, Duration maxDelay) {
+        this(origin, maxRetries, initialDelay, multiplier, maxDelay, DEFAULT_JITTER);
+    }
+
+    /**
+     * Create retry decorator with custom settings, including jitter.
+     *
+     * @param origin       the origin publisher to wrap
+     * @param maxRetries   maximum number of retry attempts (must be &gt;= 0)
+     * @param initialDelay initial delay between retries
+     * @param multiplier   backoff multiplier (must be &gt;= 1.0)
+     * @param maxDelay     maximum delay between retries (caps exponential backoff)
+     * @param jitter       symmetric jitter fraction in {@code [0, 1]}; {@code 0}
+     *                     disables jitter
+     * @throws IllegalArgumentException if maxRetries &lt; 0, multiplier &lt; 1.0,
+     *                                  maxDelay is not positive, or jitter is outside {@code [0, 1]}
+     */
+    public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay,
+                               double multiplier, Duration maxDelay, double jitter) {
         if (maxRetries < 0) {
             throw new IllegalArgumentException("Max retries must be >= 0");
         }
@@ -128,11 +166,15 @@ public class RetryEventPublisher implements EventPublisher {
         if (maxDelay.isNegative() || maxDelay.isZero()) {
             throw new IllegalArgumentException("Max delay must be positive");
         }
+        if (jitter < 0.0 || jitter > 1.0) {
+            throw new IllegalArgumentException("Jitter must be between 0 and 1");
+        }
         this.origin = origin;
         this.maxRetries = maxRetries;
         this.initialDelay = initialDelay;
         this.multiplier = multiplier;
         this.maxDelay = maxDelay;
+        this.jitter = jitter;
     }
 
     @Override
@@ -144,7 +186,22 @@ public class RetryEventPublisher implements EventPublisher {
 
     private void retryPublish(Event event, int attempt, CompletableFuture<SendResults> resultFuture) {
         String eventTypeName = event.type().getSimpleName();
-        origin.publish(event).whenComplete((results, error) -> {
+        CompletableFuture<SendResults> originFuture;
+        try {
+            originFuture = origin.publish(event);
+        } catch (RuntimeException e) {
+            // The EventPublisher contract promises an asynchronous result, but a
+            // misbehaving delegate may still throw synchronously. Treat it like
+            // any other failure instead of leaking the exception to the caller.
+            handleError(event, attempt, resultFuture, eventTypeName, e);
+            return;
+        }
+        if (originFuture == null) {
+            handleError(event, attempt, resultFuture, eventTypeName,
+                    new NullPointerException("origin.publish returned a null future"));
+            return;
+        }
+        originFuture.whenComplete((results, error) -> {
             if (error != null) {
                 handleError(event, attempt, resultFuture, eventTypeName, error);
                 return;
@@ -198,19 +255,30 @@ public class RetryEventPublisher implements EventPublisher {
     }
 
     private void scheduleRetry(Event event, int attempt, long delayMs, CompletableFuture<SendResults> resultFuture) {
-        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS)
-                .execute(() -> retryPublish(event, attempt + 1, resultFuture));
+        DELAYER.schedule(() -> retryPublish(event, attempt + 1, resultFuture),
+                delayMs, TimeUnit.MILLISECONDS);
     }
 
     /**
-     * Calculate delay for the given attempt using exponential backoff.
+     * Calculate delay for the given attempt using exponential backoff, capped
+     * at {@code maxDelay} and optionally jittered.
      *
      * @param attempt the current attempt number (1-based)
      * @return delay in milliseconds
      */
     private long calculateDelay(int attempt) {
         double delay = initialDelay.toMillis() * Math.pow(multiplier, attempt - 1);
-        return (long) Math.min(delay, maxDelay.toMillis());
+        long capped = (long) Math.min(delay, maxDelay.toMillis());
+        return applyJitter(capped);
+    }
+
+    private long applyJitter(long delayMillis) {
+        if (jitter <= 0.0) {
+            return delayMillis;
+        }
+        long bound = Math.max(1L, (long) (delayMillis * jitter));
+        long offset = ThreadLocalRandom.current().nextLong(-bound, bound + 1);
+        return Math.max(0L, delayMillis + offset);
     }
 
     /**

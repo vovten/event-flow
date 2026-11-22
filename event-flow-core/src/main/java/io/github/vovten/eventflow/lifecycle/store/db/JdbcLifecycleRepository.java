@@ -4,6 +4,7 @@ import io.github.vovten.eventflow.lifecycle.LifecycleRepository;
 import io.github.vovten.eventflow.lifecycle.retry.RetryReason;
 import io.github.vovten.eventflow.lifecycle.retry.RetryTask;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.retry.RetryKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,20 +85,37 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
 
     @Override
     public void onAccepted(UUID eventId, int deliveryAttempt) {
-        tryOnAccepted(eventId, deliveryAttempt);
+        tryOnAccepted(eventId, deliveryAttempt, null, null);
     }
 
     @Override
     public boolean tryOnAccepted(UUID eventId, int deliveryAttempt) {
+        return tryOnAccepted(eventId, deliveryAttempt, null, null);
+    }
+
+    @Override
+    public boolean tryOnAccepted(UUID eventId, int deliveryAttempt, String service,
+                                 Instant processingDeadline) {
         AtomicBoolean processed = new AtomicBoolean(false);
         inTransaction(conn -> {
             boolean applied = eventStore.transitionStatus(
                     conn, eventId, ACCEPTANCE_SOURCES, EventStatus.ACCEPTED, null);
+            Optional<StoredEvent> current = eventStore.findById(conn, eventId);
             // A delivery confirmation for a terminal event preserves the status
             // but must still clear the DELIVERY row. Only an unknown event makes
             // the ack unprocessable.
-            if (applied || eventStore.findById(conn, eventId).isPresent()) {
+            if (applied || current.isPresent()) {
                 retryStore.complete(conn, eventId, RetryKind.DELIVERY);
+                if (applied && processingDeadline != null
+                        && retryStore.find(conn, eventId, RetryKind.PROCESSING).isEmpty()) {
+                    String owner = service != null ? service
+                            : current.map(StoredEvent::service).orElse(null);
+                    if (owner != null && !owner.isBlank()) {
+                        schedule(conn, eventId, owner, RetryKind.PROCESSING, 1,
+                                RetryReason.PROCESSING_TIMEOUT, processingDeadline,
+                                null, null, null);
+                    }
+                }
                 processed.set(true);
             }
         });

@@ -89,7 +89,8 @@ public class PublisherConfiguration {
         // Apply retry if enabled
         var retry = publisherConfig.getRetry();
         if (retry.isEnabled()) {
-            builder.retryable(retry.getMaxAttempts(), retry.getInitialDelay(), retry.getMultiplier());
+            builder.retryable(retry.getMaxAttempts(), retry.getInitialDelay(),
+                    retry.getMultiplier(), retry.getJitter());
         }
 
         // Apply transactional if enabled

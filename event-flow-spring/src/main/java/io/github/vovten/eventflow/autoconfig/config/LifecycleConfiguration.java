@@ -329,13 +329,14 @@ public class LifecycleConfiguration {
         LifecycleRepository repository = repositoryProvider.getIfAvailable();
         EventRetryStore retryStore = retryStoreProvider.getIfAvailable();
         log.info("Creating AckHandler with service: {}", service);
-        EventFlowProperties.ProcessingConfig processing =
-                properties.getPublisher().getLifecycle().getRetry().getProcessing();
+        EventFlowProperties.PublisherRetryConfig retry =
+                properties.getPublisher().getLifecycle().getRetry();
+        EventFlowProperties.ProcessingConfig processing = retry.getProcessing();
         if (repository != null && retryStore != null) {
             return new AckHandler(repository, retryStore, service,
                     new AckHandlerOptions(processing.isEnabled(),
                             processing.getDefaultDelay(), processing.getMaxDelay(),
-                            processing.getMaxAttempts()));
+                            retry.getAckTimeout(), processing.getMaxAttempts()));
         }
         // Durable retries are disabled, but acknowledgments must still follow the
         // "processing disabled" contract: a terminal FailureAck leaves the event
@@ -350,7 +351,7 @@ public class LifecycleConfiguration {
         return new AckHandler(inMemoryRepository, inMemoryRetryStore, service,
                 new AckHandlerOptions(processing.isEnabled(),
                         processing.getDefaultDelay(), processing.getMaxDelay(),
-                        processing.getMaxAttempts()));
+                        retry.getAckTimeout(), processing.getMaxAttempts()));
     }
 
     /**

@@ -57,6 +57,29 @@ public interface LifecycleRepository {
     }
 
     /**
+     * Records consumer acceptance and optionally seeds a processing-timeout
+     * watchdog row when the consumer's local retry campaign is longer than the
+     * configured ack timeout.
+     * <p>
+     * The deadline is advisory: implementations that do not support it (the
+     * default) ignore it and keep the fixed watchdog timeout. Built-in
+     * repositories create a {@code PROCESSING} row at {@code processingDeadline}
+     * only when the event actually transitions to {@code ACCEPTED} and no
+     * processing row exists yet.
+     *
+     * @param eventId            event identifier
+     * @param deliveryAttempt    accepted delivery attempt
+     * @param service            owning service, used for the watchdog row
+     * @param processingDeadline when the processing watchdog should fire, or {@code null}
+     * @return {@code true} when the event exists and the ack was processed
+     * @since 1.4.0
+     */
+    default boolean tryOnAccepted(UUID eventId, int deliveryAttempt, String service,
+                                  Instant processingDeadline) {
+        return tryOnAccepted(eventId, deliveryAttempt);
+    }
+
+    /**
      * Records a handler failure.
      *
      * @param eventId       event identifier

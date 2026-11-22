@@ -15,10 +15,14 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -144,59 +148,75 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
             log.trace("No processing retries are due");
             return;
         }
+        List<CompletableFuture<Void>> inFlight = new ArrayList<>(due.size());
         for (RetryTask task : due) {
             try {
-                process(task, now);
+                inFlight.add(process(task, now));
             } catch (RuntimeException e) {
                 log.error("Failed to process processing retry for event {}", task.eventId(), e);
             }
         }
+        try {
+            CompletableFuture.allOf(inFlight.toArray(CompletableFuture[]::new)).get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Interrupted while waiting for the processing retry batch");
+        } catch (ExecutionException e) {
+            log.error("Processing retry batch failed", e.getCause());
+        }
     }
 
-    private void process(RetryTask task, Instant now) {
+    private CompletableFuture<Void> process(RetryTask task, Instant now) {
         if (task.state() == RetryState.IN_PROGRESS) {
             if (task.isClaimExpired(now)) {
-                handleExpiredClaim(task, now);
-            } else {
-                log.trace("Processing retry for event {} is still in progress", task.eventId());
+                return handleExpiredClaim(task, now);
             }
-            return;
+            log.trace("Processing retry for event {} is still in progress", task.eventId());
+            return CompletableFuture.completedFuture(null);
         }
         if (task.state() == RetryState.PENDING && task.isDue(now)) {
-            deliver(task, now);
+            return deliver(task, now);
         }
+        return CompletableFuture.completedFuture(null);
     }
 
-    private void deliver(RetryTask task, Instant now) {
+    private CompletableFuture<Void> deliver(RetryTask task, Instant now) {
         if (deliveryInFlight(task)) {
             // A delivery re-publish in flight is itself a dispatch, so it will
             // provide this processing attempt. Defer instead of publishing the
             // same event twice in one interval.
             log.debug("Deferring processing retry for event {}: a delivery retry is in flight",
                     task.eventId());
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         int nextAttempt = task.attempt() + 1;
         if (isBudgetExhausted(nextAttempt)) {
             support.deadLetter(task, RetryReason.CAP_EXCEEDED, "processing retry budget exhausted");
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         if (!support.claimNextAttempt(task, nextAttempt, now, options.ackTimeout())) {
             log.debug("Processing retry for event {} was already claimed", task.eventId());
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         Optional<StoredEvent> stored = eventStore.findById(task.eventId());
         if (stored.isEmpty()) {
             support.markDeadWithoutEvent(task, "stored event not found");
-            return;
+            return CompletableFuture.completedFuture(null);
         }
-        publish(task, stored.get(), nextAttempt, now);
+        return publish(task, stored.get(), nextAttempt);
     }
 
-    private void publish(RetryTask task, StoredEvent stored, int attempt, Instant now) {
-        Event event;
+    private CompletableFuture<Void> publish(RetryTask task, StoredEvent stored, int attempt) {
+        Optional<Event> event = createRetryEvent(task, stored, attempt);
+        if (event.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return submit(task, event.get(), attempt);
+    }
+
+    private Optional<Event> createRetryEvent(RetryTask task, StoredEvent stored, int attempt) {
         try {
-            event = RetryEventFactory.forRetry(stored, RetryKind.PROCESSING, attempt);
+            return Optional.of(RetryEventFactory.forRetry(stored, RetryKind.PROCESSING, attempt));
         } catch (RuntimeException e) {
             // An unreadable payload can never be delivered. Counting attempts
             // would only burn the retry budget and leave the row in the loop.
@@ -204,35 +224,63 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
                     task.eventId(), e);
             support.deadLetter(task, RetryReason.PAYLOAD_UNREADABLE,
                     "retry payload cannot be deserialized: " + e.getMessage());
-            return;
-        }
-        try {
-            SendResults results = publisher.publish(event).join();
-            if (results == null || results.isAllFailure()) {
-                String error = results == null ? "null publish result" : results.getSummary();
-                scheduleNextAttempt(task, attempt, now, RetryReason.PUBLISH_FAILED, null, error);
-                return;
-            }
-            log.info("Re-published processing retry for event {} (attempt {}/{}); awaiting final ack",
-                    task.eventId(), attempt, maxAttempts());
-        } catch (RuntimeException e) {
-            log.warn("Processing retry publish failed for event {} (attempt {}): {}",
-                    task.eventId(), attempt, e.getMessage());
-            scheduleNextAttempt(task, attempt, now, RetryReason.PUBLISH_FAILED,
-                    e.getClass().getName(), errorDetails(e));
+            return Optional.empty();
         }
     }
 
-    private void handleExpiredClaim(RetryTask task, Instant now) {
+    private CompletableFuture<Void> submit(RetryTask task, Event event, int attempt) {
+        CompletableFuture<SendResults> published;
+        try {
+            published = publisher.publish(event);
+        } catch (RuntimeException e) {
+            handlePublishError(task, attempt, e);
+            return CompletableFuture.completedFuture(null);
+        }
+        return published.handle((results, error) -> {
+            if (error != null) {
+                handlePublishError(task, attempt, unwrapCompletion(error));
+            } else if (results == null || results.isAllFailure()) {
+                handleFailedResults(task, attempt, results);
+            } else {
+                log.info("Re-published processing retry for event {} (attempt {}/{}); awaiting final ack",
+                        task.eventId(), attempt, maxAttempts());
+            }
+            return null;
+        });
+    }
+
+    private void handlePublishError(RetryTask task, int attempt, Throwable error) {
+        log.warn("Processing retry publish failed for event {} (attempt {}): {}",
+                task.eventId(), attempt, error.getMessage());
+        scheduleNextAttempt(task, attempt, Instant.now(), RetryReason.PUBLISH_FAILED,
+                error.getClass().getName(), errorDetails(error));
+    }
+
+    private void handleFailedResults(RetryTask task, int attempt, SendResults results) {
+        String failure = results == null ? "null publish result" : results.getSummary();
+        log.warn("Processing retry publish failed for event {} (attempt {}): {}",
+                task.eventId(), attempt, failure);
+        scheduleNextAttempt(task, attempt, Instant.now(), RetryReason.PUBLISH_FAILED,
+                null, failure);
+    }
+
+    private static Throwable unwrapCompletion(Throwable error) {
+        return error instanceof CompletionException && error.getCause() != null
+                ? error.getCause()
+                : error;
+    }
+
+    private CompletableFuture<Void> handleExpiredClaim(RetryTask task, Instant now) {
         if (!support.claim(task, now, options.ackTimeout())) {
             log.debug("Expired processing retry for event {} was claimed by another instance",
                     task.eventId());
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         log.warn("Processing ack timeout for event {} (attempt {}/{})",
                 task.eventId(), task.attempt(), maxAttempts());
         scheduleNextAttempt(task, task.attempt(), now, RetryReason.PROCESSING_TIMEOUT, null,
                 "no final ack within " + options.ackTimeout());
+        return CompletableFuture.completedFuture(null);
     }
 
     private void scheduleNextAttempt(RetryTask task, int performedAttempt, Instant now,
