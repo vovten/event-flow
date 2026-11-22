@@ -13,6 +13,7 @@ import io.github.vovten.eventflow.transport.SendResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -244,9 +245,11 @@ public final class DeliveryRetryScheduler implements AutoCloseable {
             support.deadLetter(task, RetryReason.CAP_EXCEEDED, error);
             return;
         }
-        support.reschedule(task, nextAttempt, reason, now, errorType, error);
-        log.debug("Scheduled delivery retry for event {}: attempt {}/{}, reason={}",
-                task.eventId(), nextAttempt, maxAttempts(), reason);
+        Duration delay = RetrySchedulerSupport.withJitter(
+                options.backoff(performedAttempt), options.jitter());
+        support.reschedule(task, nextAttempt, reason, now.plus(delay), errorType, error);
+        log.debug("Scheduled delivery retry for event {}: attempt {}/{}, reason={}, delay={}",
+                task.eventId(), nextAttempt, maxAttempts(), reason, delay);
     }
 
     private boolean isBudgetExhausted(int attempt) {

@@ -238,12 +238,17 @@ public class LifecycleConfiguration {
         EventFlowProperties.PublisherRetryConfig retry =
                 properties.getPublisher().getLifecycle().getRetry();
         EventFlowProperties.DeliveryConfig delivery = retry.getDelivery();
-        log.info("Creating DeliveryRetryScheduler: interval={}, ackTimeout={}, maxRetries={}, batchSize={}",
-                retry.getInterval(), retry.getAckTimeout(),
+        log.info("Creating DeliveryRetryScheduler: interval={}, ackTimeout={}, retryDelay={}, "
+                        + "multiplier={}, jitter={}, maxRetryDelay={}, maxRetries={}, batchSize={}",
+                retry.getInterval(), retry.getAckTimeout(), delivery.getRetryDelay(),
+                delivery.getMultiplier(), delivery.getJitter(), delivery.getMaxRetryDelay(),
                 delivery.getMaxRetries(), retry.getBatchSize());
         return new DeliveryRetryScheduler(support, eventStore, requirePublisher(publisherProvider),
                 new DeliveryRetryOptions(requireService(), retry.getInterval(),
-                        retry.getAckTimeout(), delivery.getMaxRetries(), retry.getBatchSize()));
+                        retry.getAckTimeout(), delivery.getRetryDelay(),
+                        delivery.getMultiplier(), delivery.getJitter(),
+                        delivery.getMaxRetryDelay(), delivery.getMaxRetries(),
+                        retry.getBatchSize()));
     }
 
     /**
@@ -268,14 +273,17 @@ public class LifecycleConfiguration {
         EventFlowProperties.PublisherRetryConfig retry =
                 properties.getPublisher().getLifecycle().getRetry();
         EventFlowProperties.ProcessingConfig processing = retry.getProcessing();
-        log.info("Creating ProcessingRetryScheduler: interval={}, ackTimeout={}, maxAttempts={}, batchSize={}",
-                retry.getInterval(), retry.getAckTimeout(),
+        log.info("Creating ProcessingRetryScheduler: interval={}, ackTimeout={}, retryDelay={}, "
+                        + "multiplier={}, jitter={}, maxRetryDelay={}, maxAttempts={}, batchSize={}",
+                retry.getInterval(), retry.getAckTimeout(), processing.getDefaultDelay(),
+                processing.getMultiplier(), processing.getJitter(), processing.getMaxDelay(),
                 processing.getMaxAttempts(), retry.getBatchSize());
         return new ProcessingRetryScheduler(support, eventStore, requirePublisher(publisherProvider),
                 new ProcessingRetryOptions(requireService(), retry.getInterval(),
                         retry.getAckTimeout(), processing.getDefaultDelay(),
-                        1.0, 0.0, processing.getMaxDelay(),
-                        processing.getMaxAttempts(), retry.getBatchSize()));
+                        processing.getMultiplier(), processing.getJitter(),
+                        processing.getMaxDelay(), processing.getMaxAttempts(),
+                        retry.getBatchSize()));
     }
 
     /**

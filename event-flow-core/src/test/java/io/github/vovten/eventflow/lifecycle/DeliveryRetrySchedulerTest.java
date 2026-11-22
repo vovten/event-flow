@@ -64,7 +64,8 @@ class DeliveryRetrySchedulerTest {
 
     private DeliveryRetryOptions options(int maxRetries) {
         return new DeliveryRetryOptions(
-                SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30), maxRetries, 100);
+                SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                Duration.ofSeconds(5), 2.0, 0.0, Duration.ofMinutes(1), maxRetries, 100);
     }
 
     private UUID storeEvent(EventStatus status) {
@@ -186,6 +187,9 @@ class DeliveryRetrySchedulerTest {
             assertThat(row.state()).isEqualTo(RetryState.PENDING);
             assertThat(row.attempt()).isEqualTo(3);
             assertThat(row.reason()).isEqualTo(RetryReason.PUBLISH_FAILED);
+            assertThat(row.nextAttemptAt())
+                    .as("publish failure must apply the retry backoff, not retry on every cycle")
+                    .isAfter(Instant.now().plusSeconds(5));
         }
 
         @Test
@@ -267,7 +271,8 @@ class DeliveryRetrySchedulerTest {
             scheduleDelivery(second, 1);
             scheduleDelivery(third, 1);
             DeliveryRetryOptions limited = new DeliveryRetryOptions(
-                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30), 3, 2);
+                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                    Duration.ofSeconds(5), 2.0, 0.0, Duration.ofMinutes(1), 3, 2);
 
             scheduler(limited).retryCycle();
 
@@ -323,10 +328,24 @@ class DeliveryRetrySchedulerTest {
     class Options {
 
         @Test
+        @DisplayName("should compute exponential backoff capped at the maximum")
+        void computesBackoff() {
+            DeliveryRetryOptions options = new DeliveryRetryOptions(
+                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                    Duration.ofSeconds(5), 2.0, 0.0, Duration.ofSeconds(30), 3, 100);
+
+            assertThat(options.backoff(1)).isEqualTo(Duration.ofSeconds(5));
+            assertThat(options.backoff(2)).isEqualTo(Duration.ofSeconds(10));
+            assertThat(options.backoff(3)).isEqualTo(Duration.ofSeconds(20));
+            assertThat(options.backoff(4)).isEqualTo(Duration.ofSeconds(30));
+        }
+
+        @Test
         @DisplayName("should reject a blank service")
         void rejectsBlankService() {
             assertThatThrownBy(() -> new DeliveryRetryOptions(
-                    "  ", Duration.ofMinutes(1), Duration.ofSeconds(30), 3, 100))
+                    "  ", Duration.ofMinutes(1), Duration.ofSeconds(30),
+                    Duration.ofSeconds(5), 2.0, 0.0, Duration.ofMinutes(1), 3, 100))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("service must not be null or blank");
         }
@@ -335,7 +354,8 @@ class DeliveryRetrySchedulerTest {
         @DisplayName("should reject a non-positive interval")
         void rejectsNonPositiveInterval() {
             assertThatThrownBy(() -> new DeliveryRetryOptions(
-                    SERVICE, Duration.ZERO, Duration.ofSeconds(30), 3, 100))
+                    SERVICE, Duration.ZERO, Duration.ofSeconds(30),
+                    Duration.ofSeconds(5), 2.0, 0.0, Duration.ofMinutes(1), 3, 100))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("interval must be positive");
         }
@@ -344,9 +364,40 @@ class DeliveryRetrySchedulerTest {
         @DisplayName("should reject a negative retry budget")
         void rejectsNegativeRetries() {
             assertThatThrownBy(() -> new DeliveryRetryOptions(
-                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30), -1, 100))
+                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                    Duration.ofSeconds(5), 2.0, 0.0, Duration.ofMinutes(1), -1, 100))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("maxRetries must be >= 0");
+        }
+
+        @Test
+        @DisplayName("should reject a multiplier below one")
+        void rejectsInvalidMultiplier() {
+            assertThatThrownBy(() -> new DeliveryRetryOptions(
+                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                    Duration.ofSeconds(5), 0.5, 0.0, Duration.ofMinutes(1), 3, 100))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("multiplier must be >= 1.0");
+        }
+
+        @Test
+        @DisplayName("should reject jitter outside the zero-to-one range")
+        void rejectsInvalidJitter() {
+            assertThatThrownBy(() -> new DeliveryRetryOptions(
+                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                    Duration.ofSeconds(5), 2.0, 1.5, Duration.ofMinutes(1), 3, 100))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("jitter must be between 0 and 1");
+        }
+
+        @Test
+        @DisplayName("should reject a maximum delay shorter than the base delay")
+        void rejectsInvalidMaxDelay() {
+            assertThatThrownBy(() -> new DeliveryRetryOptions(
+                    SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                    Duration.ofSeconds(10), 2.0, 0.0, Duration.ofSeconds(5), 3, 100))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("maxRetryDelay must not be shorter than retryDelay");
         }
     }
 

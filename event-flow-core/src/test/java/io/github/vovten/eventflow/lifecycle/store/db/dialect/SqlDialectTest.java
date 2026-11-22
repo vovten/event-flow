@@ -197,6 +197,17 @@ class SqlDialectTest {
     }
 
     @Test
+    @DisplayName("Should filter SELECT BY STATUSES by service before the limit")
+    void selectByStatusesAndServiceStatement() {
+        SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.POSTGRESQL);
+        String sql = dialect.selectByStatusesAndServiceStatement(2);
+        assertThat(sql).contains("IN (?, ?)");
+        assertThat(sql).contains("updated_at < ?");
+        assertThat(sql).contains("service = ?");
+        assertThat(sql).contains("LIMIT ?");
+    }
+
+    @Test
     @DisplayName("Should generate DELETE with single-level subquery for PostgreSQL")
     void deleteByStatusesStatementPostgresql() {
         SqlDialect dialect = SqlDialect.forDialect(DatabaseDialect.POSTGRESQL);

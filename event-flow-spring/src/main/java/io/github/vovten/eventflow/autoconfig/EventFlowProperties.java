@@ -38,12 +38,17 @@ import java.util.Map;
  *           enabled: true
  *           max-retries: 3
  *           retry-delay: 30s
+ *           multiplier: 2.0
+ *           jitter: 0.5
+ *           max-retry-delay: 10m
  *           require-accepted-ack: true
  *         processing:
  *           enabled: true
  *           max-attempts: 100
  *           default-delay: 30s
  *           max-delay: 10m
+ *           multiplier: 2.0
+ *           jitter: 0.5
  *     retry:
  *       enabled: true
  *       max-attempts: 3
@@ -1015,6 +1020,22 @@ public class EventFlowProperties {
         private Duration retryDelay = Duration.ofSeconds(30);
 
         /**
+         * Exponential backoff multiplier applied to each subsequent scheduler retry.
+         */
+        private double multiplier = 2.0;
+
+        /**
+         * Jitter fraction in {@code [0, 1]} applied to scheduler backoff;
+         * {@code 1.0} means full jitter.
+         */
+        private double jitter = 0.5;
+
+        /**
+         * Upper bound for the computed delivery backoff delay.
+         */
+        private Duration maxRetryDelay = Duration.ofMinutes(10);
+
+        /**
          * Whether publish success requires an explicit {@code AcceptedAck}.
          * Set to {@code false} during a mixed-fleet migration.
          */
@@ -1042,6 +1063,30 @@ public class EventFlowProperties {
 
         public void setRetryDelay(Duration retryDelay) {
             this.retryDelay = retryDelay;
+        }
+
+        public double getMultiplier() {
+            return multiplier;
+        }
+
+        public void setMultiplier(double multiplier) {
+            this.multiplier = multiplier;
+        }
+
+        public double getJitter() {
+            return jitter;
+        }
+
+        public void setJitter(double jitter) {
+            this.jitter = jitter;
+        }
+
+        public Duration getMaxRetryDelay() {
+            return maxRetryDelay;
+        }
+
+        public void setMaxRetryDelay(Duration maxRetryDelay) {
+            this.maxRetryDelay = maxRetryDelay;
         }
 
         public boolean isRequireAcceptedAck() {
@@ -1082,6 +1127,17 @@ public class EventFlowProperties {
          */
         private Duration maxDelay = Duration.ofMinutes(10);
 
+        /**
+         * Exponential backoff multiplier applied to each subsequent scheduler retry.
+         */
+        private double multiplier = 2.0;
+
+        /**
+         * Jitter fraction in {@code [0, 1]} applied to scheduler backoff;
+         * {@code 1.0} means full jitter.
+         */
+        private double jitter = 0.5;
+
         public boolean isEnabled() {
             return enabled;
         }
@@ -1112,6 +1168,22 @@ public class EventFlowProperties {
 
         public void setMaxDelay(Duration maxDelay) {
             this.maxDelay = maxDelay;
+        }
+
+        public double getMultiplier() {
+            return multiplier;
+        }
+
+        public void setMultiplier(double multiplier) {
+            this.multiplier = multiplier;
+        }
+
+        public double getJitter() {
+            return jitter;
+        }
+
+        public void setJitter(double jitter) {
+            this.jitter = jitter;
         }
     }
 

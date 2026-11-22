@@ -294,6 +294,37 @@ class JdbcEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should filter by service before applying the limit in findByStatusesAndService")
+    void shouldFilterFindByStatusesAndService() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        Instant old = Instant.now().minusSeconds(60);
+        Instant recent = Instant.now().minusSeconds(10);
+        for (int i = 0; i < 2; i++) {
+            store.save(new StoredEvent(UUID.randomUUID(), "test.T", "other-service", "{}",
+                    null, null, EventStatus.FAILED, 0, false, old, old, "err"));
+        }
+        UUID ownId = UUID.randomUUID();
+        store.save(new StoredEvent(ownId, "test.T", "own-service", "{}",
+                null, null, EventStatus.FAILED, 0, false, recent, recent, "err"));
+
+        List<StoredEvent> results = store.findByStatusesAndService(
+                List.of(EventStatus.FAILED), Instant.now().plusSeconds(1), 1, "own-service");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).eventId()).isEqualTo(ownId);
+    }
+
+    @Test
+    @DisplayName("Should require a service in findByStatusesAndService")
+    void shouldRejectNullServiceInFindByStatusesAndService() {
+        JdbcEventStore store = new JdbcEventStore(dataSource);
+        assertThatThrownBy(() -> store.findByStatusesAndService(
+                List.of(EventStatus.FAILED), Instant.now(), 10, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("service must not be null");
+    }
+
+    @Test
     @DisplayName("Should filter retryable events by service when service is provided")
     void shouldFilterRetryableEventsByService() {
         JdbcEventStore store = new JdbcEventStore(dataSource);

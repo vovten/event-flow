@@ -3,6 +3,7 @@ package io.github.vovten.eventflow.lifecycle.store;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -134,6 +135,37 @@ public interface EventStore {
      * @since 1.2.0
      */
     List<StoredEvent> findByStatuses(List<EventStatus> statuses, Instant before, int batchSize);
+
+    /**
+     * Finds events with given statuses, updated before {@code before}, that
+     * belong to {@code service}, limited to {@code batchSize} results.
+     * <p>
+     * The service filter is applied <b>before</b> the limit. Implementations
+     * that can express the filter in the underlying store should do so;
+     * filtering a full batch in memory lets events from other services consume
+     * the batch and starve the caller's own events.
+     * <p>
+     * The default implementation filters the result of
+     * {@link #findByStatuses(List, Instant, int)} in memory. It is correct for
+     * an exclusive store, but cannot guarantee that {@code batchSize} matching
+     * events are returned when the store is shared: override it to push the
+     * filter down.
+     *
+     * @param statuses  statuses to search for (must not be null or empty)
+     * @param before    return events updated before this time
+     * @param batchSize maximum number of events to return
+     * @param service   the originating service to filter by (must not be null)
+     * @return matching events, at most {@code batchSize} (never null)
+     * @throws NullPointerException if service is null
+     * @since 1.4.0
+     */
+    default List<StoredEvent> findByStatusesAndService(List<EventStatus> statuses, Instant before,
+                                                       int batchSize, String service) {
+        Objects.requireNonNull(service, "service must not be null");
+        return findByStatuses(statuses, before, batchSize).stream()
+                .filter(event -> service.equals(event.service()))
+                .toList();
+    }
 
     /**
      * Marks an event for manual retry.

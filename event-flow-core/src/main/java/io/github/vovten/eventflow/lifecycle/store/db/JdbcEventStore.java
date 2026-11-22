@@ -69,6 +69,7 @@ public class JdbcEventStore implements EventStore {
     private final String recordRetryFailureSql;
     private final String markForRetrySql;
     private final Map<Set<EventStatus>, String> selectByStatusesCache = new ConcurrentHashMap<>();
+    private final Map<Set<EventStatus>, String> selectByStatusesAndServiceCache = new ConcurrentHashMap<>();
     private final Map<Set<EventStatus>, String> selectRetryableEventsCache = new ConcurrentHashMap<>();
     private final Map<Set<EventStatus>, String> deleteByStatusesCache = new ConcurrentHashMap<>();
     private final Map<Set<EventStatus>, String> transitionStatusSqlCache = new ConcurrentHashMap<>();
@@ -338,6 +339,28 @@ public class JdbcEventStore implements EventStore {
             return mapResultList(ps);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find events by statuses: " + statuses, e);
+        }
+    }
+
+    @Override
+    public List<StoredEvent> findByStatusesAndService(List<EventStatus> statuses, Instant before,
+                                                       int batchSize, String service) {
+        Objects.requireNonNull(service, "service must not be null");
+        if (statuses.isEmpty() || batchSize <= 0) {
+            return List.of();
+        }
+        String sql = selectByStatusesAndServiceCache.computeIfAbsent(Set.copyOf(statuses), key ->
+                sqlDialect.selectByStatusesAndServiceStatement(key.size()).formatted(tableName));
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+            mapper.setStatusCodes(ps, statuses);
+            mapper.setBeforeTimestamp(ps, statuses.size() + 1, before);
+            ps.setString(statuses.size() + 2, service);
+            ps.setInt(statuses.size() + 3, batchSize);
+            return mapResultList(ps);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find events by statuses and service: "
+                    + statuses + ", service=" + service, e);
         }
     }
 

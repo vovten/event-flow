@@ -99,11 +99,16 @@ class EventFlowPropertiesTest {
                 Map.entry("event-flow.publisher.lifecycle.retry.delivery.enabled", "true"),
                 Map.entry("event-flow.publisher.lifecycle.retry.delivery.max-retries", "8"),
                 Map.entry("event-flow.publisher.lifecycle.retry.delivery.retry-delay", "5s"),
+                Map.entry("event-flow.publisher.lifecycle.retry.delivery.multiplier", "3.0"),
+                Map.entry("event-flow.publisher.lifecycle.retry.delivery.jitter", "0.25"),
+                Map.entry("event-flow.publisher.lifecycle.retry.delivery.max-retry-delay", "2m"),
                 Map.entry("event-flow.publisher.lifecycle.retry.delivery.require-accepted-ack", "false"),
                 Map.entry("event-flow.publisher.lifecycle.retry.processing.enabled", "true"),
                 Map.entry("event-flow.publisher.lifecycle.retry.processing.max-attempts", "42"),
                 Map.entry("event-flow.publisher.lifecycle.retry.processing.default-delay", "3s"),
-                Map.entry("event-flow.publisher.lifecycle.retry.processing.max-delay", "1m")
+                Map.entry("event-flow.publisher.lifecycle.retry.processing.max-delay", "1m"),
+                Map.entry("event-flow.publisher.lifecycle.retry.processing.multiplier", "4.0"),
+                Map.entry("event-flow.publisher.lifecycle.retry.processing.jitter", "0.1")
         );
         ConfigurationPropertySource source = new MapConfigurationPropertySource(properties);
         Binder binder = new Binder(source);
@@ -121,6 +126,9 @@ class EventFlowPropertiesTest {
         assertThat(delivery.isEnabled()).isTrue();
         assertThat(delivery.getMaxRetries()).isEqualTo(8);
         assertThat(delivery.getRetryDelay()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(delivery.getMultiplier()).isEqualTo(3.0);
+        assertThat(delivery.getJitter()).isEqualTo(0.25);
+        assertThat(delivery.getMaxRetryDelay()).isEqualTo(Duration.ofMinutes(2));
         assertThat(delivery.isRequireAcceptedAck()).isFalse();
 
         var processing = retry.getProcessing();
@@ -128,6 +136,8 @@ class EventFlowPropertiesTest {
         assertThat(processing.getMaxAttempts()).isEqualTo(42);
         assertThat(processing.getDefaultDelay()).isEqualTo(Duration.ofSeconds(3));
         assertThat(processing.getMaxDelay()).isEqualTo(Duration.ofMinutes(1));
+        assertThat(processing.getMultiplier()).isEqualTo(4.0);
+        assertThat(processing.getJitter()).isEqualTo(0.1);
     }
 
     @Test

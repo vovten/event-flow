@@ -227,6 +227,37 @@ public interface SqlDialect {
     String selectByStatusesStatement(int statusCount);
 
     /**
+     * SELECT by multiple statuses with a mandatory service filter, cutoff, and
+     * limit. The service filter is applied before the limit so events from
+     * other services cannot consume the batch.
+     * <p>
+     * The caller fills status placeholders, then cutoff, service, and limit.
+     *
+     * @param statusCount number of status values for the IN clause
+     * @return SELECT SQL with placeholders for statuses, cutoff, service, and limit
+     * @since 1.4.0
+     */
+    default String selectByStatusesAndServiceStatement(int statusCount) {
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < statusCount; i++) {
+            if (i > 0) {
+                placeholders.append(", ");
+            }
+            placeholders.append("?");
+        }
+        String template = """
+                SELECT event_id, event_type, service, payload, channels, process_id,
+                       status, retry_count, retry, created_at, updated_at, error_details
+                FROM %%s
+                WHERE status IN (%s) AND updated_at < ?
+                  AND service = ?
+                ORDER BY updated_at ASC
+                %s
+                """;
+        return String.format(template, placeholders, limitClause());
+    }
+
+    /**
      * SELECT for events eligible for retry belonging to a specific service:
      * matching any of the given statuses with an updated-at cutoff, <b>or</b>
      * having the manual retry flag set ({@code retry = TRUE}) regardless of age,

@@ -6,6 +6,7 @@ import io.github.vovten.eventflow.lifecycle.retry.RetryReason;
 import io.github.vovten.eventflow.lifecycle.retry.RetryState;
 import io.github.vovten.eventflow.lifecycle.retry.RetryTask;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
+import io.github.vovten.eventflow.lifecycle.store.EventStore;
 import io.github.vovten.eventflow.lifecycle.store.InMemoryEventStore;
 import io.github.vovten.eventflow.lifecycle.store.StoredEvent;
 import io.github.vovten.eventflow.retry.RetryKind;
@@ -16,14 +17,19 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,24 +147,27 @@ class RetryWatchdogTest {
         }
 
         @Test
-        @DisplayName("should raise an existing pending retry so it becomes due")
-        void raisesExistingPendingRetry() {
+        @DisplayName("should not pull a pending retry scheduled in the future forward")
+        void leavesFuturePendingRetryUntouched() {
             UUID eventId = storeEvent(EventStatus.PUBLISHED, Duration.ofHours(1));
+            Instant scheduledAt = Instant.now().plusSeconds(3600);
             retryStore.schedule(RetryTask.pending(
                     eventId, SERVICE, RetryKind.DELIVERY, 2,
-                    RetryReason.PUBLISH_FAILED, Instant.now().plusSeconds(3600), null));
+                    RetryReason.PUBLISH_FAILED, scheduledAt, null));
 
             watchdog(true).watchdogCycle();
 
             RetryTask task = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
             assertThat(task.state()).isEqualTo(RetryState.PENDING);
             assertThat(task.attempt()).isEqualTo(2);
-            assertThat(task.nextAttemptAt()).isBeforeOrEqualTo(Instant.now());
+            assertThat(task.nextAttemptAt())
+                    .as("watchdog must not reset the backoff of an active retry")
+                    .isEqualTo(scheduledAt);
         }
 
         @Test
-        @DisplayName("should not recreate a pending retry row completed before the raise")
-        void doesNotResurrectRowCompletedBeforeRaise() {
+        @DisplayName("should not recreate or reschedule a pending retry row")
+        void doesNotTouchExistingPendingRow() {
             UUID eventId = storeEvent(EventStatus.PUBLISHED, Duration.ofHours(1));
             EventRetryStore mockedRetryStore = mock(EventRetryStore.class);
             RetryTask pending = RetryTask.pending(
@@ -166,11 +175,25 @@ class RetryWatchdogTest {
                     RetryReason.PUBLISH_FAILED, Instant.now().plusSeconds(3600), null);
             when(mockedRetryStore.find(eventId, RetryKind.DELIVERY))
                     .thenReturn(Optional.of(pending));
-            when(mockedRetryStore.tryReschedule(any())).thenReturn(false);
 
             new RetryWatchdog(eventStore, mockedRetryStore, options(true)).watchdogCycle();
 
             verify(mockedRetryStore, never()).schedule(any());
+            verify(mockedRetryStore, never()).tryReschedule(any());
+        }
+
+        @Test
+        @DisplayName("should push the service filter into the stale-event query")
+        void queriesStaleEventsForItsService() {
+            EventStore mockedEventStore = mock(EventStore.class);
+            when(mockedEventStore.findByStatusesAndService(anyList(), any(), anyInt(), eq(SERVICE)))
+                    .thenReturn(List.of());
+
+            new RetryWatchdog(mockedEventStore, retryStore, options(true)).watchdogCycle();
+
+            verify(mockedEventStore, times(2))
+                    .findByStatusesAndService(anyList(), any(), anyInt(), eq(SERVICE));
+            verify(mockedEventStore, never()).findByStatuses(anyList(), any(), anyInt());
         }
 
         @Test

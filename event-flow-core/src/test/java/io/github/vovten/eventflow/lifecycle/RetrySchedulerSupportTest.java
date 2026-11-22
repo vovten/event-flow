@@ -78,7 +78,8 @@ class RetrySchedulerSupportTest {
         DeliveryRetryScheduler delivery = new DeliveryRetryScheduler(
                 retryStore, eventStore, lifecycleRepository, lifecyclePublisher,
                 new DeliveryRetryOptions(
-                        SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30), 3, 100));
+                        SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                        Duration.ofSeconds(5), 2.0, 0.0, Duration.ofMinutes(1), 3, 100));
         ProcessingRetryScheduler processing = new ProcessingRetryScheduler(
                 retryStore, eventStore, lifecycleRepository, lifecyclePublisher,
                 new ProcessingRetryOptions(
@@ -104,7 +105,8 @@ class RetrySchedulerSupportTest {
         DeliveryRetryScheduler delivery = new DeliveryRetryScheduler(
                 retryStore, eventStore, lifecycleRepository, lifecyclePublisher,
                 new DeliveryRetryOptions(
-                        SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30), 3, 100));
+                        SERVICE, Duration.ofMinutes(1), Duration.ofSeconds(30),
+                        Duration.ofSeconds(5), 2.0, 0.0, Duration.ofMinutes(1), 3, 100));
 
         delivery.retryCycle();
 

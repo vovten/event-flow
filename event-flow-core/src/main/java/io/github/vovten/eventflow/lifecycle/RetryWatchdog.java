@@ -2,7 +2,6 @@ package io.github.vovten.eventflow.lifecycle;
 
 import io.github.vovten.eventflow.lifecycle.retry.EventRetryStore;
 import io.github.vovten.eventflow.lifecycle.retry.RetryReason;
-import io.github.vovten.eventflow.lifecycle.retry.RetryState;
 import io.github.vovten.eventflow.lifecycle.retry.RetryTask;
 import io.github.vovten.eventflow.lifecycle.store.EventStatus;
 import io.github.vovten.eventflow.lifecycle.store.EventStore;
@@ -20,18 +19,22 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Watchdog that creates or raises durable retries for missing acknowledgments.
+ * Watchdog that creates durable retries for missing acknowledgments.
  * <p>
- * It scans {@code event_store} for events that are older than the configured
- * ack timeouts:
+ * It scans {@code event_store} for events owned by its service that are older
+ * than the configured ack timeouts:
  * <ul>
- *   <li>{@link EventStatus#PUBLISHED} older than the delivery timeout raises a
+ *   <li>{@link EventStatus#PUBLISHED} older than the delivery timeout creates a
  *       {@link RetryKind#DELIVERY} row;</li>
- *   <li>{@link EventStatus#ACCEPTED} older than the processing timeout raises a
+ *   <li>{@link EventStatus#ACCEPTED} older than the processing timeout creates a
  *       {@link RetryKind#PROCESSING} row, only when processing retries are
  *       enabled.</li>
  * </ul>
- * Existing {@code IN_PROGRESS} and {@code DEAD} rows are left untouched.
+ * Existing rows are never modified: an {@code IN_PROGRESS} or {@code DEAD} row
+ * is left as is, and a {@code PENDING} row keeps its scheduled
+ * {@code nextAttemptAt}. In particular, the watchdog does not pull a
+ * backoff-delayed row forward to {@code now}, so a consumer-provided retry
+ * delay is preserved.
  *
  * @author Vladimir Aleshkov
  * @since 1.4.0
@@ -115,49 +118,32 @@ public final class RetryWatchdog implements AutoCloseable {
 
     private void scan(EventStatus status, RetryKind retryKind, RetryReason reason,
                       Instant before, Instant now) {
-        List<StoredEvent> stale = eventStore.findByStatuses(
-                List.of(status), before, options.batchSize());
+        List<StoredEvent> stale = eventStore.findByStatusesAndService(
+                List.of(status), before, options.batchSize(), options.service());
         for (StoredEvent event : stale) {
-            if (!options.service().equals(event.service())) {
-                continue;
-            }
             try {
-                raise(event, retryKind, reason, now);
+                ensureRetry(event, retryKind, reason, now);
             } catch (RuntimeException e) {
-                log.error("Failed to raise {} retry for stale event {}",
+                log.error("Failed to ensure {} retry for stale event {}",
                         retryKind, event.eventId(), e);
             }
         }
     }
 
-    private void raise(StoredEvent event, RetryKind retryKind, RetryReason reason, Instant now) {
+    private void ensureRetry(StoredEvent event, RetryKind retryKind, RetryReason reason, Instant now) {
         Optional<RetryTask> existing = retryStore.find(event.eventId(), retryKind);
-        if (existing.isEmpty()) {
-            // retry_count is a cross-domain legacy counter, not this kind's
-            // attempt number. A watchdog-created row is the first attempt of
-            // its own DELIVERY/PROCESSING domain.
-            int attempt = 1;
-            retryStore.schedule(RetryTask.pending(
-                    event.eventId(), options.service(), retryKind, attempt, reason, now, null));
-            log.warn("Created {} retry for stale event {} (status {})",
-                    retryKind, event.eventId(), event.status());
+        if (existing.isPresent()) {
+            log.trace("{} retry for stale event {} is already {}",
+                    retryKind, event.eventId(), existing.get().state());
             return;
         }
-        RetryTask task = existing.get();
-        if (task.state() == RetryState.PENDING && task.nextAttemptAt().isAfter(now)) {
-            boolean raised = retryStore.tryReschedule(task.withNextAttempt(
-                    task.attempt(), reason, now, task.lastErrorType(), task.lastError()));
-            if (raised) {
-                log.warn("Raised {} retry for stale event {} (status {})",
-                        retryKind, event.eventId(), event.status());
-            } else {
-                log.debug("{} retry for stale event {} was completed before raise",
-                        retryKind, event.eventId());
-            }
-        } else {
-            log.trace("{} retry for stale event {} is already {}", retryKind, event.eventId(),
-                    task.state());
-        }
+        // retry_count is a cross-domain legacy counter, not this kind's
+        // attempt number. A watchdog-created row is the first attempt of
+        // its own DELIVERY/PROCESSING domain.
+        retryStore.schedule(RetryTask.pending(
+                event.eventId(), options.service(), retryKind, 1, reason, now, null));
+        log.warn("Created {} retry for stale event {} (status {})",
+                retryKind, event.eventId(), event.status());
     }
 
     @Override

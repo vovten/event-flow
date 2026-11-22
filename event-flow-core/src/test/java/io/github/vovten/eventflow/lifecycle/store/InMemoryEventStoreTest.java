@@ -260,6 +260,34 @@ class InMemoryEventStoreTest {
     }
 
     @Test
+    @DisplayName("Should filter findByStatusesAndService by service and apply the limit")
+    void shouldFilterFindByStatusesAndService() {
+        Instant now = Instant.now();
+        UUID ownId = UUID.randomUUID();
+        UUID foreignId = UUID.randomUUID();
+        store.save(StoredEvent.newEvent(ownId, "test.T", "own-service", "{}", null));
+        store.save(StoredEvent.newEvent(foreignId, "test.T", "other-service", "{}", null));
+        store.updateStatus(ownId, EventStatus.FAILED, "err");
+        store.updateStatus(foreignId, EventStatus.FAILED, "err");
+
+        List<StoredEvent> results = store.findByStatusesAndService(
+                List.of(EventStatus.FAILED), now.plusSeconds(1), 1, "own-service");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).eventId()).isEqualTo(ownId);
+        assertThat(results.get(0).service()).isEqualTo("own-service");
+    }
+
+    @Test
+    @DisplayName("Should require a service in findByStatusesAndService")
+    void shouldRejectNullServiceInFindByStatusesAndService() {
+        assertThatThrownBy(() -> store.findByStatusesAndService(
+                List.of(EventStatus.FAILED), Instant.now(), 10, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("service must not be null");
+    }
+
+    @Test
     @DisplayName("Should find events by status and age")
     void shouldFindByStatusAndAge() {
         store.save(event);
