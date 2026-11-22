@@ -202,13 +202,22 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
     @Override
     public void onDeadLetter(UUID eventId, String service, RetryKind kind,
                              RetryReason reason, String errorType, String error) {
+        tryOnDeadLetter(eventId, service, kind, reason, errorType, error);
+    }
+
+    @Override
+    public boolean tryOnDeadLetter(UUID eventId, String service, RetryKind kind,
+                                   RetryReason reason, String errorType, String error) {
+        AtomicBoolean applied = new AtomicBoolean(false);
         inTransaction(conn -> {
-            boolean applied = eventStore.transitionStatus(
+            boolean updated = eventStore.transitionStatus(
                     conn, eventId, PROCESSING_SOURCES, EventStatus.DEAD, error);
-            if (applied) {
+            applied.set(updated);
+            if (updated) {
                 deadOrSchedule(conn, eventId, service, kind, reason, null, errorType, error);
             }
         });
+        return applied.get();
     }
 
     @Override

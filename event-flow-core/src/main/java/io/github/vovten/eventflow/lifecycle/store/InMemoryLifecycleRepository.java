@@ -165,11 +165,18 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
     @Override
     public synchronized void onDeadLetter(UUID eventId, String service, RetryKind kind,
                                           RetryReason reason, String errorType, String error) {
+        tryOnDeadLetter(eventId, service, kind, reason, errorType, error);
+    }
+
+    @Override
+    public synchronized boolean tryOnDeadLetter(UUID eventId, String service, RetryKind kind,
+                                                RetryReason reason, String errorType, String error) {
         boolean applied = eventStore.transitionStatus(
                 eventId, PROCESSING_SOURCES, EventStatus.DEAD, error);
         if (applied) {
             deadOrSchedule(eventId, service, kind, reason, null, errorType, error);
         }
+        return applied;
     }
 
     @Override

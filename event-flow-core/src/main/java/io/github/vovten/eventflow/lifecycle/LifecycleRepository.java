@@ -185,6 +185,28 @@ public interface LifecycleRepository {
                       String errorType, String error);
 
     /**
+     * Marks the event and the retry domain terminally dead and reports whether
+     * the event transition was applied.
+     * <p>
+     * The retry row must become terminal even when the event status is outside
+     * the allowed processing sources; callers use the boolean result to force
+     * the row to {@code DEAD} themselves.
+     *
+     * @param eventId   event identifier
+     * @param service   owning service
+     * @param kind      retry domain
+     * @param reason    terminal reason
+     * @param errorType error class name, may be null
+     * @param error     error message, may be null
+     * @return {@code true} when the event existed and the transition was applied
+     */
+    default boolean tryOnDeadLetter(UUID eventId, String service, RetryKind kind,
+                                    RetryReason reason, String errorType, String error) {
+        onDeadLetter(eventId, service, kind, reason, errorType, error);
+        return true;
+    }
+
+    /**
      * Resets an event for manual retry.
      *
      * @param eventId event identifier

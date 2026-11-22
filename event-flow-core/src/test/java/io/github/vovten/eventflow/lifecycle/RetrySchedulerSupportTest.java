@@ -111,6 +111,27 @@ class RetrySchedulerSupportTest {
         assertThat(origin.published).hasSize(1);
     }
 
+    @Test
+    @DisplayName("should force the retry row DEAD when the event transition is not applied")
+    void forcesRowDeadWhenEventTransitionIsNotApplied() {
+        UUID eventId = storeEvent(EventStatus.UNDEFINED);
+        scheduleDelivery(eventId);
+        RetrySchedulerSupport support = new RetrySchedulerSupport(
+                retryStore, lifecycleRepository, "owner-1");
+        RetryTask task = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
+
+        support.deadLetter(task, RetryReason.CAP_EXCEEDED, "budget exhausted");
+
+        assertThat(eventStore.findById(eventId).orElseThrow().status())
+                .as("UNDEFINED is outside the processing sources; the event status must not change")
+                .isEqualTo(EventStatus.UNDEFINED);
+        RetryTask dead = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
+        assertThat(dead.state())
+                .as("the retry row must not stay PENDING/IN_PROGRESS forever")
+                .isEqualTo(RetryState.DEAD);
+        assertThat(dead.reason()).isEqualTo(RetryReason.CAP_EXCEEDED);
+    }
+
     private UUID storeEvent(EventStatus status) {
         UUID eventId = UUID.randomUUID();
         Envelope<TestEvent> envelope = new Envelope<>(

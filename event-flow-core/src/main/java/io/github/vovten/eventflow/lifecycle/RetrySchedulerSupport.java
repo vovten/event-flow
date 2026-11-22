@@ -128,12 +128,28 @@ public final class RetrySchedulerSupport {
      */
     public void deadLetter(RetryTask task, RetryReason reason, String error) {
         try {
-            lifecycleRepository.onDeadLetter(task.eventId(), task.service(),
+            boolean applied = lifecycleRepository.tryOnDeadLetter(task.eventId(), task.service(),
                     task.retryKind(), reason, null, error);
-            log.error("Dead-lettered {} retry for event {}: {}",
-                    task.retryKind(), task.eventId(), error);
+            if (applied) {
+                log.error("Dead-lettered {} retry for event {}: {}",
+                        task.retryKind(), task.eventId(), error);
+                return;
+            }
+            log.warn("Event transition was not applied for {} retry on event {}; "
+                            + "forcing the retry row to DEAD",
+                    task.retryKind(), task.eventId());
         } catch (RuntimeException e) {
-            log.error("Failed to dead-letter {} retry for event {}",
+            log.error("Failed to dead-letter {} retry for event {}; forcing the retry row to DEAD",
+                    task.retryKind(), task.eventId(), e);
+        }
+        forceRowDead(task, reason, error);
+    }
+
+    private void forceRowDead(RetryTask task, RetryReason reason, String error) {
+        try {
+            retryStore.dead(task.eventId(), task.retryKind(), reason, null, error);
+        } catch (RuntimeException e) {
+            log.error("Failed to force {} retry row for event {} to DEAD",
                     task.retryKind(), task.eventId(), e);
         }
     }
