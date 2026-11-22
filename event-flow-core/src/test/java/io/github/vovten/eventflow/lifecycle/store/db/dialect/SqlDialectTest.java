@@ -105,7 +105,7 @@ class SqlDialectTest {
         assertThat(SqlDialect.forDialect(DatabaseDialect.POSTGRESQL).supportsCommentOn()).isTrue();
         assertThat(SqlDialect.forDialect(DatabaseDialect.H2).supportsCommentOn()).isTrue();
         assertThat(SqlDialect.forDialect(DatabaseDialect.ORACLE).supportsCommentOn()).isTrue();
-        assertThat(SqlDialect.forDialect(DatabaseDialect.SQLSERVER).supportsCommentOn()).isTrue();
+        assertThat(SqlDialect.forDialect(DatabaseDialect.SQLSERVER).supportsCommentOn()).isFalse();
     }
 
     @Test

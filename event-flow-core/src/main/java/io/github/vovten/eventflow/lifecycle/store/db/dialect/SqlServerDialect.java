@@ -19,6 +19,12 @@ public class SqlServerDialect implements SqlDialect {
     }
 
     @Override
+    public boolean supportsCommentOn() {
+        // SQL Server has no COMMENT ON DDL; comments require extended properties.
+        return false;
+    }
+
+    @Override
     public String limitClause() {
         return "OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY";
     }
