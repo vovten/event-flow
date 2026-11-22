@@ -110,6 +110,35 @@ class AckHandlerRetryTest {
         assertThat(status(eventId)).isEqualTo(EventStatus.PUBLISHED);
     }
 
+    @Test
+    @DisplayName("should ignore accepted, no-handler and failure acks for unknown events")
+    void ignoresUnknownAcks() {
+        Logger logger = (Logger) LoggerFactory.getLogger(AckHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            UUID unknownAccepted = UUID.randomUUID();
+            UUID unknownNoHandler = UUID.randomUUID();
+            UUID unknownFailure = UUID.randomUUID();
+
+            handler().onEvent(acceptedAck(unknownAccepted, 1));
+            handler().onEvent(noHandlerAck(unknownNoHandler, 1));
+            handler().onEvent(failureAck(unknownFailure, RetryKind.PROCESSING, 1,
+                    false, 0L, "default"));
+
+            assertThat(appender.list).filteredOn(event -> event.getLevel() == Level.INFO)
+                    .filteredOn(event -> event.getFormattedMessage()
+                            .contains("Ignoring ack for unknown event"))
+                    .hasSize(3);
+            assertThat(appender.list).allSatisfy(event -> assertThat(event.getFormattedMessage())
+                    .doesNotContain("accepted on delivery")
+                    .doesNotContain("dead-lettered"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
     @Nested
     @DisplayName("AcceptedAck")
     class Accepted {
@@ -230,7 +259,7 @@ class AckHandlerRetryTest {
                 assertThat(appender.list).anySatisfy(event -> {
                     assertThat(event.getLevel()).isEqualTo(Level.INFO);
                     assertThat(event.getFormattedMessage())
-                            .contains("Ignoring ack for unknown event")
+                            .contains("Ignoring ack")
                             .contains(unknownEventId.toString());
                 });
             } finally {

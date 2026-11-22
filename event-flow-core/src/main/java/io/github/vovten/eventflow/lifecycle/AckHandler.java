@@ -143,9 +143,13 @@ public final class AckHandler implements EventSubscriber {
         if (isStale(ack.originalEventId(), RetryKind.DELIVERY, ack.attempt(), ack.eventType())) {
             return;
         }
-        lifecycleRepository.onAccepted(ack.originalEventId(), ack.attempt());
-        log.debug("Event {} accepted on delivery attempt {} ({})",
-                ack.originalEventId(), ack.attempt(), ack.eventType());
+        boolean applied = lifecycleRepository.tryOnAccepted(ack.originalEventId(), ack.attempt());
+        if (applied) {
+            log.debug("Event {} accepted on delivery attempt {} ({})",
+                    ack.originalEventId(), ack.attempt(), ack.eventType());
+        } else {
+            log.info("Ignoring ack for unknown event: {}", ack.originalEventId());
+        }
     }
 
     private void handle(NoHandlerAck ack) {
@@ -160,10 +164,14 @@ public final class AckHandler implements EventSubscriber {
         if (isStale(ack.originalEventId(), RetryKind.DELIVERY, ack.attempt(), ack.eventType())) {
             return;
         }
-        lifecycleRepository.onNoHandler(ack.originalEventId(), serviceName, ack.attempt(),
-                null, "No handler resolved for event type: " + ack.eventType());
-        log.warn("Event {} dead-lettered: no handler resolved ({})",
-                ack.originalEventId(), ack.eventType());
+        boolean applied = lifecycleRepository.tryOnNoHandler(ack.originalEventId(), serviceName,
+                ack.attempt(), null, "No handler resolved for event type: " + ack.eventType());
+        if (applied) {
+            log.warn("Event {} dead-lettered: no handler resolved ({})",
+                    ack.originalEventId(), ack.eventType());
+        } else {
+            log.info("Ignoring ack for unknown event: {}", ack.originalEventId());
+        }
     }
 
     private void handle(SuccessAck ack) {
@@ -183,7 +191,7 @@ public final class AckHandler implements EventSubscriber {
             log.debug("Event {} handled on {} attempt {} ({})",
                     ack.originalEventId(), ack.retryKind(), ack.attempt(), ack.eventType());
         } else {
-            log.info("Ignoring ack for unknown event: {}", ack.originalEventId());
+            log.info("Ignoring ack for unknown or terminal event: {}", ack.originalEventId());
         }
     }
 
@@ -202,8 +210,12 @@ public final class AckHandler implements EventSubscriber {
         }
         int processingAttempt = processingAttempt(ack);
         if (!options.processingEnabled()) {
-            lifecycleRepository.onProcessingDisabled(
+            boolean applied = lifecycleRepository.tryOnProcessingDisabled(
                     ack.originalEventId(), ack.errorType(), ack.error());
+            if (!applied) {
+                log.info("Ignoring ack for unknown event: {}", ack.originalEventId());
+                return;
+            }
             if (ack.retryable()) {
                 log.warn("Processing retries are disabled; retry request for event {} ignored "
                                 + "({} attempt {}, policy={})",
@@ -217,8 +229,13 @@ public final class AckHandler implements EventSubscriber {
         boolean retryable = ack.retryable()
                 && processingAttempt <= options.maxProcessingRetries();
         Instant nextAttemptAt = retryable ? nextAttemptAt(ack) : Instant.now();
-        lifecycleRepository.onProcessingFailed(ack.originalEventId(), serviceName, processingAttempt,
+        boolean applied = lifecycleRepository.tryOnProcessingFailed(
+                ack.originalEventId(), serviceName, processingAttempt,
                 retryable, nextAttemptAt, ack.policyName(), ack.errorType(), ack.error());
+        if (!applied) {
+            log.info("Ignoring ack for unknown event: {}", ack.originalEventId());
+            return;
+        }
         if (!retryable) {
             log.warn("Event {} dead-lettered after {} processing attempt(s) ({})",
                     ack.originalEventId(), processingAttempt, ack.eventType());

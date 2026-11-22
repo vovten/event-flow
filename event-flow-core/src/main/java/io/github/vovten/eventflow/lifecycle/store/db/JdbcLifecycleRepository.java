@@ -84,22 +84,45 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
 
     @Override
     public void onAccepted(UUID eventId, int deliveryAttempt) {
+        tryOnAccepted(eventId, deliveryAttempt);
+    }
+
+    @Override
+    public boolean tryOnAccepted(UUID eventId, int deliveryAttempt) {
+        AtomicBoolean processed = new AtomicBoolean(false);
         inTransaction(conn -> {
-            eventStore.transitionStatus(
+            boolean applied = eventStore.transitionStatus(
                     conn, eventId, ACCEPTANCE_SOURCES, EventStatus.ACCEPTED, null);
-            retryStore.complete(conn, eventId, RetryKind.DELIVERY);
+            // A delivery confirmation for a terminal event preserves the status
+            // but must still clear the DELIVERY row. Only an unknown event makes
+            // the ack unprocessable.
+            if (applied || eventStore.findById(conn, eventId).isPresent()) {
+                retryStore.complete(conn, eventId, RetryKind.DELIVERY);
+                processed.set(true);
+            }
         });
+        return processed.get();
     }
 
     @Override
     public void onProcessingFailed(UUID eventId, String service, int attempt,
                                    boolean retryable, Instant nextAttemptAt,
                                    String policyName, String errorType, String error) {
+        tryOnProcessingFailed(eventId, service, attempt, retryable, nextAttemptAt,
+                policyName, errorType, error);
+    }
+
+    @Override
+    public boolean tryOnProcessingFailed(UUID eventId, String service, int attempt,
+                                         boolean retryable, Instant nextAttemptAt,
+                                         String policyName, String errorType, String error) {
+        AtomicBoolean applied = new AtomicBoolean(false);
         inTransaction(conn -> {
             EventStatus target = retryable ? EventStatus.FAILED : EventStatus.DEAD;
-            boolean applied = eventStore.transitionStatus(
+            boolean updated = eventStore.transitionStatus(
                     conn, eventId, PROCESSING_SOURCES, target, error);
-            if (!applied) {
+            applied.set(updated);
+            if (!updated) {
                 return;
             }
             retryStore.complete(conn, eventId, RetryKind.DELIVERY);
@@ -111,15 +134,26 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
                         RetryReason.HANDLER_FAILED, policyName, errorType, error);
             }
         });
+        return applied.get();
     }
 
     @Override
     public void onProcessingDisabled(UUID eventId, String errorType, String error) {
+        tryOnProcessingDisabled(eventId, errorType, error);
+    }
+
+    @Override
+    public boolean tryOnProcessingDisabled(UUID eventId, String errorType, String error) {
+        AtomicBoolean applied = new AtomicBoolean(false);
         inTransaction(conn -> {
-            eventStore.transitionStatus(
+            boolean updated = eventStore.transitionStatus(
                     conn, eventId, PROCESSING_SOURCES, EventStatus.FAILED, error);
-            retryStore.complete(conn, eventId, RetryKind.DELIVERY);
+            applied.set(updated);
+            if (updated) {
+                retryStore.complete(conn, eventId, RetryKind.DELIVERY);
+            }
         });
+        return applied.get();
     }
 
     @Override
@@ -145,15 +179,24 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
     @Override
     public void onNoHandler(UUID eventId, String service, int attempt,
                             String errorType, String error) {
+        tryOnNoHandler(eventId, service, attempt, errorType, error);
+    }
+
+    @Override
+    public boolean tryOnNoHandler(UUID eventId, String service, int attempt,
+                                  String errorType, String error) {
+        AtomicBoolean applied = new AtomicBoolean(false);
         inTransaction(conn -> {
-            boolean applied = eventStore.transitionStatus(
+            boolean updated = eventStore.transitionStatus(
                     conn, eventId, PROCESSING_SOURCES, EventStatus.DEAD, error);
-            if (applied) {
+            applied.set(updated);
+            if (updated) {
                 retryStore.complete(conn, eventId, RetryKind.DELIVERY);
                 deadOrSchedule(conn, eventId, service, RetryKind.PROCESSING,
                         RetryReason.NO_HANDLER, null, errorType, error);
             }
         });
+        return applied.get();
     }
 
     @Override
@@ -189,6 +232,7 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
             schedule(conn, eventId, service, kind, 1,
                     RetryReason.HANDLER_FAILED, Instant.now(), policyName, null, null);
         });
+        return applied.get();
     }
 
     private void schedule(Connection conn, UUID eventId, String service, RetryKind kind,

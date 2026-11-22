@@ -422,6 +422,24 @@ public class JdbcEventStore implements EventStore {
         }
     }
 
+    /**
+     * Reads an event using an existing transaction connection.
+     * <p>
+     * Used by the lifecycle repository to distinguish an unknown ack from a
+     * terminal transition without requesting a second connection from the pool.
+     *
+     * @param conn    transaction connection
+     * @param eventId event identifier
+     * @return the stored event, or empty when it does not exist
+     * @throws SQLException on JDBC error
+     */
+    Optional<StoredEvent> findById(Connection conn, UUID eventId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(selectByIdSql)) {
+            mapper.setUuid(ps, 1, eventId);
+            return mapSingleResult(ps);
+        }
+    }
+
     private List<StoredEvent> mapResultList(PreparedStatement ps) throws SQLException {
         try (ResultSet rs = ps.executeQuery()) {
             List<StoredEvent> results = new ArrayList<>();

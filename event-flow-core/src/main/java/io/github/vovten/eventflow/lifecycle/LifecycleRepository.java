@@ -40,6 +40,23 @@ public interface LifecycleRepository {
     void onAccepted(UUID eventId, int deliveryAttempt);
 
     /**
+     * Records consumer acceptance and reports whether the event was known.
+     * <p>
+     * A delivery confirmation is valid even when the event is already
+     * {@code FAILED}/{@code HANDLED} (the status is preserved, the DELIVERY row
+     * is cleared). Therefore this method returns {@code true} for any existing
+     * event and {@code false} only when the event is unknown.
+     *
+     * @param eventId        event identifier
+     * @param deliveryAttempt accepted delivery attempt
+     * @return {@code true} when the event exists and the ack was processed
+     */
+    default boolean tryOnAccepted(UUID eventId, int deliveryAttempt) {
+        onAccepted(eventId, deliveryAttempt);
+        return true;
+    }
+
+    /**
      * Records a handler failure.
      *
      * @param eventId       event identifier
@@ -55,6 +72,27 @@ public interface LifecycleRepository {
                             Instant nextAttemptAt, String policyName, String errorType, String error);
 
     /**
+     * Records a handler failure and reports whether the transition was applied.
+     *
+     * @param eventId       event identifier
+     * @param service       owning service
+     * @param attempt       attempt number that failed
+     * @param retryable     whether another processing attempt is allowed
+     * @param nextAttemptAt next processing retry time, used when retryable
+     * @param policyName    effective policy name, may be null
+     * @param errorType     error class name, may be null
+     * @param error         error message, may be null
+     * @return {@code true} when the event existed and the transition was applied
+     */
+    default boolean tryOnProcessingFailed(UUID eventId, String service, int attempt,
+                                          boolean retryable, Instant nextAttemptAt,
+                                          String policyName, String errorType, String error) {
+        onProcessingFailed(eventId, service, attempt, retryable, nextAttemptAt,
+                policyName, errorType, error);
+        return true;
+    }
+
+    /**
      * Records a processing failure when processing retries are disabled.
      * <p>
      * The event becomes {@code FAILED} with error details, the delivery retry
@@ -65,6 +103,20 @@ public interface LifecycleRepository {
      * @param error     error message, may be null
      */
     void onProcessingDisabled(UUID eventId, String errorType, String error);
+
+    /**
+     * Records a processing failure when processing retries are disabled and
+     * reports whether the transition was applied.
+     *
+     * @param eventId   event identifier
+     * @param errorType error class name, may be null
+     * @param error     error message, may be null
+     * @return {@code true} when the event existed and the transition was applied
+     */
+    default boolean tryOnProcessingDisabled(UUID eventId, String errorType, String error) {
+        onProcessingDisabled(eventId, errorType, error);
+        return true;
+    }
 
     /**
      * Records successful handling and clears retry work.
@@ -101,6 +153,23 @@ public interface LifecycleRepository {
      * @param error     error message, may be null
      */
     void onNoHandler(UUID eventId, String service, int attempt, String errorType, String error);
+
+    /**
+     * Records that no handler was resolved and reports whether the transition
+     * was applied.
+     *
+     * @param eventId   event identifier
+     * @param service   owning service
+     * @param attempt   attempt number
+     * @param errorType error class name, may be null
+     * @param error     error message, may be null
+     * @return {@code true} when the event existed and the transition was applied
+     */
+    default boolean tryOnNoHandler(UUID eventId, String service, int attempt,
+                                   String errorType, String error) {
+        onNoHandler(eventId, service, attempt, errorType, error);
+        return true;
+    }
 
     /**
      * Marks the event and the given retry domain as terminally dead.

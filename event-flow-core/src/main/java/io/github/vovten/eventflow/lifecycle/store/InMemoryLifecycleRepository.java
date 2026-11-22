@@ -68,19 +68,38 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
 
     @Override
     public synchronized void onAccepted(UUID eventId, int deliveryAttempt) {
+        tryOnAccepted(eventId, deliveryAttempt);
+    }
+
+    @Override
+    public synchronized boolean tryOnAccepted(UUID eventId, int deliveryAttempt) {
+        if (eventStore.findById(eventId).isEmpty()) {
+            return false;
+        }
+        // A delivery confirmation for a terminal event preserves the status
+        // but must still clear the DELIVERY row.
         eventStore.transitionStatus(eventId, ACCEPTANCE_SOURCES, EventStatus.ACCEPTED, null);
         retryStore.complete(eventId, RetryKind.DELIVERY);
+        return true;
     }
 
     @Override
     public synchronized void onProcessingFailed(UUID eventId, String service, int attempt,
                                                 boolean retryable, Instant nextAttemptAt,
                                                 String policyName, String errorType, String error) {
+        tryOnProcessingFailed(eventId, service, attempt, retryable, nextAttemptAt,
+                policyName, errorType, error);
+    }
+
+    @Override
+    public synchronized boolean tryOnProcessingFailed(UUID eventId, String service, int attempt,
+                                                      boolean retryable, Instant nextAttemptAt,
+                                                      String policyName, String errorType, String error) {
         EventStatus target = retryable ? EventStatus.FAILED : EventStatus.DEAD;
         boolean applied = eventStore.transitionStatus(
                 eventId, PROCESSING_SOURCES, target, error);
         if (!applied) {
-            return;
+            return false;
         }
         retryStore.complete(eventId, RetryKind.DELIVERY);
         if (retryable) {
@@ -90,12 +109,22 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
             deadOrSchedule(eventId, service, RetryKind.PROCESSING,
                     RetryReason.HANDLER_FAILED, policyName, errorType, error);
         }
+        return true;
     }
 
     @Override
     public synchronized void onProcessingDisabled(UUID eventId, String errorType, String error) {
-        eventStore.transitionStatus(eventId, PROCESSING_SOURCES, EventStatus.FAILED, error);
-        retryStore.complete(eventId, RetryKind.DELIVERY);
+        tryOnProcessingDisabled(eventId, errorType, error);
+    }
+
+    @Override
+    public synchronized boolean tryOnProcessingDisabled(UUID eventId, String errorType, String error) {
+        boolean applied = eventStore.transitionStatus(
+                eventId, PROCESSING_SOURCES, EventStatus.FAILED, error);
+        if (applied) {
+            retryStore.complete(eventId, RetryKind.DELIVERY);
+        }
+        return applied;
     }
 
     @Override
@@ -117,6 +146,12 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
     @Override
     public synchronized void onNoHandler(UUID eventId, String service, int attempt,
                                          String errorType, String error) {
+        tryOnNoHandler(eventId, service, attempt, errorType, error);
+    }
+
+    @Override
+    public synchronized boolean tryOnNoHandler(UUID eventId, String service, int attempt,
+                                               String errorType, String error) {
         boolean applied = eventStore.transitionStatus(
                 eventId, PROCESSING_SOURCES, EventStatus.DEAD, error);
         if (applied) {
@@ -124,6 +159,7 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
             deadOrSchedule(eventId, service, RetryKind.PROCESSING,
                     RetryReason.NO_HANDLER, null, errorType, error);
         }
+        return applied;
     }
 
     @Override
