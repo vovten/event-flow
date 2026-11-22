@@ -730,6 +730,14 @@ class KafkaInTransportTest {
     }
 
     @Test
+    @DisplayName("Should reject a blank consumer group id with a clear message")
+    void shouldRejectBlankConsumerGroup() {
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new KafkaInTransport("localhost:9092", "test-topic", ""));
+        assertTrue(error.getMessage().contains("consumer-group"));
+    }
+
+    @Test
     @DisplayName("Should block a partition after a processing failure and never resume it in this session")
     void shouldBlockPartitionAfterFailedRecord() throws Exception {
         ExecutorService executorService = Executors.newSingleThreadExecutor();

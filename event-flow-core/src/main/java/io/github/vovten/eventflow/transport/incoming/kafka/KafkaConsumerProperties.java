@@ -34,6 +34,7 @@ public final class KafkaConsumerProperties {
      * @return consumer properties
      */
     public static Properties defaults(String bootstrapServers, String groupId) {
+        requireGroupId(groupId);
         Properties props = new Properties();
         props.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
@@ -55,6 +56,7 @@ public final class KafkaConsumerProperties {
         Properties props = new Properties();
         props.putAll(overrides);
         props.putIfAbsent(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        requireGroupId(props.getProperty(ConsumerConfig.GROUP_ID_CONFIG));
         props.putIfAbsent(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.putIfAbsent(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         applyAtLeastOnceDefaults(props);
@@ -77,6 +79,12 @@ public final class KafkaConsumerProperties {
         props.putIfAbsent(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "1000");
         props.putIfAbsent(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, "524288");
         props.putIfAbsent(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, "500");
+    }
+
+    private static void requireGroupId(String groupId) {
+        if (groupId == null || groupId.isBlank()) {
+            throw new IllegalArgumentException("consumer-group must not be blank");
+        }
     }
 
     /**
