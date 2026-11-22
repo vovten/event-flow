@@ -133,7 +133,10 @@ public final class RetryWatchdog implements AutoCloseable {
     private void raise(StoredEvent event, RetryKind retryKind, RetryReason reason, Instant now) {
         Optional<RetryTask> existing = retryStore.find(event.eventId(), retryKind);
         if (existing.isEmpty()) {
-            int attempt = Math.max(1, event.retryCount() + 1);
+            // retry_count is a cross-domain legacy counter, not this kind's
+            // attempt number. A watchdog-created row is the first attempt of
+            // its own DELIVERY/PROCESSING domain.
+            int attempt = 1;
             retryStore.schedule(RetryTask.pending(
                     event.eventId(), options.service(), retryKind, attempt, reason, now, null));
             log.warn("Created {} retry for stale event {} (status {})",

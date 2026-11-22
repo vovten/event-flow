@@ -75,6 +75,23 @@ class RetryWatchdogTest {
         }
 
         @Test
+        @DisplayName("should seed a new delivery retry at attempt 1 despite accumulated retry_count")
+        void seedsNewDeliveryRetryAtAttemptOne() {
+            UUID eventId = UUID.randomUUID();
+            Instant timestamp = Instant.now().minus(Duration.ofHours(1));
+            eventStore.save(new StoredEvent(
+                    eventId, "test.TestEvent", SERVICE, "{}", null, null,
+                    EventStatus.PUBLISHED, 3, false, timestamp, timestamp, null));
+
+            watchdog(true).watchdogCycle();
+
+            RetryTask task = retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow();
+            assertThat(task.attempt())
+                    .as("retry_count belongs to other domains and must not seed this DELIVERY attempt")
+                    .isEqualTo(1);
+        }
+
+        @Test
         @DisplayName("should not create a delivery retry for a recent PUBLISHED event")
         void ignoresRecentPublishedEvent() {
             UUID eventId = storeEvent(EventStatus.PUBLISHED, Duration.ofSeconds(5));
