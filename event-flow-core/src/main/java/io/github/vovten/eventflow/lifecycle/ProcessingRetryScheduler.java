@@ -38,6 +38,10 @@ import java.util.concurrent.TimeUnit;
  * {@link ProcessingRetryOptions#maxRetries()} is exhausted, the row and the
  * event are dead-lettered.
  * <p>
+ * A processing retry is deferred while a {@code DELIVERY} row for the same
+ * event is {@link RetryState#IN_PROGRESS}: the in-flight delivery re-publish is
+ * itself a dispatch and provides the next processing attempt.
+ * <p>
  * Attempt numbers are 1-based and count the original publish. The row stores
  * the last attempted number; each scheduler publish uses {@code attempt + 1}.
  *
@@ -164,6 +168,14 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
     }
 
     private void deliver(RetryTask task, Instant now) {
+        if (deliveryInFlight(task)) {
+            // A delivery re-publish in flight is itself a dispatch, so it will
+            // provide this processing attempt. Defer instead of publishing the
+            // same event twice in one interval.
+            log.debug("Deferring processing retry for event {}: a delivery retry is in flight",
+                    task.eventId());
+            return;
+        }
         int nextAttempt = task.attempt() + 1;
         if (isBudgetExhausted(nextAttempt)) {
             support.deadLetter(task, RetryReason.CAP_EXCEEDED, "processing retry budget exhausted");
@@ -235,6 +247,12 @@ public final class ProcessingRetryScheduler implements AutoCloseable {
         support.reschedule(task, nextAttempt, reason, now.plus(delay), errorType, error);
         log.debug("Scheduled processing retry for event {}: attempt {}/{}, reason={}, delay={}",
                 task.eventId(), nextAttempt, maxAttempts(), reason, delay);
+    }
+
+    private boolean deliveryInFlight(RetryTask task) {
+        return support.find(task.eventId(), RetryKind.DELIVERY)
+                .filter(row -> row.state() == RetryState.IN_PROGRESS)
+                .isPresent();
     }
 
     private boolean isBudgetExhausted(int attempt) {

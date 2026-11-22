@@ -141,6 +141,41 @@ class ProcessingRetrySchedulerTest {
         }
 
         @Test
+        @DisplayName("should defer while a delivery retry is in flight")
+        void defersWhileDeliveryIsInFlight() {
+            UUID eventId = storeEvent(EventStatus.FAILED);
+            scheduleProcessing(eventId, 1);
+            retryStore.schedule(RetryTask.pending(
+                            eventId, SERVICE, RetryKind.DELIVERY, 2,
+                            RetryReason.PUBLISH_FAILED, Instant.now().minusSeconds(1), null)
+                    .withClaim("other-instance", Instant.now().plusSeconds(30)));
+
+            scheduler(3).retryCycle();
+
+            assertThat(origin.published).isEmpty();
+            assertThat(retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow().state())
+                    .isEqualTo(RetryState.PENDING);
+        }
+
+        @Test
+        @DisplayName("should process when the delivery row is only pending")
+        void processesWhenDeliveryIsPending() {
+            UUID eventId = storeEvent(EventStatus.FAILED);
+            scheduleProcessing(eventId, 1);
+            retryStore.schedule(RetryTask.pending(
+                    eventId, SERVICE, RetryKind.DELIVERY, 2,
+                    RetryReason.PUBLISH_FAILED, Instant.now().minusSeconds(1), null));
+
+            scheduler(3).retryCycle();
+
+            assertThat(origin.published).hasSize(1);
+            assertThat(retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow().state())
+                    .isEqualTo(RetryState.IN_PROGRESS);
+            assertThat(retryStore.find(eventId, RetryKind.DELIVERY).orElseThrow().state())
+                    .isEqualTo(RetryState.PENDING);
+        }
+
+        @Test
         @DisplayName("should wait for the row's next attempt time")
         void respectsNextAttemptAt() {
             UUID eventId = storeEvent(EventStatus.FAILED);
