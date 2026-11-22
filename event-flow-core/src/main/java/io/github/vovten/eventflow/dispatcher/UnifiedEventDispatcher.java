@@ -54,6 +54,17 @@ import static java.util.stream.Collectors.joining;
  *       backpressure without overwhelming downstream systems.</li>
  * </ul>
  * <p>
+ * <b>{@code CallerRunsPolicy} caveat for ack-on-completion transports:</b> running
+ * the handler on the transport's poll thread also blocks that thread's poll loop.
+ * With Kafka this can exceed {@code max.poll.interval.ms} (5 minutes by default),
+ * causing a rebalance, concurrent re-processing and further rebalances. For
+ * transports that commit an offset only after the dispatch future completes,
+ * prefer virtual threads with a {@link java.util.concurrent.Semaphore} concurrency
+ * limit over {@code CallerRunsPolicy}. If {@code CallerRunsPolicy} is used, ensure
+ * {@code max.poll.interval.ms} exceeds the worst-case dispatch time; the dispatch
+ * future completes only after all local retries, so the handler budget must include
+ * their backoff.
+ * <p>
  * <b>Architecture:</b>
  * <pre>{@code
  * DispatcherTransport(s) → [IdempotentEventDispatcher] → UnifiedEventDispatcher → EventHandler(s)
