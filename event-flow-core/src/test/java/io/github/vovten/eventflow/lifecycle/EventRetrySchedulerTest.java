@@ -203,6 +203,18 @@ class EventRetrySchedulerTest {
         }
 
         @Test
+        @DisplayName("caps the backoff shift instead of retrying immediately on a large retry count")
+        void capsBackoffShift() {
+            UUID eventId = createFailedEvent(63, Instant.now().minusSeconds(10));
+
+            scheduler(Duration.ofSeconds(1), 100).retryCycle();
+
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
+            assertThat(stored.retryCount()).isEqualTo(63);
+        }
+
+        @Test
         @DisplayName("skips events below the minimum age threshold")
         void skipsEventsBelowMinAge() {
             // Event updated just now — newer than minAge of 10 seconds

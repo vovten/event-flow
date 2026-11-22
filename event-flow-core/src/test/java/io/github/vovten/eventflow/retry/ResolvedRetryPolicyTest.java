@@ -122,6 +122,22 @@ class ResolvedRetryPolicyTest {
     }
 
     @Test
+    @DisplayName("Should stop walking a cyclic cause chain")
+    void shouldStopWalkingCyclicCauseChain() {
+        ResolvedRetryPolicy policy = new ResolvedRetryPolicy(
+                "test", Set.of(TimeoutException.class), Set.of(), 3, 0,
+                Duration.ofMillis(1), 2.0, Duration.ofSeconds(1), 0.0);
+        Throwable cyclic = new RuntimeException("cyclic") {
+            @Override
+            public synchronized Throwable getCause() {
+                return this;
+            }
+        };
+
+        assertThat(policy.matches(cyclic)).isFalse();
+    }
+
+    @Test
     @DisplayName("Should let noRetryOn win over retryOn")
     void shouldLetNoRetryOnWin() {
         ResolvedRetryPolicy policy = new ResolvedRetryPolicy(

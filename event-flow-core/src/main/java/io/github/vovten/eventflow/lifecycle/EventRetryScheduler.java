@@ -65,6 +65,13 @@ public final class EventRetryScheduler implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(EventRetryScheduler.class);
 
+    /**
+     * Caps the exponential shift. A retry count of 64 or more would wrap
+     * {@code 1L << retryCount} around the long width and produce a negative
+     * or zero backoff, so the legacy scheduler could retry immediately.
+     */
+    private static final int MAX_BACKOFF_SHIFT = 20;
+
     private final EventStore eventStore;
     private final EventPublisher publisher;
     private final Duration interval;
@@ -212,7 +219,8 @@ public final class EventRetryScheduler implements AutoCloseable {
      * @return the instant when this event becomes eligible for retry
      */
     private Instant computeRetryAt(StoredEvent event) {
-        Duration backoff = minAge.multipliedBy(1L << event.retryCount());
+        int shift = Math.min(Math.max(0, event.retryCount()), MAX_BACKOFF_SHIFT);
+        Duration backoff = minAge.multipliedBy(1L << shift);
         return event.updatedAt().plus(backoff);
     }
 

@@ -1,6 +1,8 @@
 package io.github.vovten.eventflow.retry;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -51,6 +53,12 @@ public record ResolvedRetryPolicy(
     private static final double DEFAULT_MULTIPLIER = 2.0;
     private static final Duration DEFAULT_MAX_DELAY = Duration.ofMinutes(10);
     private static final double DEFAULT_JITTER = 0.5;
+
+    /**
+     * Upper bound for walking a cause chain. Guards against self-referential
+     * chains and pathologically deep nesting.
+     */
+    private static final int MAX_CAUSE_DEPTH = 64;
 
     public ResolvedRetryPolicy {
         Objects.requireNonNull(name, "name must not be null");
@@ -214,12 +222,18 @@ public record ResolvedRetryPolicy(
     }
 
     private static boolean matchesAny(Throwable error, Set<Class<? extends Throwable>> types) {
-        for (Throwable current = error; current != null; current = current.getCause()) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = error;
+        for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
+            if (!seen.add(current)) {
+                return false;
+            }
             for (Class<? extends Throwable> type : types) {
                 if (type.isInstance(current)) {
                     return true;
                 }
             }
+            current = current.getCause();
         }
         return false;
     }

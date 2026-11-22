@@ -47,6 +47,14 @@ public record StoredEvent(
         String errorDetails
 ) {
 
+    /**
+     * Caps the exponential shift in {@link #isReadyForRetry(Duration)}. A retry
+     * count of 64 or more would wrap {@code 1L << retryCount} around the long
+     * width and produce a negative or zero backoff, making the event eligible
+     * immediately.
+     */
+    private static final int MAX_BACKOFF_SHIFT = 20;
+
     public StoredEvent {
         Objects.requireNonNull(eventId, "eventId must not be null");
         Objects.requireNonNull(eventType, "eventType must not be null");
@@ -157,7 +165,8 @@ public record StoredEvent(
      *         to allow the next retry, {@code false} otherwise
      */
     public boolean isReadyForRetry(Duration minAge) {
-        Duration backoff = minAge.multipliedBy(1L << retryCount);
+        int shift = Math.min(Math.max(0, retryCount), MAX_BACKOFF_SHIFT);
+        Duration backoff = minAge.multipliedBy(1L << shift);
         Instant retryAt = updatedAt.plus(backoff);
         return !Instant.now().isBefore(retryAt);
     }
