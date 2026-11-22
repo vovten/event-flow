@@ -123,6 +123,11 @@ public class LifecycleConfiguration {
             log.warn("Using InMemoryEventStore — event data is NOT persisted across restarts");
             return new InMemoryEventStore();
         }
+        if (!"db".equals(type)) {
+            throw new IllegalStateException(
+                    "Unknown store.type '" + type + "'. Allowed values: 'db', 'in-memory', "
+                            + "or the type of a custom EventStore bean.");
+        }
         DataSource dataSource = transactionAwareDataSource(dataSourceProvider);
         if (dataSource != null) {
             LifecyclePublisherConfig.StoreConfig cfg = properties.getPublisher().getLifecycle().getStore();

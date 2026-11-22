@@ -121,6 +121,28 @@ class LifecycleConfigurationTest {
     }
 
     @Test
+    @DisplayName("Should fail fast when store.type is unknown")
+    void shouldFailFastWhenStoreTypeIsUnknown() {
+        AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
+        addInlinedPropertiesToEnvironment(ctx, "event-flow.publisher.lifecycle.enabled=true");
+        ctx.registerBean("properties", EventFlowProperties.class, () -> {
+            EventFlowProperties props = new EventFlowProperties();
+            props.getPublisher().setEnabled(true);
+            props.getPublisher().getLifecycle().setEnabled(true);
+            props.getPublisher().getLifecycle().getStore().setType("bogus");
+            return props;
+        });
+        ctx.register(LifecycleConfiguration.class);
+
+        assertThatThrownBy(ctx::refresh)
+                .isInstanceOf(BeanCreationException.class)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("Unknown store.type")
+                .hasMessageContaining("bogus");
+    }
+
+    @Test
     @DisplayName("Should return custom EventStore bean when store.type matches its type")
     void shouldReturnCustomEventStoreWhenTypeMatches() {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
