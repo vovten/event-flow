@@ -134,7 +134,15 @@ public final class EventLifecycleDispatcher implements EventDispatcher {
                     List.of(), error.getClass().getName(), true, 0L, null);
             return;
         }
-        if (results != null && results.isEmpty() && !results.isDuplicate()) {
+        if (results != null && results.isDuplicate()) {
+            // The original in-flight delivery owns the final ack. Publishing a
+            // SuccessAck for the skipped duplicate would mark the event HANDLED
+            // before the original handler has actually completed.
+            log.debug("Skipping lifecycle ack for duplicate event: {}",
+                    ((TraceableEvent) event).eventId());
+            return;
+        }
+        if (results != null && results.isEmpty()) {
             publishNoHandlerAck(event, originalService, retryContext);
             return;
         }

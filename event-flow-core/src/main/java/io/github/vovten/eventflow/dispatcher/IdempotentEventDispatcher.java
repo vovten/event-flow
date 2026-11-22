@@ -47,7 +47,7 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
     private static final Logger log = LoggerFactory.getLogger(IdempotentEventDispatcher.class);
 
     private final EventDispatcher origin;
-    private final Cache<UUID, Boolean> cache;
+    private final Cache<UUID, CompletableFuture<HandlerResults>> cache;
     private final boolean warnOnDuplicate;
 
     public IdempotentEventDispatcher(EventDispatcher origin,
@@ -82,25 +82,58 @@ public final class IdempotentEventDispatcher implements EventDispatcher {
         if (eventId == null) {
             return origin.dispatch(event);
         }
-        Boolean previous = cache.asMap().putIfAbsent(eventId, Boolean.TRUE);
+        CompletableFuture<HandlerResults> result = new CompletableFuture<>();
+        CompletableFuture<HandlerResults> previous = cache.asMap().putIfAbsent(eventId, result);
         if (previous != null) {
             if (warnOnDuplicate) {
                 log.warn("Duplicate event ignored: {}", eventId);
             }
-            return CompletableFuture.completedFuture(HandlerResults.duplicate());
+            // Share the original outcome: a successful in-flight original is a
+            // duplicate no-op, while an original failure must fail this delivery
+            // too so the transport does not commit its offset.
+            return duplicateView(previous);
         }
-        return origin.dispatch(event)
-                .whenComplete((results, throwable) -> {
-                    if (throwable != null) {
-                        cache.invalidate(eventId);
-                        log.debug("Event dispatch failed, removed from cache: {}", eventId);
-                    } else if (results == null || !results.isAllSuccess()) {
-                        cache.invalidate(eventId);
-                        log.debug("Event was not fully processed, removed from cache: {}", eventId);
-                    } else {
-                        log.debug("Event processed: {}", eventId);
-                    }
-                });
+        try {
+            origin.dispatch(event).whenComplete((results, throwable) -> {
+                if (throwable != null) {
+                    cache.invalidate(eventId);
+                    result.completeExceptionally(throwable);
+                    log.debug("Event dispatch failed, removed from cache: {}", eventId);
+                } else if (results == null || !results.isAllSuccess()) {
+                    cache.invalidate(eventId);
+                    result.complete(results);
+                    log.debug("Event was not fully processed, removed from cache: {}", eventId);
+                } else {
+                    result.complete(results);
+                    log.debug("Event processed: {}", eventId);
+                }
+            });
+        } catch (RuntimeException e) {
+            cache.invalidate(eventId);
+            result.completeExceptionally(e);
+        }
+        return result;
+    }
+
+    /**
+     * Creates the view returned to an in-flight duplicate.
+     * <p>
+     * The duplicate must observe the original failure (or exception) so the
+     * transport keeps the offset uncommitted. A successful original is mapped
+     * to {@link HandlerResults#duplicate()} to preserve the existing duplicate
+     * log/contract.
+     *
+     * @param original the future of the original in-flight delivery
+     * @return future completed with the duplicate view of the original outcome
+     */
+    private CompletableFuture<HandlerResults> duplicateView(
+            CompletableFuture<HandlerResults> original) {
+        return original.thenApply(results -> {
+            if (results != null && results.isAllSuccess()) {
+                return HandlerResults.duplicate();
+            }
+            return results;
+        });
     }
 
     @Override

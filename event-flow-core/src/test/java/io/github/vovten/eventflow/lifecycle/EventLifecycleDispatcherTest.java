@@ -123,16 +123,17 @@ class EventLifecycleDispatcherTest {
     }
 
     @Test
-    @DisplayName("Should publish SuccessAck and not NoHandlerAck for a duplicate")
-    void shouldPublishSuccessAckForDuplicate() {
+    @DisplayName("Should not publish a final ack for a duplicate")
+    void shouldSkipFinalAckForDuplicate() {
         EventDispatcher origin = new TestDispatcher(e -> CompletableFuture.completedFuture(HandlerResults.duplicate()));
         EventLifecycleDispatcher dispatcher = new EventLifecycleDispatcher(origin, ackPublisher);
 
         dispatcher.dispatch(event).join();
 
-        assertThat(publishedAcks).hasSize(2);
-        assertThat(publishedAcks.get(1)).isInstanceOf(SuccessAck.class);
-        assertThat(publishedAcks.get(1)).isNotInstanceOf(NoHandlerAck.class);
+        assertThat(publishedAcks).hasSize(1);
+        assertThat(publishedAcks.get(0)).isInstanceOf(AcceptedAck.class);
+        assertThat(publishedAcks).noneMatch(SuccessAck.class::isInstance);
+        assertThat(publishedAcks).noneMatch(NoHandlerAck.class::isInstance);
     }
 
     @Test

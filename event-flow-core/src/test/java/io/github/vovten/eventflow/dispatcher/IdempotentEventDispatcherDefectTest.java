@@ -187,6 +187,32 @@ class IdempotentEventDispatcherDefectTest {
     }
 
     @Test
+    @DisplayName("Should propagate the original failure to an in-flight duplicate")
+    void shouldPropagateFailureToInFlightDuplicate() {
+        CompletableFuture<HandlerResults> original = new CompletableFuture<>();
+        IdempotentEventDispatcher dispatcher = new IdempotentEventDispatcher(
+                new PendingDispatcher(original), Duration.ofMinutes(10), 100, false);
+        UUID eventId = UUID.randomUUID();
+
+        CompletableFuture<HandlerResults> first =
+                dispatcher.dispatch(new TestTraceableEvent(eventId));
+        CompletableFuture<HandlerResults> duplicate =
+                dispatcher.dispatch(new TestTraceableEvent(eventId));
+
+        assertThat(first.isDone()).isFalse();
+        assertThat(duplicate.isDone()).isFalse();
+
+        HandlerResults failure = HandlerResults.of(List.of(
+                HandlerResult.failure("handler", new RuntimeException("boom"))));
+        original.complete(failure);
+
+        assertThat(first.join()).isSameAs(failure);
+        assertThat(duplicate.join().isAllSuccess())
+                .as("a duplicate must not turn an in-flight failure into success")
+                .isFalse();
+    }
+
+    @Test
     @DisplayName("Should invalidate cache when only some handlers fail")
     void shouldInvalidateCacheOnPartialFailure() {
         AtomicInteger invocations = new AtomicInteger();
@@ -241,6 +267,37 @@ class IdempotentEventDispatcherDefectTest {
         @Override
         public CompletableFuture<HandlerResults> dispatch(Event event) {
             return CompletableFuture.completedFuture(responses.get(invocations.getAndIncrement()));
+        }
+
+        @Override
+        public void register(Object listener) {
+        }
+
+        @Override
+        public boolean isRegistered(Object listener) {
+            return false;
+        }
+
+        @Override
+        public void start(AsyncEventConsumer dispatchConsumer) {
+        }
+
+        @Override
+        public void stop() {
+        }
+    }
+
+    private static final class PendingDispatcher implements EventDispatcher {
+
+        private final CompletableFuture<HandlerResults> result;
+
+        private PendingDispatcher(CompletableFuture<HandlerResults> result) {
+            this.result = result;
+        }
+
+        @Override
+        public CompletableFuture<HandlerResults> dispatch(Event event) {
+            return result;
         }
 
         @Override
