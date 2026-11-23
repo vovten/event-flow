@@ -957,6 +957,13 @@ public class EventFlowProperties {
         private int batchSize = 100;
 
         /**
+         * Maximum number of attempts for a transient payload failure (unknown
+         * type id, missing class, linkage error) before the event is
+         * dead-lettered. Malformed payloads are dead-lettered immediately.
+         */
+        private int payloadRetryThreshold = 3;
+
+        /**
          * Durable retry table name shared by both retry domains.
          */
         private String tableName = "event_retry";
@@ -986,6 +993,14 @@ public class EventFlowProperties {
 
         public void setBatchSize(int batchSize) {
             this.batchSize = batchSize;
+        }
+
+        public int getPayloadRetryThreshold() {
+            return payloadRetryThreshold;
+        }
+
+        public void setPayloadRetryThreshold(int payloadRetryThreshold) {
+            this.payloadRetryThreshold = payloadRetryThreshold;
         }
 
         public String getTableName() {

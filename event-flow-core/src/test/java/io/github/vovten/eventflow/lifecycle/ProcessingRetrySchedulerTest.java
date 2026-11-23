@@ -81,6 +81,21 @@ class ProcessingRetrySchedulerTest {
         return eventId;
     }
 
+    private UUID storeEventWithMissingType() {
+        UUID eventId = UUID.randomUUID();
+        Envelope<TestEvent> envelope = new Envelope<>(
+                eventId, null, Instant.now(), new TestEvent(eventId, "data"),
+                Map.of(), List.of(ExternalEventChannel.class));
+        String payload = EventUtils.toJson(envelope)
+                .replace(TestEvent.class.getName(), "com.example.MissingEvent");
+        eventStore.save(new StoredEvent(
+                eventId, TestEvent.class.getName(), SERVICE, payload,
+                ExternalEventChannel.class.getName(), null,
+                EventStatus.FAILED, 0, false,
+                Instant.now().minusSeconds(10), Instant.now().minusSeconds(10), "stored error"));
+        return eventId;
+    }
+
     private void scheduleProcessing(UUID eventId, int attempt) {
         retryStore.schedule(RetryTask.pending(
                 eventId, SERVICE, RetryKind.PROCESSING, attempt,
@@ -291,6 +306,39 @@ class ProcessingRetrySchedulerTest {
             RetryTask row = retryStore.find(invalidId, RetryKind.PROCESSING).orElseThrow();
             assertThat(row.state()).isEqualTo(RetryState.DEAD);
             assertThat(row.reason()).isEqualTo(RetryReason.PAYLOAD_UNREADABLE);
+        }
+
+        @Test
+        @DisplayName("should retry a transient payload failure instead of dead-lettering immediately")
+        void retriesTransientPayloadFailure() {
+            UUID eventId = storeEventWithMissingType();
+            scheduleProcessing(eventId, 1);
+
+            scheduler(3).retryCycle();
+
+            assertThat(origin.published).isEmpty();
+            assertThat(status(eventId)).isEqualTo(EventStatus.FAILED);
+            RetryTask row = retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow();
+            assertThat(row.state()).isEqualTo(RetryState.PENDING);
+            assertThat(row.reason()).isEqualTo(RetryReason.PAYLOAD_UNREADABLE);
+            assertThat(row.attempt()).isEqualTo(3);
+            assertThat(row.lastError()).contains("EventSerializationException");
+        }
+
+        @Test
+        @DisplayName("should dead-letter a transient payload failure at the configured threshold")
+        void deadLettersTransientPayloadFailureAtThreshold() {
+            UUID eventId = storeEventWithMissingType();
+            scheduleProcessing(eventId, 3);
+
+            scheduler(3).retryCycle();
+
+            assertThat(origin.published).isEmpty();
+            assertThat(status(eventId)).isEqualTo(EventStatus.DEAD);
+            RetryTask row = retryStore.find(eventId, RetryKind.PROCESSING).orElseThrow();
+            assertThat(row.state()).isEqualTo(RetryState.DEAD);
+            assertThat(row.reason()).isEqualTo(RetryReason.PAYLOAD_UNREADABLE);
+            assertThat(row.lastError()).contains("EventSerializationException");
         }
 
         @Test

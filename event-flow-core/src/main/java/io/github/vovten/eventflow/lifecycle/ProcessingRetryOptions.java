@@ -15,6 +15,8 @@ import java.util.Objects;
  * @param maxRetryDelay upper bound for the backoff delay (must not be shorter than {@code retryDelay})
  * @param maxRetries    maximum number of retries after the first attempt (must be &gt;= 0)
  * @param batchSize     maximum number of retry rows handled per cycle (must be positive)
+ * @param payloadRetryThreshold maximum number of attempts for a transient payload failure
+ *                      before the event is dead-lettered (must be &gt;= 1)
  * @author Vladimir Aleshkov
  * @since 1.4.0
  */
@@ -27,8 +29,29 @@ public record ProcessingRetryOptions(
         double jitter,
         Duration maxRetryDelay,
         int maxRetries,
-        int batchSize
+        int batchSize,
+        int payloadRetryThreshold
 ) {
+
+    /**
+     * Creates options with the default payload retry threshold.
+     *
+     * @param service       the local service that owns the retried events
+     * @param interval      delay between retry cycles
+     * @param ackTimeout    maximum time to wait for a final ack
+     * @param retryDelay    base backoff delay
+     * @param multiplier    exponential backoff multiplier
+     * @param jitter        symmetric jitter fraction in [0, 1]
+     * @param maxRetryDelay upper bound for the backoff delay
+     * @param maxRetries    maximum number of retries after the first attempt
+     * @param batchSize     maximum number of retry rows handled per cycle
+     */
+    public ProcessingRetryOptions(String service, Duration interval, Duration ackTimeout,
+                                  Duration retryDelay, double multiplier, double jitter,
+                                  Duration maxRetryDelay, int maxRetries, int batchSize) {
+        this(service, interval, ackTimeout, retryDelay, multiplier, jitter,
+                maxRetryDelay, maxRetries, batchSize, PayloadFailure.DEFAULT_RETRY_THRESHOLD);
+    }
 
     public ProcessingRetryOptions {
         if (service == null || service.isBlank()) {
@@ -61,6 +84,9 @@ public record ProcessingRetryOptions(
         }
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize must be positive");
+        }
+        if (payloadRetryThreshold < 1) {
+            throw new IllegalArgumentException("payloadRetryThreshold must be >= 1");
         }
     }
 

@@ -229,7 +229,13 @@ public final class EventRetryScheduler implements AutoCloseable {
         try {
             event = EventUtils.fromJson(stored.payload(), Event.class);
             event = restoreChannels(event, stored.channels());
-        } catch (Exception e) {
+        } catch (RuntimeException | LinkageError e) {
+            if (isTransientPayloadFailure(stored, e)) {
+                log.warn("Transient payload failure for event id={}; the attempt is counted",
+                        stored.eventId(), e);
+                recordRetryFailure(stored, e);
+                return;
+            }
             // The payload can never be deserialized: counting the attempt would
             // only keep an undecodable event in the retry loop. Move it to the
             // terminal DEAD state (manual markForRetry can resurrect it).
@@ -252,18 +258,25 @@ public final class EventRetryScheduler implements AutoCloseable {
         }
     }
 
-    private void markAsDead(StoredEvent stored, Exception failure) {
+    private boolean isTransientPayloadFailure(StoredEvent stored, Throwable error) {
+        int nextAttempt = stored.retryCount() + 1;
+        return PayloadFailure.isTransient(error)
+                && nextAttempt < PayloadFailure.DEFAULT_RETRY_THRESHOLD
+                && nextAttempt < maxRetries;
+    }
+
+    private void markAsDead(StoredEvent stored, Throwable failure) {
         try {
             eventStore.updateStatus(stored.eventId(), EventStatus.DEAD,
-                    "Retry payload cannot be deserialized: " + failure.getMessage());
+                    "Retry payload cannot be deserialized: " + PayloadFailure.describe(failure));
         } catch (Exception e) {
             log.warn("Failed to move event id={} to DEAD", stored.eventId(), e);
         }
     }
 
-    private void recordRetryFailure(StoredEvent stored, Exception failure) {
+    private void recordRetryFailure(StoredEvent stored, Throwable failure) {
         try {
-            eventStore.recordRetryFailure(stored.eventId(), failure.getMessage());
+            eventStore.recordRetryFailure(stored.eventId(), PayloadFailure.describe(failure));
         } catch (Exception e) {
             log.warn("Failed to record the retry failure for event id={}", stored.eventId(), e);
         }

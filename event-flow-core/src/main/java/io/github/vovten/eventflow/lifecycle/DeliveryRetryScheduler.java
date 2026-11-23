@@ -220,14 +220,26 @@ public final class DeliveryRetryScheduler implements AutoCloseable {
     private Optional<Event> createRetryEvent(RetryTask task, StoredEvent stored, int attempt) {
         try {
             return Optional.of(RetryEventFactory.forRetry(stored, RetryKind.DELIVERY, attempt));
-        } catch (RuntimeException e) {
-            // An unreadable payload can never be delivered. Counting attempts
-            // would only burn the retry budget and leave the row in the loop.
-            log.error("Failed to deserialize retry payload for event {}; dead-lettering", task.eventId(), e);
-            support.deadLetter(task, RetryReason.PAYLOAD_UNREADABLE,
-                    "retry payload cannot be deserialized: " + e.getMessage());
+        } catch (RuntimeException | LinkageError e) {
+            handleUnreadablePayload(task, attempt, e);
             return Optional.empty();
         }
+    }
+
+    private void handleUnreadablePayload(RetryTask task, int attempt, Throwable error) {
+        String details = PayloadFailure.describe(error);
+        if (PayloadFailure.isTransient(error)
+                && attempt <= options.payloadRetryThreshold()
+                && !isBudgetExhausted(attempt + 1)) {
+            log.warn("Transient payload failure for delivery retry of event {} (attempt {}); retrying: {}",
+                    task.eventId(), attempt, details);
+            scheduleNextAttempt(task, attempt, Instant.now(), RetryReason.PAYLOAD_UNREADABLE,
+                    error.getClass().getName(), details);
+            return;
+        }
+        log.error("Unreadable payload for delivery retry of event {} (attempt {}); dead-lettering: {}",
+                task.eventId(), attempt, details);
+        support.deadLetter(task, RetryReason.PAYLOAD_UNREADABLE, details);
     }
 
     private CompletableFuture<Void> submit(RetryTask task, Event event, int attempt) {
