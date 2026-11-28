@@ -54,8 +54,12 @@ public enum EventStatus {
     HANDLED('H'),
 
     /**
-     * Event publication or handling failed. Eligible for retry.
-     * Check {@link StoredEvent#errorDetails()} for the specific cause.
+     * Event publication or handling failed. Manual retry is possible.
+     * <p>
+     * A publish that reached only some destinations also lands here: it is not
+     * retried automatically because that would duplicate delivery to the
+     * destinations that already received the event. Check
+     * {@link StoredEvent#errorDetails()} for the specific cause.
      */
     FAILED('F'),
 

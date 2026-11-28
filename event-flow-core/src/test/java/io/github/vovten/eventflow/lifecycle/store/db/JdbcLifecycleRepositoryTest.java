@@ -81,6 +81,18 @@ class JdbcLifecycleRepositoryTest {
     }
 
     @Test
+    @DisplayName("Should delete the delivery retry without changing the status when delivery is abandoned")
+    void shouldAbandonDeliveryRetry() {
+        repository.onPublishFailed(eventId, SERVICE, RetryReason.PUBLISH_FAILED,
+                Instant.now().plusSeconds(5), null, null);
+
+        repository.onDeliveryAbandoned(eventId);
+
+        assertThat(status()).isEqualTo(EventStatus.FAILED);
+        assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should seed a processing watchdog row when accepting with a deadline")
     void shouldSeedProcessingWatchdogRowOnAccept() {
         Instant deadline = Instant.now().plusSeconds(600);

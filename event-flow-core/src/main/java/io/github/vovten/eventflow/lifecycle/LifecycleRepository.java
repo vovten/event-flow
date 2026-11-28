@@ -80,6 +80,18 @@ public interface LifecycleRepository {
     }
 
     /**
+     * Clears pending delivery retry work without scheduling another attempt.
+     * <p>
+     * Used after a publish that reached some destinations but not all: retrying
+     * would duplicate delivery to the destinations that already received the
+     * event. The event status is left to the caller (typically {@code FAILED})
+     * so that an operator can act on the partial delivery.
+     *
+     * @param eventId event identifier
+     */
+    void onDeliveryAbandoned(UUID eventId);
+
+    /**
      * Records a handler failure.
      *
      * @param eventId       event identifier

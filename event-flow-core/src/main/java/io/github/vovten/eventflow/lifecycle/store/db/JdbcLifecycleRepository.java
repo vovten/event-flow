@@ -123,6 +123,11 @@ public final class JdbcLifecycleRepository implements LifecycleRepository {
     }
 
     @Override
+    public void onDeliveryAbandoned(UUID eventId) {
+        inTransaction(conn -> retryStore.complete(conn, eventId, RetryKind.DELIVERY));
+    }
+
+    @Override
     public void onProcessingFailed(UUID eventId, String service, int attempt,
                                    boolean retryable, Instant nextAttemptAt,
                                    String policyName, String errorType, String error) {

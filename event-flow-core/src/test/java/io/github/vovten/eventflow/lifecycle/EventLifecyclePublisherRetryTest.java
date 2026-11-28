@@ -124,7 +124,7 @@ class EventLifecyclePublisherRetryTest {
         }
 
         @Test
-        @DisplayName("should keep PUBLISHED on partial success without a delivery retry")
+        @DisplayName("P0-4: should mark FAILED without a delivery retry on partial success")
         void partialSuccessDoesNotRetry() {
             UUID eventId = UUID.randomUUID();
             origin.result = SendResults.of(List.of(
@@ -133,7 +133,36 @@ class EventLifecyclePublisherRetryTest {
 
             publisher(true).publish(envelope(eventId)).join();
 
-            assertThat(status(eventId)).isEqualTo(EventStatus.PUBLISHED);
+            StoredEvent stored = eventStore.findById(eventId).orElseThrow();
+            assertThat(stored.status()).isEqualTo(EventStatus.FAILED);
+            assertThat(stored.errorDetails())
+                    .contains("partial delivery")
+                    .contains("dest-b");
+            assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("P0-4: should abandon the delivery retry when a scheduler publish succeeds partially")
+        void partialSuccessOnSchedulerPublishAbandonsDeliveryRetry() {
+            UUID eventId = UUID.randomUUID();
+            eventStore.save(StoredEvent.newEvent(
+                    eventId, TestEvent.class.getSimpleName(), SERVICE, "{}", null, EventStatus.FAILED));
+            retryStore.schedule(RetryTask.pending(
+                            eventId, SERVICE, RetryKind.DELIVERY, 2,
+                            RetryReason.PUBLISH_FAILED, Instant.now().minusSeconds(1), null)
+                    .withClaim("scheduler", Instant.now().plusSeconds(30)));
+            origin.result = SendResults.of(List.of(
+                    SendResult.success("dest-a"),
+                    SendResult.failure("dest-b", "down")));
+            Envelope<TestEvent> retryEnvelope = new Envelope<>(
+                    eventId, null, Instant.now(), new TestEvent("data"),
+                    Map.of(RetryMetadata.RETRY_KIND, RetryKind.DELIVERY.name(),
+                            RetryMetadata.ATTEMPT, "2"),
+                    List.of(InternalEventChannel.class));
+
+            publisher(true).publish(retryEnvelope).join();
+
+            assertThat(status(eventId)).isEqualTo(EventStatus.FAILED);
             assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isEmpty();
         }
     }

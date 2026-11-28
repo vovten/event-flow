@@ -100,6 +100,11 @@ public final class InMemoryLifecycleRepository implements LifecycleRepository {
     }
 
     @Override
+    public synchronized void onDeliveryAbandoned(UUID eventId) {
+        retryStore.complete(eventId, RetryKind.DELIVERY);
+    }
+
+    @Override
     public synchronized void onProcessingFailed(UUID eventId, String service, int attempt,
                                                 boolean retryable, Instant nextAttemptAt,
                                                 String policyName, String errorType, String error) {

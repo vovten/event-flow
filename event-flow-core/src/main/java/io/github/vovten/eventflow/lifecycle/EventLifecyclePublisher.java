@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * A decorator for {@link EventPublisher} that persists events to an {@link EventStore}
@@ -42,6 +43,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>
  * {@link LifecycleAckEvent} instances are passed through without persistence
  * (they are technical events used for lifecycle tracking, not business events).
+ * <p>
+ * A publish that reaches only some destinations is marked {@link EventStatus#FAILED}
+ * with the failed destinations in the error details. No automatic retry is
+ * scheduled, because it would duplicate delivery to the destinations that already
+ * received the event; an operator decides how to recover.
  * <p>
  * Lifecycle-store updates after a publish complete are executed on a dedicated
  * daemon executor ({@code event-flow-store-updater-*}), so transport completion
@@ -285,11 +291,51 @@ public final class EventLifecyclePublisher implements EventPublisher {
                     result != null ? result.getSummary() : "null result");
             return;
         }
+        if (result.isPartialSuccess()) {
+            markPartiallyFailed(eventId, result);
+            return;
+        }
         if (options != null && !options.requireAcceptedAck()) {
             acceptAfterPublish(eventId, attempt);
         } else {
             markPublished(eventId);
         }
+    }
+
+    /**
+     * Marks an event whose publish reached only some destinations as
+     * {@link EventStatus#FAILED} and abandons its delivery retry.
+     * <p>
+     * A retry would duplicate delivery to the destinations that already received
+     * the event, so it is never scheduled automatically. The failure details list
+     * the destinations that missed the event so that an operator can decide how
+     * to recover.
+     *
+     * @param eventId the event identifier
+     * @param result  the partial publish result
+     */
+    private void markPartiallyFailed(UUID eventId, SendResults result) {
+        String details = describePartialFailure(result);
+        if (lifecycleRepository != null) {
+            lifecycleRepository.onDeliveryAbandoned(eventId);
+        }
+        boolean applied = eventStore.transitionStatus(
+                eventId, PUBLISH_RESULT_SOURCES, EventStatus.FAILED, details);
+        if (applied) {
+            log.error("Event delivered partially: {} — {} (no automatic retry; "
+                    + "a manual retry may duplicate delivery)", eventId, details);
+        } else {
+            log.debug("Ignoring late partial publish result for event {}: "
+                    + "status is already newer or terminal", eventId);
+        }
+    }
+
+    private static String describePartialFailure(SendResults result) {
+        String failed = result.getFailures().stream()
+                .map(failure -> failure.destination() + ": " + failure.errorDetails())
+                .collect(Collectors.joining("; "));
+        return String.format("partial delivery: %d/%d succeeded; failed: %s",
+                result.getSuccessfulCount(), result.getTotalCount(), failed);
     }
 
     private void markPublished(UUID eventId) {

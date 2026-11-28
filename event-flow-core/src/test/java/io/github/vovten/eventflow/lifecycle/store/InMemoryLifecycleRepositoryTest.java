@@ -72,6 +72,18 @@ class InMemoryLifecycleRepositoryTest {
     }
 
     @Test
+    @DisplayName("Should clear the delivery retry without changing the status when delivery is abandoned")
+    void shouldAbandonDeliveryRetry() {
+        repository.onPublishFailed(eventId, SERVICE, RetryReason.PUBLISH_FAILED,
+                Instant.now().plusSeconds(5), null, null);
+
+        repository.onDeliveryAbandoned(eventId);
+
+        assertThat(eventStore.findById(eventId).orElseThrow().status()).isEqualTo(EventStatus.FAILED);
+        assertThat(retryStore.find(eventId, RetryKind.DELIVERY)).isEmpty();
+    }
+
+    @Test
     @DisplayName("Should record retryable processing failure")
     void shouldRecordRetryableProcessingFailure() {
         repository.onProcessingFailed(eventId, SERVICE, 2, true,
