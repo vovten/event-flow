@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
@@ -25,13 +26,16 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  *   <li>Uses exponential backoff: delay = initialDelay * (multiplier ^ (attempt - 1)),
  *       capped by {@code maxDelay} and optionally jittered by ±{@code jitter}</li>
- *   <li>Retries every failure except {@link EventPublisherConfigException} and
- *       {@link IllegalArgumentException}, which are treated as configuration or
- *       programmer errors. This includes NPEs and serialization failures: the
- *       decorator is best-effort and leaves the retry budget to bound them</li>
+ *   <li>Consults a {@link RetryClassifier} before every retry. The default
+ *       classifier refuses configuration and programmer errors
+ *       ({@link EventPublisherConfigException}, {@link IllegalArgumentException},
+ *       {@link NullPointerException}), serialization failures and
+ *       {@code RecordTooLargeException}, because they would fail again and only
+ *       spend the retry budget</li>
  *   <li>Also retries when the delegate reports that <b>all</b> destinations failed
  *       (e.g. a full local queue or a rejected transport), because no durable
- *       delivery happened for any destination</li>
+ *       delivery happened for any destination — unless the first failure is
+ *       classified as non-retryable</li>
  *   <li>Does not retry partial success: some destinations already received the
  *       event, so a retry would duplicate delivery</li>
  *   <li>Logs each retry attempt with delay information</li>
@@ -69,6 +73,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Vladimir Aleshkov
  * @see ChannelEventPublisher
+ * @see RetryClassifier
  * @since 1.0.0
  */
 public class RetryEventPublisher implements EventPublisher {
@@ -95,6 +100,7 @@ public class RetryEventPublisher implements EventPublisher {
     private final double multiplier;
     private final Duration maxDelay;
     private final double jitter;
+    private final RetryClassifier retryClassifier;
 
     /**
      * Create retry decorator with default settings.
@@ -154,6 +160,27 @@ public class RetryEventPublisher implements EventPublisher {
      */
     public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay,
                                double multiplier, Duration maxDelay, double jitter) {
+        this(origin, maxRetries, initialDelay, multiplier, maxDelay, jitter,
+                DefaultRetryClassifier.INSTANCE);
+    }
+
+    /**
+     * Create retry decorator with custom settings and a custom failure classifier.
+     *
+     * @param origin          the origin publisher to wrap
+     * @param maxRetries      maximum number of retry attempts (must be &gt;= 0)
+     * @param initialDelay    initial delay between retries
+     * @param multiplier      backoff multiplier (must be &gt;= 1.0)
+     * @param maxDelay        maximum delay between retries (caps exponential backoff)
+     * @param jitter          symmetric jitter fraction in {@code [0, 1]}; {@code 0}
+     *                        disables jitter
+     * @param retryClassifier decides whether a failure is worth retrying
+     * @throws IllegalArgumentException if maxRetries &lt; 0, multiplier &lt; 1.0,
+     *                                  maxDelay is not positive, or jitter is outside {@code [0, 1]}
+     */
+    public RetryEventPublisher(EventPublisher origin, int maxRetries, Duration initialDelay,
+                               double multiplier, Duration maxDelay, double jitter,
+                               RetryClassifier retryClassifier) {
         if (maxRetries < 0) {
             throw new IllegalArgumentException("Max retries must be >= 0");
         }
@@ -175,6 +202,8 @@ public class RetryEventPublisher implements EventPublisher {
         this.multiplier = multiplier;
         this.maxDelay = maxDelay;
         this.jitter = jitter;
+        this.retryClassifier = Objects.requireNonNull(retryClassifier,
+                "retryClassifier must not be null");
     }
 
     @Override
@@ -208,10 +237,17 @@ public class RetryEventPublisher implements EventPublisher {
             }
             if (results != null && results.isAllFailure()) {
                 // Transport-level rejection reported as a result (for example a full
-                // local queue): nothing was delivered, so retrying is safe.
+                // local queue): nothing was delivered, so retrying is safe unless the
+                // failure is deterministic.
                 String details = results.getFirstFailure()
                         .map(SendResult::errorDetails)
                         .orElse("all destinations failed");
+                if (!retryClassifier.shouldRetry(results.getFirstError().orElse(null))) {
+                    log.error("Not retrying event {} after a non-retryable failure: {}",
+                            eventTypeName, details);
+                    resultFuture.complete(results);
+                    return;
+                }
                 if (scheduleRetryIfAllowed(event, attempt, resultFuture, eventTypeName, details)) {
                     return;
                 }
@@ -229,7 +265,7 @@ public class RetryEventPublisher implements EventPublisher {
         Throwable cause = error instanceof CompletionException && error.getCause() != null
                 ? error.getCause()
                 : error;
-        if (!shouldRetry(cause)) {
+        if (!retryClassifier.shouldRetry(cause)) {
             log.warn("Non-retryable error publishing event {}: {}", eventTypeName, cause.getMessage());
             resultFuture.completeExceptionally(error);
             return;
@@ -279,34 +315,5 @@ public class RetryEventPublisher implements EventPublisher {
         long bound = Math.max(1L, (long) (delayMillis * jitter));
         long offset = ThreadLocalRandom.current().nextLong(-bound, bound + 1);
         return Math.max(0L, delayMillis + offset);
-    }
-
-    /**
-     * Determine if the exception is retryable.
-     * <p>
-     * Retryable exceptions include:
-     * <ul>
-     *   <li>Network exceptions</li>
-     *   <li>Timeout exceptions</li>
-     *   <li>Temporary broker unavailability</li>
-     * </ul>
-     * <p>
-     * Non-retryable exceptions include:
-     * <ul>
-     *   <li>{@link EventPublisherConfigException} - configuration errors</li>
-     *   <li>{@link IllegalArgumentException} - invalid arguments</li>
-     * </ul>
-     *
-     * @param ex the exception to check
-     * @return true if the exception should trigger a retry
-     */
-    private boolean shouldRetry(Throwable ex) {
-        if (ex instanceof EventPublisherConfigException) {
-            return false;
-        }
-        if (ex instanceof IllegalArgumentException) {
-            return false;
-        }
-        return true;
     }
 }

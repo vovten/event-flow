@@ -2,8 +2,10 @@ package io.github.vovten.eventflow.publisher;
 
 import io.github.vovten.eventflow.event.AbstractTraceableEvent;
 import io.github.vovten.eventflow.event.Event;
+import io.github.vovten.eventflow.serialization.EventSerializationException;
 import io.github.vovten.eventflow.transport.SendResult;
 import io.github.vovten.eventflow.transport.SendResults;
+import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -238,6 +241,77 @@ class RetryEventPublisherTest {
 
         assertThat(callCount).hasValue(1);
         assertThat(results.isPartialSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("P0-3: Should not retry a deterministic RecordTooLargeException")
+    void shouldNotRetryRecordTooLargeException() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = event -> {
+            callCount.incrementAndGet();
+            return CompletableFuture.completedFuture(SendResults.of(List.of(
+                    SendResult.failure("kafka", new RecordTooLargeException("record is too large"),
+                            "record is too large"))));
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0);
+
+        SendResults results = publisher.publish(event).join();
+
+        assertThat(callCount).hasValue(1);
+        assertThat(results.isAllFailure()).isTrue();
+    }
+
+    @Test
+    @DisplayName("P0-3: Should not retry a serialization failure")
+    void shouldNotRetrySerializationFailure() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = event -> {
+            callCount.incrementAndGet();
+            return CompletableFuture.failedFuture(new EventSerializationException("cannot serialize"));
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0);
+
+        assertThatThrownBy(() -> publisher.publish(event).join())
+                .hasCauseInstanceOf(EventSerializationException.class);
+        assertThat(callCount).hasValue(1);
+    }
+
+    @Test
+    @DisplayName("P0-3: Should retry a transient timeout failure")
+    void shouldRetryTransientTimeoutException() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = new EventPublisher() {
+            @Override
+            public CompletableFuture<SendResults> publish(Event event) {
+                if (callCount.incrementAndGet() < 2) {
+                    return CompletableFuture.failedFuture(new TimeoutException("broker timeout"));
+                }
+                return CompletableFuture.completedFuture(SendResults.of(List.of(SendResult.success("kafka"))));
+            }
+        };
+        EventPublisher publisher = new TestRetryEventPublisher(origin, 2, Duration.ofMillis(10), 2.0);
+
+        SendResults results = publisher.publish(event).join();
+
+        assertThat(callCount).hasValue(2);
+        assertThat(results.isAllSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("P0-3: Should stop retrying when a custom classifier refuses the failure")
+    void shouldHonourCustomRetryClassifier() {
+        AtomicInteger callCount = new AtomicInteger(0);
+        EventPublisher origin = event -> {
+            callCount.incrementAndGet();
+            return CompletableFuture.failedFuture(new RuntimeException("temporary"));
+        };
+        RetryClassifier neverRetry = error -> false;
+        EventPublisher publisher = new RetryEventPublisher(origin, 3, Duration.ofMillis(10), 2.0,
+                Duration.ofSeconds(1), 0.0, neverRetry);
+
+        assertThatThrownBy(() -> publisher.publish(event).join())
+                .hasCauseInstanceOf(RuntimeException.class);
+        assertThat(callCount).hasValue(1);
     }
 
     @Test
